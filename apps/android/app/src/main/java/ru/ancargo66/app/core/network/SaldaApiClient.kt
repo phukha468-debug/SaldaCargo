@@ -203,6 +203,9 @@ object SaldaApiClient {
         isCarryover: Boolean = !isHandedToAccountant,
         carryoverAmount: Double? = null,
         carryoverNote: String? = null,
+        isCubeFuel: Boolean = false,
+        cubeFuelLiters: Double? = null,
+        cubeFuelAmount: Double? = null,
         userId: String? = null
     ): Result<TripDetail> = withContext(Dispatchers.IO) {
         cachedDriverSummary = null
@@ -214,6 +217,11 @@ object SaldaApiClient {
                 put("is_carryover", true)
                 if (carryoverAmount != null) put("carryover_amount", carryoverAmount.toString())
                 if (!carryoverNote.isNullOrBlank()) put("carryover_note", carryoverNote)
+            }
+            if (isCubeFuel) {
+                put("is_cube_fuel", true)
+                if (cubeFuelLiters != null) put("cube_fuel_liters", cubeFuelLiters.toString())
+                if (cubeFuelAmount != null) put("cube_fuel_amount", cubeFuelAmount.toString())
             }
         }.toString()
         val request = buildRequest("/api/trips/$tripId/finish", method = "POST", bodyJson = body, userId = userId)

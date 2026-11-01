@@ -602,7 +602,11 @@ export default function TripDetailPage() {
                           </h3>
                           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                             {expense.description ??
-                              (expense.payment_method === 'fuel_card' ? 'Топливо' : 'Расход')}
+                              (expense.payment_method === 'fuel_card'
+                                ? 'Топливо (Опти24)'
+                                : expense.payment_method === 'cube'
+                                  ? 'Кубик (ДТ База)'
+                                  : 'Расход')}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">

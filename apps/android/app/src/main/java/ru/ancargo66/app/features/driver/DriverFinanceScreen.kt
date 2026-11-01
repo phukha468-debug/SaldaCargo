@@ -22,13 +22,16 @@ import ru.ancargo66.app.core.model.DriverFinanceData
 import ru.ancargo66.app.core.model.User
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.theme.*
+import ru.ancargo66.app.ui.components.BottomNavItem
+import ru.ancargo66.app.ui.components.SaldaBottomNav
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverFinanceScreen(
     user: User,
     initialTab: Int = 1, // 0: Подотчёт, 1: Зарплата (по умолчанию Зарплата)
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSelectTab: (Int) -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(initialTab) }
     var financeData by remember { mutableStateOf<DriverFinanceData?>(null) }
@@ -58,6 +61,19 @@ fun DriverFinanceScreen(
         modifier = Modifier
             .fillMaxSize()
             .swipeToBack(onBack = onBack),
+        bottomBar = {
+            SaldaBottomNav(
+                items = listOf(
+                    BottomNavItem("🏠", "Главная"),
+                    BottomNavItem("📋", "Рейсы"),
+                    BottomNavItem("💰", "Финансы"),
+                    BottomNavItem("👤", "Профиль")
+                ),
+                selectedIndex = 2,
+                onSelectIndex = onSelectTab,
+                activeColor = SaldaOrangePrimary
+            )
+        },
         topBar = {
             TopAppBar(
                 title = {

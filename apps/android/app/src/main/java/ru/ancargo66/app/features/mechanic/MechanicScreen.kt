@@ -1,4 +1,7 @@
 package ru.ancargo66.app.features.mechanic
+import ru.ancargo66.app.ui.theme.swipeToBack
+import ru.ancargo66.app.ui.components.BottomNavItem
+import ru.ancargo66.app.ui.components.SaldaBottomNav
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -107,6 +110,7 @@ fun MechanicScreen(
     var showChangePinScreen by rememberSaveable { mutableStateOf(false) }
     var rejectingItemId by remember { mutableStateOf<String?>(null) }
     var isConfirmingPayroll by remember { mutableStateOf(false) }
+    var mechanicNavTab by rememberSaveable { mutableIntStateOf(0) } // 0: Главная, 1: Наряды, 2: Зарплата, 3: Профиль
 
     val refreshAll = {
         scope.launch {
@@ -178,33 +182,130 @@ fun MechanicScreen(
         return
     }
 
-    // 4. Экран зарплаты и выплат
-    if (showSalaryScreen) {
+    // 4. Экран профиля механика (Таб 3)
+    if (mechanicNavTab == 3) {
+        BackHandler { mechanicNavTab = 0 }
+        Scaffold(
+            modifier = Modifier.fillMaxSize().swipeToBack { mechanicNavTab = 0 },
+            containerColor = SberBg,
+            bottomBar = {
+                SaldaBottomNav(
+                    items = listOf(
+                        BottomNavItem("🏠", "Главная"),
+                        BottomNavItem("🔧", "Наряды"),
+                        BottomNavItem("💰", "Зарплата"),
+                        BottomNavItem("👤", "Профиль")
+                    ),
+                    selectedIndex = 3,
+                    onSelectIndex = { mechanicNavTab = it },
+                    activeColor = SberGreen,
+                    topIndicatorColor = SberGreen
+                )
+            },
+            topBar = {
+                Surface(color = SberCard, shadowElevation = 1.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Профиль механика", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = SberTextPrimary)
+                    }
+                }
+            }
+        ) { pad ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(pad)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SberCard),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, SberBorder)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                color = SberMint,
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.size(50.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Build, contentDescription = null, tint = SberGreen, modifier = Modifier.size(26.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(user.name, fontSize = 18.sp, fontWeight = FontWeight.Black, color = SberTextPrimary)
+                                Text("Механик СТО ТК501", fontSize = 12.sp, color = SberGreen, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = { showChangePinScreen = true },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SberTextPrimary),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Сменить PIN-код", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+
+                OutlinedButton(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SberRedText),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Выйти из аккаунта", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        return
+    }
+
+    // 5. Экран зарплаты и выплат (Таб 2)
+    if (showSalaryScreen || mechanicNavTab == 2) {
         MechanicSalaryScreen(
             user = user,
             onBack = {
                 showSalaryScreen = false
+                mechanicNavTab = 0
                 refreshAll()
             },
-            onOpenOrder = { ordId ->
+            onSelectTab = { idx ->
                 showSalaryScreen = false
+                mechanicNavTab = idx
+                if (idx == 0) refreshAll()
+            },
+            onOpenOrder = { ordId ->
                 selectedOrderId = ordId
             }
         )
         return
     }
 
-    // 5. Экран истории всех нарядов с фильтрами
-    if (showAllOrdersScreen) {
+    // 6. Экран истории всех нарядов с фильтрами (Таб 1)
+    if (showAllOrdersScreen || mechanicNavTab == 1) {
         AllMechanicOrdersScreen(
             orders = orders,
-            onBack = { showAllOrdersScreen = false },
+            onBack = {
+                showAllOrdersScreen = false
+                mechanicNavTab = 0
+            },
+            onSelectTab = { idx ->
+                showAllOrdersScreen = false
+                mechanicNavTab = idx
+            },
             onOpenCreate = {
                 showAllOrdersScreen = false
                 showCreateOrderScreen = true
             },
             onOpenOrder = { ordId ->
-                showAllOrdersScreen = false
                 selectedOrderId = ordId
             }
         )
@@ -225,7 +326,24 @@ fun MechanicScreen(
     val payouts = salaryData.payouts
 
     Scaffold(
+        modifier = Modifier.fillMaxSize().swipeToBack { mechanicNavTab = 0 },
         containerColor = SberBg,
+        bottomBar = {
+            SaldaBottomNav(
+                items = listOf(
+                    BottomNavItem("🏠", "Главная"),
+                    BottomNavItem("🔧", "Наряды"),
+                    BottomNavItem("💰", "Зарплата"),
+                    BottomNavItem("👤", "Профиль")
+                ),
+                selectedIndex = mechanicNavTab,
+                onSelectIndex = { idx ->
+                    mechanicNavTab = idx
+                },
+                activeColor = SberGreen,
+                topIndicatorColor = SberGreen
+            )
+        },
         topBar = {
             Surface(
                 color = SberCard,
@@ -299,7 +417,7 @@ fun MechanicScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showSalaryScreen = true },
+                        .clickable { mechanicNavTab = 2 },
                     colors = CardDefaults.cardColors(containerColor = SberCard),
                     shape = RoundedCornerShape(24.dp),
                     border = BorderStroke(1.dp, SberBorder)
@@ -631,7 +749,7 @@ fun MechanicScreen(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = SberGreen,
-                        modifier = Modifier.clickable { showAllOrdersScreen = true }
+                        modifier = Modifier.clickable { mechanicNavTab = 1 }
                     )
                 }
             }
@@ -701,7 +819,7 @@ fun MechanicScreen(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = SberGreen,
-                        modifier = Modifier.clickable { showSalaryScreen = true }
+                        modifier = Modifier.clickable { mechanicNavTab = 2 }
                     )
                 }
             }
@@ -1841,6 +1959,7 @@ private fun MechanicOrderDetailScreen(
     val isEditable = ord != null && !isApproved
 
     Scaffold(
+        modifier = Modifier.fillMaxSize().swipeToBack(onBack = onBack),
         containerColor = SberBg,
         topBar = {
             Surface(color = SberCard, shadowElevation = 1.dp) {
@@ -1850,14 +1969,24 @@ private fun MechanicOrderDetailScreen(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = SberTextPrimary)
+                    Button(
+                        onClick = onBack,
+                        colors = ButtonDefaults.buttonColors(containerColor = SberMint, contentColor = SberDarkGreen),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Кабинет", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (ord != null) "Заказ-наряд #${ord.orderNumber}" else "Заказ-наряд",
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = SberTextPrimary
+                        color = SberTextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -1949,9 +2078,9 @@ private fun MechanicOrderDetailScreen(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = SberCard),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F7FF)),
                         shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, SberBorder)
+                        border = BorderStroke(1.5.dp, Color(0xFFBAE6FD))
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(
@@ -1963,7 +2092,7 @@ private fun MechanicOrderDetailScreen(
                                         text = if (isOwn) "🚛 Свой автопарк (${ord.hourlyRate.toInt()} ₽/ч)" else "🚗 Клиентский авто (${ord.hourlyRate.toInt()} ₽/ч)",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.ExtraBold,
-                                        color = SberGreen
+                                        color = Color(0xFF0284C7)
                                     )
                                     Text(
                                         text = "$vehicleTitle ${vehicleReg ?: ""}".trim(),
@@ -1982,20 +2111,20 @@ private fun MechanicOrderDetailScreen(
                     }
                 }
 
-                // Список работ
+                // Список работ (Emerald/Green Gradation)
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = SberCard),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
                         shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, SberBorder)
+                        border = BorderStroke(1.5.dp, Color(0xFFBBF7D0))
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "ПЕРЕЧЕНЬ РАБОТ (${ord.works.size})",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = SberTextSecondary
+                                color = Color(0xFF15803D)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -2090,20 +2219,20 @@ private fun MechanicOrderDetailScreen(
                     }
                 }
 
-                // Запчасти автосервиса
+                // Запчасти автосервиса (Amber/Yellow Gradation)
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = SberCard),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
                         shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, SberBorder)
+                        border = BorderStroke(1.5.dp, Color(0xFFFDE68A))
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "ЗАПЧАСТИ АВТОСЕРВИСА (${ord.parts.size})",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = SberTextSecondary
+                                color = Color(0xFFB45309)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -2214,6 +2343,7 @@ private fun MechanicOrderDetailScreen(
 private fun MechanicSalaryScreen(
     user: User,
     onBack: () -> Unit,
+    onSelectTab: (Int) -> Unit = {},
     onOpenOrder: (String) -> Unit
 ) {
     BackHandler { onBack() }
@@ -2236,7 +2366,22 @@ private fun MechanicSalaryScreen(
     }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize().swipeToBack { onBack() },
         containerColor = SberBg,
+        bottomBar = {
+            SaldaBottomNav(
+                items = listOf(
+                    BottomNavItem("🏠", "Главная"),
+                    BottomNavItem("🔧", "Наряды"),
+                    BottomNavItem("💰", "Зарплата"),
+                    BottomNavItem("👤", "Профиль")
+                ),
+                selectedIndex = 2,
+                onSelectIndex = onSelectTab,
+                activeColor = SberGreen,
+                topIndicatorColor = SberGreen
+            )
+        },
         topBar = {
             Surface(color = SberCard, shadowElevation = 1.dp) {
                 Row(
@@ -2405,6 +2550,15 @@ private fun MechanicSalaryScreen(
                                     fontSize = 11.sp,
                                     color = SberTextSecondary
                                 )
+                                if (acc.serviceOrder?.id != null) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "Посмотреть выполненные работы →",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = SberGreen
+                                    )
+                                }
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 Text("+${formatRub(acc.amount)}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = SberGreen)
@@ -2472,6 +2626,7 @@ private fun MechanicSalaryScreen(
 private fun AllMechanicOrdersScreen(
     orders: List<MechanicOrder>,
     onBack: () -> Unit,
+    onSelectTab: (Int) -> Unit = {},
     onOpenCreate: () -> Unit,
     onOpenOrder: (String) -> Unit
 ) {
@@ -2488,7 +2643,22 @@ private fun AllMechanicOrdersScreen(
     }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize().swipeToBack { onBack() },
         containerColor = SberBg,
+        bottomBar = {
+            SaldaBottomNav(
+                items = listOf(
+                    BottomNavItem("🏠", "Главная"),
+                    BottomNavItem("🔧", "Наряды"),
+                    BottomNavItem("💰", "Зарплата"),
+                    BottomNavItem("👤", "Профиль")
+                ),
+                selectedIndex = 1,
+                onSelectIndex = onSelectTab,
+                activeColor = SberGreen,
+                topIndicatorColor = SberGreen
+            )
+        },
         topBar = {
             Surface(color = SberCard, shadowElevation = 1.dp) {
                 Row(

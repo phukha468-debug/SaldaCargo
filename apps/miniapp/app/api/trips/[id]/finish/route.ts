@@ -6,6 +6,8 @@ import {
   isGeostroyOrderValid,
   checkOdometerRequirement,
   validateTripOdometer,
+  calculateCubeFuel,
+  FINANCIAL_CATEGORIES,
 } from '@saldacargo/shared';
 
 /** POST /api/trips/:id/finish — завершить рейс */
@@ -15,7 +17,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     odometer_end?: number | string;
     driver_note?: string;
     fuel_amount?: number;
-    fuel_payment_method?: 'fuel_card' | 'cash';
+    fuel_payment_method?: 'fuel_card' | 'cash' | 'cube';
+    is_cube_fuel?: boolean;
+    cube_fuel_liters?: number | string;
+    cube_fuel_amount?: number | string;
     is_handed_to_accountant?: boolean;
     is_carryover?: boolean;
     carryover_amount?: number | string;
@@ -175,6 +180,55 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           updated_at: new Date().toISOString(),
         })
         .eq('id', trip.asset_id);
+    }
+  }
+
+  // 6. Фиксация заправки из кубика (База) по одометру или введённым литрам
+  if (body.is_cube_fuel) {
+    const startOdo = trip.odometer_start || trip.asset?.odometer_current || 0;
+    const mileage = odoEnd && startOdo > 0 && odoEnd >= startOdo ? odoEnd - startOdo : 0;
+    const assetTypeCode = trip.asset?.asset_type?.code;
+    const calc = calculateCubeFuel(mileage, assetTypeCode, trip.asset);
+
+    const liters =
+      body.cube_fuel_liters != null && Number(body.cube_fuel_liters) > 0
+        ? Number(body.cube_fuel_liters)
+        : calc.liters;
+
+    const amount =
+      body.cube_fuel_amount != null && Number(body.cube_fuel_amount) > 0
+        ? Number(body.cube_fuel_amount)
+        : Math.round(liters * 60);
+
+    if (amount > 0) {
+      // Проверяем, не был ли уже добавлен расход из куба в этом рейсе
+      const { data: existingCubeExp } = await (supabase.from('trip_expenses') as any)
+        .select('id')
+        .eq('trip_id', id)
+        .eq('payment_method', 'cube')
+        .limit(1)
+        .maybeSingle();
+
+      const fuelCatId = FINANCIAL_CATEGORIES.FUEL;
+      const desc = `Заправка из кубика: ${liters} л (норма ${calc.rate} л/100км, пробег ${mileage} км)`;
+
+      if (existingCubeExp) {
+        await (supabase.from('trip_expenses') as any)
+          .update({
+            amount: amount.toFixed(2),
+            description: desc,
+          })
+          .eq('id', existingCubeExp.id);
+      } else {
+        await (supabase.from('trip_expenses') as any).insert({
+          trip_id: id,
+          category_id: fuelCatId,
+          amount: amount.toFixed(2),
+          payment_method: 'cube',
+          description: desc,
+          idempotency_key: crypto.randomUUID(),
+        });
+      }
     }
   }
 

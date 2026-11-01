@@ -3,6 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, Suspense, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
 import { DriverDocuments } from '@/components/DriverDocuments';
 
@@ -21,6 +22,9 @@ type PayrollEntry = {
   payout?: string;
   is_management: boolean;
   shifts: number;
+  is_online?: boolean;
+  address?: string;
+  has_transport?: boolean;
 };
 
 type Wallet = {
@@ -115,10 +119,16 @@ export default function StaffPage() {
 
 function StaffContent() {
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [activeGroup, setActiveGroup] = useState<RoleGroup>('drivers');
+  const paramGroup = searchParams?.get('group') as RoleGroup | null;
+  const [activeGroup, setActiveGroup] = useState<RoleGroup>(
+    paramGroup && ['drivers', 'loaders', 'workshop', 'debts'].includes(paramGroup)
+      ? paramGroup
+      : 'drivers',
+  );
 
   // Settle modal state
   const [settleTarget, setSettleTarget] = useState<PayrollEntry | null>(null);
@@ -249,7 +259,14 @@ function StaffContent() {
 
   const grouped = {
     drivers: payroll.filter((u) => u.roles.includes('driver')),
-    loaders: payroll.filter((u) => u.roles.includes('loader')),
+    loaders: payroll
+      .filter((u) => u.roles.includes('loader'))
+      .sort((a, b) => {
+        if (Boolean(a.is_online) !== Boolean(b.is_online)) {
+          return a.is_online ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name, 'ru');
+      }),
     workshop: payroll.filter((u) =>
       u.roles.some((r) =>
         ['mechanic', 'mechanic_lead', 'welder', 'painter', 'electrician', 'handyman'].includes(r),
@@ -444,6 +461,9 @@ function StaffContent() {
         <div className="flex gap-1 bg-zinc-100 p-1 rounded-2xl">
           {GROUP_TABS.map((tab) => {
             const count = grouped[tab.key].length;
+            const onlineCount =
+              tab.key === 'loaders' ? grouped.loaders.filter((l) => l.is_online).length : 0;
+
             return (
               <button
                 key={tab.key}
@@ -453,11 +473,13 @@ function StaffContent() {
                 }`}
               >
                 {tab.label}
-                {count > 0 && (
+                {onlineCount > 0 ? (
+                  <span className="ml-1 text-emerald-600 font-black">🟢{onlineCount}</span>
+                ) : count > 0 ? (
                   <span className={`ml-1 ${activeGroup === tab.key ? 'text-orange-500' : ''}`}>
                     {count}
                   </span>
-                )}
+                ) : null}
               </button>
             );
           })}
@@ -479,19 +501,38 @@ function StaffContent() {
           <div className="space-y-3">
             {activeList.map((entry) => {
               const hasDebt = parseFloat(entry.debt) > 0;
+              const isOnlineLoader = entry.roles.includes('loader') && Boolean(entry.is_online);
+
               return (
                 <div
                   key={entry.id}
                   onClick={() => setDetailsTarget(entry)}
-                  className="bg-white rounded-2xl border border-zinc-200 overflow-hidden active:scale-[0.98] transition-all"
+                  className={`bg-white rounded-2xl border-2 ${
+                    isOnlineLoader
+                      ? 'border-emerald-500 bg-emerald-50/20 shadow-xs'
+                      : 'border-zinc-200'
+                  } overflow-hidden active:scale-[0.98] transition-all`}
                 >
                   <div className="px-4 pt-4 pb-3">
                     {/* Name + role */}
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <p className="font-black text-zinc-900">{entry.name}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-black text-zinc-900">{entry.name}</p>
+                          {isOnlineLoader && (
+                            <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              На линии {entry.has_transport ? '🚗' : '🚶'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <p className="text-xs text-zinc-400">{primaryRoleLabel(entry.roles)}</p>
+                          {isOnlineLoader && entry.address && (
+                            <span className="text-[11px] font-bold text-emerald-700 truncate">
+                              📍 {entry.address}
+                            </span>
+                          )}
                           {entry.shifts > 0 && (
                             <span className="text-[10px] font-black bg-zinc-100 text-zinc-500 px-1.5 py-0.5 rounded">
                               {entry.shifts}{' '}

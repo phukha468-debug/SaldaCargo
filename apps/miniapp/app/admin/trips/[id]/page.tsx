@@ -163,6 +163,7 @@ export default function AdminTripDetailPage() {
     debt_cash: '⏳ Долг',
     card_driver: '💳 Карта',
     fuel_card: '⛽ Топл.карта',
+    cube: '🛢️ Кубик',
   };
 
   return (

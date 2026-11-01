@@ -7,6 +7,7 @@ const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 const GARAGE_ID = '10000000-0000-0000-0000-000000000005';
+const FUEL_CUBE_ID = '10000000-0000-0000-0000-000000000006';
 const TBANK_API_HOSTS = ['business.tbank.ru', 'business.tinkoff.ru'];
 const TARGET_ACCOUNT_NUMBER = '40802810500001961654';
 const TBANK_FALLBACK_TOKEN =
@@ -131,6 +132,8 @@ export async function GET(request: Request) {
       { data: fuelOutAfterAudit },
       { data: garageIn },
       { data: garageOut },
+      { data: cubeIn },
+      { data: cubeOut },
     ] = await Promise.all([
       // Р/С: bank_invoice + qr (оплаченные)
       (supabase.from('trip_orders') as any)
@@ -193,6 +196,18 @@ export async function GET(request: Request) {
         .eq('from_wallet_id', GARAGE_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', FUEL_CUBE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', FUEL_CUBE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
     ]);
 
     const bankInWithoutOrders = (bankIn ?? [])
@@ -217,6 +232,13 @@ export async function GET(request: Request) {
 
     const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 
+    // Кубик 1000л (дизель): начальная закупка 60 000 ₽ (1000л по 60 ₽/л) плюс пополнения минус списания
+    const baseCubePurchased = 60000;
+    const recordedCubeIn = sum(cubeIn ?? []);
+    const totalCubeIn = recordedCubeIn > 0 ? recordedCubeIn : baseCubePurchased;
+    const cubeBalance = Math.max(0, totalCubeIn - sum(cubeOut ?? []));
+    const cubeLiters = Math.round(cubeBalance / 60);
+
     const responseData = {
       bank: {
         id: BANK_ID,
@@ -231,6 +253,13 @@ export async function GET(request: Request) {
         id: FUEL_CARD_ID,
         name: 'Топливные карты (ГСМ)',
         balance: fuelBalance.toFixed(2),
+      },
+      fuel_cube: {
+        id: FUEL_CUBE_ID,
+        name: 'Кубик (Дизель База)',
+        balance: cubeBalance.toFixed(2),
+        liters: cubeLiters,
+        price_per_liter: 60,
       },
       garage: {
         id: GARAGE_ID,

@@ -29,6 +29,8 @@ import kotlinx.coroutines.launch
 import ru.ancargo66.app.R
 import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
+import ru.ancargo66.app.ui.components.BottomNavItem
+import ru.ancargo66.app.ui.components.SaldaBottomNav
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.saveable.rememberSaveable
 import ru.ancargo66.app.features.auth.PinScreen
@@ -91,6 +93,7 @@ fun DriverScreen(
     var selectedTripIdForDetails by rememberSaveable { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(SaldaApiClient.getCachedSummary() == null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var driverNavTab by rememberSaveable { mutableStateOf(0) } // 0: Главная, 1: Рейсы, 2: Финансы, 3: Профиль
 
     var showVehiclePicker by remember { mutableStateOf(false) }
     var currentAssetId by rememberSaveable { mutableStateOf(user.currentAssetId) }
@@ -170,30 +173,114 @@ fun DriverScreen(
         return
     }
 
-    // Если открыт экран финансов водителя
-    val finTab = financeInitialTab
-    if (finTab != null) {
+    // Если открыта вкладка финансов или подотчёта
+    if (driverNavTab == 2 || financeInitialTab != null) {
         DriverFinanceScreen(
             user = user,
-            initialTab = finTab,
-            onBack = { financeInitialTab = null }
+            initialTab = financeInitialTab ?: 0,
+            onBack = {
+                financeInitialTab = null
+                driverNavTab = 0
+            },
+            onSelectTab = { idx ->
+                financeInitialTab = null
+                driverNavTab = idx
+                if (idx == 1) showAllTripsModal = true
+            }
         )
         return
     }
 
     // Если открыт экран деталей рейса
-    val detailId = selectedTripIdForDetails
+    val detailId = selectedTripIdForDetails ?: (if (driverNavTab == 1 && summary?.activeTrip != null) summary?.activeTrip?.id else null)
     if (detailId != null) {
         TripDetailScreen(
             tripId = detailId,
             userId = user.id,
             isAdmin = user.roles.any { it == "admin" || it == "owner" || it == "director" },
-            onBack = { selectedTripIdForDetails = null },
+            onBack = {
+                selectedTripIdForDetails = null
+                if (driverNavTab == 1) driverNavTab = 0
+            },
             onTripUpdated = {
                 refreshData()
                 selectedTripIdForDetails = null
+                if (driverNavTab == 1) driverNavTab = 0
             }
         )
+        return
+    }
+
+        if (driverNavTab == 3) {
+        BackHandler { driverNavTab = 0 }
+        Scaffold(
+            modifier = Modifier.fillMaxSize().swipeToBack { driverNavTab = 0 },
+            bottomBar = {
+                SaldaBottomNav(
+                    items = listOf(
+                        BottomNavItem("🏠", "Главная"),
+                        BottomNavItem("📋", "Рейсы"),
+                        BottomNavItem("💰", "Финансы"),
+                        BottomNavItem("👤", "Профиль")
+                    ),
+                    selectedIndex = driverNavTab,
+                    onSelectIndex = { driverNavTab = it },
+                    activeColor = SaldaOrangePrimary
+                )
+            },
+            topBar = {
+                Surface(color = Color.White, shadowElevation = 1.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Профиль водителя", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Zinc900)
+                    }
+                }
+            }
+        ) { pad ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Zinc50)
+                    .padding(pad)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Zinc200)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(user.name, fontSize = 18.sp, fontWeight = FontWeight.Black, color = Zinc900)
+                        Text("Водитель ТК501", fontSize = 12.sp, color = SaldaOrangePrimary, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        val ast = assets.firstOrNull { it.id == currentAssetId } ?: assets.firstOrNull()
+                        Text("Текущий автомобиль: ${ast?.shortName ?: "Не назначен"} (${ast?.regNumber ?: ""})", fontSize = 13.sp, color = Zinc700)
+                    }
+                }
+
+                Button(
+                    onClick = { showChangePinScreen = true },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Zinc800),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Сменить PIN-код", fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = RedAlert),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Выйти из аккаунта", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
         return
     }
 
@@ -203,6 +290,27 @@ fun DriverScreen(
     val recentTrips = summary?.recentTrips ?: emptyList()
 
     Scaffold(
+        modifier = Modifier.fillMaxSize().swipeToBack { driverNavTab = 0 },
+        bottomBar = {
+            SaldaBottomNav(
+                items = listOf(
+                    BottomNavItem("🏠", "Главная"),
+                    BottomNavItem("📋", "Рейсы"),
+                    BottomNavItem("💰", "Финансы"),
+                    BottomNavItem("👤", "Профиль")
+                ),
+                selectedIndex = driverNavTab,
+                onSelectIndex = { idx ->
+                    driverNavTab = idx
+                    if (idx == 1) {
+                        showAllTripsModal = true
+                    } else if (idx == 2) {
+                        financeInitialTab = 0
+                    }
+                },
+                activeColor = SaldaOrangePrimary
+            )
+        },
         topBar = {
             Surface(
                 color = Color.White,
@@ -353,88 +461,61 @@ fun DriverScreen(
                     }
                 }
 
-                // Карточка Подотчёта / Наличных на руках
-                val accBal = summary?.accountableBalance ?: "0"
-                val carryover = summary?.activeCarryover
-                val hasAccCash = (accBal.toDoubleOrNull() ?: 0.0) > 0.0 || carryover != null
-
-                if (hasAccCash) {
-                    item {
-                        Card(
-                            onClick = { financeInitialTab = 0 },
+                // Карточка Подотчёта: сумма на руках прямо у кнопки мелким шрифтом (Требование №2)
+                item {
+                    val accBal = summary?.accountableBalance ?: "0"
+                    val hasMoney = (accBal.toDoubleOrNull() ?: 0.0) > 0.0
+                    Card(
+                        onClick = { financeInitialTab = 0 },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bouncyTouch(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(14.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .bouncyTouch(),
-                            colors = CardDefaults.cardColors(containerColor = if (carryover != null) Color(0xFFFFF7ED) else Color.White),
-                            shape = RoundedCornerShape(18.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, if (carryover != null) Color(0xFFFDBA74) else Color(0xFFE2E8F0)),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp, pressedElevation = 4.dp)
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.padding(18.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("💵", fontSize = 18.sp)
+                                Text(
+                                    text = "ПОДОТЧЁТ",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Zinc900
+                                )
+                                Surface(
+                                    color = if (hasMoney) GreenOnline.copy(alpha = 0.12f) else Zinc100,
+                                    shape = RoundedCornerShape(6.dp),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (hasMoney) GreenOnline.copy(alpha = 0.3f) else Zinc200
+                                    )
                                 ) {
                                     Text(
-                                        text = "НАЛИЧНЫЕ НА РУКАХ (К СДАЧЕ)",
-                                        fontSize = 10.sp,
+                                        text = "на руках: $accBal ₽",
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = if (carryover != null) Color(0xFFC2410C) else Zinc400,
-                                        letterSpacing = 1.2.sp
+                                        color = if (hasMoney) GreenOnline else Zinc600,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
-                                    Surface(
-                                        color = if (carryover != null) Color(0xFFEA580C) else Color(0xFFF4F4F5),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text(
-                                            text = "Касса →",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (carryover != null) Color.White else Zinc700,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "$accBal ₽",
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = if (carryover != null) Color(0xFFEA580C) else Zinc900
-                                )
-                                if (carryover != null) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Surface(
-                                        color = Color(0xFFFEE2E2),
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCA5A5))
-                                    ) {
-                                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
-                                            Text(
-                                                text = "⚠️ В т.ч. перенос с прошлого дня: ${carryover.amount} ₽",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFB91C1C)
-                                            )
-                                            if (carryover.note.isNotBlank()) {
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = "Причина: ${carryover.note}",
-                                                    fontSize = 10.sp,
-                                                    color = Color(0xFF7F1D1D)
-                                                )
-                                            }
-                                            Text(
-                                                text = "Сдать в кассу поверх смены!",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFB91C1C)
-                                            )
-                                        }
-                                    }
                                 }
                             }
+                            Text(
+                                text = "Сдать →",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SaldaOrangePrimary
+                            )
                         }
                     }
                 }

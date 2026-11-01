@@ -14,13 +14,15 @@ const FUEL_CAT_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
 
 const schema = z.object({
   amount: z.coerce.number().positive('Введите сумму заправки'),
-  payment_method: z.enum(['fuel_card', 'cash']),
+  payment_method: z.enum(['cube', 'fuel_card', 'cash']),
+  liters: z.coerce.number().optional(),
   description: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
 
 const PAYMENT_METHODS = [
+  { value: 'cube', label: 'Кубик (База)', icon: '🛢️' },
   { value: 'fuel_card', label: 'Топливная ТК', icon: '⛽' },
   { value: 'cash', label: 'Наличные', icon: '💵' },
 ] as const;
@@ -37,11 +39,12 @@ export default function AddFuelExpensePage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema as any) as any,
     defaultValues: {
-      payment_method: 'fuel_card',
+      payment_method: 'cube',
     },
   });
 
@@ -51,11 +54,18 @@ export default function AddFuelExpensePage() {
     if (submitting) return;
     setSubmitting(true);
 
+    const desc =
+      data.payment_method === 'cube'
+        ? data.liters
+          ? `Кубик: ${data.liters} л${data.description ? ` · ${data.description}` : ''}`
+          : data.description || 'Заправка из кубика (База)'
+        : data.description?.trim() || null;
+
     const payload = JSON.stringify({
       category_id: FUEL_CAT_ID,
       amount: String(data.amount),
       payment_method: data.payment_method,
-      description: data.description?.trim() || null,
+      description: desc,
       idempotency_key: idempotencyKey,
     });
 
@@ -117,7 +127,7 @@ export default function AddFuelExpensePage() {
           <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
             Способ оплаты топлива
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             {PAYMENT_METHODS.map((m) => (
               <label key={m.value} className="relative">
                 <input
@@ -126,18 +136,47 @@ export default function AddFuelExpensePage() {
                   {...register('payment_method')}
                   className="sr-only peer"
                 />
-                <div className="flex flex-col items-center justify-center gap-1.5 border-2 border-zinc-200 rounded-xl h-24 cursor-pointer peer-checked:border-amber-600 peer-checked:bg-amber-50 peer-checked:text-amber-900 transition-all active:scale-95">
-                  <span className="text-3xl">{m.icon}</span>
-                  <span className="text-xs font-black text-center leading-tight uppercase tracking-tight">
+                <div className="flex flex-col items-center justify-center gap-1 border-2 border-zinc-200 rounded-xl h-20 cursor-pointer peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-950 transition-all active:scale-95">
+                  <span className="text-2xl">{m.icon}</span>
+                  <span className="text-[11px] font-black text-center leading-tight uppercase tracking-tight">
                     {m.label}
                   </span>
                 </div>
               </label>
             ))}
           </div>
+
+          {selectedPaymentMethod === 'cube' && (
+            <div className="p-3 bg-orange-50/80 rounded-xl border border-orange-200 space-y-2 mt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-orange-950">
+                  🛢️ Кубик на базе (60 ₽/л)
+                </span>
+                <span className="text-[11px] font-bold text-orange-700">Не списывает нал</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.5"
+                  placeholder="Количество литров (например: 45)"
+                  onChange={(e) => {
+                    const l = parseFloat(e.target.value.replace(',', '.'));
+                    if (!isNaN(l) && l > 0) {
+                      setValue('amount', Math.round(l * 60));
+                    }
+                  }}
+                  className="flex-1 bg-white border border-orange-300 rounded-lg px-3 py-2 text-xs font-bold text-zinc-900 focus:outline-none focus:border-orange-500"
+                />
+                <span className="text-xs font-black text-orange-900">литров</span>
+              </div>
+              <p className="text-[10px] text-orange-800 font-medium">
+                Сумма в рублях рассчитается автоматически (литры × 60 ₽).
+              </p>
+            </div>
+          )}
           {selectedPaymentMethod === 'fuel_card' && (
             <p className="text-[11px] text-amber-800 font-medium bg-amber-50 p-2.5 rounded-xl border border-amber-200 mt-2">
-              ⛽ Топливная карта ТК — заправка списывается с баланса карты компании.
+              ⛽ Топливная карта ТК — заправка списывается с баланса карты компании (Опти24).
             </p>
           )}
           {selectedPaymentMethod === 'cash' && (

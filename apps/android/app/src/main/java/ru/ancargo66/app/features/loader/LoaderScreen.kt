@@ -23,6 +23,10 @@ import ru.ancargo66.app.core.model.DriverFinanceData
 import ru.ancargo66.app.core.model.User
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.core.storage.SessionManager
+import ru.ancargo66.app.ui.components.BottomNavItem
+import ru.ancargo66.app.ui.components.SaldaBottomNav
+import ru.ancargo66.app.ui.theme.swipeToBack
+import androidx.activity.compose.BackHandler
 import ru.ancargo66.app.ui.theme.*
 
 @Composable
@@ -31,6 +35,7 @@ fun LoaderScreen(
     sessionManager: SessionManager,
     onLogout: () -> Unit
 ) {
+    var loaderNavTab by remember { mutableStateOf(0) } // 0: Смена, 1: Заказы, 2: Баланс, 3: Профиль
     var isOnline by remember { mutableStateOf(sessionManager.isLoaderOnline()) }
     var currentAddress by remember { mutableStateOf(sessionManager.getLoaderAddress()) }
     var hasTransport by remember { mutableStateOf(sessionManager.hasLoaderTransport()) }
@@ -70,7 +75,93 @@ fun LoaderScreen(
         }
     }
 
+    // Экран профиля грузчика
+    if (loaderNavTab == 3) {
+        BackHandler { loaderNavTab = 0 }
+        Scaffold(
+            modifier = Modifier.fillMaxSize().swipeToBack { loaderNavTab = 0 },
+            bottomBar = {
+                SaldaBottomNav(
+                    items = listOf(
+                        BottomNavItem("👷", "Смена"),
+                        BottomNavItem("📦", "Заказы"),
+                        BottomNavItem("💳", "Баланс"),
+                        BottomNavItem("👤", "Профиль")
+                    ),
+                    selectedIndex = loaderNavTab,
+                    onSelectIndex = { loaderNavTab = it },
+                    activeColor = SaldaOrangePrimary
+                )
+            },
+            topBar = {
+                Surface(color = Color.White, shadowElevation = 1.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Профиль грузчика", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Zinc900)
+                    }
+                }
+            }
+        ) { pad ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Zinc50)
+                    .padding(pad)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(16.dp),
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(user.name, fontSize = 18.sp, fontWeight = FontWeight.Black, color = Zinc900)
+                        Text("Грузчик • ПРР Биржа", fontSize = 12.sp, color = SaldaOrangePrimary, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("Адрес: $currentAddress", fontSize = 13.sp, color = Zinc700)
+                        Text(if (hasTransport) "🚗 На своём авто (доеду сам)" else "🚶 Пеший (забирать на машине)", fontSize = 13.sp, color = Zinc700)
+                        Text(if (isOnline) "🟢 Статус: На линии" else "⚪ Статус: Не на линии", fontSize = 13.sp, color = if (isOnline) GreenOnline else Zinc500, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = RedAlert),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Выйти из аккаунта", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        return
+    }
+
     Scaffold(
+        modifier = Modifier.fillMaxSize().swipeToBack {
+            if (loaderNavTab != 0) loaderNavTab = 0
+        },
+        bottomBar = {
+            SaldaBottomNav(
+                items = listOf(
+                    BottomNavItem("👷", "Смена"),
+                    BottomNavItem("📦", "Заказы"),
+                    BottomNavItem("💳", "Баланс"),
+                    BottomNavItem("👤", "Профиль")
+                ),
+                selectedIndex = loaderNavTab,
+                onSelectIndex = { index ->
+                    loaderNavTab = index
+                    if (index == 1) activeTab = 0
+                    if (index == 2) activeTab = 1
+                },
+                activeColor = SaldaOrangePrimary
+            )
+        },
         topBar = {
             Surface(
                 color = Color.White,

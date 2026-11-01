@@ -15,6 +15,7 @@ import {
   checkOdometerRequirement,
   validateTripOdometer,
   getMaxOdometerDelta,
+  calculateCubeFuel,
 } from '@saldacargo/shared';
 
 const schema = z.object({
@@ -34,6 +35,8 @@ export default function FinishTripPage() {
   const [isHandedToAccountant, setIsHandedToAccountant] = useState(false);
   const [unhandedAmount, setUnhandedAmount] = useState('');
   const [unhandedNote, setUnhandedNote] = useState('');
+  const [isCubeFuel, setIsCubeFuel] = useState(false);
+  const [cubeLitersInput, setCubeLitersInput] = useState('');
 
   const { data: driverSummary } = useQuery({
     queryKey: ['driver-summary'],
@@ -98,6 +101,14 @@ export default function FinishTripPage() {
     odoEndNum != null && odoEndNum > 0
       ? validateTripOdometer(trip?.asset, startOdo, odoEndNum)
       : { valid: true };
+
+  const assetTypeCode =
+    (trip?.asset as any)?.asset_type?.code || (trip?.asset as any)?.asset_type_code;
+  const cubeCalc = calculateCubeFuel(tripMileage ?? 0, assetTypeCode, trip?.asset);
+  const activeCubeLiters = cubeLitersInput
+    ? parseFloat(cubeLitersInput.replace(',', '.')) || 0
+    : cubeCalc.liters;
+  const activeCubeAmount = Math.round(activeCubeLiters * 60);
 
   const activeOrders = (trip?.trip_orders ?? []).filter((o) => o.lifecycle_status !== 'cancelled');
   const revenue = activeOrders.reduce((s, o) => s + parseFloat(o.amount), 0);
@@ -183,6 +194,9 @@ export default function FinishTripPage() {
         carryover_note: !isHandedToAccountant
           ? unhandedNote.trim() || 'Деньги не переданы бухгалтеру, остаток на руках'
           : undefined,
+        is_cube_fuel: isCubeFuel,
+        cube_fuel_liters: activeCubeLiters,
+        cube_fuel_amount: activeCubeAmount,
       }),
     });
 
@@ -466,6 +480,51 @@ export default function FinishTripPage() {
             {odoValidation.valid && tripMileage != null && tripMileage >= 0 && (
               <div className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center">
                 Пробег за смену: +{tripMileage.toLocaleString('ru-RU')} км
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Заправка из кубика (База) */}
+        {trip?.trip_type !== 'loaders_only' && (
+          <div className="bg-white rounded-lg border-2 border-zinc-200 p-3 shadow-xs space-y-2">
+            <label className="flex items-center justify-between cursor-pointer select-none">
+              <div className="flex items-center gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={isCubeFuel}
+                  onChange={(e) => setIsCubeFuel(e.target.checked)}
+                  className="w-5 h-5 rounded border-2 border-orange-500 text-orange-500 focus:ring-orange-500 accent-orange-500 cursor-pointer"
+                />
+                <span className="text-xs font-black text-zinc-900 uppercase tracking-tight">
+                  🛢️ Заправился из кубика (База)
+                </span>
+              </div>
+              {isCubeFuel && (
+                <span className="text-xs font-black text-emerald-600">
+                  ~{activeCubeLiters} л ({activeCubeAmount.toLocaleString('ru-RU')} ₽)
+                </span>
+              )}
+            </label>
+
+            {isCubeFuel && (
+              <div className="pt-2 border-t border-zinc-100 flex items-center justify-between gap-2 text-xs">
+                <span className="text-zinc-500 font-medium truncate">
+                  {tripMileage != null && tripMileage > 0
+                    ? `По одометру: +${tripMileage} км (норма ${cubeCalc.rate} л/100км)`
+                    : `Норма ${cubeCalc.rate} л/100км (60 ₽/л)`}
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={cubeLitersInput || (cubeCalc.liters > 0 ? String(cubeCalc.liters) : '')}
+                    onChange={(e) => setCubeLitersInput(e.target.value)}
+                    placeholder={String(cubeCalc.liters || 0)}
+                    className="w-16 bg-zinc-50 border border-zinc-300 rounded px-2 py-1 text-xs font-black text-right text-zinc-900 focus:bg-white focus:border-orange-500 focus:outline-none"
+                  />
+                  <span className="text-zinc-400 font-bold">л</span>
+                </div>
               </div>
             )}
           </div>

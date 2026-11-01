@@ -142,11 +142,31 @@ export async function GET(request: Request) {
         const offsetNow = Math.min(debtAmt, advanceBalance);
         const payoutNow = Math.max(0, debtAmt - offsetNow);
 
+        let isOnline = false;
+        let address = '';
+        let hasTransport = false;
+
+        if (u.notes) {
+          try {
+            const parsed = typeof u.notes === 'string' ? JSON.parse(u.notes) : u.notes;
+            if (typeof parsed === 'object' && parsed !== null) {
+              isOnline = Boolean(parsed.online);
+              address = String(parsed.address || '');
+              hasTransport = Boolean(parsed.car);
+            }
+          } catch {
+            // ignore non-json notes
+          }
+        }
+
         return {
           id: u.id,
           name: u.name,
           roles: u.roles,
           notes: u.notes,
+          is_online: isOnline,
+          address,
+          has_transport: hasTransport,
           auto_settle: u.auto_settle,
           is_management: isManagement && !isOp,
           earned: earnedAmt.toFixed(2),

@@ -11,6 +11,13 @@ type Wallets = {
   bank: { id: string; name: string; balance: string };
   cash: { id: string; name: string; balance: string };
   fuel_card?: { id: string; name: string; balance: string };
+  fuel_cube?: {
+    id: string;
+    name: string;
+    balance: string;
+    liters?: number;
+    price_per_liter?: number;
+  };
   garage?: { id: string; name: string; balance: string };
 };
 
@@ -142,7 +149,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Счета в виде чистых плашек */}
-        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-100">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-zinc-100">
           <div className="bg-sky-50/70 border border-sky-100 rounded-xl p-2.5">
             <div className="flex items-center gap-1 text-[9px] font-black uppercase text-sky-700">
               <span>🏦</span> Р/Счёт
@@ -180,7 +187,7 @@ export default function AdminDashboard() {
 
           <div className="bg-amber-50/70 border border-amber-100 rounded-xl p-2.5">
             <div className="flex items-center gap-1 text-[9px] font-black uppercase text-amber-700">
-              <span>⛽</span> Топливо
+              <span>⛽</span> Опти24
             </div>
             {walletsLoading ? (
               <div className="h-4 w-14 bg-amber-200/50 rounded animate-pulse mt-1" />
@@ -188,6 +195,25 @@ export default function AdminDashboard() {
               <Money
                 amount={String(Math.max(0, parseFloat(wallets?.fuel_card?.balance ?? '0')))}
                 className="text-xs font-black text-amber-900 mt-0.5 block truncate"
+              />
+            )}
+          </div>
+
+          <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-2.5">
+            <div className="flex items-center justify-between text-[9px] font-black uppercase text-orange-800">
+              <span className="flex items-center gap-1">
+                <span>🛢️</span> Кубик
+              </span>
+              <span className="text-[10px] font-black text-orange-600">
+                {wallets?.fuel_cube?.liters ?? 1000} л
+              </span>
+            </div>
+            {walletsLoading ? (
+              <div className="h-4 w-14 bg-orange-200/50 rounded animate-pulse mt-1" />
+            ) : (
+              <Money
+                amount={wallets?.fuel_cube?.balance ?? '60000'}
+                className="text-xs font-black text-orange-950 mt-0.5 block truncate"
               />
             )}
           </div>
@@ -213,38 +239,60 @@ export default function AdminDashboard() {
       </div>
 
       {/* Строка операционной сводки */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <Link
           href="/admin/trips?filter=active"
-          className="bg-white border border-zinc-200 rounded-2xl p-3 flex items-center justify-between active:bg-zinc-50 transition-colors"
+          className="bg-white border border-zinc-200 rounded-2xl p-2.5 flex flex-col justify-between active:bg-zinc-50 transition-colors"
         >
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
-              В рейсе сейчас
-            </p>
-            <p className="text-xl font-black text-zinc-900 mt-0.5">
-              {summaryLoading ? '...' : (summary?.activeTrips ?? 0)}
-            </p>
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] font-black uppercase tracking-wider text-zinc-400">В рейсе</p>
+            <span className="text-base">🚛</span>
           </div>
-          <span className="text-2xl">🚛</span>
+          <p className="text-lg font-black text-zinc-900 mt-1">
+            {summaryLoading ? '...' : (summary?.activeTrips ?? 0)}
+          </p>
         </Link>
 
-        <div className="bg-white border border-zinc-200 rounded-2xl p-3 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
-              Выручка сегодня
-            </p>
-            {summaryLoading ? (
-              <div className="h-6 w-20 bg-zinc-100 rounded animate-pulse mt-1" />
+        <div className="bg-white border border-zinc-200 rounded-2xl p-2.5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] font-black uppercase tracking-wider text-zinc-400">Выручка</p>
+            <span className="text-base">📈</span>
+          </div>
+          {summaryLoading ? (
+            <div className="h-5 w-16 bg-zinc-100 rounded animate-pulse mt-1" />
+          ) : (
+            <Money
+              amount={summary?.todayRevenue ?? '0'}
+              className="text-sm font-black text-zinc-900 mt-1 block truncate"
+            />
+          )}
+        </div>
+
+        <Link
+          href="/admin/staff?group=loaders"
+          className={`border rounded-2xl p-2.5 flex flex-col justify-between transition-colors ${
+            (summary?.onlineLoaders ?? 0) > 0
+              ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 active:bg-emerald-100'
+              : 'bg-white border-zinc-200 text-zinc-900 active:bg-zinc-50'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] font-black uppercase tracking-wider text-zinc-400">Грузчики</p>
+            <span className="text-base">👷</span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-1">
+            {(summary?.onlineLoaders ?? 0) > 0 ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-sm font-black text-emerald-700">
+                  {summary.onlineLoaders} онл
+                </span>
+              </>
             ) : (
-              <Money
-                amount={summary?.todayRevenue ?? '0'}
-                className="text-lg font-black text-zinc-900 mt-0.5 block truncate"
-              />
+              <span className="text-sm font-black text-zinc-400">0 онл</span>
             )}
           </div>
-          <span className="text-2xl">📈</span>
-        </div>
+        </Link>
       </div>
 
       {/* Сигнальный баннер: Ревью (Авто + Гараж) */}

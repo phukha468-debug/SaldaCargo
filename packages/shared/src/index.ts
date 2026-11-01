@@ -119,6 +119,7 @@ export const FINANCIAL_WALLETS = {
   CASH: '10000000-0000-0000-0000-000000000002',
   CARD_LEGACY: '10000000-0000-0000-0000-000000000003',
   FUEL_CARD: '10000000-0000-0000-0000-000000000004',
+  FUEL_CUBE: '10000000-0000-0000-0000-000000000006',
 } as const;
 
 export const FINANCIAL_CATEGORIES = {
@@ -128,6 +129,82 @@ export const FINANCIAL_CATEGORIES = {
   FUEL: '62cebf3f-9982-4cc6-904b-48c6169cf5e4',
   OTHER: 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30',
 } as const;
+
+// ─── Нормы расхода топлива (л / 100 км) и кубик (ДТ 1000л) ───────────────────
+export const CUBE_FUEL_PRICE_PER_LITER = 60;
+export const DEFAULT_FUEL_CONSUMPTION_RATE = 16;
+
+export const FUEL_CONSUMPTION_RATES: Record<string, number> = {
+  valdai_6m: 18,
+  valdai_5m: 18,
+  valdai_dump: 18,
+  canter: 18,
+  gazelle_4m: 15,
+  gazelle_3m: 14,
+  gazelle_project: 15,
+};
+
+/**
+ * Возвращает норму расхода топлива на 100 км для типа или госномера автомобиля
+ */
+export function getVehicleFuelRate(
+  assetTypeCode?: string | null,
+  assetInfo?: { short_name?: string | null; reg_number?: string | null } | null,
+): number {
+  if (assetTypeCode && FUEL_CONSUMPTION_RATES[assetTypeCode]) {
+    return FUEL_CONSUMPTION_RATES[assetTypeCode];
+  }
+  const reg = (assetInfo?.reg_number || '').toUpperCase();
+  const name = (assetInfo?.short_name || '').toLowerCase();
+
+  if (
+    name.includes('валдай') ||
+    reg.includes('096') ||
+    reg.includes('188') ||
+    reg.includes('446') ||
+    reg.includes('883')
+  ) {
+    return 18;
+  }
+  if (name.includes('кантер') || reg.includes('661')) {
+    return 18;
+  }
+  if (
+    reg.includes('009') ||
+    reg.includes('099') ||
+    reg.includes('051') ||
+    name.includes('некст') ||
+    name.includes('next')
+  ) {
+    return 15;
+  }
+  if (reg.includes('866') || reg.includes('877') || reg.includes('914')) {
+    return 14;
+  }
+  return DEFAULT_FUEL_CONSUMPTION_RATE;
+}
+
+/**
+ * Рассчитывает расход топлива из кубика на основе пробега рейса и нормы авто
+ */
+export function calculateCubeFuel(
+  mileageKm: number,
+  assetTypeCode?: string | null,
+  assetInfo?: { short_name?: string | null; reg_number?: string | null } | null,
+  customRate?: number,
+) {
+  const rate = customRate ?? getVehicleFuelRate(assetTypeCode, assetInfo);
+  const km = Math.max(0, Math.round(mileageKm));
+  const liters = Math.round((km * rate) / 10) / 10; // округление до 0.1 л
+  const amount = Math.round(liters * CUBE_FUEL_PRICE_PER_LITER);
+  return {
+    km,
+    rate,
+    liters,
+    amount,
+    pricePerLiter: CUBE_FUEL_PRICE_PER_LITER,
+  };
+}
 
 // ─── Аналитика грузчиков (ПРР) ───────────────────────────────────────────────
 export const LOADER_PROFIT_START_DATE = '2026-09-01';

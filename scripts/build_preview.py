@@ -1,0 +1,1717 @@
+# -*- coding: utf-8 -*-
+import os
+
+html_code = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAX Bot → Android TK501 v2 | 100% 1:1 Макет всех экранов</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    
+    .phone-scroll::-webkit-scrollbar { width: 3px; }
+    .phone-scroll::-webkit-scrollbar-track { background: transparent; }
+    .phone-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+    
+    /* Мягкая обводка 1px solid #E2E8F0, контрастный текст */
+    .soft-card {
+      background-color: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 14px;
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+      transition: all 0.15s ease;
+    }
+    .soft-card:hover {
+      border-color: #CBD5E1;
+    }
+    
+    /* Градация цветов в наряде СТО (Требование №4) */
+    .card-auto {
+      background-color: #F8FAFC;
+      border: 1.5px solid #CBD5E1;
+      border-radius: 14px;
+    }
+    .card-works {
+      background-color: #F0FDF4;
+      border: 1.5px solid #86EFAC;
+      border-radius: 14px;
+    }
+    .card-parts {
+      background-color: #FFFBEB;
+      border: 1.5px solid #FDE68A;
+      border-radius: 14px;
+    }
+    
+    /* Жест свайпа назад */
+    .swipe-edge-indicator {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%) translateX(-100%);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .swiping-active .swipe-edge-indicator {
+      transform: translateY(-50%) translateX(16px);
+      opacity: 1;
+    }
+    
+    /* Dense 1-Line Row Helper */
+    .dense-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-3 sm:p-6">
+
+  <div class="max-w-[1520px] mx-auto space-y-5">
+    
+    <!-- ── ВЕРХНЯЯ ШАПКА ── -->
+    <header class="bg-slate-800/95 border border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="bg-orange-600 text-white text-[11px] font-black uppercase px-2.5 py-0.5 rounded-md tracking-wider">
+            Android TK501 v2
+          </span>
+          <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold px-2 py-0.5 rounded-md">
+            100% Копия MAX Bot (Нижние тулбары + Все 4 роли)
+          </span>
+          <span class="bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[11px] font-bold px-2 py-0.5 rounded-md">
+            Dense 1-Line Layout Priority
+          </span>
+        </div>
+        <h1 class="text-xl sm:text-2xl font-black text-white mt-1 tracking-tight">
+          Интерактивный макет экранов Android (1:1 функционал MAX Бот)
+        </h1>
+        <p class="text-xs text-slate-300 mt-1 max-w-4xl leading-relaxed">
+          Все 4 роли (Водитель, Механик, Грузчик, Директор) с <b>фирменными нижними тулбарами управления</b>, плотным 1-строчным списком и свайпом назад.
+        </p>
+      </div>
+
+      <!-- ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМА: ТЕЛЕФОН ИЛИ ВСЕ ЭКРАНЫ СРАЗУ -->
+      <div class="flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-700 shrink-0">
+        <button onclick="setViewMode('phone')" id="btnViewPhone" class="px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider bg-orange-600 text-white shadow-sm transition">
+          📱 Смартфон (Интерактивный)
+        </button>
+        <button onclick="setViewMode('all')" id="btnViewAll" class="px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white transition">
+          🖼️ Все экраны рядом
+        </button>
+      </div>
+    </header>
+
+    <!-- ── ПЕРЕКЛЮЧАТЕЛЬ 4 РОЛЕЙ ── -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <button onclick="selectRole('driver')" id="role-tab-driver" class="p-3.5 rounded-2xl border-2 transition-all flex items-center gap-3 bg-orange-600 border-orange-500 text-white font-black shadow-lg shadow-orange-600/20 cursor-pointer active:scale-[0.98]">
+        <span class="text-3xl">🚚</span>
+        <div class="text-left">
+          <div class="text-xs uppercase tracking-wide">Водитель</div>
+          <div class="text-[10px] opacity-80 font-normal">4 таба: Главная, Рейсы, Финансы, Профиль</div>
+        </div>
+      </button>
+
+      <button onclick="selectRole('mechanic')" id="role-tab-mechanic" class="p-3.5 rounded-2xl border-2 transition-all flex items-center gap-3 bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 cursor-pointer active:scale-[0.98]">
+        <span class="text-3xl">🔧</span>
+        <div class="text-left">
+          <div class="text-xs uppercase tracking-wide">Механик СТО</div>
+          <div class="text-[10px] opacity-80 font-normal">4 таба: Главная, Наряды, Зарплата, Профиль</div>
+        </div>
+      </button>
+
+      <button onclick="selectRole('loader')" id="role-tab-loader" class="p-3.5 rounded-2xl border-2 transition-all flex items-center gap-3 bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 cursor-pointer active:scale-[0.98]">
+        <span class="text-3xl">👷</span>
+        <div class="text-left">
+          <div class="text-xs uppercase tracking-wide">Грузчик ПРР</div>
+          <div class="text-[10px] opacity-80 font-normal">4 таба: Смена, Начисления, Выплаты, Профиль</div>
+        </div>
+      </button>
+
+      <button onclick="selectRole('admin')" id="role-tab-admin" class="p-3.5 rounded-2xl border-2 transition-all flex items-center gap-3 bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 cursor-pointer active:scale-[0.98]">
+        <span class="text-3xl">💼</span>
+        <div class="text-left">
+          <div class="text-xs uppercase tracking-wide">Директор / Админ</div>
+          <div class="text-[10px] opacity-80 font-normal">4 таба: Главная, Рейсы, Финансы, Персонал</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- ── НАВИГАТОР ВНУТРЕННИХ ЭКРАНОВ ВЫБРАННОЙ РОЛИ ── -->
+    <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-2.5 shadow-md flex items-center gap-2 overflow-x-auto text-xs font-bold" id="subscreensNav">
+      <!-- Наполняется динамически через JS -->
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         РЕЖИМ 1: ИНТЕРАКТИВНЫЙ СМАРТФОН СЛЕВА + ДЕТАЛИ И ПРОМПТ СПРАВА
+         ══════════════════════════════════════════════════════════════════════ -->
+    <div id="phoneViewModeSection" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- ЛЕВАЯ КОЛОНКА: СМАРТФОН ANDROID -->
+      <div class="lg:col-span-6 xl:col-span-5 flex justify-center sticky top-6">
+        <div class="w-[390px] h-[830px] bg-slate-950 rounded-[48px] p-3.5 shadow-2xl border-4 border-slate-700 relative overflow-hidden flex flex-col select-none ring-1 ring-slate-800">
+          
+          <!-- Вырез Dynamic Island -->
+          <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-950 rounded-b-2xl z-50 flex items-center justify-center">
+            <div class="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-800"></div>
+            <div class="w-12 h-1 bg-slate-800 rounded-full ml-3"></div>
+          </div>
+
+          <!-- СТАТУС-БАР -->
+          <div class="h-8 bg-white px-6 flex items-center justify-between text-[11px] font-black text-slate-900 z-40 rounded-t-[36px] pt-1 border-b border-slate-100">
+            <span>10:45</span>
+            <div class="flex items-center gap-1.5 text-[10px]">
+              <span>📶 5G</span>
+              <span>🔋 99%</span>
+            </div>
+          </div>
+
+          <!-- ИНДИКАТОР ЖЕСТА СВАЙПА НАЗАД СЛЕВА НАПРАВО -->
+          <div id="swipeIndicator" class="swipe-edge-indicator flex items-center gap-2 bg-slate-900/95 text-white px-3.5 py-2 rounded-full shadow-2xl backdrop-blur-md border border-slate-700 z-50">
+            <span class="text-base font-bold animate-pulse">←</span>
+            <span class="text-[11px] font-black tracking-tight" id="swipeIndicatorText">Назад</span>
+          </div>
+
+          <!-- КОНТЕЙНЕР ЭКРАНОВ С ПОДДЕРЖКОЙ ЖЕСТА СВАЙПА -->
+          <div id="phoneScreenContainer" 
+               class="flex-1 bg-slate-50 overflow-hidden relative flex flex-col"
+               onmousedown="startSwipe(event)"
+               ontouchstart="startSwipeTouch(event)">
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 1. ВОДИТЕЛЬ (DRIVER)
+                 ══════════════════════════════════════════════════════════════ -->
+            
+            <!-- 1.1 Водитель: Главная (Home) -->
+            <div id="view-driver-home" class="screen-view flex-1 overflow-y-auto phone-scroll flex flex-col p-3.5 space-y-3 bg-slate-50">
+              <div class="flex items-center justify-between pt-1">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-xl bg-orange-600 text-white font-black text-xs flex items-center justify-center shadow-xs">TK</div>
+                  <div>
+                    <div class="text-xs font-black text-slate-950 leading-tight">Михайлов Сергей</div>
+                    <div class="text-[10px] font-bold text-orange-600 uppercase tracking-tight">Водитель • Газель Next 501</div>
+                  </div>
+                </div>
+                <span class="text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  В рейсе
+                </span>
+              </div>
+
+              <!-- КАРТОЧКА АКТИВНОГО РЕЙСА -->
+              <div class="soft-card p-3.5 border-l-4 border-l-orange-500 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-black uppercase text-orange-600 tracking-wider">Рейс №142 • Активен</span>
+                  <span class="text-[10px] font-bold text-slate-400">Начат 08:30 (2ч 15м)</span>
+                </div>
+                <div class="flex items-baseline justify-between">
+                  <div>
+                    <div class="text-sm font-black text-slate-900">Газель Next 4.2м</div>
+                    <div class="text-[11px] font-semibold text-slate-500">Гос.номер А 501 АА 196</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-xs font-black text-emerald-700 font-mono">Выручка: 6 500 ₽</div>
+                    <div class="text-[10px] font-bold text-slate-400">ЗП: 1 800 ₽</div>
+                  </div>
+                </div>
+
+                <div class="pt-1.5 flex gap-2">
+                  <button onclick="showSubscreen('driver-trip')" class="flex-1 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm active:scale-95 transition">
+                    Открыть рейс →
+                  </button>
+                  <button onclick="showSubscreen('driver-fuel')" class="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm active:scale-95 transition flex items-center gap-1">
+                    <span>⛽</span> ГСМ
+                  </button>
+                </div>
+              </div>
+
+              <!-- КНОПКА ПОДОТЧЁТ: СУММА НА РУКАХ В ШАПКЕ КНОПКИ (ТРЕБОВАНИЕ №7) -->
+              <div class="soft-card p-3 flex items-center justify-between bg-gradient-to-r from-white to-slate-50">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center text-sm font-black">💵</div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-black text-slate-900 uppercase">Подотчёт</span>
+                      <span class="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded font-mono">
+                        на руках: 2 400 ₽
+                      </span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Наличные средства водителя к сдаче</p>
+                  </div>
+                </div>
+                <button onclick="showSubscreen('driver-finance')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold active:scale-95 transition">
+                  Сдать →
+                </button>
+              </div>
+
+              <!-- БЫСТРЫЕ ДЕЙСТВИЯ -->
+              <div class="grid grid-cols-2 gap-2">
+                <div class="soft-card p-2.5 flex items-center justify-between">
+                  <div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Одометр авто</div>
+                    <div class="text-xs font-black text-slate-900 font-mono mt-0.5">148 520 км</div>
+                  </div>
+                  <button onclick="alert('Модалка одометра авто')" class="text-xs text-orange-600 font-black p-1">✏️</button>
+                </div>
+                <div class="soft-card p-2.5 flex items-center justify-between">
+                  <div>
+                    <div class="text-[10px] font-bold text-slate-400 uppercase">Заявка на ПРР</div>
+                    <div class="text-xs font-black text-amber-700 mt-0.5">👷 Грузчик</div>
+                  </div>
+                  <button onclick="alert('Модалка вызова грузчика на точку')" class="text-xs text-amber-600 font-black p-1">+</button>
+                </div>
+              </div>
+
+              <!-- ИСТОРИЯ РЕЙСОВ В 1 СТРОЧКУ -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between px-1">
+                  <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider">История рейсов</span>
+                  <span class="text-[10px] font-bold text-orange-600 cursor-pointer">Все рейсы →</span>
+                </div>
+                <div class="soft-card divide-y divide-slate-100">
+                  <div class="p-2.5 dense-row hover:bg-slate-50 transition cursor-pointer">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                      <span class="text-xs">🚛</span>
+                      <span class="text-xs font-black text-slate-900 truncate">Рейс №141</span>
+                      <span class="text-[10px] text-slate-400">· 31 окт</span>
+                      <span class="text-[10px] text-emerald-600 font-bold">· Принят</span>
+                    </div>
+                    <span class="text-xs font-mono font-black text-slate-900 shrink-0">+2 100 ₽</span>
+                  </div>
+                  <div class="p-2.5 dense-row hover:bg-slate-50 transition cursor-pointer">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                      <span class="text-xs">🚛</span>
+                      <span class="text-xs font-black text-slate-900 truncate">Рейс №140</span>
+                      <span class="text-[10px] text-slate-400">· 30 окт</span>
+                      <span class="text-[10px] text-emerald-600 font-bold">· Принят</span>
+                    </div>
+                    <span class="text-xs font-mono font-black text-slate-900 shrink-0">+1 800 ₽</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 1.2 Водитель: Детали рейса (Trip) -->
+            <div id="view-driver-trip" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-3.5 space-y-3 bg-slate-50">
+              <div class="flex items-center justify-between pt-1 border-b border-slate-200 pb-2">
+                <div class="flex items-center gap-2">
+                  <button onclick="showSubscreen('driver-home')" class="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 flex items-center justify-center font-black text-xs active:scale-95 transition">
+                    ←
+                  </button>
+                  <span class="text-sm font-black text-slate-900 uppercase">Рейс №142</span>
+                </div>
+                <span class="text-[10px] font-black uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                  В работе
+                </span>
+              </div>
+
+              <!-- Сводка рейса в 2 строки -->
+              <div class="soft-card p-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div class="text-[9px] font-bold text-slate-400 uppercase">Выручка</div>
+                  <div class="text-xs font-black text-slate-900 font-mono mt-0.5">6 500 ₽</div>
+                </div>
+                <div>
+                  <div class="text-[9px] font-bold text-slate-400 uppercase">ЗП Водителя</div>
+                  <div class="text-xs font-black text-emerald-700 font-mono mt-0.5">1 800 ₽</div>
+                </div>
+                <div>
+                  <div class="text-[9px] font-bold text-slate-400 uppercase">Пробег</div>
+                  <div class="text-xs font-black text-slate-900 font-mono mt-0.5">42 км</div>
+                </div>
+              </div>
+
+              <!-- Заказы внутри рейса (1-Строчный вид Dense 1-Line) -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between px-1">
+                  <span class="text-[10px] font-black uppercase text-slate-400">Заказы рейса (2)</span>
+                  <span class="text-[10px] font-bold text-orange-600 cursor-pointer">+ Добавить заказ</span>
+                </div>
+                <div class="soft-card divide-y divide-slate-100">
+                  <div class="p-2.5 dense-row">
+                    <div class="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+                      <span class="text-xs font-black text-slate-900">#1</span>
+                      <span class="text-xs font-black text-slate-900 truncate">ООО Геострой</span>
+                      <span class="text-[10px] font-bold text-slate-500 truncate">· Металлургов 45</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span class="text-[10px] font-black bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded">ЗП: 1000 ₽</span>
+                      <span class="text-xs font-mono font-black text-slate-900">3 500 ₽</span>
+                    </div>
+                  </div>
+                  <div class="p-2.5 dense-row">
+                    <div class="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+                      <span class="text-xs font-black text-slate-900">#2</span>
+                      <span class="text-xs font-black text-slate-900 truncate">Частный заказ</span>
+                      <span class="text-[10px] font-bold text-slate-500 truncate">· Доставка мебели</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span class="text-[10px] font-black bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded">ЗП: 800 ₽</span>
+                      <span class="text-xs font-mono font-black text-slate-900">3 000 ₽</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Расходы ГСМ в рейсе -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between px-1">
+                  <span class="text-[10px] font-black uppercase text-slate-400">Расходы ГСМ</span>
+                  <span class="text-[10px] font-bold text-orange-600 cursor-pointer" onclick="showSubscreen('driver-fuel')">+ Заправка</span>
+                </div>
+                <div class="soft-card p-2.5 dense-row bg-amber-50/50 border-amber-200">
+                  <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <span class="text-base">🛢️</span>
+                    <div>
+                      <div class="text-xs font-black text-slate-900">Кубик (ДТ База)</div>
+                      <div class="text-[10px] text-amber-800 font-bold">18 л по норме 18 л/100км</div>
+                    </div>
+                  </div>
+                  <span class="text-xs font-mono font-black text-amber-900">1 080 ₽</span>
+                </div>
+              </div>
+
+              <!-- Нижние кнопки действий рейса -->
+              <div class="pt-2 grid grid-cols-3 gap-2">
+                <button onclick="alert('Добавление заказа')" class="py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1">
+                  <span>➕</span> Заказ
+                </button>
+                <button onclick="showSubscreen('driver-fuel')" class="py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1">
+                  <span>⛽</span> ГСМ
+                </button>
+                <button onclick="showSubscreen('driver-finish')" class="py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1">
+                  <span>🏁</span> Финиш
+                </button>
+              </div>
+            </div>
+
+            <!-- 1.3 Водитель: Ввод ГСМ (3 ЧИСТЫЕ КНОПКИ - ТРЕБОВАНИЕ №6) -->
+            <div id="view-driver-fuel" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-4 space-y-4 bg-slate-50">
+              <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                <div class="flex items-center gap-2">
+                  <button onclick="showSubscreen('driver-trip')" class="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 flex items-center justify-center font-black text-xs active:scale-95 transition">
+                    ←
+                  </button>
+                  <h3 class="text-sm font-black text-slate-900 uppercase">Заправка ГСМ</h3>
+                </div>
+                <span class="text-[10px] font-bold text-slate-400">Рейс №142</span>
+              </div>
+
+              <!-- 3 КНОПКИ: ТК, НАЛИЧКА, КУБИК (ЧИСТО, БЕЗ ЛИШНЕГО ТЕКСТА) -->
+              <div>
+                <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1.5">
+                  Источник оплаты:
+                </span>
+                <div class="grid grid-cols-3 gap-2">
+                  <button type="button" onclick="selectFuelBtn('tk')" id="btnFuelTk" class="py-3 px-2 rounded-xl border-2 border-slate-200 bg-white font-black text-xs text-slate-800 flex flex-col items-center gap-1 active:scale-95 transition">
+                    <span class="text-lg">⛽</span>
+                    <span>ТК</span>
+                  </button>
+                  <button type="button" onclick="selectFuelBtn('cash')" id="btnFuelCash" class="py-3 px-2 rounded-xl border-2 border-slate-200 bg-white font-black text-xs text-slate-800 flex flex-col items-center gap-1 active:scale-95 transition">
+                    <span class="text-lg">💵</span>
+                    <span>Наличка</span>
+                  </button>
+                  <button type="button" onclick="selectFuelBtn('cube')" id="btnFuelCube" class="py-3 px-2 rounded-xl border-2 border-orange-500 bg-orange-50 font-black text-xs text-orange-950 flex flex-col items-center gap-1 shadow-xs active:scale-95 transition">
+                    <span class="text-lg">🛢️</span>
+                    <span>Кубик</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Поля ввода -->
+              <div class="soft-card p-3 space-y-3">
+                <div>
+                  <label class="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                    Литров топлива:
+                  </label>
+                  <input type="number" id="fuelLitersInput" value="18" oninput="updateFuelRub(this.value)" placeholder="18" class="w-full text-base font-black px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 font-mono">
+                </div>
+                <div>
+                  <label class="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                    Сумма расхода (₽):
+                  </label>
+                  <input type="number" id="fuelAmountInput" value="1080" placeholder="1080" class="w-full text-base font-black px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 font-mono text-orange-600">
+                  <span class="text-[10px] text-slate-400 block mt-1">Авторасчет по тарифу 60 ₽/л</span>
+                </div>
+              </div>
+
+              <button onclick="alert('Заправка успешно зафиксирована'); showSubscreen('driver-trip');" class="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md active:scale-95 transition">
+                ✓ Сохранить заправку
+              </button>
+            </div>
+
+            <!-- 1.4 Водитель: Завершение рейса (Финиш с одометром и расчетом кубика) -->
+            <div id="view-driver-finish" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-4 space-y-4 bg-slate-50">
+              <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                <div class="flex items-center gap-2">
+                  <button onclick="showSubscreen('driver-trip')" class="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 flex items-center justify-center font-black text-xs active:scale-95 transition">
+                    ←
+                  </button>
+                  <h3 class="text-sm font-black text-slate-900 uppercase">Завершение рейса №142</h3>
+                </div>
+              </div>
+
+              <!-- Одометр финиша -->
+              <div class="soft-card p-3 space-y-2">
+                <label class="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                  Конечный одометр (км):
+                </label>
+                <input type="number" value="148562" class="w-full text-base font-black px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 font-mono">
+                <div class="flex justify-between text-[11px] text-slate-500 font-semibold">
+                  <span>Старт: 148 520 км</span>
+                  <span class="text-emerald-700 font-bold">Пробег: 42 км</span>
+                </div>
+              </div>
+
+              <!-- Чекбокс Кубика с авто-расчетом -->
+              <div class="soft-card p-3 bg-amber-50/70 border-amber-200 space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked class="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300">
+                  <span class="text-xs font-black text-amber-950">Заправлялся из кубика (База)</span>
+                </label>
+                <div class="text-[11px] text-amber-900 pl-6 flex justify-between items-center">
+                  <span>Расчет по норме (18 л/100км):</span>
+                  <span class="font-mono font-black text-xs">7.6 л · 456 ₽</span>
+                </div>
+              </div>
+
+              <!-- Подотчёт -->
+              <div class="soft-card p-3 space-y-2">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="text-slate-500 font-bold">Наличная выручка:</span>
+                  <span class="font-mono font-black text-slate-900">3 500 ₽</span>
+                </div>
+                <div class="flex justify-between items-center text-xs">
+                  <span class="text-slate-500 font-bold">Останется в подотчёте:</span>
+                  <span class="font-mono font-black text-emerald-700">+3 500 ₽</span>
+                </div>
+              </div>
+
+              <button onclick="alert('Рейс №142 отправлен на проверку диспетчеру'); showSubscreen('driver-home');" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md active:scale-95 transition">
+                🏁 Завершить рейс и отправить на проверку
+              </button>
+            </div>
+
+            <!-- 1.5 Водитель: Подотчёт и финансы -->
+            <div id="view-driver-finance" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-3.5 space-y-3 bg-slate-50">
+              <div class="flex items-center justify-between border-b border-slate-200 pb-2 pt-1">
+                <div class="flex items-center gap-2">
+                  <button onclick="showSubscreen('driver-home')" class="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 flex items-center justify-center font-black text-xs active:scale-95 transition">
+                    ←
+                  </button>
+                  <h3 class="text-sm font-black text-slate-900 uppercase">Подотчёт водителя</h3>
+                </div>
+              </div>
+
+              <div class="soft-card p-4 text-center bg-gradient-to-b from-emerald-50/50 to-white">
+                <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Фактически на руках</span>
+                <div class="text-3xl font-black text-emerald-700 font-mono mt-1">2 400 ₽</div>
+                <p class="text-[11px] text-slate-500 mt-1">Сумма наличных к передаче в кассу / бухгалтеру</p>
+                <button onclick="alert('Сдача подотчетных денег в сейф')" class="mt-3 w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm active:scale-95 transition">
+                  ✓ Сдать в сейф (Наличные)
+                </button>
+              </div>
+
+              <div class="space-y-1.5">
+                <span class="text-[10px] font-black uppercase text-slate-400 px-1">Начисления ЗП за месяц</span>
+                <div class="soft-card p-3 space-y-2">
+                  <div class="flex justify-between text-xs">
+                    <span class="text-slate-500 font-bold">Одобрено к выплате:</span>
+                    <span class="font-mono font-black text-slate-900">48 500 ₽</span>
+                  </div>
+                  <div class="flex justify-between text-xs">
+                    <span class="text-slate-500 font-bold">На проверке:</span>
+                    <span class="font-mono font-black text-amber-600">+1 800 ₽</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 2. МЕХАНИК СТО (MECHANIC)
+                 ══════════════════════════════════════════════════════════════ -->
+
+            <!-- 2.1 Механик: Главная (Home) -->
+            <div id="view-mechanic-home" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-3.5 space-y-3 bg-[#F2F4F7]">
+              <div class="flex items-center justify-between pt-1">
+                <div>
+                  <span class="text-[10px] font-extrabold text-[#21A038] uppercase tracking-wider">СТО · TK501 Гараж</span>
+                  <h1 class="text-lg font-black text-slate-900 leading-tight">Хасанов Руслан</h1>
+                </div>
+                <div class="w-8 h-8 rounded-xl bg-[#E8F7EC] text-[#21A038] flex items-center justify-center font-black text-sm">
+                  🔧
+                </div>
+              </div>
+
+              <!-- КАРТОЧКА БАЛАНСА МЕХАНИКА (СБЕРБАНК-СТИЛЬ) -->
+              <div onclick="showSubscreen('mechanic-salary')" class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs cursor-pointer active:scale-[0.99] transition">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-[#21A038]"></span>
+                    <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Баланс механика</span>
+                  </div>
+                  <span class="text-[10px] font-extrabold text-[#21A038] bg-[#E8F7EC] px-2 py-0.5 rounded-full">
+                    Все выплаты →
+                  </span>
+                </div>
+                <div class="flex items-baseline justify-between">
+                  <div>
+                    <span class="text-[10px] font-semibold text-slate-400 block">К выплате сейчас</span>
+                    <div class="text-2xl font-black text-slate-900 font-mono mt-0.5">42 800 ₽</div>
+                    <div class="inline-flex items-center gap-1 mt-1 bg-[#E8F7EC] text-[#0E7C5B] px-2 py-0.5 rounded-md text-[10px] font-extrabold">
+                      <span>⏳ На проверке:</span>
+                      <span>+8 400 ₽</span>
+                    </div>
+                  </div>
+                  <div class="w-10 h-10 rounded-xl bg-[#E8F7EC] text-[#21A038] flex items-center justify-center text-xl">
+                    💳
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-slate-100">
+                  <div class="bg-[#F2F4F7] rounded-xl p-2 text-center">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase">Закрыто (мес.)</span>
+                    <div class="text-xs font-black text-slate-900 font-mono">68 000 ₽</div>
+                  </div>
+                  <div class="bg-[#F2F4F7] rounded-xl p-2 text-center">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase">Выплачено</span>
+                    <div class="text-xs font-black text-[#21A038] font-mono">25 200 ₽</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- КНОПКА: ОТКРЫТЬ ЗАКАЗ-НАРЯД -->
+              <button onclick="showSubscreen('mechanic-order')" class="w-full bg-[#21A038] hover:bg-[#1b8a2f] text-white rounded-2xl p-3 shadow-md shadow-[#21A038]/20 flex items-center justify-between active:scale-[0.99] transition">
+                <div class="flex items-center gap-3 text-left">
+                  <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-xl font-black">
+                    +
+                  </div>
+                  <div>
+                    <div class="text-xs font-black uppercase tracking-tight">Открыть заказ-наряд</div>
+                    <div class="text-[10px] text-white/80">Свой (1600 ₽/ч) · Клиентский (2000 ₽/ч)</div>
+                  </div>
+                </div>
+                <span class="text-base font-bold pr-1">→</span>
+              </button>
+
+              <!-- ПОДТВЕРЖДЕНИЕ ЗП ПО ЗАКРЫТЫМ НАРЯДАМ -->
+              <div class="bg-white border-2 border-amber-300 rounded-2xl overflow-hidden shadow-xs">
+                <div class="bg-amber-50 px-3 py-2 border-b border-amber-200 flex items-center justify-between">
+                  <span class="text-[10px] font-black uppercase text-amber-900">⏳ Подтвердите начисленную ЗП (1)</span>
+                  <span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded">+2 800 ₽</span>
+                </div>
+                <div class="p-3 space-y-2">
+                  <div class="dense-row">
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-black text-slate-900 truncate">Наряд №84 · Газель Next 009</div>
+                      <div class="text-[10px] text-slate-500">Замена колодок + ТО суппортов</div>
+                    </div>
+                    <span class="text-xs font-black text-[#21A038] font-mono shrink-0">+2 800 ₽</span>
+                  </div>
+                  <div class="flex gap-2 pt-1">
+                    <button onclick="alert('Зарплата подтверждена!');" class="flex-1 py-1.5 bg-[#21A038] text-white rounded-lg text-[11px] font-black uppercase active:scale-95 transition">
+                      ✓ Подтвердить
+                    </button>
+                    <button onclick="alert('Отклонено! Отправлено админу на пересмотр суммы.');" class="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[11px] font-black uppercase active:scale-95 transition">
+                      Не согласен
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- НАРЯДЫ В РАБОТЕ -->
+              <div class="space-y-1.5">
+                <span class="text-[10px] font-black uppercase text-slate-500 px-1">🔧 Сейчас в работе (2)</span>
+                <div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-xs">
+                  <div onclick="showSubscreen('mechanic-order')" class="p-2.5 dense-row hover:bg-slate-50 transition cursor-pointer">
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-black text-slate-900 truncate">Наряд №85 · Валдай 501</div>
+                      <div class="text-[10px] text-slate-500 truncate">Капремонт сцепления · 4.5 нормо-часа</div>
+                    </div>
+                    <span class="text-xs font-mono font-black text-amber-600 shrink-0">В работе</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2.2 Механик: Наряд с градацией цветов (ТРЕБОВАНИЕ №4) -->
+            <div id="view-mechanic-order" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-3.5 space-y-3 bg-slate-50">
+              <!-- Шапка наряда: КНОПКА ВОЗВРАТА ОБРАТНО В КАБИНЕТ МЕХАНИКА (ТРЕБОВАНИЕ №2) -->
+              <div class="flex items-center justify-between border-b border-slate-200 pb-2 pt-1">
+                <div class="flex items-center gap-2">
+                  <button onclick="showSubscreen('mechanic-home')" class="w-8 h-8 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 flex items-center justify-center font-black text-sm active:scale-95 transition" title="В кабинет механика">
+                    ←
+                  </button>
+                  <div>
+                    <h2 class="text-xs font-black text-slate-950 uppercase tracking-tight">Заказ-наряд №85</h2>
+                    <span class="text-[10px] font-bold text-slate-400">Кабинет механика</span>
+                  </div>
+                </div>
+                <span class="text-[10px] font-black uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                  В работе
+                </span>
+              </div>
+
+              <!-- БЛОК 1: АВТОМОБИЛЬ (СИНИЙ/СЕРЫЙ ЦВЕТ) -->
+              <div class="card-auto p-3 space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-[9px] font-black uppercase text-slate-500 tracking-wider">🚙 Автомобиль и клиент</span>
+                  <span class="text-[10px] font-bold bg-white text-slate-700 px-1.5 py-0.2 rounded border border-slate-300">Собственный парк</span>
+                </div>
+                <div class="text-xs font-black text-slate-900">Валдай 3010GD (ТК501)</div>
+                <div class="text-[10px] text-slate-600 font-semibold">Гос.номер: В 501 ТК 196 · Пробег: 214 000 км</div>
+              </div>
+
+              <!-- БЛОК 2: РАБОТЫ СО СТАВКАМИ (ИЗУМРУДНЫЙ/ЗЕЛЕНЫЙ ЦВЕТ) -->
+              <div class="card-works p-3 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[9px] font-black uppercase text-emerald-800 tracking-wider">🔧 Выполненные работы (2)</span>
+                  <span class="text-[10px] font-bold text-emerald-700 font-mono">Ставка: 1 600 ₽/ч (50%)</span>
+                </div>
+
+                <div class="space-y-1.5">
+                  <div class="bg-white/80 p-2 rounded-xl border border-emerald-200 dense-row">
+                    <div class="min-w-0 flex-1 truncate">
+                      <div class="text-xs font-black text-slate-900 truncate">Снятие/установка КПП и сцепления</div>
+                      <div class="text-[10px] text-slate-500">3.5 н-ч · Итого клиенту: 5 600 ₽</div>
+                    </div>
+                    <span class="text-xs font-mono font-black text-emerald-700 shrink-0">+2 800 ₽ ЗП</span>
+                  </div>
+
+                  <div class="bg-white/80 p-2 rounded-xl border border-emerald-200 dense-row">
+                    <div class="min-w-0 flex-1 truncate">
+                      <div class="text-xs font-black text-slate-900 truncate">Замена выжимного подшипника</div>
+                      <div class="text-[10px] text-slate-500">1.0 н-ч · Итого клиенту: 1 600 ₽</div>
+                    </div>
+                    <span class="text-xs font-mono font-black text-emerald-700 shrink-0">+800 ₽ ЗП</span>
+                  </div>
+                </div>
+
+                <div class="pt-1 flex justify-between items-center text-xs font-black border-t border-emerald-200/60">
+                  <span class="text-emerald-900">Итого заработок механика:</span>
+                  <span class="text-emerald-700 font-mono text-sm">+3 600 ₽</span>
+                </div>
+              </div>
+
+              <!-- БЛОК 3: ЗАПЧАСТИ СО СКЛАДА (ЯНТАРНЫЙ/ЖЕЛТЫЙ ЦВЕТ) -->
+              <div class="card-parts p-3 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[9px] font-black uppercase text-amber-800 tracking-wider">📦 Запчасти со склада</span>
+                  <span class="text-[10px] font-bold text-amber-700 cursor-pointer">+ Добавить со склада</span>
+                </div>
+                <div class="space-y-1">
+                  <div class="bg-white/80 p-2 rounded-xl border border-amber-200 dense-row text-xs">
+                    <span class="font-bold text-slate-900 truncate">Диск сцепления Sachs Valdai</span>
+                    <span class="font-mono font-black text-slate-800 shrink-0">1 шт · 12 400 ₽</span>
+                  </div>
+                  <div class="bg-white/80 p-2 rounded-xl border border-amber-200 dense-row text-xs">
+                    <span class="font-bold text-slate-900 truncate">Подшипник выжимной SKF</span>
+                    <span class="font-mono font-black text-slate-800 shrink-0">1 шт · 3 200 ₽</span>
+                  </div>
+                </div>
+              </div>
+
+              <button onclick="alert('Наряд отправлен на проверку администратору'); showSubscreen('mechanic-home');" class="w-full py-3 bg-[#21A038] hover:bg-[#1b8a2f] text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md active:scale-95 transition">
+                ✓ Завершить и отправить на проверку (+3 600 ₽)
+              </button>
+            </div>
+
+            <!-- 2.3 Механик: ЗП и История выплат (ТРЕБОВАНИЯ №3 и №5) -->
+            <div id="view-mechanic-salary" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-3.5 space-y-3 bg-[#F2F4F7]">
+              <div class="flex items-center justify-between border-b border-slate-200 pb-2 pt-1">
+                <div class="flex items-center gap-2">
+                  <button onclick="showSubscreen('mechanic-home')" class="w-8 h-8 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 flex items-center justify-center font-black text-sm active:scale-95 transition">
+                    ←
+                  </button>
+                  <h3 class="text-sm font-black text-slate-900 uppercase">Зарплата и Выплаты СТО</h3>
+                </div>
+                <select class="text-xs font-black bg-white border border-slate-200 rounded-lg px-2 py-1">
+                  <option>Октябрь 2026</option>
+                  <option>Сентябрь 2026</option>
+                </select>
+              </div>
+
+              <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                <div class="flex border-b border-slate-200 bg-slate-50 p-1 gap-1">
+                  <button class="flex-1 py-1.5 rounded-xl text-xs font-black uppercase bg-white text-slate-900 shadow-xs border border-slate-200">
+                    📦 Начисления (12)
+                  </button>
+                  <button class="flex-1 py-1.5 rounded-xl text-xs font-black uppercase text-slate-500 hover:text-slate-800">
+                    💳 Выплаты (3)
+                  </button>
+                </div>
+
+                <!-- ДЕТАЛИЗАЦИЯ ЗП ПО РАБОТАМ ПРИ КЛИКЕ (ТРЕБОВАНИЕ №5) -->
+                <div class="p-2.5 divide-y divide-slate-100">
+                  <div onclick="alert('Детализация наряда №84:\\n- Замена передних колодок: 1.5 н-ч = +1200 ₽\\n- ТО направляющих суппорта: 1.0 н-ч = +800 ₽\\n- Прокачка тормозов: 1.0 н-ч = +800 ₽\\nИтого ЗП механика: 2 800 ₽')" class="py-2 dense-row cursor-pointer hover:bg-slate-50 rounded-lg px-1.5 transition">
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-black text-slate-900 truncate">Наряд №84 · Газель Next</div>
+                      <div class="text-[10px] text-slate-400">3 работы · 31 окт · Нажмите для деталей</div>
+                    </div>
+                    <span class="text-xs font-mono font-black text-[#21A038] shrink-0">+2 800 ₽ ℹ️</span>
+                  </div>
+
+                  <div onclick="alert('Детализация наряда №82:\\n- Замена масла и фильтров: 1.0 н-ч = +800 ₽\\n- Шприцевание кардана: 0.5 н-ч = +400 ₽\\nИтого ЗП: 1 200 ₽')" class="py-2 dense-row cursor-pointer hover:bg-slate-50 rounded-lg px-1.5 transition">
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-black text-slate-900 truncate">Наряд №82 · Газель 3м</div>
+                      <div class="text-[10px] text-slate-400">2 работы · 29 окт · Нажмите для деталей</div>
+                    </div>
+                    <span class="text-xs font-mono font-black text-[#21A038] shrink-0">+1 200 ₽ ℹ️</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 3. ГРУЗЧИК ПРР (LOADER) - ТРЕБОВАНИЕ №8
+                 ══════════════════════════════════════════════════════════════ -->
+
+            <!-- 3.1 Грузчик: Главный экран -->
+            <div id="view-loader-home" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-3.5 space-y-3 bg-slate-50">
+              <div class="flex items-center justify-between pt-1">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-xl bg-amber-500 text-white font-black text-lg flex items-center justify-center shadow-xs">
+                    👷
+                  </div>
+                  <div>
+                    <h1 class="text-xs font-black text-slate-900 leading-tight">Халилов Фарух</h1>
+                    <p class="text-[10px] font-bold text-amber-600 uppercase">Грузчик • ПРР Биржа</p>
+                  </div>
+                </div>
+                <button onclick="alert('Выход из аккаунта');" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg">
+                  🚪
+                </button>
+              </div>
+
+              <!-- СТАТУС ВЫХОДА НА СМЕНУ -->
+              <div id="loaderStatusCard" class="soft-card p-3.5 bg-emerald-50/80 border-emerald-300 space-y-2.5 transition-all">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Статус для диспетчера:</span>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                      <span class="text-sm">🟢</span>
+                      <span class="text-xs font-black uppercase text-emerald-700">На смене (Готов к работе)</span>
+                    </div>
+                  </div>
+                  <button onclick="alert('Переключение статуса смены');" class="w-12 h-6 bg-emerald-600 rounded-full p-0.5 transition flex items-center justify-end">
+                    <span class="w-5 h-5 bg-white rounded-full shadow-md"></span>
+                  </button>
+                </div>
+
+                <div class="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-1.5 text-slate-700 truncate">
+                    <span>📍</span>
+                    <span class="font-bold truncate">Верхняя Салда, Ленина 12</span>
+                  </div>
+                  <button onclick="alert('Смена адреса')" class="text-amber-700 font-black text-[11px] shrink-0">
+                    Сменить
+                  </button>
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer text-xs pt-0.5">
+                  <input type="checkbox" checked class="w-3.5 h-3.5 text-amber-600 rounded border-slate-300">
+                  <span class="font-bold text-slate-800">🚗 На своём авто (доеду сам)</span>
+                </label>
+              </div>
+
+              <!-- КРУПНАЯ ЦИФРА ПО ЦЕНТРУ: СКОЛЬКО КОМПАНИЯ НЕ ВЫПЛАТИЛА (ТРЕБОВАНИЕ №8) -->
+              <div class="soft-card p-4 text-center bg-white border border-slate-200 shadow-xs space-y-1">
+                <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Заработано к выплате
+                </span>
+                <div class="text-3xl font-black text-emerald-600 font-mono tracking-tight">
+                  14 500 ₽
+                </div>
+                <div class="text-[10px] text-slate-400 font-semibold pt-0.5">
+                  Всего выплачено за период: <span class="font-mono font-bold text-slate-700">58 000 ₽</span>
+                </div>
+
+                <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span class="text-[11px] font-black text-amber-800">⏳ Ожидает подтверждения:</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-black text-amber-700">+1 500 ₽</span>
+                    <button onclick="alert('Начисление ПРР подтверждено!')" class="px-2 py-0.5 bg-emerald-600 text-white rounded text-[10px] font-black uppercase">
+                      ✓ Ок
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ИСТОРИЯ ЗАКАЗОВ В 1 СТРОЧКУ (ДЕНЬ / НЕДЕЛЯ / МЕСЯЦ) -->
+              <div class="soft-card overflow-hidden">
+                <div class="flex border-b border-slate-200 bg-slate-50 p-1 gap-1 text-[11px] font-black uppercase">
+                  <button class="flex-1 py-1 rounded-lg bg-white text-slate-900 shadow-xs border border-slate-200">
+                    📦 Начисления
+                  </button>
+                  <button class="flex-1 py-1 rounded-lg text-slate-500 hover:text-slate-800">
+                    💳 Выплаты
+                  </button>
+                </div>
+
+                <div class="p-2 divide-y divide-slate-100">
+                  <div onclick="showLoaderModal()" class="py-2.5 px-1 dense-row cursor-pointer hover:bg-slate-50 rounded-lg transition">
+                    <div class="flex items-center gap-1.5 min-w-0 flex-1 truncate text-xs">
+                      <span class="font-black text-slate-900">01.11</span>
+                      <span class="text-slate-400">·</span>
+                      <span class="font-black text-slate-900 truncate">Газель 009</span>
+                      <span class="text-slate-400">·</span>
+                      <span class="text-slate-600 truncate">Михайлов С.</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <span class="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                        К выплате
+                      </span>
+                      <span class="text-xs font-mono font-black text-emerald-700">+1 500 ₽</span>
+                    </div>
+                  </div>
+
+                  <div onclick="showLoaderModal()" class="py-2.5 px-1 dense-row cursor-pointer hover:bg-slate-50 rounded-lg transition">
+                    <div class="flex items-center gap-1.5 min-w-0 flex-1 truncate text-xs">
+                      <span class="font-black text-slate-900">31.10</span>
+                      <span class="text-slate-400">·</span>
+                      <span class="font-black text-slate-900 truncate">Валдай 501</span>
+                      <span class="text-slate-400">·</span>
+                      <span class="text-slate-600 truncate">Нигамедьянов</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <span class="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Выплачено
+                      </span>
+                      <span class="text-xs font-mono font-black text-slate-800">+2 000 ₽</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 4. ДИРЕКТОР / ДИСПЕТЧЕР (ADMIN)
+                 ══════════════════════════════════════════════════════════════ -->
+
+            <!-- 4.1 Директор: Пульт управления (БЕЗ КНОПКИ СТО! ТРЕБОВАНИЕ №1) -->
+            <div id="view-admin-home" class="screen-view hidden flex-1 overflow-y-auto phone-scroll flex flex-col p-3.5 space-y-3 bg-slate-50">
+              <div class="flex items-center justify-between pt-1">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-full bg-orange-600 text-white font-black text-xs flex items-center justify-center">TK</div>
+                  <div>
+                    <div class="text-xs font-black text-slate-950 leading-tight">Нигамедьянов А.С.</div>
+                    <div class="text-[10px] font-bold text-orange-600 uppercase tracking-tight">Пульт Директора</div>
+                  </div>
+                </div>
+                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg">
+                  Админ
+                </span>
+              </div>
+
+              <!-- 4 КОШЕЛЬКА В 1 СТРОКУ (ВКЛЮЧАЯ КУБИК 1000Л) -->
+              <div class="grid grid-cols-4 gap-1.5">
+                <div class="soft-card p-2 bg-sky-50/70 border-sky-200">
+                  <div class="text-[9px] font-black uppercase text-sky-700 truncate">🏦 Р/Счёт</div>
+                  <div class="text-xs font-black text-sky-950 mt-0.5 truncate">148 200 ₽</div>
+                </div>
+                <div class="soft-card p-2 bg-emerald-50/70 border-emerald-200">
+                  <div class="text-[9px] font-black uppercase text-emerald-700 truncate">💵 Сейф</div>
+                  <div class="text-xs font-black text-emerald-950 mt-0.5 truncate">34 500 ₽</div>
+                </div>
+                <div class="soft-card p-2 bg-amber-50/70 border-amber-200">
+                  <div class="text-[9px] font-black uppercase text-amber-700 truncate">⛽ Опти24</div>
+                  <div class="text-xs font-black text-amber-950 mt-0.5 truncate">12 400 ₽</div>
+                </div>
+                <div class="soft-card p-2 bg-orange-50/70 border-orange-200">
+                  <div class="text-[9px] font-black uppercase text-orange-700 truncate">🛢️ Кубик</div>
+                  <div class="text-xs font-black text-orange-950 mt-0.5 truncate">840 л</div>
+                </div>
+              </div>
+
+              <!-- ПЕРЕВОД МЕЖДУ КАССАМИ -->
+              <div class="soft-card p-2.5 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">💸</span>
+                  <span class="text-xs font-black text-slate-900">Перевод между кассами</span>
+                </div>
+                <button onclick="alert('Модалка перевода: Р/С ↔ Сейф')" class="text-xs font-black text-orange-600 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-lg active:scale-95 transition">
+                  Перевести →
+                </button>
+              </div>
+
+              <!-- РЕЙСЫ НА РЕВЬЮ -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between px-1">
+                  <span class="text-[10px] font-black uppercase text-slate-400">Рейсы на ревью (1)</span>
+                  <span class="text-[10px] font-bold text-orange-600 cursor-pointer">Все рейсы →</span>
+                </div>
+
+                <div class="soft-card p-3 space-y-2 border-amber-200 bg-amber-50/30">
+                  <div class="dense-row">
+                    <div class="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+                      <span class="text-xs font-black text-slate-900">Рейс №141</span>
+                      <span class="text-[10px] text-slate-500 truncate">· Михайлов · Газель Next</span>
+                    </div>
+                    <span class="text-xs font-mono font-black text-slate-900 shrink-0">6 500 ₽</span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button onclick="alert('Рейс №141 утверждён!');" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-black uppercase active:scale-95 transition shadow-xs">
+                      ✓ Утвердить
+                    </button>
+                    <button onclick="alert('Рейс возвращен на доработку водителю');" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg text-[11px] font-black uppercase active:scale-95 transition">
+                      ↩ Возврат
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div> <!-- конец phoneScreenContainer -->
+
+          <!-- ══════════════════════════════════════════════════════════════
+               НИЖНИЕ РОЛЕВЫЕ ТУЛБАРЫ УПРАВЛЕНИЯ (1:1 С MINIAAPP И БОТ МАКС)
+               ══════════════════════════════════════════════════════════════ -->
+          
+          <!-- Тулбар 1: ВОДИТЕЛЬ (Главная, Рейсы, Финансы, Профиль) -->
+          <div id="bottom-bar-driver" class="role-bottom-bar h-18 bg-white border-t-2 border-slate-200 flex items-center justify-around px-2 z-40 rounded-b-[36px] shadow-[0_-4px_16px_rgba(15,23,42,0.04)]">
+            <button onclick="showSubscreen('driver-home')" id="driver-tab-home" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-orange-600 font-black border-t-2 border-orange-600 -mt-0.5">
+              <span class="text-xl leading-none">🏠</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Главная</span>
+            </button>
+            <button onclick="showSubscreen('driver-trip')" id="driver-tab-trip" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">📋</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Рейсы</span>
+            </button>
+            <button onclick="showSubscreen('driver-finance')" id="driver-tab-finance" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">💰</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Финансы</span>
+            </button>
+            <button onclick="alert('Профиль водителя')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">👤</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Профиль</span>
+            </button>
+          </div>
+
+          <!-- Тулбар 2: МЕХАНИК СТО (Главная, Наряды, Зарплата, Профиль) -->
+          <div id="bottom-bar-mechanic" class="role-bottom-bar hidden h-18 bg-white border-t border-slate-200/90 flex items-center justify-around px-2 z-40 rounded-b-[36px] shadow-[0_-4px_16px_rgba(15,23,42,0.04)]">
+            <button onclick="showSubscreen('mechanic-home')" id="mechanic-tab-home" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-[#21A038] font-black relative">
+              <span class="absolute -top-1 w-8 h-1 rounded-b-full bg-[#21A038]"></span>
+              <span class="text-xl leading-none">🏠</span>
+              <span class="text-[10px] font-bold tracking-tight mt-1">Главная</span>
+            </button>
+            <button onclick="showSubscreen('mechanic-order')" id="mechanic-tab-order" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">📋</span>
+              <span class="text-[10px] font-bold tracking-tight mt-1">Наряды</span>
+            </button>
+            <button onclick="showSubscreen('mechanic-salary')" id="mechanic-tab-salary" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">💳</span>
+              <span class="text-[10px] font-bold tracking-tight mt-1">Зарплата</span>
+            </button>
+            <button onclick="alert('Профиль механика')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">👤</span>
+              <span class="text-[10px] font-bold tracking-tight mt-1">Профиль</span>
+            </button>
+          </div>
+
+          <!-- Тулбар 3: ГРУЗЧИК ПРР (Смена, Начисления, Выплаты, Профиль) -->
+          <div id="bottom-bar-loader" class="role-bottom-bar hidden h-18 bg-white border-t border-slate-200 flex items-center justify-around px-2 z-40 rounded-b-[36px] shadow-[0_-4px_16px_rgba(15,23,42,0.04)]">
+            <button onclick="showSubscreen('loader-home')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-amber-600 font-black border-t-2 border-amber-600 -mt-0.5">
+              <span class="text-xl leading-none">👷</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Смена</span>
+            </button>
+            <button onclick="showSubscreen('loader-home')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">📦</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Заказы</span>
+            </button>
+            <button onclick="showSubscreen('loader-home')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">💳</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Баланс</span>
+            </button>
+            <button onclick="alert('Профиль грузчика')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">👤</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Профиль</span>
+            </button>
+          </div>
+
+          <!-- Тулбар 4: ДИРЕКТОР / АДМИН (Главная, Рейсы, Финансы, Персонал) -->
+          <div id="bottom-bar-admin" class="role-bottom-bar hidden h-18 bg-white border-t border-slate-200 flex items-center justify-around px-2 z-40 rounded-b-[36px] shadow-[0_-4px_16px_rgba(15,23,42,0.04)]">
+            <button onclick="showSubscreen('admin-home')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-orange-600 font-black border-t-2 border-orange-600 -mt-0.5">
+              <span class="text-xl leading-none">🏠</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Главная</span>
+            </button>
+            <button onclick="showSubscreen('admin-home')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">🚛</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Рейсы</span>
+            </button>
+            <button onclick="showSubscreen('admin-home')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">💰</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Финансы</span>
+            </button>
+            <button onclick="alert('Управление персоналом')" class="flex-1 flex flex-col items-center justify-center py-2 transition active:scale-95 text-slate-400 font-bold">
+              <span class="text-xl leading-none">👥</span>
+              <span class="text-[10px] uppercase tracking-wider mt-1">Персонал</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ПРАВАЯ КОЛОНКА: СРАВНЕНИЕ С БОТОМ МАКС И ГОТОВЫЙ ПРОМПТ -->
+      <div class="lg:col-span-6 xl:col-span-7 space-y-5">
+        
+        <!-- КАРТА ПЕРЕНОСА 1:1 -->
+        <div class="bg-slate-800/95 border border-slate-700/80 rounded-2xl p-5 shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🗺️</span>
+              <h2 class="text-base font-black text-white">Карта переноса функционала 1:1 (MAX Бот → Android)</h2>
+            </div>
+            <span class="text-[11px] font-bold text-orange-400 bg-orange-950/60 border border-orange-800/80 px-2 py-0.5 rounded-md">
+              apps/miniapp → apps/android
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700 space-y-1.5">
+              <div class="font-black text-orange-400 flex items-center gap-1.5">
+                <span>🚚</span> 1. Водитель (Driver)
+              </div>
+              <ul class="space-y-1 text-slate-300">
+                <li>• <b>Нижний тулбар:</b> 🏠 Главная, 📋 Рейсы, 💰 Финансы, 👤 Профиль</li>
+                <li>• <b>Подотчёт:</b> Сумма на руках мелким шрифтом прямо у кнопки (без простыней)</li>
+                <li>• <b>ГСМ:</b> Чистые 3 кнопки: <code>ТК</code>, <code>Наличка</code>, <code>Кубик</code></li>
+                <li>• <b>Финиш:</b> Одометр + расчет Кубика (18л/100км по 60₽/л)</li>
+              </ul>
+            </div>
+
+            <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700 space-y-1.5">
+              <div class="font-black text-emerald-400 flex items-center gap-1.5">
+                <span>🔧</span> 2. Механик СТО (Mechanic)
+              </div>
+              <ul class="space-y-1 text-slate-300">
+                <li>• <b>Нижний тулбар:</b> 🏠 Главная, 📋 Наряды, 💳 Зарплата, 👤 Профиль</li>
+                <li>• <b>Изоляция:</b> Вход сам под собой, в наряде кнопка возврата в кабинет механика</li>
+                <li>• <b>Градация наряда:</b> Авто (синий), Работы нормо-час (зеленый), Склад (желтый)</li>
+                <li>• <b>ЗП механика:</b> Клик на наряд → детальный список работ и оплата за каждую</li>
+              </ul>
+            </div>
+
+            <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700 space-y-1.5">
+              <div class="font-black text-amber-400 flex items-center gap-1.5">
+                <span>👷</span> 3. Грузчик ПРР (Loader)
+              </div>
+              <ul class="space-y-1 text-slate-300">
+                <li>• <b>Нижний тулбар:</b> 👷 Смена, 📦 Заказы, 💳 Баланс, 👤 Профиль</li>
+                <li>• <b>Смена:</b> Переключатель «Готов работать» + адрес + чекбокс «🚗 На авто»</li>
+                <li>• <b>Финансы:</b> Крупная цифра по центру «Заработано к выплате»</li>
+                <li>• <b>Список:</b> Строго в 1 строчку: Дата · Авто · Водитель · Сумма · Статус</li>
+              </ul>
+            </div>
+
+            <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700 space-y-1.5">
+              <div class="font-black text-sky-400 flex items-center gap-1.5">
+                <span>💼</span> 4. Директор / Пульт (Admin)
+              </div>
+              <ul class="space-y-1 text-slate-300">
+                <li>• <b>Нижний тулбар:</b> 🏠 Главная, 🚛 Рейсы, 💰 Финансы, 👥 Персонал</li>
+                <li>• <b>Без СТО:</b> Кнопка перехода в СТО удалена из пульта админа</li>
+                <li>• <b>4 Кассы:</b> Р/Счёт, Сейф нал, Опти24, Кубик (с остатком литров)</li>
+                <li>• <b>Ревью рейсов:</b> Быстрое утверждение в 1 клик или возврат</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- КАРТОЧКА: ГОТОВЫЙ ПРОМПТ ДЛЯ ПЕРЕНОСА В KOTLIN -->
+        <div class="bg-slate-800/95 border-2 border-orange-500/70 rounded-2xl p-5 shadow-xl space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🤖</span>
+              <h2 class="text-base font-black text-white">Промпт для 1:1 переноса функционала в Android</h2>
+            </div>
+            <button onclick="copyPromptText()" id="copyPromptBtn" class="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-black uppercase tracking-wider transition active:scale-95 shadow-sm cursor-pointer">
+              📋 Скопировать
+            </button>
+          </div>
+
+          <p class="text-xs text-slate-300">
+            Этот готовый самодостаточный промпт передается агенту для выполнения переноса.
+          </p>
+
+          <textarea id="promptTextarea" readonly class="w-full h-80 bg-slate-950 text-slate-200 text-[11px] font-mono p-3 rounded-xl border border-slate-700 leading-relaxed phone-scroll resize-none focus:outline-none"></textarea>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         РЕЖИМ 2: ВСЕ ЭКРАНЫ ВСЕХ 4 РОЛЕЙ РЯДОМ (ДЛЯ БЫСТРОГО ОБЗОРА)
+         ══════════════════════════════════════════════════════════════════════ -->
+    <div id="allScreensGalleryModeSection" class="hidden space-y-6">
+      
+      <!-- СЕКЦИЯ 1: ВОДИТЕЛЬ -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-3xl p-5 space-y-3">
+        <div class="flex items-center gap-2 text-orange-400 font-black text-lg">
+          <span>🚚</span> 1. Экраны Водителя (Нижний бар: Главная, Рейсы, Финансы, Профиль)
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-orange-400 block mb-2">1.1 Главная (Подотчёт с суммой прямо у кнопки)</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-2">
+              <div class="font-black text-sm">Газель Next 501 · Рейс №142</div>
+              <div class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex justify-between font-bold text-emerald-800">
+                <span>Подотчёт водителя:</span>
+                <span>на руках: 2 400 ₽</span>
+              </div>
+              <div class="p-2 bg-slate-100 rounded-lg flex justify-between text-slate-600">
+                <span>Одометр авто:</span>
+                <span class="font-mono font-black">148 520 км</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-orange-400 block mb-2">1.2 Детали Рейса (1-строчные заказы)</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-1.5">
+              <div class="font-black text-sm">Рейс №142 · Заказы</div>
+              <div class="p-1.5 bg-slate-50 border border-slate-200 rounded-lg dense-row">
+                <span class="font-black truncate">#1 Геострой · Металлургов 45</span>
+                <span class="font-mono font-black text-emerald-700 shrink-0">+1000 ₽ ЗП</span>
+              </div>
+              <div class="p-1.5 bg-slate-50 border border-slate-200 rounded-lg dense-row">
+                <span class="font-black truncate">#2 Частный заказ · Мебель</span>
+                <span class="font-mono font-black text-emerald-700 shrink-0">+800 ₽ ЗП</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-orange-400 block mb-2">1.3 Ввод ГСМ (3 чистые кнопки ТК / Нал / Кубик)</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-2">
+              <div class="grid grid-cols-3 gap-1.5 text-center font-black">
+                <div class="p-2 border rounded-lg bg-slate-50">⛽ ТК</div>
+                <div class="p-2 border rounded-lg bg-slate-50">💵 Нал</div>
+                <div class="p-2 border-2 border-orange-500 bg-orange-50 text-orange-950 rounded-lg">🛢️ Кубик</div>
+              </div>
+              <div class="p-2 bg-slate-50 border rounded-lg flex justify-between font-mono font-black">
+                <span>18 литров</span>
+                <span class="text-orange-600">1 080 ₽ (60 ₽/л)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- СЕКЦИЯ 2: МЕХАНИК СТО -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-3xl p-5 space-y-3">
+        <div class="flex items-center gap-2 text-emerald-400 font-black text-lg">
+          <span>🔧</span> 2. Экраны Механика (Нижний бар: Главная, Наряды, Зарплата, Профиль)
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-emerald-400 block mb-2">2.1 Кабинет Механика (Баланс Сбербанк-стиль)</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-2">
+              <div class="text-slate-400 font-bold uppercase text-[10px]">Баланс механика:</div>
+              <div class="text-xl font-black text-slate-900 font-mono">42 800 ₽</div>
+              <div class="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg font-bold">
+                + Открыть заказ-наряд (1600 / 2000 ₽/ч)
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-emerald-400 block mb-2">2.2 Заказ-наряд (Градация Авто / Работы / Склад)</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-1.5">
+              <div class="p-2 card-auto">
+                <span class="font-black">🚙 Авто: Валдай В 501 ТК</span>
+              </div>
+              <div class="p-2 card-works">
+                <span class="font-black text-emerald-800">🔧 Работы: КПП 3.5 н-ч (+2800 ₽ ЗП)</span>
+              </div>
+              <div class="p-2 card-parts">
+                <span class="font-black text-amber-900">📦 Склад: Диск Sachs (12 400 ₽)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-emerald-400 block mb-2">2.3 Зарплата (Детализация работ с суммами)</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-1.5">
+              <div class="p-2 bg-slate-50 border rounded-lg font-bold">
+                Октябрь 2026: 12 начислений
+              </div>
+              <div class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg dense-row">
+                <span class="truncate">Наряд №84 (3 работы)</span>
+                <span class="font-mono font-black text-emerald-700">+2 800 ₽</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- СЕКЦИЯ 3: ГРУЗЧИК ПРР -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-3xl p-5 space-y-3">
+        <div class="flex items-center gap-2 text-amber-400 font-black text-lg">
+          <span>👷</span> 3. Экраны Грузчика (Нижний бар: Смена, Заказы, Баланс, Профиль)
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-amber-400 block mb-2">3.1 Выход на смену + Адрес + Транспорт</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-2">
+              <div class="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg font-black flex justify-between">
+                <span>🟢 На смене (Готов к работе)</span>
+                <span>Свитчер [✓]</span>
+              </div>
+              <div class="p-2 bg-slate-50 border rounded-lg flex justify-between">
+                <span>📍 Верхняя Салда, Ленина 12</span>
+                <span class="text-amber-700 font-bold">Сменить</span>
+              </div>
+              <div class="font-bold text-slate-700">🚗 На своём авто (доеду сам)</div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-amber-400 block mb-2">3.2 Баланс к выплате + Список в 1 строчку</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-2 text-center">
+              <div class="text-[10px] uppercase font-bold text-slate-400">Заработано к выплате:</div>
+              <div class="text-2xl font-black text-emerald-600 font-mono">14 500 ₽</div>
+              <div class="p-2 bg-slate-50 border rounded-lg dense-row text-left">
+                <span class="truncate">01.11 · Газель 009 · Фарух</span>
+                <span class="font-mono font-black text-emerald-700 shrink-0">+1 500 ₽</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- СЕКЦИЯ 4: ДИРЕКТОР / АДМИН -->
+      <div class="bg-slate-800/80 border border-slate-700 rounded-3xl p-5 space-y-3">
+        <div class="flex items-center gap-2 text-sky-400 font-black text-lg">
+          <span>💼</span> 4. Пульт Директора (Нижний бар: Главная, Рейсы, Финансы, Персонал)
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-sky-400 block mb-2">4.1 4 Кошелька компании строго в 1 строку (Р/С, Сейф, Опти24, Кубик)</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs">
+              <div class="grid grid-cols-4 gap-1 text-center font-black">
+                <div class="p-1.5 bg-sky-50 border border-sky-200 rounded">🏦 148т ₽</div>
+                <div class="p-1.5 bg-emerald-50 border border-emerald-200 rounded">💵 34т ₽</div>
+                <div class="p-1.5 bg-amber-50 border border-amber-200 rounded">⛽ 12т ₽</div>
+                <div class="p-1.5 bg-orange-50 border border-orange-200 rounded">🛢️ 840 л</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-950 p-3 rounded-2xl border border-slate-700">
+            <span class="text-xs font-black text-sky-400 block mb-2">4.2 Рейсы на ревью (Утверждение в 1 клик или возврат)</span>
+            <div class="bg-white text-slate-900 rounded-xl p-3 text-xs space-y-2">
+              <div class="dense-row font-black">
+                <span>Рейс №141 · Михайлов · Газель</span>
+                <span class="font-mono">6 500 ₽</span>
+              </div>
+              <div class="flex gap-2">
+                <button class="flex-1 py-1 bg-emerald-600 text-white rounded font-black uppercase text-[10px]">✓ Утвердить</button>
+                <button class="px-2 py-1 bg-slate-100 border text-slate-700 rounded font-black uppercase text-[10px]">↩ Возврат</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО ДЕТАЛЕЙ НАЧИСЛЕНИЯ ГРУЗЧИКА -->
+  <div id="loaderAccrualModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-4 border border-slate-200 shadow-2xl space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">📦</span>
+          <h3 class="text-xs font-black text-slate-900 uppercase">Детализация ПРР · Рейс №141</h3>
+        </div>
+        <button onclick="hideLoaderModal()" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold cursor-pointer">
+          ✕
+        </button>
+      </div>
+      <div class="space-y-1.5 text-xs text-slate-900">
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-400 font-bold">Сумма:</span>
+          <span class="font-mono font-black text-emerald-600">+1 500 ₽</span>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-400 font-bold">Статус:</span>
+          <span class="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 text-[10px] uppercase">Ожидает выплаты</span>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-400 font-bold">Автомобиль:</span>
+          <span class="font-bold text-slate-900">Газель Next 009 (А 501 АА 196)</span>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-400 font-bold">Водитель:</span>
+          <span class="font-bold text-slate-900">Михайлов Сергей</span>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-400 font-bold">Дата работы:</span>
+          <span class="font-semibold text-slate-700">01.11.2026, 11:30</span>
+        </div>
+      </div>
+      <button onclick="hideLoaderModal()" class="w-full py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer">
+        Закрыть
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // ГЛОБАЛЬНЫЙ СТЕК И СОСТОЯНИЕ
+    var currentRole = 'driver';
+    var currentSubscreen = 'driver-home';
+    var screenHistory = [];
+
+    var ROLE_CONFIG = {
+      driver: {
+        firstScreen: 'driver-home',
+        bottomBarId: 'bottom-bar-driver',
+        screens: [
+          { id: 'driver-home', label: '1. Главная (Подотчёт с суммой)', icon: '🏠' },
+          { id: 'driver-trip', label: '2. Детали рейса (1-строчные заказы)', icon: '🚛' },
+          { id: 'driver-fuel', label: '3. Ввод ГСМ (3 чистые кнопки)', icon: '⛽' },
+          { id: 'driver-finish', label: '4. Завершение рейса (Кубик 60₽)', icon: '🏁' },
+          { id: 'driver-finance', label: '5. Подотчёт и финансы', icon: '💵' }
+        ]
+      },
+      mechanic: {
+        firstScreen: 'mechanic-home',
+        bottomBarId: 'bottom-bar-mechanic',
+        screens: [
+          { id: 'mechanic-home', label: '1. Кабинет механика (Баланс)', icon: '🔧' },
+          { id: 'mechanic-order', label: '2. Наряд (Авто / Работы / Склад)', icon: '🛠️' },
+          { id: 'mechanic-salary', label: '3. ЗП и работы с суммами', icon: '💰' }
+        ]
+      },
+      loader: {
+        firstScreen: 'loader-home',
+        bottomBarId: 'bottom-bar-loader',
+        screens: [
+          { id: 'loader-home', label: '1. Меню Грузчика (Смена, Баланс, ПРР)', icon: '👷' }
+        ]
+      },
+      admin: {
+        firstScreen: 'admin-home',
+        bottomBarId: 'bottom-bar-admin',
+        screens: [
+          { id: 'admin-home', label: '1. Пульт Директора (4 кассы, без СТО)', icon: '💼' }
+        ]
+      }
+    };
+
+    function selectRole(role) {
+      currentRole = role;
+
+      // 1. Обновляем визуальный стиль верхних карточек ролей
+      var roles = ['driver', 'mechanic', 'loader', 'admin'];
+      for (var i = 0; i < roles.length; i++) {
+        var r = roles[i];
+        var btn = document.getElementById('role-tab-' + r);
+        if (btn) {
+          if (r === role) {
+            btn.className = 'p-3.5 rounded-2xl border-2 transition-all flex items-center gap-3 bg-orange-600 border-orange-500 text-white font-black shadow-lg shadow-orange-600/20 cursor-pointer active:scale-[0.98]';
+          } else {
+            btn.className = 'p-3.5 rounded-2xl border-2 transition-all flex items-center gap-3 bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 cursor-pointer active:scale-[0.98]';
+          }
+        }
+      }
+
+      // 2. Показываем нужный нижний тулбар
+      var allBars = ['bottom-bar-driver', 'bottom-bar-mechanic', 'bottom-bar-loader', 'bottom-bar-admin'];
+      for (var j = 0; j < allBars.length; j++) {
+        var bar = document.getElementById(allBars[j]);
+        if (bar) {
+          bar.classList.add('hidden');
+        }
+      }
+      var targetBarId = ROLE_CONFIG[role].bottomBarId;
+      var activeBar = document.getElementById(targetBarId);
+      if (activeBar) {
+        activeBar.classList.remove('hidden');
+      }
+
+      // 3. Открываем первый экран выбранной роли
+      var firstScreen = ROLE_CONFIG[role].firstScreen;
+      showSubscreen(firstScreen, false);
+    }
+
+    function renderSubscreensNav() {
+      var container = document.getElementById('subscreensNav');
+      if (!container) return;
+      var screens = ROLE_CONFIG[currentRole].screens;
+      var html = '<span class="text-slate-400 uppercase text-[10px] tracking-wider px-2 font-black shrink-0">Экраны роли:</span>';
+      for (var i = 0; i < screens.length; i++) {
+        var s = screens[i];
+        var active = (s.id === currentSubscreen);
+        var cls = active 
+          ? 'bg-orange-600 text-white font-black shadow-sm' 
+          : 'bg-slate-700 text-slate-300 hover:text-white';
+        html += '<button onclick="showSubscreen(\\'' + s.id + '\\')" class="px-3 py-1.5 rounded-xl transition shrink-0 flex items-center gap-1.5 cursor-pointer ' + cls + '">';
+        html += '<span>' + s.icon + '</span> ' + s.label;
+        html += '</button>';
+      }
+      container.innerHTML = html;
+    }
+
+    function showSubscreen(screenId, addToHistory) {
+      if (addToHistory === undefined) addToHistory = true;
+      if (addToHistory && currentSubscreen !== screenId) {
+        screenHistory.push(currentSubscreen);
+      }
+      currentSubscreen = screenId;
+
+      // Скрываем все экраны
+      var views = document.querySelectorAll('.screen-view');
+      for (var i = 0; i < views.length; i++) {
+        views[i].classList.add('hidden');
+      }
+
+      // Показываем целевой экран
+      var target = document.getElementById('view-' + screenId);
+      if (target) {
+        target.classList.remove('hidden');
+        target.scrollTop = 0;
+      }
+
+      renderSubscreensNav();
+    }
+
+    function triggerSwipeBack() {
+      if (screenHistory.length > 0) {
+        var prev = screenHistory.pop();
+        showSubscreen(prev, false);
+      } else {
+        var defaultScreen = ROLE_CONFIG[currentRole].firstScreen;
+        if (currentSubscreen !== defaultScreen) {
+          showSubscreen(defaultScreen, false);
+        }
+      }
+    }
+
+    // РЕЖИМ ОТОБРАЖЕНИЯ: СМАРТФОН ИЛИ ВСЕ ЭКРАНЫ
+    function setViewMode(mode) {
+      var phoneSec = document.getElementById('phoneViewModeSection');
+      var allSec = document.getElementById('allScreensGalleryModeSection');
+      var btnPhone = document.getElementById('btnViewPhone');
+      var btnAll = document.getElementById('btnViewAll');
+
+      if (mode === 'all') {
+        phoneSec.classList.add('hidden');
+        allSec.classList.remove('hidden');
+        btnAll.className = 'px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider bg-orange-600 text-white shadow-sm transition';
+        btnPhone.className = 'px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white transition';
+      } else {
+        allSec.classList.add('hidden');
+        phoneSec.classList.remove('hidden');
+        btnPhone.className = 'px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider bg-orange-600 text-white shadow-sm transition';
+        btnAll.className = 'px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white transition';
+      }
+    }
+
+    // ТОПЛИВНЫЕ КНОПКИ
+    function selectFuelBtn(type) {
+      var btnTk = document.getElementById('btnFuelTk');
+      var btnCash = document.getElementById('btnFuelCash');
+      var btnCube = document.getElementById('btnFuelCube');
+
+      var btns = [btnTk, btnCash, btnCube];
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].className = 'py-3 px-2 rounded-xl border-2 border-slate-200 bg-white font-black text-xs text-slate-800 flex flex-col items-center gap-1 active:scale-95 transition cursor-pointer';
+      }
+
+      if (type === 'tk') {
+        btnTk.className = 'py-3 px-2 rounded-xl border-2 border-amber-500 bg-amber-50 font-black text-xs text-amber-950 flex flex-col items-center gap-1 shadow-xs active:scale-95 transition cursor-pointer';
+      } else if (type === 'cash') {
+        btnCash.className = 'py-3 px-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 font-black text-xs text-emerald-950 flex flex-col items-center gap-1 shadow-xs active:scale-95 transition cursor-pointer';
+      } else {
+        btnCube.className = 'py-3 px-2 rounded-xl border-2 border-orange-500 bg-orange-50 font-black text-xs text-orange-950 flex flex-col items-center gap-1 shadow-xs active:scale-95 transition cursor-pointer';
+      }
+    }
+
+    function updateFuelRub(liters) {
+      var l = parseFloat(liters) || 0;
+      document.getElementById('fuelAmountInput').value = Math.round(l * 60);
+    }
+
+    function showLoaderModal() {
+      document.getElementById('loaderAccrualModal').classList.remove('hidden');
+    }
+    function hideLoaderModal() {
+      document.getElementById('loaderAccrualModal').classList.add('hidden');
+    }
+
+    // ЖЕСТ СВАЙПА НАЗАД
+    var touchStartX = 0;
+    var isSwiping = false;
+    var phoneContainer = document.getElementById('phoneScreenContainer');
+    var swipeIndicator = document.getElementById('swipeIndicator');
+    var swipeIndicatorText = document.getElementById('swipeIndicatorText');
+
+    function startSwipe(e) {
+      if (e.clientX - phoneContainer.getBoundingClientRect().left < 90) {
+        touchStartX = e.clientX;
+        isSwiping = true;
+        document.addEventListener('mousemove', onSwipeMove);
+        document.addEventListener('mouseup', endSwipe);
+      }
+    }
+
+    function startSwipeTouch(e) {
+      var touch = e.touches[0];
+      var rect = phoneContainer.getBoundingClientRect();
+      if (touch.clientX - rect.left < 90) {
+        touchStartX = touch.clientX;
+        isSwiping = true;
+        document.addEventListener('touchmove', onSwipeMoveTouch);
+        document.addEventListener('touchend', endSwipeTouch);
+      }
+    }
+
+    function onSwipeMove(e) {
+      if (!isSwiping) return;
+      handleSwipeDelta(e.clientX - touchStartX);
+    }
+
+    function onSwipeMoveTouch(e) {
+      if (!isSwiping) return;
+      handleSwipeDelta(e.touches[0].clientX - touchStartX);
+    }
+
+    function handleSwipeDelta(delta) {
+      if (delta > 20) {
+        phoneContainer.classList.add('swiping-active');
+        swipeIndicatorText.innerText = '← Назад';
+      }
+      if (delta > 85) {
+        triggerSwipeBack();
+        endSwipe();
+      }
+    }
+
+    function endSwipe() {
+      isSwiping = false;
+      phoneContainer.classList.remove('swiping-active');
+      document.removeEventListener('mousemove', onSwipeMove);
+      document.removeEventListener('mouseup', endSwipe);
+    }
+
+    function endSwipeTouch() {
+      isSwiping = false;
+      phoneContainer.classList.remove('swiping-active');
+      document.removeEventListener('touchmove', onSwipeMoveTouch);
+      document.removeEventListener('touchend', endSwipeTouch);
+    }
+
+    // ТЕКСТ ГОТОВОГО ПРОМПТА
+    var PROMPT_TEXT = [
+      "# 1:1 ПЕРЕНОС ФУНКЦИОНАЛА ИЗ ВЕБ-ПРИЛОЖЕНИЯ МАКС БОТ (apps/miniapp) В ANDROID APP (apps/android)",
+      "",
+      "У нас есть полностью готовое, отлаженное и рабочее решение всех экранов, кнопок и бизнес-логики в веб-приложении бота MAX (папка apps/miniapp). Этим функционалом уже пользуются Водители, Механики, Грузчики и Руководство компании.",
+      "",
+      "Необходимо скопировать этот функционал 1:1 в Android приложение (apps/android), строго соблюдая стандарты интерфейса ТК501:",
+      "1. Dense 1-Line Layout Priority: вся ключевая информация (заказы, начисления, расходы, история) размещается строго в 1 строчку (максимум 2 строки на узких экранах, никогда не делать 3 строки). Все дополнительные детали убираются в модальные окна.",
+      "2. Мягкая прорисовка блоков (Soft Cards): 1px solid #E2E8F0, скругление rounded-xl / rounded-2xl, высокая контрастность текста (#0F172A).",
+      "3. Универсальный свайп слева направо (Swipe to Go Back): возврат из любого вложенного экрана или диалога жестом свайпа.",
+      "4. Полная изоляция ролей: Механик заходит под своим аккаунтом и работает только в СТО (никаких выходов в пульт админа). В пульте Директора/Диспетчера удалена кнопка перехода в СТО.",
+      "5. Фирменные нижние тулбары: у каждой роли (Водитель, Механик, Грузчик, Админ) свой нижний таб-бар с 4 кнопками управления.",
+      "",
+      "---",
+      "",
+      "### ЭТАП 1: ВОДИТЕЛЬ (DRIVER)",
+      "Исходный код: apps/miniapp/app/driver/, apps/miniapp/app/trip/[id]/",
+      "Файлы Android: DriverScreen.kt, TripDetailScreen.kt, TripOrdersSection.kt",
+      "",
+      "1. Нижний таб-бар водителя: Главная (🏠), Рейсы (📋), Финансы (💰), Профиль (👤).",
+      "2. Кнопка 'Подотчёт': прямо рядом с кнопкой мелким шрифтом выводить текущую сумму наличных на руках у водителя (например, 'на руках: 2 400 ₽'). Убрать все лишние простыни текста с пояснениями.",
+      "3. Блок ввода ГСМ: строго 3 чистые кнопки в один ряд без объяснений: [🛢️ Кубик], [⛽ ТК], [💵 Наличка]. При выборе Кубика — поле ввода литров с авторасчетом по 60 ₽/л (тариф кубика) и списанием с кошелька FUEL_CUBE_ID.",
+      "4. Завершение рейса: одометр финиша + чекбокс 'Заправлялся из кубика' с автоматическим расчетом литров и рублей по норме расхода машины (Валдай/Кантер: 18 л, Газель Next: 15 л, Газель 3м: 14 л).",
+      "5. 1-строчный вид заказов в рейсе: [Номер] [Контрагент/Адрес] · [ЗП водителя] · [Сумма заказа].",
+      "",
+      "---",
+      "",
+      "### ЭТАП 2: МЕХАНИК СТО (MECHANIC)",
+      "Исходный код: apps/miniapp/app/(mechanic)/mechanic/",
+      "Файлы Android: MechanicScreen.kt, MechanicOrderScreen.kt, MechanicSalaryScreen.kt",
+      "",
+      "1. Нижний таб-бар механика: Главная (🏠), Наряды (📋), Зарплата (💳), Профиль (👤).",
+      "2. Главный экран механика: банковская карточка баланса (К выплате сейчас, На проверке, Закрытые наряды, Выплачено), кнопка '+ Открыть заказ-наряд' (Свой 1600 ₽/ч, Клиентский 2000 ₽/ч), блок подтверждения ЗП ('✓ Подтвердить' / 'Не согласен').",
+      "3. Заказ-наряд: обязательная кнопка '← В кабинет механика' в шапке (механик не выходит в пульт админа!).",
+      "4. Градация цветов внутри заказ-наряда:",
+      "   - Автомобиль (Синий/Slate фон): марка, госномер, пробег, тип (свой/клиент).",
+      "   - Выполненные работы (Зеленый/Emerald фон): название работы, нормо-часы, ставка нормо-часа, заработок механика (50%).",
+      "   - Запчасти со склада (Желтый/Amber фон): наименование запчасти, количество, цена.",
+      "5. Зарплата механика: фильтр по периодам (месяц/год), вкладки 'Начисления' и 'Выплаты'. При нажатии на выполненный заказ показывать детальный список проделанных работ с указанием, сколько заплатили за каждую конкретную работу.",
+      "",
+      "---",
+      "",
+      "### ЭТАП 3: ГРУЗЧИК ПРР (LOADER)",
+      "Исходный код: apps/miniapp/app/loader/page.tsx",
+      "Файлы Android: LoaderScreen.kt",
+      "",
+      "1. Нижний таб-бар грузчика: Смена (👷), Заказы (📦), Баланс (💳), Профиль (👤).",
+      "2. Статус готовности к работе (Смена): свитчер 'Готов работать (На линии)' / 'Не на линии'. При включении — поле адреса текущего нахождения с кнопкой 'Сменить' и чекбокс '🚗 На своём авто' / '🚶 Пеший'.",
+      "3. Финансовая сводка: по центру крупная цифра 'Заработано к выплате' (невыплаченный баланс компании перед грузчиком). Ниже — 'Всего выплачено' и блок 'Ожидают подтверждения' с кнопкой '✓ Подтвердить'.",
+      "4. История начислений и выплат: вкладки 'Начисления' и 'Выплаты' с фильтром за день/неделю/месяц.",
+      "5. Строго 1-строчный формат каждого начисления: '01.11.2026 - Газель 009 - Фарух | +1500 ₽ (неоплачено)'. По клику на строчку открывать компактное модальное окно с деталями рейса.",
+      "",
+      "---",
+      "",
+      "### ЭТАП 4: ДИРЕКТОР / ДИСПЕТЧЕР (ADMIN)",
+      "Исходный код: apps/miniapp/app/admin/",
+      "Файлы Android: DispatcherScreen.kt",
+      "",
+      "1. Нижний таб-бар админа: Главная (🏠), Рейсы (🚛), Финансы (💰), Персонал (👥).",
+      "2. В пульте диспетчера УДАЛИТЬ кнопку перехода в СТО. Механик авторизуется под своим логином.",
+      "3. 4 кошелька компании строго в 1 строчку: Р/Счёт, Сейф (Наличные), Опти24, Кубик (с остатком в литрах и рублях).",
+      "4. Перевод между кассами: кнопка быстрого перевода средств между кошельками.",
+      "5. Рейсы на проверке: 1-строчные карточки рейсов с кнопками '✓ Утвердить' и '↩ Возврат'.",
+      "",
+      "---",
+      "",
+      "### ЭТАП 5: СБОРКА И ПРОВЕРКА",
+      "1. Выполнить сборку ./gradlew assembleDebug в apps/android.",
+      "2. Скопировать готовый APK в корень c:\\\\salda\\\\TK501.apk.",
+      "3. Убедиться в отсутствии ошибок сборки и полном соответствии интерактивному макету."
+    ].join("\\n");
+
+    var textarea = document.getElementById('promptTextarea');
+    if (textarea) {
+      textarea.value = PROMPT_TEXT;
+    }
+
+    function copyPromptText() {
+      var t = document.getElementById('promptTextarea');
+      t.select();
+      navigator.clipboard.writeText(t.value).then(function() {
+        var btn = document.getElementById('copyPromptBtn');
+        btn.innerText = '✓ Скопировано!';
+        btn.className = 'px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-black uppercase tracking-wider transition shadow-sm';
+        setTimeout(function() {
+          btn.innerText = '📋 Скопировать';
+          btn.className = 'px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-black uppercase tracking-wider transition active:scale-95 shadow-sm cursor-pointer';
+        }, 2000);
+      });
+    }
+
+    // Инициализация при старте
+    selectRole('driver');
+  </script>
+</body>
+</html>
+"""
+
+output_path = r"c:\salda\android_screens_redesign_preview.html"
+with open(output_path, "w", encoding="utf-8") as f:
+    f.write(html_code)
+
+print("Python successfully wrote android_screens_redesign_preview.html, length:", len(html_code))

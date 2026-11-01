@@ -1,5 +1,6 @@
 package ru.ancargo66.app.features.driver
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,6 +30,7 @@ import kotlinx.coroutines.launch
 import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.theme.*
+import ru.ancargo66.app.ui.theme.bouncyClick
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +46,16 @@ fun TripDetailScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val isPrr = tripDetail?.asset?.regNumber == "БЕЗ АВТО" || tripDetail?.tripType == "loaders_only"
+
+    fun getVehicleFuelRate(shortName: String?, regNumber: String?): Double {
+        val name = (shortName ?: "").lowercase()
+        val reg = (regNumber ?: "").uppercase()
+        if (name.contains("валдай") || reg.contains("096") || reg.contains("188") || reg.contains("446") || reg.contains("883")) return 18.0
+        if (name.contains("кантер") || reg.contains("661")) return 18.0
+        if (reg.contains("009") || reg.contains("099") || reg.contains("051") || name.contains("некст") || name.contains("next")) return 15.0
+        if (reg.contains("866") || reg.contains("877") || reg.contains("914")) return 14.0
+        return 16.0
+    }
 
     // Диалоги
     var showAddOrderDialog by rememberSaveable { mutableStateOf(false) }
@@ -71,6 +84,8 @@ fun TripDetailScreen(
     var isHandedToAccountant by rememberSaveable { mutableStateOf(false) }
     var unhandedAmountInput by rememberSaveable { mutableStateOf("") }
     var unhandedNoteInput by rememberSaveable { mutableStateOf("") }
+    var isCubeFuelFinish by rememberSaveable { mutableStateOf(false) }
+    var cubeLitersInputFinish by rememberSaveable { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
 
@@ -491,129 +506,68 @@ fun TripDetailScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
-                            shape = RoundedCornerShape(10.dp),
-                            border = CardDefaults.outlinedCardBorder()
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Zinc200)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+                                // 1 Строка: Номер, Контрагент / Описание, ЗП водителя, Сумма заказа
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.Top
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Surface(
+                                            color = SaldaOrange50,
+                                            shape = RoundedCornerShape(4.dp)
                                         ) {
-                                            // Бейдж способа оплаты
-                                            Surface(
-                                                color = when (ord.paymentMethod) {
-                                                    "cash" -> GreenOnline.copy(alpha = 0.15f)
-                                                    "qr", "card_driver" -> Color(0xFF9333EA).copy(alpha = 0.15f)
-                                                    "debt_cash" -> RedAlert.copy(alpha = 0.15f)
-                                                    else -> Color(0xFF2563EB).copy(alpha = 0.15f)
-                                                },
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = when (ord.paymentMethod) {
-                                                        "cash" -> "💵 Наличные"
-                                                        "qr", "card_driver" -> "⚡ QR-код"
-                                                        "debt_cash" -> "⏳ Долг"
-                                                        else -> "🏛️ Безнал"
-                                                    },
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = when (ord.paymentMethod) {
-                                                        "cash" -> GreenOnline
-                                                        "qr", "card_driver" -> Color(0xFF9333EA)
-                                                        "debt_cash" -> RedAlert
-                                                        else -> Color(0xFF2563EB)
-                                                    },
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-
-                                            // Бейдж направления
-                                            Surface(
-                                                color = Zinc100,
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = when (ord.direction) {
-                                                        "local" -> "В. Салда"
-                                                        "n_salda" -> "Н. Салда"
-                                                        "tagil" -> "Тагил"
-                                                        "ekb" -> "Екатеринбург"
-                                                        "loaders_only" -> "Без авто"
-                                                        else -> ord.direction ?: "Город"
-                                                    },
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = Zinc700,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
+                                            Text(
+                                                text = "#${activeOrders.indexOf(ord) + 1}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = SaldaOrangePrimary,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                            )
                                         }
 
-                                        Spacer(modifier = Modifier.height(6.dp))
-
-                                        // Название клиента / контрагента
                                         Text(
-                                            text = ord.counterparty?.name ?: ord.description ?: "Частный заказ",
+                                            text = ord.counterparty?.name ?: ord.description ?: "Заказ",
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = Zinc900
+                                            fontSize = 13.sp,
+                                            color = Zinc900,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
                                         )
 
-                                        if (!ord.description.isNullOrBlank() && ord.counterparty?.name != null) {
-                                            Text(
-                                                text = "📝 ${ord.description}",
-                                                fontSize = 12.sp,
-                                                color = Zinc600,
-                                                modifier = Modifier.padding(top = 2.dp)
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.height(4.dp))
-
-                                        // ЗП водителя
                                         if (ord.driverPay > 0) {
-                                            Text(
-                                                text = "ЗП водителя: ${ord.driverPay.toInt()} ₽",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = GreenOnline
-                                            )
-                                        }
-
-                                        // Грузчики
-                                        if (ord.loadersData.isNotEmpty()) {
-                                            Column(modifier = Modifier.padding(top = 2.dp)) {
-                                                ord.loadersData.forEach { loader ->
-                                                    Text(
-                                                        text = "👷 ${loader.name ?: "Грузчик"}: ${loader.pay} ₽",
-                                                        fontSize = 11.sp,
-                                                        color = Color(0xFF1E40AF),
-                                                        fontWeight = FontWeight.SemiBold
-                                                    )
-                                                }
+                                            Surface(
+                                                color = GreenOnline.copy(alpha = 0.12f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "+${ord.driverPay.toInt()} ₽",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = GreenOnline,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
                                             }
-                                        } else if (ord.loaderPay > 0 || ord.loader2Pay > 0) {
-                                            Text(
-                                                text = "Грузчики: ${(ord.loaderPay + ord.loader2Pay).toInt()} ₽",
-                                                fontSize = 11.sp,
-                                                color = Color(0xFF1E40AF),
-                                                fontWeight = FontWeight.SemiBold
-                                            )
                                         }
                                     }
 
-                                    Column(horizontalAlignment = Alignment.End) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
                                         Text(
                                             text = "${ord.amount.toInt()} ₽",
                                             fontWeight = FontWeight.Black,
-                                            fontSize = 17.sp,
+                                            fontSize = 14.sp,
                                             color = Zinc900
                                         )
 
@@ -625,17 +579,39 @@ fun TripDetailScreen(
                                                         loadTrip()
                                                     }
                                                 },
-                                                modifier = Modifier.size(32.dp)
+                                                modifier = Modifier.size(24.dp)
                                             ) {
                                                 Icon(
                                                     Icons.Default.Delete,
                                                     contentDescription = "Отменить заказ",
                                                     tint = Zinc400,
-                                                    modifier = Modifier.size(18.dp)
+                                                    modifier = Modifier.size(16.dp)
                                                 )
                                             }
                                         }
                                     }
+                                }
+
+                                // 2-я строчка максимум: примечание или грузчики если есть
+                                val extraInfo = buildList {
+                                    if (!ord.description.isNullOrBlank() && ord.counterparty?.name != null) add(ord.description)
+                                    if (ord.loadersData.isNotEmpty()) {
+                                        val lStr = ord.loadersData.joinToString { "${it.name ?: "Грузчик"}: ${it.pay} ₽" }
+                                        add("👷 $lStr")
+                                    } else if (ord.loaderPay > 0 || ord.loader2Pay > 0) {
+                                        add("👷 Грузчики: ${(ord.loaderPay + ord.loader2Pay).toInt()} ₽")
+                                    }
+                                }.joinToString(" · ")
+
+                                if (extraInfo.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = extraInfo,
+                                        fontSize = 11.sp,
+                                        color = Zinc500,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                         }
@@ -695,7 +671,11 @@ fun TripDetailScreen(
                                         color = Zinc900
                                     )
                                     Text(
-                                        text = if (exp.paymentMethod == "fuel_card") "Топливная карта Опти24" else "Наличные из подотчёта",
+                                        text = when (exp.paymentMethod) {
+                                            "fuel_card" -> "Топливная карта Опти24"
+                                            "cube" -> "Кубик (ДТ База)"
+                                            else -> "Наличные из подотчёта"
+                                        },
                                         fontSize = 11.sp,
                                         color = Zinc700
                                     )
@@ -831,16 +811,64 @@ fun TripDetailScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    // 3 ЧИСТЫЕ КНОПКИ ВЫБОРА ГСМ: КУБИК, ТК, НАЛИЧКА (ТРЕБОВАНИЕ №6)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("fuel_card" to "Топливная карта", "cash" to "Наличные").forEach { (method, label) ->
-                            FilterChip(
-                                selected = expensePaymentMethod == method,
-                                onClick = { expensePaymentMethod = method },
-                                label = { Text(label, fontSize = 11.sp) }
-                            )
+                        val fuelOptions = listOf(
+                            Triple("cube", "🛢️", "Кубик"),
+                            Triple("fuel_card", "⛽", "ТК"),
+                            Triple("cash", "💵", "Наличка")
+                        )
+                        fuelOptions.forEach { (method, icon, label) ->
+                            val isSelected = expensePaymentMethod == method
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .bouncyClick {
+                                        expensePaymentMethod = method
+                                        if (method == "cube") {
+                                            val rate = getVehicleFuelRate(tripDetail?.asset?.shortName, tripDetail?.asset?.regNumber)
+                                            val startOdo = (tripDetail?.odometerStart ?: 0).toLong()
+                                            val endOdo = endOdometerInput.toLongOrNull() ?: (tripDetail?.odometerEnd ?: 0L).toLong()
+                                            val delta = if (endOdo > startOdo) endOdo - startOdo else 0L
+                                            if (delta > 0 && expenseAmountInput.isBlank()) {
+                                                val liters = kotlin.math.round((delta * rate / 100.0) * 10.0) / 10.0
+                                                val amt = kotlin.math.round(liters * 60.0).toInt()
+                                                expenseAmountInput = amt.toString()
+                                                if (expenseDescInput.isBlank()) {
+                                                    expenseDescInput = "Кубик: $liters л"
+                                                }
+                                            }
+                                        }
+                                    },
+                                color = if (isSelected) {
+                                    if (method == "cube") SaldaOrange50 else if (method == "cash") Color(0xFFECFDF5) else Color(0xFFFFFBEB)
+                                } else Color.White,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(
+                                    if (isSelected) 2.dp else 1.dp,
+                                    if (isSelected) {
+                                        if (method == "cube") SaldaOrangePrimary else if (method == "cash") GreenOnline else AmberWarning
+                                    } else Zinc200
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(icon, fontSize = 20.sp)
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(
+                                        text = label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (isSelected) Zinc900 else Zinc600
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -887,6 +915,15 @@ fun TripDetailScreen(
         val cashRevenue = activeOrders.filter { it.paymentMethod == "cash" }.sumOf { it.amount }
         val cashExpenses = trip.tripExpenses.filter { it.paymentMethod == "cash" }.sumOf { it.amount }
         val cashToSurrender = maxOf(0.0, cashRevenue - cashExpenses)
+
+        val rate = getVehicleFuelRate(trip.asset?.shortName, trip.asset?.regNumber)
+        val startOdo = trip.odometerStart.toLong()
+        val enteredEndOdo = endOdometerInput.toLongOrNull() ?: (trip.odometerEnd ?: 0L).toLong()
+        val mileage = if (enteredEndOdo > startOdo) enteredEndOdo - startOdo else 0L
+        val autoLiters = kotlin.math.round((mileage * rate / 100.0) * 10.0) / 10.0
+        val autoAmount = kotlin.math.round(autoLiters * 60.0).toInt()
+        val finalLiters = cubeLitersInputFinish.toDoubleOrNull() ?: autoLiters
+        val finalAmount = kotlin.math.round(finalLiters * 60.0).toInt()
 
         AlertDialog(
             onDismissRequest = { if (!isSubmitting) showFinishDialog = false },
@@ -1029,6 +1066,66 @@ fun TripDetailScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    if (!isPrr) {
+                        Surface(
+                            color = if (isCubeFuelFinish) Color(0xFFFFF7ED) else Zinc100,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isCubeFuelFinish) SaldaOrangePrimary else Zinc200),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().clickable { isCubeFuelFinish = !isCubeFuelFinish }
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Checkbox(
+                                        checked = isCubeFuelFinish,
+                                        onCheckedChange = { isCubeFuelFinish = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = SaldaOrangePrimary),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "🛢️ Заправлен из кубика (База)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Zinc900,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isCubeFuelFinish) {
+                                        Text(
+                                            "~$finalLiters л ($finalAmount ₽)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = SaldaOrangePrimary
+                                        )
+                                    }
+                                }
+                                if (isCubeFuelFinish) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth().padding(start = 30.dp, top = 2.dp)
+                                    ) {
+                                        Text(
+                                            if (mileage > 0) "+$mileage км (норма $rate л/100км)" else "Норма $rate л/100км (60 ₽/л)",
+                                            fontSize = 10.sp,
+                                            color = Zinc600
+                                        )
+                                        OutlinedTextField(
+                                            value = cubeLitersInputFinish,
+                                            onValueChange = { cubeLitersInputFinish = it },
+                                            placeholder = { Text(autoLiters.toString(), fontSize = 10.sp) },
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                            modifier = Modifier.width(75.dp).height(46.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = driverNoteInput,
                         onValueChange = { driverNoteInput = it },
@@ -1067,6 +1164,9 @@ fun TripDetailScreen(
                                 isCarryover = !isHandedToAccountant,
                                 carryoverAmount = if (!isHandedToAccountant) unhandedAmountInput.toDoubleOrNull() ?: cashToSurrender else null,
                                 carryoverNote = if (!isHandedToAccountant) unhandedNoteInput.ifBlank { null } else null,
+                                isCubeFuel = isCubeFuelFinish,
+                                cubeFuelLiters = if (isCubeFuelFinish) finalLiters else null,
+                                cubeFuelAmount = if (isCubeFuelFinish) finalAmount.toDouble() else null,
                                 tripId = tripId,
                                 endOdometer = endOdo,
                                 driverNote = driverNoteInput.ifBlank { null },

@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const supabase = createAdminClient();
 
-  const [tripsRes, reviewRes, garageReviewRes, todayRes] = await Promise.all([
+  const [tripsRes, reviewRes, garageReviewRes, todayRes, loadersRes] = await Promise.all([
     // Активные рейсы прямо сейчас (без отменённых)
     supabase
       .from('trips')
@@ -31,6 +31,12 @@ export async function GET() {
       .select('amount')
       .eq('lifecycle_status', 'approved')
       .gte('created_at', new Date().toISOString().slice(0, 10)) as any,
+    // Грузчики (для подсчёта онлайн)
+    supabase
+      .from('users')
+      .select('id, notes')
+      .filter('roles', 'cs', '{"loader"}')
+      .eq('is_active', true) as any,
   ]);
 
   const todayRevenue = (todayRes.data ?? []).reduce(
@@ -38,11 +44,24 @@ export async function GET() {
     0,
   );
 
+  let onlineLoaders = 0;
+  for (const l of loadersRes.data ?? []) {
+    if (l.notes) {
+      try {
+        const parsed = typeof l.notes === 'string' ? JSON.parse(l.notes) : l.notes;
+        if (parsed?.online) onlineLoaders++;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   const pendingTrips = reviewRes.count ?? 0;
   const pendingGarage = garageReviewRes.count ?? 0;
 
   return NextResponse.json({
     activeTrips: tripsRes.count ?? 0,
+    onlineLoaders,
     pendingReview: pendingTrips,
     pendingGarageReview: pendingGarage,
     totalPendingReview: pendingTrips + pendingGarage,

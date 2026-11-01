@@ -33,6 +33,10 @@ import kotlinx.coroutines.launch
 import ru.ancargo66.app.R
 import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
+import ru.ancargo66.app.ui.components.BottomNavItem
+import ru.ancargo66.app.ui.components.SaldaBottomNav
+import ru.ancargo66.app.ui.theme.swipeToBack
+import androidx.activity.compose.BackHandler
 import ru.ancargo66.app.features.auth.PinScreen
 import ru.ancargo66.app.features.driver.TripDetailScreen
 import ru.ancargo66.app.ui.theme.*
@@ -44,6 +48,7 @@ fun DispatcherScreen(
     onLogout: () -> Unit
 ) {
     var showChangePinScreen by rememberSaveable { mutableStateOf(false) }
+    var adminNavTab by rememberSaveable { mutableStateOf(0) } // 0: Главная, 1: Рейсы, 2: Финансы, 3: Персонал
     var selectedTab by remember { mutableStateOf(0) } // 0: Ревью, 1: В пути, 2: Штат
     var reviewSubTab by rememberSaveable { mutableStateOf(0) } // 0: Авто (Водители), 1: Гараж (Механики)
     var adminSummary by remember { mutableStateOf<AdminSummary?>(null) }
@@ -179,7 +184,8 @@ fun DispatcherScreen(
     val totalBalance = wallets.sumOf { it.balance }
     val bankWallet = wallets.firstOrNull { it.type == "bank" }
     val cashWallet = wallets.firstOrNull { it.type == "cash" }
-    val fuelWallet = wallets.firstOrNull { it.type != "bank" && it.type != "cash" }
+    val fuelWallet = wallets.firstOrNull { it.type == "fuel_card" } ?: wallets.firstOrNull { it.type != "bank" && it.type != "cash" && it.type != "fuel_cube" }
+    val cubeWallet = wallets.firstOrNull { it.type == "fuel_cube" }
     val pendingTripsCount = adminSummary?.pendingReview ?: reviewTrips.size
     val pendingGarageCount = if (reviewServiceOrders.isNotEmpty()) reviewServiceOrders.size else (adminSummary?.pendingGarageReview ?: 0)
     val pendingCount = pendingTripsCount + pendingGarageCount
@@ -233,6 +239,33 @@ fun DispatcherScreen(
     }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize().swipeToBack {
+            if (adminNavTab != 0) {
+                adminNavTab = 0
+                selectedTab = 0
+            }
+        },
+        bottomBar = {
+            SaldaBottomNav(
+                items = listOf(
+                    BottomNavItem("🏠", "Главная"),
+                    BottomNavItem("🚛", "Рейсы"),
+                    BottomNavItem("💰", "Финансы"),
+                    BottomNavItem("👥", "Персонал")
+                ),
+                selectedIndex = adminNavTab,
+                onSelectIndex = { index ->
+                    adminNavTab = index
+                    when (index) {
+                        0 -> selectedTab = 0
+                        1 -> selectedTab = 1
+                        2 -> showWalletTransferDialog = true
+                        3 -> selectedTab = 2
+                    }
+                },
+                activeColor = SaldaOrangePrimary
+            )
+        },
         topBar = {
             Surface(
                 color = Color.White,
@@ -433,7 +466,7 @@ fun DispatcherScreen(
                                 shadowElevation = 1.dp
                             ) {
                                 Column(modifier = Modifier.padding(10.dp)) {
-                                    Text("⛽ ТОПЛИВО", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color(0xFFB45309), letterSpacing = 0.5.sp)
+                                    Text("⛽ ОПТИ24", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color(0xFFB45309), letterSpacing = 0.5.sp)
                                     Spacer(modifier = Modifier.height(3.dp))
                                     val fVal = String.format("%,d", (fuelWallet?.balance ?: 0.0).toLong()).replace(',', ' ')
                                     Text(
@@ -441,6 +474,30 @@ fun DispatcherScreen(
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Black,
                                         color = Color(0xFF78350F),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+
+                            // Кубик
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .bouncyClick { selectedTab = 2 },
+                                color = Color(0xFFFFF7ED),
+                                shape = RoundedCornerShape(14.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFED7AA)),
+                                shadowElevation = 1.dp
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text("🛢️ КУБИК", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color(0xFFC2410C), letterSpacing = 0.5.sp)
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    val cubeLiters = kotlin.math.round((cubeWallet?.balance ?: 60000.0) / 60.0).toInt()
+                                    Text(
+                                        text = "$cubeLiters л",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFF7C2D12),
                                         maxLines = 1
                                     )
                                 }
@@ -979,12 +1036,12 @@ fun DispatcherScreen(
                                     .padding(6.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Кнопка 1: 🚛 АВТО (Водители)
+                                // 🚛 АВТО (Водители) - СТО полностью изолировано в кабинете механика!
                                 Surface(
                                     modifier = Modifier
-                                        .weight(1f)
+                                        .fillMaxWidth()
                                         .bouncyClick { reviewSubTab = 0 },
-                                    color = if (reviewSubTab == 0) Zinc900 else Zinc100,
+                                    color = Zinc900,
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Row(
@@ -993,60 +1050,23 @@ fun DispatcherScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "🚛 Авто",
+                                            text = "🚛 Рейсы водителей на проверке",
                                             fontWeight = FontWeight.Black,
                                             fontSize = 13.sp,
-                                            color = if (reviewSubTab == 0) Color.White else Zinc700
+                                            color = Color.White
                                         )
                                         if (reviewTrips.isNotEmpty()) {
-                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
                                             Surface(
-                                                color = if (reviewSubTab == 0) SaldaOrangePrimary else Zinc200,
+                                                color = SaldaOrangePrimary,
                                                 shape = RoundedCornerShape(8.dp)
                                             ) {
                                                 Text(
                                                     text = "${reviewTrips.size}",
-                                                    fontSize = 10.sp,
+                                                    fontSize = 11.sp,
                                                     fontWeight = FontWeight.Black,
-                                                    color = if (reviewSubTab == 0) Color.White else Zinc800,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Кнопка 2: 🔧 ГАРАЖ (Механики)
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .bouncyClick { reviewSubTab = 1 },
-                                    color = if (reviewSubTab == 1) Color(0xFF21A038) else Zinc100,
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "🔧 Гараж",
-                                            fontWeight = FontWeight.Black,
-                                            fontSize = 13.sp,
-                                            color = if (reviewSubTab == 1) Color.White else Zinc700
-                                        )
-                                        if (reviewServiceOrders.isNotEmpty()) {
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Surface(
-                                                color = if (reviewSubTab == 1) Color.White else Color(0xFFDCFCE7),
-                                                shape = RoundedCornerShape(8.dp)
-                                            ) {
-                                                Text(
-                                                    text = "${reviewServiceOrders.size}",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Black,
-                                                    color = Color(0xFF15803D),
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    color = Color.White,
+                                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                                 )
                                             }
                                         }
