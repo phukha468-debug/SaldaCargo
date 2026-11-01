@@ -879,11 +879,7 @@ export default function TripDetailPage() {
                       type="button"
                       onClick={() => {
                         if (isRequiredMissing) {
-                          setOdometerError(
-                            odoReq.reason === 'gazelle_shift'
-                              ? 'Для Газелей ввод одометра обязателен при сдаче каждой смены'
-                              : 'Для грузовиков в конце месяца ввод одометра обязателен',
-                          );
+                          setOdometerError('Ввод одометра обязателен при сдаче каждой смены');
                           return;
                         }
                         if (!odoValidation.valid) {
