@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -238,13 +239,18 @@ fun DispatcherScreen(
         }
     }
 
+    val handleBackToLogin = {
+        if (adminNavTab != 0) {
+            adminNavTab = 0
+            selectedTab = 0
+        } else {
+            onLogout()
+        }
+    }
+    BackHandler(onBack = handleBackToLogin)
+
     Scaffold(
-        modifier = Modifier.fillMaxSize().swipeToBack {
-            if (adminNavTab != 0) {
-                adminNavTab = 0
-                selectedTab = 0
-            }
-        },
+        modifier = Modifier.fillMaxSize().swipeToBack(edgeWidth = 140.dp, dragThreshold = 45.dp, onBack = handleBackToLogin),
         bottomBar = {
             SaldaBottomNav(
                 items = listOf(
@@ -275,30 +281,31 @@ fun DispatcherScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(12.dp),
-                            shadowElevation = 2.dp,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                            modifier = Modifier
-                                .size(42.dp)
-                                .bouncyTouch()
+                            color = Zinc100,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.clickable { handleBackToLogin() }
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.logo),
-                                contentDescription = "TK501 Logo",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(3.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "К ролям",
+                                    tint = Zinc800,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Роли", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Zinc800)
+                            }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(

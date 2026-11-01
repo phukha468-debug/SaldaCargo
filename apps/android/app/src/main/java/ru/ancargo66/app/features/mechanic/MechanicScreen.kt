@@ -325,8 +325,13 @@ fun MechanicScreen(
     val pendingItems = salaryData.pendingConfirmation
     val payouts = salaryData.payouts
 
+    val handleBackToLogin = {
+        if (mechanicNavTab != 0) mechanicNavTab = 0 else onLogout()
+    }
+    BackHandler(onBack = handleBackToLogin)
+
     Scaffold(
-        modifier = Modifier.fillMaxSize().swipeToBack { mechanicNavTab = 0 },
+        modifier = Modifier.fillMaxSize().swipeToBack(edgeWidth = 140.dp, dragThreshold = 45.dp, onBack = handleBackToLogin),
         containerColor = SberBg,
         bottomBar = {
             SaldaBottomNav(
@@ -358,32 +363,35 @@ fun MechanicScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            color = SberMint,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.size(44.dp)
+                            color = SberBg,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.clickable { handleBackToLogin() }
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Icon(
-                                    Icons.Default.Build,
-                                    contentDescription = null,
-                                    tint = SberGreen,
-                                    modifier = Modifier.size(22.dp)
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "К ролям",
+                                    tint = SberTextPrimary,
+                                    modifier = Modifier.size(16.dp)
                                 )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Роли", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SberTextPrimary)
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = user.name,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = SberTextPrimary
-                                )
-                            }
                             Text(
-                                text = "СТО TK501 · Кабинет механика",
-                                fontSize = 12.sp,
+                                text = user.name,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = SberTextPrimary
+                            )
+                            Text(
+                                text = "СТО TK501 · Механик",
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = SberGreen
                             )
@@ -391,14 +399,24 @@ fun MechanicScreen(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { refreshAll() }) {
+                        IconButton(onClick = { refreshAll() }, modifier = Modifier.size(34.dp)) {
                             Icon(Icons.Default.Refresh, contentDescription = "Обновить", tint = SberTextSecondary)
                         }
-                        IconButton(onClick = { showChangePinScreen = true }) {
-                            Icon(Icons.Default.Lock, contentDescription = "Сменить PIN", tint = SberTextSecondary)
-                        }
-                        IconButton(onClick = onLogout) {
-                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Выйти", tint = SberTextSecondary)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = SberRedBg,
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, SberRedText.copy(alpha = 0.3f)),
+                            modifier = Modifier.clickable { onLogout() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = SberRedText, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Выйти", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SberRedText)
+                            }
                         }
                     }
                 }

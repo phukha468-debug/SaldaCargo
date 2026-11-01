@@ -27,6 +27,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import ru.ancargo66.app.R
+import androidx.compose.ui.text.style.TextOverflow
 import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.components.BottomNavItem
@@ -289,8 +290,17 @@ fun DriverScreen(
     val reviewTrips = summary?.reviewTrips ?: emptyList()
     val recentTrips = summary?.recentTrips ?: emptyList()
 
+    val handleBackToLogin = {
+        if (driverNavTab != 0) {
+            driverNavTab = 0
+        } else {
+            onLogout()
+        }
+    }
+    BackHandler(onBack = handleBackToLogin)
+
     Scaffold(
-        modifier = Modifier.fillMaxSize().swipeToBack { driverNavTab = 0 },
+        modifier = Modifier.fillMaxSize().swipeToBack(edgeWidth = 140.dp, dragThreshold = 45.dp, onBack = handleBackToLogin),
         bottomBar = {
             SaldaBottomNav(
                 items = listOf(
@@ -319,43 +329,58 @@ fun DriverScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            color = Color.White,
+                            color = Zinc100,
                             shape = RoundedCornerShape(10.dp),
-                            shadowElevation = 1.dp,
-                            modifier = Modifier.size(42.dp)
+                            modifier = Modifier.clickable { handleBackToLogin() }
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.logo),
-                                contentDescription = "TK501 Logo",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(2.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "К выбору роли",
+                                    tint = Zinc800,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Роли", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Zinc800)
+                            }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Привет, ${user.name}! 👋",
-                                fontSize = 16.sp,
+                                text = user.name,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Zinc900
+                                color = Zinc900,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            Text(text = "Водитель • СалдаКарго", fontSize = 12.sp, color = Zinc500)
+                            Text(text = "Водитель ТК501", fontSize = 11.sp, color = SaldaOrangePrimary, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { showChangePinScreen = true }) {
-                            Icon(Icons.Default.Lock, contentDescription = "Сменить PIN", tint = Zinc700)
-                        }
-                        IconButton(onClick = onLogout) {
-                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Выйти", tint = Zinc700)
+                        Surface(
+                            color = Color(0xFFFEF2F2),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECACA)),
+                            modifier = Modifier.clickable { onLogout() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = RedAlert, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Выйти", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = RedAlert)
+                            }
                         }
                     }
                 }

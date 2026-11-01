@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -141,10 +142,13 @@ fun LoaderScreen(
         return
     }
 
+    val handleBackToLogin = {
+        if (loaderNavTab != 0) loaderNavTab = 0 else onLogout()
+    }
+    BackHandler(onBack = handleBackToLogin)
+
     Scaffold(
-        modifier = Modifier.fillMaxSize().swipeToBack {
-            if (loaderNavTab != 0) loaderNavTab = 0
-        },
+        modifier = Modifier.fillMaxSize().swipeToBack(edgeWidth = 140.dp, dragThreshold = 45.dp, onBack = handleBackToLogin),
         bottomBar = {
             SaldaBottomNav(
                 items = listOf(
@@ -176,22 +180,44 @@ fun LoaderScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            color = SaldaOrange50,
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier.size(44.dp)
+                            color = Zinc100,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.clickable { handleBackToLogin() }
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("👷", fontSize = 22.sp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "К ролям",
+                                    tint = Zinc800,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Роли", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Zinc800)
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(text = user.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Zinc900)
-                            Text(text = "Грузчик • ПРР Биржа", fontSize = 12.sp, color = Zinc500)
+                            Text(text = user.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Zinc900)
+                            Text(text = "Грузчик • ПРР Биржа", fontSize = 11.sp, color = SaldaOrangePrimary, fontWeight = FontWeight.SemiBold)
                         }
                     }
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Выйти", tint = Zinc500)
+                    Surface(
+                        color = Color(0xFFFEF2F2),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECACA)),
+                        modifier = Modifier.clickable { onLogout() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = RedAlert, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Выйти", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = RedAlert)
+                        }
                     }
                 }
             }
