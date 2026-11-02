@@ -1205,7 +1205,10 @@ export interface FuelAuditResult {
   hasDiscrepancy: boolean;
   type?: 'overflow' | 'dry_tank' | 'tank_limit_exceeded';
   badgeText?: string;
+  shortBadgeText?: string;
   badgeClass?: string;
+  isCalibrated: boolean;
+  lastCalibratedAt?: string | null;
   tankCapacity: number;
   currentTankLiters: number;
   totalFuelAddedLiters: number;
@@ -1218,8 +1221,8 @@ export interface FuelAuditResult {
 /**
  * Проверяет рейс на расхождение топлива:
  * 1. Заправка за рейс превышает физическую емкость бака
- * 2. Заправка + остаток в баке превышают емкость бака
- * 3. Расход по пробегу превышает всё топливо в машине (сухой бак)
+ * 2. Заправка + остаток в баке превышают емкость бака (только если бак калибровался)
+ * 3. Расход по пробегу превышает всё топливо в машине (сухой бак, только если бак калибровался)
  *
  * Возвращает компактный 1-строчный бейдж для пульта Администраторов (Dense 1-Line).
  */
@@ -1247,6 +1250,8 @@ export function auditTripFuel(trip: {
   const tankCapacity = getVehicleTankCapacity(trip.asset);
   const currentFuelInfo = getVehicleCurrentFuel(trip.asset);
   const currentTankLiters = currentFuelInfo.currentLiters;
+  // Машина считается откалиброванной только если администратор явно зафиксировал остаток > 0 и дату калибровки
+  const isCalibrated = Boolean(currentFuelInfo.lastCalibratedAt && currentTankLiters > 0);
 
   const expenses = Array.isArray(trip.trip_expenses) ? trip.trip_expenses : [];
   let totalFuelAddedLiters = 0;
@@ -1290,7 +1295,10 @@ export function auditTripFuel(trip: {
       hasDiscrepancy: true,
       type: 'tank_limit_exceeded',
       badgeText: `⚠️ Перелив бака: +${diff} л (заправлено ${totalFuelAddedLiters} л при баке ${tankCapacity} л)`,
-      badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
+      shortBadgeText: '⚠️',
+      badgeClass: 'bg-rose-600 text-white border-rose-700',
+      isCalibrated,
+      lastCalibratedAt: currentFuelInfo.lastCalibratedAt,
       tankCapacity,
       currentTankLiters,
       totalFuelAddedLiters,
@@ -1302,13 +1310,17 @@ export function auditTripFuel(trip: {
   }
 
   // 2. Перелив с учетом начального остатка: остаток + заправка > емкость бака (+ погрешность 5 л)
-  if (currentTankLiters > 0 && currentTankLiters + totalFuelAddedLiters > tankCapacity + 5) {
+  // Срабатывает только если машина была откалибрована администратором
+  if (isCalibrated && currentTankLiters + totalFuelAddedLiters > tankCapacity + 5) {
     const diff = Math.round(currentTankLiters + totalFuelAddedLiters - tankCapacity);
     return {
       hasDiscrepancy: true,
       type: 'overflow',
       badgeText: `⚠️ Перелив с остатком: +${diff} л (в баке ${currentTankLiters} л + заправка ${totalFuelAddedLiters} л > бака ${tankCapacity} л)`,
-      badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+      shortBadgeText: '⚠️',
+      badgeClass: 'bg-rose-600 text-white border-rose-700',
+      isCalibrated,
+      lastCalibratedAt: currentFuelInfo.lastCalibratedAt,
       tankCapacity,
       currentTankLiters,
       totalFuelAddedLiters,
@@ -1319,11 +1331,10 @@ export function auditTripFuel(trip: {
     };
   }
 
-  // 3. Сухой бак: потрачено больше, чем было в баке с учетом заправки (если машина была откалибрована)
-  if (
-    currentFuelInfo.lastCalibratedAt &&
-    currentTankLiters + totalFuelAddedLiters - fuelConsumedLiters < -8
-  ) {
+  // 3. Сухой бак: потрачено больше, чем было в баке с учетом заправки
+  // ВНИМАНИЕ: Срабатывает ТОЛЬКО если автомобиль был явно откалиброван администратором.
+  // Если машина еще не калибровалась — проверка сухого бака не производится, чтобы избежать ложных алертов.
+  if (isCalibrated && currentTankLiters + totalFuelAddedLiters - fuelConsumedLiters < -8) {
     const diff = Math.round(
       Math.abs(currentTankLiters + totalFuelAddedLiters - fuelConsumedLiters),
     );
@@ -1331,7 +1342,10 @@ export function auditTripFuel(trip: {
       hasDiscrepancy: true,
       type: 'dry_tank',
       badgeText: `⚠️ Нехватка топлива: -${diff} л (пробег ${mileageKm} км съел больше, чем было)`,
-      badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
+      shortBadgeText: '⚠️',
+      badgeClass: 'bg-rose-600 text-white border-rose-700',
+      isCalibrated,
+      lastCalibratedAt: currentFuelInfo.lastCalibratedAt,
       tankCapacity,
       currentTankLiters,
       totalFuelAddedLiters,
@@ -1344,6 +1358,8 @@ export function auditTripFuel(trip: {
 
   return {
     hasDiscrepancy: false,
+    isCalibrated,
+    lastCalibratedAt: currentFuelInfo.lastCalibratedAt,
     tankCapacity,
     currentTankLiters,
     totalFuelAddedLiters,

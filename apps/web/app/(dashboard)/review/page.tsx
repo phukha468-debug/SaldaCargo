@@ -1113,12 +1113,11 @@ function EditModal({
               )}
               {auditTripFuel(trip).hasDiscrepancy && (
                 <span
-                  className={cn(
-                    'text-xs font-bold px-2 py-0.5 rounded-full border',
-                    auditTripFuel(trip).badgeClass,
-                  )}
+                  className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1 cursor-help"
+                  title={auditTripFuel(trip).badgeText}
                 >
-                  {auditTripFuel(trip).badgeText}
+                  <span>⚠️</span>
+                  <span>Сигнал ГСМ</span>
                 </span>
               )}
             </div>
@@ -1862,6 +1861,7 @@ function TripCard({
     ),
   ].filter(Boolean) as string[];
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [showFuelModal, setShowFuelModal] = useState(false);
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const accentColor =
@@ -1941,15 +1941,18 @@ function TripCard({
                 </span>
               )}
               {fuelAudit.hasDiscrepancy && (
-                <span
-                  className={cn(
-                    'px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow-xs flex items-center gap-0.5 border',
-                    fuelAudit.badgeClass,
-                  )}
-                  title={`В баке было: ${fuelAudit.currentTankLiters} л · Заправлено: ${fuelAudit.totalFuelAddedLiters} л · Расход по норме (${fuelAudit.ratePer100Km} л/100км на ${fuelAudit.mileageKm} км): ${fuelAudit.fuelConsumedLiters} л · Расчётный остаток: ${fuelAudit.estimatedRemainingLiters} л`}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFuelModal(true);
+                  }}
+                  className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-[10px] leading-tight shrink-0 shadow-xs flex items-center justify-center cursor-pointer transition-transform"
+                  title={`${fuelAudit.badgeText}\n(Нажмите для подробного расчета ГСМ)`}
+                  aria-label="Сигнал по ГСМ"
                 >
-                  {fuelAudit.badgeText}
-                </span>
+                  ⚠️
+                </button>
               )}
             </div>
             <span className="text-[10px] text-slate-400 font-medium shrink-0 hidden sm:block">
@@ -2274,6 +2277,23 @@ function TripCard({
             </div>
           )}
 
+          {/* Предупреждение о расхождении ГСМ */}
+          {fuelAudit.hasDiscrepancy && (
+            <div className="px-5 py-2.5 bg-rose-50/90 border-t border-rose-200 flex items-center justify-between text-xs">
+              <span className="font-bold text-rose-900 flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{fuelAudit.badgeText}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowFuelModal(true)}
+                className="text-[11px] font-bold text-rose-700 underline hover:text-rose-900 cursor-pointer shrink-0 ml-3"
+              >
+                Подробный расчёт
+              </button>
+            </div>
+          )}
+
           {/* Driver note */}
           {trip.driver_note && (
             <div className="px-5 py-3 border-t border-amber-100 bg-amber-50/60">
@@ -2332,6 +2352,104 @@ function TripCard({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно с детальным расчётом расхождения ГСМ */}
+      {showFuelModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowFuelModal(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5 border border-slate-200 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center text-base">
+                  ⚠️
+                </span>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 leading-tight">
+                    Контроль расхода ГСМ
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Рейс #{trip.trip_number} · {trip.asset?.short_name} ({trip.asset?.reg_number})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFuelModal(false)}
+                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-900 leading-relaxed">
+              {fuelAudit.badgeText}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Емкость бака
+                </span>
+                <span className="text-slate-800 font-bold">{fuelAudit.tankCapacity} л</span>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  В баке зафиксировано
+                </span>
+                <span className="text-slate-800 font-bold">
+                  {fuelAudit.isCalibrated ? `${fuelAudit.currentTankLiters} л` : 'Не калибровался'}
+                </span>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Заправлено в рейсе
+                </span>
+                <span className="text-slate-800 font-bold">{fuelAudit.totalFuelAddedLiters} л</span>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Пробег рейса
+                </span>
+                <span className="text-slate-800 font-bold">{fuelAudit.mileageKm} км</span>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Расход по норме
+                </span>
+                <span className="text-slate-800 font-bold">
+                  {fuelAudit.fuelConsumedLiters} л ({fuelAudit.ratePer100Km} л/100км)
+                </span>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Расчётный остаток
+                </span>
+                <span className="text-slate-800 font-bold">
+                  {fuelAudit.estimatedRemainingLiters} л
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setShowFuelModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Понятно
+              </button>
+            </div>
           </div>
         </div>
       )}

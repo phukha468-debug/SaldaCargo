@@ -36,8 +36,10 @@ async function updateAssetFuelAfterApproval(supabase: any, tripId: string) {
       } catch {}
     }
     docsObj.fuel_tank_capacity = audit.tankCapacity;
-    docsObj.fuel_current_liters = newLiters;
-    docsObj.fuel_last_calibrated_at = new Date().toISOString();
+    // Обновляем текущий остаток только если автомобиль уже был откалиброван администратором вручную
+    if (docsObj.fuel_last_calibrated_at && typeof docsObj.fuel_current_liters === 'number') {
+      docsObj.fuel_current_liters = newLiters;
+    }
 
     const cleanNotes = notes.replace(/\[DOCS_DATA:\{.*?\}\]/g, '').trim();
     const updatedNotes = `${cleanNotes ? cleanNotes + '\n' : ''}[DOCS_DATA:${JSON.stringify(docsObj)}]`;

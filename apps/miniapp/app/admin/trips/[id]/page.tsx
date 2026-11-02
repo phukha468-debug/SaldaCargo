@@ -214,11 +214,42 @@ export default function AdminTripDetailPage() {
             </p>
           )}
           {fuelAudit?.hasDiscrepancy && (
-            <div
-              className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${fuelAudit.badgeClass}`}
-            >
-              <span>{fuelAudit.badgeText}</span>
-            </div>
+            <details className="group bg-rose-50 border border-rose-200 rounded-xl overflow-hidden mt-2">
+              <summary className="p-2.5 text-xs font-bold text-rose-800 flex items-center justify-between cursor-pointer list-none select-none">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded bg-rose-600 text-white flex items-center justify-center text-[10px]">
+                    ⚠️
+                  </span>
+                  <span>{fuelAudit.badgeText}</span>
+                </span>
+                <span className="text-[10px] text-rose-600 underline font-semibold ml-2 shrink-0 group-open:hidden">
+                  детали
+                </span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 border-t border-rose-100 text-xs text-rose-950 grid grid-cols-2 gap-1.5 bg-rose-50/50">
+                <div>
+                  Емкость бака: <b>{fuelAudit.tankCapacity} л</b>
+                </div>
+                <div>
+                  Было в баке:{' '}
+                  <b>
+                    {fuelAudit.isCalibrated ? `${fuelAudit.currentTankLiters} л` : 'Не калиброван'}
+                  </b>
+                </div>
+                <div>
+                  Заправлено: <b>{fuelAudit.totalFuelAddedLiters} л</b>
+                </div>
+                <div>
+                  Пробег рейса: <b>{fuelAudit.mileageKm} км</b>
+                </div>
+                <div>
+                  Расход по норме: <b>{fuelAudit.fuelConsumedLiters} л</b>
+                </div>
+                <div>
+                  Расчётный остаток: <b>{fuelAudit.estimatedRemainingLiters} л</b>
+                </div>
+              </div>
+            </details>
           )}
           {trip.driver_note && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
