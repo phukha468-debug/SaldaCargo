@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDate, formatDuration } from '@saldacargo/shared';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
+import { TripDetailsModal } from '@/components/TripDetailsModal';
 
 type TripCard = {
   id: string;
@@ -46,6 +47,7 @@ export default function RootPage() {
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
   const [showPrrModal, setShowPrrModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [selectedTripIdForModal, setSelectedTripIdForModal] = useState<string | null>(null);
   const [updatingVehicle, setUpdatingVehicle] = useState(false);
   const [startingTrip, setStartingTrip] = useState(false);
   const [startTripError, setStartTripError] = useState('');
@@ -216,50 +218,49 @@ export default function RootPage() {
   if (!user) return null;
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Приветствие */}
-      <div className="mb-2">
-        <h1 className="text-2xl font-black text-zinc-900">Привет, {user.name}! 👋</h1>
+    <div className="p-3 space-y-2">
+      {/* Приветствие (в 2 раза меньше по высоте) */}
+      <div className="mb-0.5">
+        <h1 className="text-base font-black text-zinc-900 leading-tight">
+          Привет, {user.name}! 👋
+        </h1>
       </div>
 
-      {/* Карточка подотчёта */}
+      {/* Карточки подотчёта и ЗП (по высоте уменьшены в 3 раза, только суммы и мелкие подписи) */}
       <AccountableCard
         balance={data?.accountableBalance ?? '0'}
         carryover={data?.activeCarryover}
       />
 
-      {/* Карточка ЗП */}
       <PayCard
         approved={data?.monthPayApproved ?? '0'}
         draft={data?.monthPayDraft ?? '0'}
         pendingCount={data?.pendingPayrollCount ?? 0}
       />
 
-      {/* Карточка активного автомобиля с быстрой сменой */}
+      {/* Карточка активного автомобиля с быстрой сменой (в 2 раза меньше по высоте) */}
       {!data?.activeTrip && (
-        <div className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-sm flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">
+        <div className="bg-white rounded-xl px-3 py-2 border border-zinc-200 shadow-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base shrink-0">
               {activeAsset?.reg_number === 'БЕЗ АВТО' ? '👷' : '🚚'}
-            </div>
-            <div>
-              <div className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider">
-                {activeAsset?.reg_number === 'БЕЗ АВТО'
-                  ? 'Виртуальный объект'
-                  : 'Активный автомобиль'}
-              </div>
-              <div className="text-sm font-black text-zinc-900">
+            </span>
+            <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider">
+                Авто:
+              </span>
+              <span className="text-xs font-black text-zinc-900 truncate">
                 {activeAsset ? (
                   <>
                     {activeAsset.short_name}{' '}
-                    <span className="text-xs text-zinc-500 font-bold">
+                    <span className="text-[11px] text-zinc-500 font-bold">
                       · {activeAsset.reg_number}
                     </span>
                   </>
                 ) : (
-                  <span className="text-orange-600">Не выбран</span>
+                  <span className="text-orange-600 font-bold">Не выбран</span>
                 )}
-              </div>
+              </span>
             </div>
           </div>
 
@@ -268,7 +269,7 @@ export default function RootPage() {
               setSelectedVehicleId(activeAssetId || null);
               setShowVehiclePicker(true);
             }}
-            className="px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-orange-700 text-xs font-black uppercase tracking-wider active:scale-95 transition-all"
+            className="px-2.5 py-1 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 text-[10px] font-black uppercase tracking-wider active:scale-95 transition-all shrink-0"
           >
             🔄 Сменить
           </button>
@@ -281,7 +282,7 @@ export default function RootPage() {
           <button
             onClick={handleStartTrip}
             disabled={startingTrip}
-            className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white rounded-xl py-5 text-lg font-black shadow-lg active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
+            className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white rounded-xl py-3 text-sm font-black shadow-md active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
           >
             <span>{activeAsset?.reg_number === 'БЕЗ АВТО' ? '👷' : '🚚'}</span>
             <span>
@@ -296,7 +297,7 @@ export default function RootPage() {
       </div>
 
       {startTripError && (
-        <div className="bg-red-50 border-2 border-red-200 rounded-lg px-4 py-3 text-red-700 text-sm font-bold">
+        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-red-700 text-xs font-bold">
           {startTripError}
         </div>
       )}
@@ -387,35 +388,51 @@ export default function RootPage() {
         </div>
       )}
 
-      {/* Активный рейс */}
+      {/* Активный рейс (компактный) */}
       {data?.activeTrip && <ActiveTripCard trip={data.activeTrip} />}
 
-      {/* Рейсы на ревью (завершены, ожидают апрува) */}
+      {/* Рейсы на ревью (завершены, ожидают апрува, уменьшены в 2 раза по высоте) */}
       {(data?.reviewTrips ?? []).length > 0 && (
-        <section className="pt-2">
-          <h2 className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-3">
+        <section className="pt-1">
+          <h2 className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">
             На проверке у администратора
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {data?.reviewTrips.map((trip) => (
-              <ReviewTripCard key={trip.id} trip={trip} />
+              <ReviewTripCard
+                key={trip.id}
+                trip={trip}
+                onClick={() => setSelectedTripIdForModal(trip.id)}
+              />
             ))}
           </div>
         </section>
       )}
 
-      {/* Последние рейсы */}
+      {/* Последние рейсы (уменьшены в 2 раза по высоте) */}
       {(data?.recentTrips ?? []).length > 0 && (
-        <section className="pt-2">
-          <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">
+        <section className="pt-1">
+          <h2 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
             Последние рейсы
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {data?.recentTrips.map((trip) => (
-              <RecentTripCard key={trip.id} trip={trip} />
+              <RecentTripCard
+                key={trip.id}
+                trip={trip}
+                onClick={() => setSelectedTripIdForModal(trip.id)}
+              />
             ))}
           </div>
         </section>
+      )}
+
+      {/* Детали рейса (модальное окно с клиентами и заказами) */}
+      {selectedTripIdForModal && (
+        <TripDetailsModal
+          tripId={selectedTripIdForModal}
+          onClose={() => setSelectedTripIdForModal(null)}
+        />
       )}
 
       {/* Модалка быстрого создания ПРР */}
@@ -435,8 +452,6 @@ export default function RootPage() {
   );
 }
 
-// ... (остальные компоненты карточек остаются без изменений)
-
 function AccountableCard({
   balance,
   carryover,
@@ -445,32 +460,28 @@ function AccountableCard({
   carryover?: { id: string; amount: string; note: string; date: string } | null;
 }) {
   return (
-    <Link href="/driver/finance?tab=accountable">
+    <Link href="/driver/finance?tab=accountable" className="block">
       <div
-        className={`rounded-lg p-4 shadow-sm border transition-colors ${
+        className={`rounded-xl px-3 py-1.5 shadow-2xs border transition-colors flex items-center justify-between ${
           carryover
             ? 'bg-orange-50 border-orange-300'
             : 'bg-white border-zinc-200 active:bg-zinc-50'
         }`}
       >
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-            На руках к сдаче
-          </p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+            Подотчёт
+          </span>
           {carryover && (
-            <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded">
-              Перенос со вчера
+            <span className="text-[8px] bg-red-100 text-red-700 font-black px-1 rounded">
+              ⚠️ перенос
             </span>
           )}
         </div>
-        <Money amount={balance} className="text-2xl font-black text-zinc-900 mt-1" />
-        {carryover ? (
-          <p className="text-xs text-red-600 mt-1 font-semibold">
-            ⚠️ В т.ч. перенос: {carryover.amount} ₽ (сдать поверх смены)
-          </p>
-        ) : (
-          <p className="text-xs text-zinc-400 mt-1 font-medium">Подотчётные наличные →</p>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          <Money amount={balance} className="text-sm font-black text-zinc-900" />
+          <span className="text-zinc-300 text-xs font-bold">→</span>
+        </div>
       </div>
     </Link>
   );
@@ -487,23 +498,28 @@ function PayCard({
 }) {
   const hasDraft = parseFloat(draft) > 0;
   return (
-    <Link href="/driver/finance?tab=pay">
-      <div className="bg-white rounded-lg p-4 shadow-sm border border-zinc-200 active:bg-zinc-50 transition-colors relative">
-        {pendingCount > 0 && (
-          <div className="absolute top-3 right-3 bg-amber-500 text-white text-[9px] font-black rounded-full px-2 py-0.5 uppercase tracking-wide">
-            {pendingCount} ожидает подтв.
-          </div>
-        )}
-        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">ЗП за месяц</p>
-        <Money amount={approved} className="text-2xl font-black text-green-600 mt-1" />
-        {hasDraft && (
-          <div className="text-xs text-amber-600 mt-1 font-bold">
-            В черновиках: <Money amount={draft} />
-          </div>
-        )}
-        <p className="text-xs text-zinc-400 mt-1 font-medium">
-          {pendingCount > 0 ? '⚠️ Требует подтверждения →' : 'Детализация →'}
-        </p>
+    <Link href="/driver/finance?tab=salary" className="block">
+      <div className="bg-white rounded-xl px-3 py-1.5 shadow-2xs border border-zinc-200 active:bg-zinc-50 transition-colors flex items-center justify-between">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+            ЗП за месяц
+          </span>
+          {pendingCount > 0 && (
+            <span className="bg-amber-500 text-white text-[8px] font-black rounded-full px-1.5 py-0.2">
+              {pendingCount} ждёт
+            </span>
+          )}
+          {hasDraft && (
+            <span className="text-[9px] text-amber-600 font-bold">
+              (+
+              <Money amount={draft} />)
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Money amount={approved} className="text-sm font-black text-green-600" />
+          <span className="text-zinc-300 text-xs font-bold">→</span>
+        </div>
       </div>
     </Link>
   );
@@ -531,30 +547,37 @@ function ActiveTripCard({
   const durationMin = Math.floor(durationMs / 60000);
 
   return (
-    <Link href={`/trip/${trip.id}`}>
-      <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4 active:bg-orange-100 transition-colors relative overflow-hidden">
+    <Link href={`/trip/${trip.id}`} className="block">
+      <div className="bg-orange-50/70 border border-orange-300 rounded-xl px-3 py-2 active:bg-orange-100 transition-colors relative overflow-hidden flex items-center justify-between">
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500"></div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
-            Активный рейс
-          </span>
-          <span className="text-xs font-bold text-orange-500">⏱ {formatDuration(durationMin)}</span>
+        <div className="pl-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[9px] font-bold text-orange-700 uppercase bg-orange-100 px-1 rounded">
+              В рейсе
+            </span>
+            <span className="font-black text-zinc-900 text-xs">Рейс №{trip.trip_number}</span>
+            <span className="text-[11px] text-zinc-600 font-medium truncate">
+              · {trip.asset?.short_name ?? 'Без авто'}
+            </span>
+            {trip.loader && (
+              <span className="text-[10px] text-zinc-500 font-medium truncate">
+                · + {trip.loader.name}
+              </span>
+            )}
+          </div>
         </div>
-        <p className="font-black text-zinc-900 text-lg">
-          Рейс №{trip.trip_number} · {trip.asset?.short_name ?? 'Без авто'}
-        </p>
-        {trip.loader && (
-          <p className="text-sm text-zinc-600 font-bold mt-0.5">+ {trip.loader.name}</p>
-        )}
-        <p className="text-sm text-orange-600 font-black mt-2 uppercase tracking-wide">
-          Открыть рейс →
-        </p>
+        <div className="flex items-center gap-1 shrink-0 ml-2">
+          <span className="text-[11px] font-bold text-orange-600">
+            ⏱ {formatDuration(durationMin)}
+          </span>
+          <span className="text-orange-600 text-xs font-bold">→</span>
+        </div>
       </div>
     </Link>
   );
 }
 
-function ReviewTripCard({ trip }: { trip: TripCard }) {
+function ReviewTripCard({ trip, onClick }: { trip: TripCard; onClick: () => void }) {
   const orders = trip.trip_orders ?? [];
   const revenue = orders
     .filter((o) => o?.lifecycle_status !== 'cancelled')
@@ -565,35 +588,36 @@ function ReviewTripCard({ trip }: { trip: TripCard }) {
     .reduce((s, o) => s + (parseFloat(o?.driver_pay || '0') || 0), 0);
 
   return (
-    <Link href={`/trip/${trip.id}`}>
-      <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 active:bg-amber-100 transition-colors relative overflow-hidden">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+    <div
+      onClick={onClick}
+      className="bg-amber-50/60 border border-amber-300 rounded-xl px-3 py-2 active:bg-amber-100 transition-colors relative overflow-hidden flex items-center justify-between cursor-pointer"
+    >
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+      <div className="pl-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-black text-zinc-900 text-xs">Рейс №{trip.trip_number}</span>
+          <span className="text-[11px] text-zinc-600 font-medium truncate">
+            · {trip.asset?.short_name ?? 'Без авто'}
+          </span>
+          <span className="text-[9px] text-amber-700 font-bold bg-amber-100 px-1 rounded">
             Ждёт проверки
           </span>
-          <span className="text-[10px] font-bold text-amber-600">
-            {trip.started_at ? formatDate(trip.started_at) : '—'}
-          </span>
-        </div>
-        <p className="font-black text-zinc-900 text-base">
-          Рейс №{trip.trip_number} · {trip.asset?.short_name ?? 'Без авто'}
-        </p>
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-amber-700 font-bold">Администратор ещё не проверил</p>
-          <div className="text-right">
-            <Money amount={revenue.toString()} className="text-sm font-black text-zinc-900" />
-            <div className="text-xs text-green-600 font-bold">
-              ЗП: <Money amount={driverPay.toString()} />
-            </div>
-          </div>
         </div>
       </div>
-    </Link>
+      <div className="flex items-center gap-2 shrink-0 ml-2">
+        <div className="text-right">
+          <Money amount={revenue.toString()} className="text-xs font-black text-zinc-900" />
+          <div className="text-[10px] text-green-600 font-bold">
+            ЗП: <Money amount={driverPay.toString()} />
+          </div>
+        </div>
+        <span className="text-zinc-400 text-xs font-bold">ℹ️</span>
+      </div>
+    </div>
   );
 }
 
-function RecentTripCard({ trip }: { trip: TripCard }) {
+function RecentTripCard({ trip, onClick }: { trip: TripCard; onClick: () => void }) {
   const orders = trip.trip_orders ?? [];
   const revenue = orders
     .filter((o) => o?.lifecycle_status !== 'cancelled')
@@ -604,30 +628,35 @@ function RecentTripCard({ trip }: { trip: TripCard }) {
     .reduce((s, o) => s + (parseFloat(o?.driver_pay || '0') || 0), 0);
 
   return (
-    <Link href={`/trip/${trip.id}`}>
-      <div className="bg-white rounded-lg p-4 shadow-sm border border-zinc-200 flex items-center justify-between active:bg-zinc-50 transition-colors relative overflow-hidden">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
-        <div className="pl-2">
-          <p className="font-bold text-zinc-900 text-sm">
-            Рейс №{trip.trip_number} · {trip.asset?.short_name ?? 'Без авто'}
-          </p>
-          <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
-            {trip.started_at ? formatDate(trip.started_at) : '—'}
-          </p>
-        </div>
-        <div className="text-right">
-          <Money amount={revenue.toString()} className="text-sm font-black text-zinc-900" />
-          <div className="text-xs text-green-600 font-bold mt-0.5">
-            ЗП: <Money amount={driverPay.toString()} />
-          </div>
-          <div className="mt-1">
-            <LifecycleBadge
-              status={trip.lifecycle_status as 'draft' | 'approved' | 'returned' | 'cancelled'}
-            />
-          </div>
+    <div
+      onClick={onClick}
+      className="bg-white rounded-xl px-3 py-2 border border-zinc-200 flex items-center justify-between active:bg-zinc-50 transition-colors relative overflow-hidden cursor-pointer"
+    >
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
+      <div className="pl-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-bold text-zinc-900 text-xs">Рейс №{trip.trip_number}</span>
+          <span className="text-[11px] text-zinc-500 font-medium truncate">
+            · {trip.asset?.short_name ?? 'Без авто'}
+          </span>
+          <span className="text-[10px] text-zinc-400 font-medium">
+            · {trip.started_at ? formatDate(trip.started_at) : ''}
+          </span>
         </div>
       </div>
-    </Link>
+      <div className="flex items-center gap-2 shrink-0 ml-2">
+        <div className="text-right">
+          <Money amount={revenue.toString()} className="text-xs font-black text-zinc-900" />
+          <div className="text-[10px] text-green-600 font-bold">
+            ЗП: <Money amount={driverPay.toString()} />
+          </div>
+        </div>
+        <LifecycleBadge
+          status={trip.lifecycle_status as 'draft' | 'approved' | 'returned' | 'cancelled'}
+        />
+        <span className="text-zinc-400 text-xs font-bold">ℹ️</span>
+      </div>
+    </div>
   );
 }
 

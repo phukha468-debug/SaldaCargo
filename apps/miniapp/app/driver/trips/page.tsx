@@ -2,11 +2,14 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
+import { useState } from 'react';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDate } from '@saldacargo/shared';
+import { TripDetailsModal } from '@/components/TripDetailsModal';
 
 export default function TripsPage() {
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+
   const { data: trips, isLoading } = useQuery<any[]>({
     queryKey: ['driver-trips'],
     queryFn: async () => {
@@ -19,80 +22,93 @@ export default function TripsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 space-y-4 animate-pulse">
-        <div className="h-8 w-48 bg-zinc-200 rounded mb-6" />
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="bg-zinc-200 rounded-lg h-20" />
+      <div className="p-3 space-y-2 animate-pulse">
+        <div className="h-6 w-36 bg-zinc-200 rounded mb-3" />
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="bg-zinc-200 rounded-xl h-12" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-6">
-      <header>
-        <h1 className="text-2xl font-black text-zinc-900 uppercase tracking-tight">
+    <div className="p-3 space-y-2">
+      <header className="mb-1">
+        <h1 className="text-base font-black text-zinc-900 uppercase tracking-tight">
           История рейсов
         </h1>
       </header>
 
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         {(trips ?? []).length === 0 ? (
-          <div className="text-center py-20 text-zinc-400 font-bold uppercase tracking-widest text-sm">
+          <div className="text-center py-16 text-zinc-400 font-bold uppercase tracking-widest text-xs">
             Рейсов пока нет
           </div>
         ) : (
-          trips?.map((trip) => <TripHistoryCard key={trip.id} trip={trip} />)
+          trips?.map((trip) => (
+            <TripHistoryCard key={trip.id} trip={trip} onClick={() => setSelectedTripId(trip.id)} />
+          ))
         )}
       </div>
+
+      {/* Модальное окно деталей рейса с клиентами */}
+      {selectedTripId && (
+        <TripDetailsModal tripId={selectedTripId} onClose={() => setSelectedTripId(null)} />
+      )}
     </div>
   );
 }
 
-function TripHistoryCard({ trip }: { trip: any }) {
+function TripHistoryCard({ trip, onClick }: { trip: any; onClick: () => void }) {
   const activeOrders = (trip.trip_orders ?? []).filter(
     (o: any) => o.lifecycle_status !== 'cancelled',
   );
-  const revenue = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
-  const driverPay = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
+  const revenue = activeOrders.reduce((s: number, o: any) => s + (parseFloat(o.amount) || 0), 0);
+  const driverPay = activeOrders.reduce(
+    (s: number, o: any) => s + (parseFloat(o.driver_pay) || 0),
+    0,
+  );
+
+  const hasMileage =
+    trip.odometer_end != null &&
+    trip.odometer_start != null &&
+    trip.odometer_end >= trip.odometer_start;
+  const mileageKm = hasMileage ? trip.odometer_end - trip.odometer_start : null;
 
   return (
-    <Link href={`/trip/${trip.id}`}>
-      <div className="bg-white rounded-lg p-4 shadow-sm border border-zinc-200 flex items-center justify-between active:bg-zinc-50 transition-colors relative overflow-hidden">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
-        <div className="pl-2">
-          <p className="font-bold text-zinc-900 text-sm">
-            Рейс №{trip.trip_number} · {trip.asset?.short_name ?? '—'}
-          </p>
-          <p className="text-[10px] text-zinc-400 font-bold uppercase mt-1">
-            {formatDate(trip.started_at)}
-          </p>
-          {(trip.odometer_end != null || trip.odometer_start != null) && (
-            <p className="text-[11px] text-zinc-500 font-semibold mt-1">
-              🛣{' '}
-              {trip.odometer_end && trip.odometer_start && trip.odometer_end >= trip.odometer_start
-                ? `${(trip.odometer_end - trip.odometer_start).toLocaleString('ru-RU')} км`
-                : '—'}
-              {trip.odometer_end != null && (
-                <span className="text-zinc-400 font-normal ml-1">
-                  (на одометре: {trip.odometer_end.toLocaleString('ru-RU')} км)
-                </span>
-              )}
-            </p>
+    <div
+      onClick={onClick}
+      className="bg-white rounded-xl px-3 py-2 border border-zinc-200 flex items-center justify-between active:bg-zinc-50 transition-colors relative overflow-hidden cursor-pointer shadow-2xs"
+    >
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-zinc-300"></div>
+      <div className="pl-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-bold text-zinc-900 text-xs">Рейс №{trip.trip_number}</span>
+          <span className="text-[11px] text-zinc-500 font-medium truncate">
+            · {trip.asset?.short_name ?? '—'}
+          </span>
+          <span className="text-[10px] text-zinc-400 font-medium">
+            · {formatDate(trip.started_at)}
+          </span>
+          {mileageKm != null && (
+            <span className="text-[10px] text-zinc-500 font-semibold bg-zinc-100 px-1 py-0.2 rounded">
+              🛣 {mileageKm.toLocaleString('ru-RU')} км
+            </span>
           )}
         </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0 ml-2">
         <div className="text-right">
-          <Money amount={revenue.toString()} className="text-sm font-black text-zinc-900" />
-          <div className="text-xs text-green-600 font-bold mt-0.5">
+          <Money amount={revenue.toString()} className="text-xs font-black text-zinc-900" />
+          <div className="text-[10px] text-green-600 font-bold">
             ЗП: <Money amount={driverPay.toString()} />
           </div>
-          <div className="mt-1">
-            <LifecycleBadge
-              status={trip.lifecycle_status as 'draft' | 'approved' | 'returned' | 'cancelled'}
-            />
-          </div>
         </div>
+        <LifecycleBadge
+          status={trip.lifecycle_status as 'draft' | 'approved' | 'returned' | 'cancelled'}
+        />
+        <span className="text-zinc-400 text-xs font-bold">ℹ️</span>
       </div>
-    </Link>
+    </div>
   );
 }

@@ -62,7 +62,7 @@ function FinanceContent() {
         </div>
       </div>
 
-      <main className="p-4 space-y-6">
+      <main className="p-3 space-y-3">
         {tab === 'salary' ? (
           <SalaryTab salary={data?.salary} />
         ) : (
@@ -79,33 +79,23 @@ function AccountableTab({ accountable }: { accountable: any }) {
   const transactions = accountable?.transactions ?? [];
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl p-5 border border-zinc-200 shadow-sm">
-        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-          Наличные на руках (к сдаче)
-        </p>
-        <Money amount={balance} className="text-3xl font-black text-zinc-900 mt-1" />
-        <p className="text-xs text-zinc-500 mt-1">
-          Сумма принятых наличных от клиентов, подлежащая сдаче в сейф кассы компании
-        </p>
-
-        {carryover && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl space-y-1">
-            <p className="text-xs font-black text-red-700">
-              ⚠️ В т.ч. перенос с прошлого дня: {carryover.amount} ₽
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl px-4 py-3 border border-zinc-200 shadow-2xs flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider">
+            Наличные к сдаче в кассу
+          </p>
+          {carryover && (
+            <p className="text-[10px] font-bold text-red-600 mt-0.5">
+              ⚠️ Перенос: {carryover.amount} ₽ (сдать поверх смены)
             </p>
-            {carryover.note && (
-              <p className="text-[11px] text-red-600">Причина: {carryover.note}</p>
-            )}
-            <p className="text-[11px] font-bold text-red-700">
-              Сдать в кассу поверх выручки текущей смены!
-            </p>
-          </div>
-        )}
+          )}
+        </div>
+        <Money amount={balance} className="text-2xl font-black text-zinc-900" />
       </div>
 
-      <div className="space-y-3">
-        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
+      <div className="space-y-2">
+        <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-200 pb-1.5">
           История приёма наличных
         </h2>
         {transactions.length === 0 ? (
@@ -113,19 +103,19 @@ function AccountableTab({ accountable }: { accountable: any }) {
             Заказов с наличными нет
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {transactions.map((tx: any) => (
               <div
                 key={tx.id}
-                className="bg-white rounded-xl p-3 border border-zinc-200 flex justify-between items-center shadow-sm"
+                className="bg-white rounded-xl px-3 py-2 border border-zinc-200 flex justify-between items-center shadow-2xs"
               >
                 <div>
-                  <p className="font-bold text-sm text-zinc-900">{tx.description || 'Рейс'}</p>
-                  <p className="text-[10px] text-zinc-400 font-medium mt-0.5">
+                  <p className="font-bold text-xs text-zinc-900">{tx.description || 'Рейс'}</p>
+                  <p className="text-[10px] text-zinc-400 font-medium">
                     {tx.created_at ? new Date(tx.created_at).toLocaleString('ru-RU') : ''}
                   </p>
                 </div>
-                <Money amount={tx.amount} className="font-black text-base text-zinc-900" />
+                <Money amount={tx.amount} className="font-black text-sm text-zinc-900" />
               </div>
             ))}
           </div>
@@ -185,41 +175,51 @@ function SalaryTab({ salary }: { salary: any }) {
     const dateStr = accrual.date
       ? new Date(accrual.date).toLocaleDateString('ru-RU', {
           day: 'numeric',
-          month: 'long',
+          month: 'short',
         })
       : '—';
     return (
       <div
         key={accrual.id}
-        className="bg-white rounded-lg p-4 border border-zinc-200 flex justify-between items-center shadow-sm relative overflow-hidden"
+        className="bg-white rounded-xl px-3 py-2 border border-zinc-200 flex justify-between items-center shadow-2xs relative overflow-hidden"
       >
         <div
           className={`absolute left-0 top-0 bottom-0 w-1 ${isPaid ? 'bg-green-500' : 'bg-zinc-400'}`}
         />
-        <div className="pl-2">
-          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
-            {accrual.label}
-          </p>
-          <p className="font-bold text-zinc-900 text-sm mt-0.5">
-            {accrual.trip_number ? `Рейс №${accrual.trip_number}` : '—'}
-            {accrual.asset_name ? ` · ${accrual.asset_name}` : ''}
-          </p>
-          <p className="text-[10px] text-zinc-400 font-bold uppercase mt-0.5">{dateStr}</p>
+        <div className="pl-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-bold text-zinc-900 text-xs">
+              {accrual.trip_number ? `Рейс №${accrual.trip_number}` : accrual.label || 'Начисление'}
+            </span>
+            {accrual.asset_name && (
+              <span className="text-[11px] text-zinc-500 font-medium truncate">
+                · {accrual.asset_name}
+              </span>
+            )}
+            <span className="text-[10px] text-zinc-400 font-medium">· {dateStr}</span>
+          </div>
+          {accrual.label && accrual.trip_number && (
+            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider truncate">
+              {accrual.label}
+            </p>
+          )}
         </div>
-        <div className="text-right">
-          <Money amount={accrual.amount} className="font-black text-sm text-zinc-900" />
-          <p
-            className={`text-[9px] font-black uppercase mt-1 ${isPaid ? 'text-green-600' : 'text-zinc-400'}`}
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          <Money amount={accrual.amount} className="font-black text-xs text-zinc-900" />
+          <span
+            className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+              isPaid ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-600'
+            }`}
           >
             {isPaid ? '✓ Выплачено' : 'К выплате'}
-          </p>
+          </span>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Секция подтверждения ЗП */}
       {pending.length > 0 && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl overflow-hidden shadow-sm">
@@ -304,28 +304,32 @@ function SalaryTab({ salary }: { salary: any }) {
         />
       )}
 
-      {/* Итог: накоплено */}
-      <div className="bg-white rounded-lg border-2 border-zinc-200 p-6 shadow-sm flex flex-col items-center">
-        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
-          Накоплено к выплате
-        </p>
-        <Money amount={accumulatedTotal} className="text-4xl font-black text-green-600" />
-        {pending.length > 0 && (
-          <p className="text-xs font-bold text-amber-600 mt-2">
-            + ещё{' '}
-            <Money
-              amount={pending.reduce((s: number, x: any) => s + parseFloat(x.amount), 0).toFixed(2)}
-            />{' '}
-            ожидает подтверждения
+      {/* Итог: накоплено (в 2 раза меньше по высоте) */}
+      <div className="bg-white rounded-xl border border-zinc-200 px-4 py-3 shadow-2xs flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-wider">
+            Накоплено к выплате
           </p>
-        )}
+          {pending.length > 0 && (
+            <p className="text-[10px] font-bold text-amber-600 mt-0.5">
+              + ещё{' '}
+              <Money
+                amount={pending
+                  .reduce((s: number, x: any) => s + parseFloat(x.amount), 0)
+                  .toFixed(2)}
+              />{' '}
+              ожидает подтверждения
+            </p>
+          )}
+        </div>
+        <Money amount={accumulatedTotal} className="text-2xl font-black text-green-600" />
       </div>
 
       {/* История начислений */}
-      <div className="space-y-6">
+      <div className="space-y-3">
         {unpaidAccruals.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
+          <div className="space-y-1.5">
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-200 pb-1.5">
               Ожидает выплаты
             </h2>
             {unpaidAccruals.map(renderAccrual)}
@@ -333,8 +337,8 @@ function SalaryTab({ salary }: { salary: any }) {
         )}
 
         {paidAccruals.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-[10px] font-black text-green-600 uppercase tracking-widest border-b-2 border-green-100 pb-2">
+          <div className="space-y-1.5">
+            <h2 className="text-[10px] font-black text-green-600 uppercase tracking-widest border-b border-green-200 pb-1.5">
               Уже выплачено
             </h2>
             {paidAccruals.map(renderAccrual)}
@@ -342,11 +346,11 @@ function SalaryTab({ salary }: { salary: any }) {
         )}
 
         {accruals.length === 0 && (
-          <div className="space-y-3">
-            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b-2 border-zinc-100 pb-2">
+          <div className="space-y-2">
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-200 pb-1.5">
               История начислений
             </h2>
-            <p className="text-center py-10 text-zinc-400 font-bold uppercase text-xs">
+            <p className="text-center py-8 text-zinc-400 font-bold uppercase text-xs">
               За последние 10 дней начислений нет
             </p>
           </div>
