@@ -4,6 +4,7 @@ import { useState, useRef, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ExpeditorBoard } from './expeditor-board';
+import { OrdersPipelineView } from '@/components/OrdersPipelineView';
 
 export type AtiOrder = {
   id: string;
@@ -158,7 +159,7 @@ const STAGE_CONFIG: Record<
 
 export default function AtiPage() {
   const queryClient = useQueryClient();
-  const [activeRole, setActiveRole] = useState<'carrier' | 'expeditor'>('carrier');
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'carrier' | 'expeditor'>('pipeline');
   const [filterDoc, setFilterDoc] = useState<'all' | 'etrn' | 'paper'>('all');
   const [selectedOrder, setSelectedOrder] = useState<AtiOrder | null>(null);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -579,45 +580,50 @@ export default function AtiPage() {
   return (
     <div className="w-full space-y-2 pb-6">
       {/* ══════════════════════════════════════════════════════════════════════
-           ШАПКА РАЗДЕЛА С ПЕРЕКЛЮЧАТЕЛЕМ РОЛИ (ПЕРЕВОЗЧИК / ЭКСПЕДИТОР)
+           ШАПКА РАЗДЕЛА С ПЕРЕКЛЮЧАТЕЛЕМ (КОНВЕЙЕР / КАНБАН АТИ / ЭКСПЕДИТОР)
            ══════════════════════════════════════════════════════════════════════ */}
       <div className="bg-white border-2 border-slate-200 rounded-2xl p-3 shadow-2xs flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0">
-            {activeRole === 'carrier' ? '🚚' : '📦'}
+            {activeTab === 'pipeline' ? '📝' : activeTab === 'carrier' ? '🚚' : '📦'}
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight font-display">
-                АТИ ПЕРЕВОЗКИ
+                ЗАЯВКИ ГРУЗОВИКИ
               </h1>
-              {/* Главный Tab-переключатель роли */}
-              <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-300">
-                <Link
-                  href="/orders"
-                  className="px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 bg-emerald-600 text-white shadow-xs hover:bg-emerald-500"
-                >
-                  <span>📝 Заявки (Wialon)</span>
-                </Link>
+              {/* Главный Tab-переключатель */}
+              <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-300 gap-1">
                 <button
                   type="button"
-                  onClick={() => setActiveRole('carrier')}
-                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeRole === 'carrier'
+                  onClick={() => setActiveTab('pipeline')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'pipeline'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950'
+                  }`}
+                >
+                  <span>📝 Конвейер заявок & Wialon</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('carrier')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'carrier'
                       ? 'bg-white text-indigo-900 shadow-xs border border-slate-200'
                       : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
-                  <span>🚚 Мы — Перевозчик</span>
+                  <span>🚚 Канбан договоров АТИ</span>
                   <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded-full font-mono">
                     {activeOrders.length}
                   </span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveRole('expeditor')}
-                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeRole === 'expeditor'
+                  onClick={() => setActiveTab('expeditor')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'expeditor'
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'text-indigo-700 hover:text-indigo-950'
                   }`}
@@ -630,15 +636,17 @@ export default function AtiPage() {
               </div>
             </div>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              {activeRole === 'carrier'
-                ? 'Свой автопарк: Менеджер заносит Контрагента → Рейс → Водитель выбирает клиента → Дебиторка'
-                : 'Организация перевозок: привлечение сторонних перевозчиков, работа с физлицами и B2B, контроль маржи'}
+              {activeTab === 'pipeline'
+                ? 'Единый сквозной цикл: входящие заявки (АТИ, Логинет, реклама) → авто-старт Wialon → ЭТрН, ТН и путевой лист'
+                : activeTab === 'carrier'
+                  ? 'Свой автопарк: Канбан договоров АТИ, 7 этапов, отслеживание документов, претензионная работа 20%'
+                  : 'Организация перевозок: привлечение сторонних перевозчиков, работа с физлицами и B2B, контроль маржи'}
             </p>
           </div>
         </div>
 
-        {/* Фильтры и действия (для роли Перевозчик) */}
-        {activeRole === 'carrier' && (
+        {/* Фильтры и действия (для роли Канбан АТИ) */}
+        {activeTab === 'carrier' && (
           <div className="flex items-center gap-2 flex-wrap self-end xl:self-center">
             <div className="flex items-center bg-slate-100 rounded-xl p-0.5 border border-slate-300 text-xs font-bold">
               <button
@@ -739,11 +747,14 @@ export default function AtiPage() {
         )}
       </div>
 
-      {/* ── РЕЖИМ 2: ЭКСПЕДИТОР (Сторонние перевозчики, физлица, маржа, папки) ── */}
-      {activeRole === 'expeditor' && <ExpeditorBoard />}
+      {/* ── РЕЖИМ 1: КОНВЕЙЕР ЗАЯВОК & WIALON (Входящие, автозаполнение, документы, телематика) ── */}
+      {activeTab === 'pipeline' && <OrdersPipelineView />}
 
-      {/* ── РЕЖИМ 1: ПЕРЕВОЗЧИК (Собственный автопарк) ──────────────────── */}
-      {activeRole === 'carrier' && (
+      {/* ── РЕЖИМ 2: ЭКСПЕДИТОР (Сторонние перевозчики, физлица, маржа, папки) ── */}
+      {activeTab === 'expeditor' && <ExpeditorBoard />}
+
+      {/* ── РЕЖИМ 3: ПЕРЕВОЗЧИК (Канбан договоров АТИ, свой автопарк) ─────────── */}
+      {activeTab === 'carrier' && (
         <>
           {/* ══════════════════════════════════════════════════════════════════════
            БАННЕР АКТИВНОЙ ПРЕТЕНЗИОННОЙ РАБОТЫ (ТОЛЬКО НЕОПЛАЧЕННЫЕ ПРЕТЕНЗИИ)
