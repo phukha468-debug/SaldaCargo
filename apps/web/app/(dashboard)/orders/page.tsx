@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { OrdersPipelineView } from '@/components/OrdersPipelineView';
 
-export default function OrdersRedirectPage() {
-  redirect('/ati');
+export default function OrdersPage() {
+  return <OrdersPipelineView />;
 }

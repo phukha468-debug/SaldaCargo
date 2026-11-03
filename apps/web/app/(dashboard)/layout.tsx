@@ -9,6 +9,7 @@ import { SafeAdjustmentModal } from '@/components/SafeAdjustmentModal';
 
 const navItems = [
   { href: '/', label: 'Главная', icon: 'dashboard' },
+  { href: '/orders', label: 'Заявки', icon: 'assignment' },
   { href: '/ati', label: 'АТИ Перевозки', icon: 'local_shipping' },
   { href: '/review', label: 'Ревью рейсов', icon: 'rate_review' },
   { href: '/finance', label: 'Финансы / P&L', icon: 'account_balance_wallet' },
@@ -322,7 +323,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         {/* ── Horizontal Navigation Bar (Only for interior subpages, hidden on homepage) ── */}
         {pathname !== '/' && (
           <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-t border-slate-200/80">
-            <nav className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            <nav className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-1.5">
               {navItems.map((item) => {
                 const active = isNavActive(item.href);
                 const { count, isCritical } = getBadge(item.href);

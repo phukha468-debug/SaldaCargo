@@ -593,6 +593,12 @@ export default function AtiPage() {
               </h1>
               {/* Главный Tab-переключатель роли */}
               <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-300">
+                <Link
+                  href="/orders"
+                  className="px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 bg-emerald-600 text-white shadow-xs hover:bg-emerald-500"
+                >
+                  <span>📝 Заявки (Wialon)</span>
+                </Link>
                 <button
                   type="button"
                   onClick={() => setActiveRole('carrier')}

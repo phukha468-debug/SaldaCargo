@@ -4,6 +4,15 @@ import Link from 'next/link';
 
 const navigationCards = [
   {
+    href: '/orders',
+    title: 'Заявки (Wialon)',
+    subtitle: 'Конвейер заявок, авто-старт Wialon, путевые листы и ЭТрН',
+    icon: '📝',
+    badge: 'Конвейер',
+    badgeColor: 'bg-emerald-400 text-slate-900 border-slate-900',
+    cardBg: 'bg-emerald-50/80',
+  },
+  {
     href: '/ati',
     title: 'АТИ Перевозки',
     subtitle: 'Канбан договоров-заявок, 8 этапов, ЭТрН, Почта РФ и дебиторка',
@@ -80,8 +89,8 @@ const navigationCards = [
 export default function DashboardHome() {
   return (
     <div className="h-full flex flex-col justify-center max-w-7xl mx-auto w-full">
-      {/* Сетка 4x2 строго в пределах экрана без скролла */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 h-full max-h-[calc(100vh-140px)]">
+      {/* Сетка 3x3 */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 h-full max-h-[calc(100vh-140px)]">
         {navigationCards.map((card) => (
           <Link
             key={card.href}
