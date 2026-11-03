@@ -69,22 +69,84 @@ export async function handleVehicleDeparture(
     throw new Error(`Ошибка поиска заявки: ${orderErr.message}`);
   }
 
-  if (!order) {
-    return { success: false, message: 'Нет назначенной заявки для выезда ТС' };
+  let targetOrder = order;
+  let driverId = order?.assigned_driver_id;
+
+  // Если заявка не была создана заранее — создаем экстренную заявку со знаком внимания ⚠️
+  if (!targetOrder) {
+    // Ищем последнего водителя этого автомобиля из прошлых рейсов
+    if (!driverId) {
+      const { data: lastTrip } = await supabase
+        .from('trips')
+        .select('driver_id')
+        .eq('asset_id', params.vehicleId)
+        .not('driver_id', 'is', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      driverId = lastTrip?.driver_id;
+    }
+
+    if (!driverId) {
+      const { data: defaultDriver } = await supabase
+        .from('users')
+        .select('id')
+        .contains('roles', ['driver'])
+        .limit(1)
+        .maybeSingle();
+      driverId = defaultDriver?.id;
+    }
+
+    const autoDocNumber = `АВТО-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const { data: emergencyOrder, error: emergErr } = await supabase
+      .from('orders')
+      .insert({
+        source_type: 'direct_ad',
+        status: 'in_progress',
+        base_doc_name: '⚠️ ВЫЕЗД БЕЗ ЗАЯВКИ',
+        base_doc_number: autoDocNumber,
+        base_doc_date: departureTime.slice(0, 10),
+        cargo_name: '⚠️ Выезд без заявки (Wialon)',
+        cargo_condition: '⚠️ Необходимо заполнить данные груза',
+        loading_city: 'Верхняя Салда',
+        unloading_city: '⚠️ Требуется заполнить',
+        price_without_vat: 0,
+        price_with_vat: 0,
+        payment_method: 'bank_invoice',
+        payment_terms: '⚠️ Требуется заполнить условия оплаты',
+        assigned_vehicle_id: params.vehicleId,
+        assigned_driver_id: driverId,
+        actual_loading_arrival_at: departureTime,
+      })
+      .select()
+      .single();
+
+    if (emergErr) {
+      throw new Error(`Ошибка создания экстренной заявки: ${emergErr.message}`);
+    }
+
+    targetOrder = emergencyOrder;
   }
+
+  const isEmergency = !order;
+  const tripNote = isEmergency
+    ? `⚠️ Внимание: Автомашина выехала без заявки по геозоне Wialon! Заявка № ${targetOrder.base_doc_number}. Необходимо заполнить все данные.`
+    : `Авто-старт по геозоне Wialon. Заявка № ${targetOrder.base_doc_number || targetOrder.order_number}`;
 
   // Создаем связанный рейс в таблице trips
   const { data: newTrip, error: tripErr } = await supabase
     .from('trips')
     .insert({
       asset_id: params.vehicleId,
-      driver_id: order.assigned_driver_id,
+      driver_id: driverId,
       trip_type: 'intercity',
       status: 'in_progress',
       lifecycle_status: 'draft',
       odometer_start: params.odometer,
       started_at: departureTime,
-      driver_note: `Авто-старт по геозоне Wialon. Заявка № ${order.base_doc_number || order.order_number}`,
+      driver_note: tripNote,
     })
     .select()
     .single();
@@ -102,7 +164,7 @@ export async function handleVehicleDeparture(
       actual_loading_arrival_at: departureTime,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', order.id);
+    .eq('id', targetOrder.id);
 
   // Обновляем одометр актива
   await supabase
@@ -112,10 +174,14 @@ export async function handleVehicleDeparture(
 
   return {
     success: true,
-    orderId: order.id,
+    isEmergency,
+    orderId: targetOrder.id,
     tripId: newTrip.id,
     departureTime,
     status: 'in_progress',
+    message: isEmergency
+      ? '⚠️ Заявка создана автоматически (выезд без заявки). Требуется заполнение.'
+      : 'Рейс успешно запущен по заявке',
   };
 }
 
@@ -172,6 +238,13 @@ export async function handleVehicleArrival(
   const perDiemPay = daysCount * 1000;
   const totalDriverPay = kmPay + perDiemPay;
 
+  // Расчет расхода топлива по нормативу для Валдая: 18 л / 100 км
+  // Актуализируемая базовая цена: 82 руб/л (ТК и нал), льготный Кубик: 60 руб/л
+  const FUEL_RATE_PER_100KM = 18;
+  const FUEL_PRICE_TK = 82;
+  const fuelLiters = Number(((distanceKm * FUEL_RATE_PER_100KM) / 100).toFixed(1));
+  const defaultFuelCost = Math.round(fuelLiters * FUEL_PRICE_TK);
+
   // 1. Обновляем рейс: статус completed, lifecycle_status = 'draft' (ждет одобрения на странице ревью)
   await supabase
     .from('trips')
@@ -180,10 +253,25 @@ export async function handleVehicleArrival(
       ended_at: arrivalTime,
       status: 'completed',
       lifecycle_status: 'draft',
-      admin_note: `Пробег: ${distanceKm} км (${kmPay} ₽) + Суточные: ${daysCount} дн (${perDiemPay} ₽) = Итого ЗП: ${totalDriverPay} ₽`,
+      admin_note: `Пробег: ${distanceKm} км (${kmPay} ₽) + Суточные: ${daysCount} дн (${perDiemPay} ₽) = Итого ЗП: ${totalDriverPay} ₽ | Норматив ГСМ: ${fuelLiters} л (~${defaultFuelCost} ₽)`,
       updated_at: new Date().toISOString(),
     })
     .eq('id', trip.id);
+
+  // 1.1 Добавляем нормативный расход на ГСМ в trip_expenses (по умолчанию через ТК)
+  const CAT_FUEL_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+  const { error: fuelExpErr } = await supabase.from('trip_expenses').insert({
+    trip_id: trip.id,
+    category_id: CAT_FUEL_ID,
+    amount: defaultFuelCost,
+    payment_method: 'fuel_card',
+    description: `Топливо по нормативу (Валдай): ${fuelLiters} л (18л/100км @ ${FUEL_PRICE_TK}₽/л)`,
+    idempotency_key: crypto.randomUUID(),
+  });
+
+  if (fuelExpErr) {
+    console.error('Ошибка создания записи ГСМ trip_expenses:', fuelExpErr);
+  }
 
   // 2. Добавляем заказ в trip_orders для связки с финансовой системой
   const { error: tripOrderErr } = await supabase.from('trip_orders').insert({
@@ -227,6 +315,8 @@ export async function handleVehicleArrival(
     kmPay,
     perDiemPay,
     totalDriverPay,
+    fuelLiters,
+    fuelCost: defaultFuelCost,
     status: 'pending_review',
   };
 }

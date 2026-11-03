@@ -163,6 +163,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   debt_cash: '⏳ Долг',
   card_driver: '⚡ QR-код',
   fuel_card: '⛽ Топливная карта ТК',
+  cube: '🛢️ Кубик (Дизель)',
 };
 
 const PAYMENT_STYLES: Record<string, string> = {
@@ -173,6 +174,7 @@ const PAYMENT_STYLES: Record<string, string> = {
   card_driver:
     'bg-purple-600 text-white font-black border-purple-700 shadow-xs ring-2 ring-purple-300',
   fuel_card: 'bg-amber-600 text-white font-black border-amber-700 shadow-xs',
+  cube: 'bg-indigo-600 text-white font-black border-indigo-700 shadow-xs',
 };
 
 const PAYMENT_EDIT_OPTIONS = [
@@ -891,6 +893,40 @@ function EditModal({
 
   const updateExpense = (id: string, field: keyof EditableExpense, value: string) => {
     setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)));
+  };
+
+  const tripMileage =
+    trip.odometer_end && trip.odometer_start && trip.odometer_end >= trip.odometer_start
+      ? trip.odometer_end - trip.odometer_start
+      : 0;
+  const estimatedFuelLiters = Number(((tripMileage * 18) / 100).toFixed(1));
+
+  const handleFuelMethodChange = (id: string, newMethod: 'fuel_card' | 'cash' | 'cube') => {
+    setExpenses((prev) =>
+      prev.map((e) => {
+        if (e.id !== id) return e;
+        let newAmount = e.amount;
+        let newDesc = e.description;
+        if (estimatedFuelLiters > 0) {
+          if (newMethod === 'cube') {
+            newAmount = String(Math.round(estimatedFuelLiters * 60));
+            newDesc = `Топливо по нормативу (Кубик 60₽/л): ${estimatedFuelLiters} л`;
+          } else if (newMethod === 'cash') {
+            newAmount = String(Math.round(estimatedFuelLiters * 82));
+            newDesc = `Топливо по нормативу (Наличные 82₽/л): ${estimatedFuelLiters} л`;
+          } else {
+            newAmount = String(Math.round(estimatedFuelLiters * 82));
+            newDesc = `Топливо по нормативу (ТК 82₽/л): ${estimatedFuelLiters} л`;
+          }
+        }
+        return {
+          ...e,
+          payment_method: newMethod,
+          amount: newAmount,
+          description: newDesc,
+        };
+      }),
+    );
   };
 
   const addExpense = () => {
@@ -1709,34 +1745,50 @@ function EditModal({
 
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Способ оплаты
+                            Вид заправки (ГСМ)
                           </label>
-                          <div className="grid grid-cols-2 gap-1.5">
+                          <div className="grid grid-cols-3 gap-1">
                             <button
                               type="button"
-                              onClick={() => updateExpense(exp.id, 'payment_method', 'fuel_card')}
+                              onClick={() => handleFuelMethodChange(exp.id, 'fuel_card')}
                               className={cn(
-                                'px-2 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1',
+                                'px-1.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1',
                                 exp.payment_method === 'fuel_card'
                                   ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100',
                               )}
+                              title="Топливная карта ТК (82 ₽/л)"
                             >
                               <span>⛽</span>
-                              <span>Топл.карта</span>
+                              <span>ТК (82₽)</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => updateExpense(exp.id, 'payment_method', 'cash')}
+                              onClick={() => handleFuelMethodChange(exp.id, 'cash')}
                               className={cn(
-                                'px-2 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1',
+                                'px-1.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1',
                                 exp.payment_method === 'cash'
                                   ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100',
                               )}
+                              title="Наличные (82 ₽/л)"
                             >
                               <span>💵</span>
-                              <span>Наличные</span>
+                              <span>Нал (82₽)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleFuelMethodChange(exp.id, 'cube')}
+                              className={cn(
+                                'px-1.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1',
+                                exp.payment_method === 'cube'
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100',
+                              )}
+                              title="Кубик (60 ₽/л, списание со склада)"
+                            >
+                              <span>🛢️</span>
+                              <span>Кубик (60₽)</span>
                             </button>
                           </div>
                         </div>

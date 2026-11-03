@@ -12,9 +12,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     description?: string;
     receipt_photo?: string;
     idempotency_key: string;
+    odometer_end?: number | string | null;
   };
 
   const supabase = createAdminClient();
+
+  // Если передан одометр рейса — сразу обновляем рейс и одометр актива
+  if (
+    body.odometer_end != null &&
+    !isNaN(Number(body.odometer_end)) &&
+    Number(body.odometer_end) > 0
+  ) {
+    const odoNum = Number(body.odometer_end);
+    const { data: trip } = await (supabase.from('trips') as any)
+      .update({ odometer_end: odoNum, updated_at: new Date().toISOString() })
+      .eq('id', tripId)
+      .select('asset_id, odometer_start')
+      .maybeSingle();
+
+    if (trip?.asset_id) {
+      await (supabase.from('assets') as any)
+        .update({ odometer_current: odoNum, updated_at: new Date().toISOString() })
+        .eq('id', trip.asset_id);
+    }
+  }
 
   const { data, error } = await ((supabase.from('trip_expenses') as any)
     .insert({

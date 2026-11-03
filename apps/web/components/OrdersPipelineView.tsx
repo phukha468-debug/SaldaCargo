@@ -320,6 +320,14 @@ export function OrdersPipelineView() {
                     <span className="font-bold text-slate-900 truncate">
                       № {order.base_doc_number || order.order_number}
                     </span>
+                    {order.cargo_name?.includes('⚠️') && (
+                      <span
+                        className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-xs shrink-0"
+                        title="Автомашина выехала без заявки! Необходимо заполнить все данные"
+                      >
+                        ⚠️ БЕЗ ЗАЯВКИ
+                      </span>
+                    )}
                     <span className="text-[10px] text-slate-400">
                       (
                       {order.base_doc_date

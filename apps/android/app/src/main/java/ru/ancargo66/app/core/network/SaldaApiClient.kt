@@ -313,7 +313,8 @@ object SaldaApiClient {
         amount: Double,
         paymentMethod: String = "fuel_card",
         description: String? = null,
-        userId: String? = null
+        userId: String? = null,
+        odometerEnd: Long? = null
     ): Boolean = withContext(Dispatchers.IO) {
         cachedDriverSummary = null
         val body = buildJsonObject {
@@ -322,6 +323,7 @@ object SaldaApiClient {
             put("payment_method", paymentMethod)
             put("idempotency_key", UUID.randomUUID().toString())
             if (description != null) put("description", description)
+            if (odometerEnd != null && odometerEnd > 0L) put("odometer_end", odometerEnd)
         }.toString()
 
         val request = buildRequest("/api/trips/$tripId/expenses", method = "POST", bodyJson = body, userId = userId)

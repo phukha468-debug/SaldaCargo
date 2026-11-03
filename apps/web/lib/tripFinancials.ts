@@ -10,6 +10,7 @@ const TRIP_REVENUE_CATEGORY = FINANCIAL_CATEGORIES.TRIP_REVENUE;
 const CASH_ID = FINANCIAL_WALLETS.CASH;
 const BANK_ID = FINANCIAL_WALLETS.BANK;
 const FUEL_CARD_ID = FINANCIAL_WALLETS.FUEL_CARD;
+const FUEL_CUBE_ID = FINANCIAL_WALLETS.FUEL_CUBE;
 const PAYROLL_DRIVER_CAT = FINANCIAL_CATEGORIES.PAYROLL_DRIVER;
 const PAYROLL_LOADER_CAT = FINANCIAL_CATEGORIES.PAYROLL_LOADER;
 const CAT_FUEL = FINANCIAL_CATEGORIES.FUEL;
@@ -288,14 +289,18 @@ export async function syncTripFinancials(
       walletId = FUEL_CARD_ID;
     } else if (exp.payment_method === 'cash') {
       walletId = CASH_ID;
+    } else if (exp.payment_method === 'cube') {
+      walletId = FUEL_CUBE_ID;
     }
 
     if (!walletId) continue;
 
-    const catId = exp.category_id || (exp.payment_method === 'fuel_card' ? CAT_FUEL : CAT_OTHER);
+    const catId =
+      exp.category_id ||
+      (exp.payment_method === 'fuel_card' || exp.payment_method === 'cube' ? CAT_FUEL : CAT_OTHER);
     const desc = exp.description
       ? `Расход рейса №${trip.trip_number}: ${exp.description}`
-      : `Расход рейса №${trip.trip_number} (${exp.payment_method === 'fuel_card' ? 'Топливная карта' : 'Наличные'})`;
+      : `Расход рейса №${trip.trip_number} (${exp.payment_method === 'cube' ? 'Кубик ДТ' : exp.payment_method === 'fuel_card' ? 'Топливная карта' : 'Наличные'})`;
 
     const txIdemp = generateDeterministicUuid(`trip-expense-${exp.id}`);
 
