@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Интерактивная демонстрация: Сквозной конвейер заявок, ЭТрН, ТН и Путевой лист</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: #fff !important; padding: 0 !important; }
+    }
+    .print-only { display: none; }
+    .dense-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      white-space: nowrap;
+      padding: 0.5rem 0.75rem;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 font-sans p-4 sm:p-6 min-h-screen">
+
+  <div class="max-w-[1700px] mx-auto space-y-4 no-print">
+    {/* Хедер */}
+    <div class="bg-slate-900 text-white p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-xl font-black shadow-inner">
+          🚛
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-black tracking-tight">SALDA CARGO • КОНВЕЙЕР ЗАЯВОК И ЭТрН</h1>
+            <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-bold uppercase">
+              Production Verified
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">
+            Парсер PDF поручений • XML ЭТрН КНД 1110339 (windows-1251) • ТН ПП РФ 2116 • Путевой лист 4-С • Wialon
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs">
+        <a href="http://localhost:3000/orders" target="_blank" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow transition flex items-center gap-1.5">
+          <span>🚀 Открыть в веб-приложении (localhost:3000)</span>
+        </a>
+      </div>
+    </div>
+
+    {/* Верхняя строка управления: Фильтры + Кнопка новой заявки */}
+    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold">
+        <button onclick="filterStatus('all')" id="tab-all" class="px-3 py-1 bg-white text-indigo-700 rounded-md shadow-xs">
+          Все заявки (2)
+        </button>
+        <button onclick="filterStatus('waiting_vehicle')" id="tab-waiting_vehicle" class="px-3 py-1 text-slate-600 hover:text-slate-900 rounded-md">
+          ⏳ Лист ожидания (0)
+        </button>
+        <button onclick="filterStatus('assigned')" id="tab-assigned" class="px-3 py-1 text-slate-600 hover:text-slate-900 rounded-md">
+          📋 Назначены (0)
+        </button>
+        <button onclick="filterStatus('in_progress')" id="tab-in_progress" class="px-3 py-1 text-slate-600 hover:text-slate-900 rounded-md">
+          🚛 В пути (0)
+        </button>
+        <button onclick="filterStatus('pending_review')" id="tab-pending_review" class="px-3 py-1 text-slate-600 hover:text-slate-900 rounded-md">
+          🔍 На ревью (2)
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="openModal()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
+          <span>+ Создать заявку (PDF / Пресет)</span>
+        </button>
+      </div>
+    </div>
+
+    {/* DENSE 1-LINE СПИСОК ЗАЯВОК */}
+    <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider flex justify-between">
+        <span class="w-[210px]">Статус и документ</span>
+        <span class="w-[220px]">Заказчик / Экспедитор</span>
+        <span class="w-[160px]">Маршрут</span>
+        <span class="w-[200px]">Груз и масса</span>
+        <span class="w-[90px] text-right">Фрахт</span>
+        <span class="w-[210px]">Транспорт и водитель</span>
+        <span class="w-[300px] text-right">Действия и закрывающие документы</span>
+      </div>
+
+      <div class="divide-y divide-slate-100 text-[11px]" id="orders-container">
+        {/* Заявка №1 */}
+        <div class="dense-row hover:bg-slate-50/80 transition" id="row-1">
+          <div class="flex items-center gap-2 w-[210px] shrink-0">
+            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-orange-100 text-orange-800 border border-orange-300">
+              🔍 На ревью
+            </span>
+            <span class="font-bold text-slate-900">№ 752/2026-1</span>
+            <span class="text-[10px] text-slate-400">(30.10)</span>
+          </div>
+
+          <div class="flex items-center gap-1.5 w-[220px] shrink-0 truncate text-slate-700">
+            <span class="font-semibold text-slate-900">ВСМПО-АВИСМА</span>
+            <span class="text-slate-400">/</span>
+            <span class="text-slate-600">ИП Парфенов А.В.</span>
+          </div>
+
+          <div class="w-[160px] shrink-0 truncate font-medium text-slate-800">
+            📍 Заречный → В.Салда
+          </div>
+
+          <div class="w-[200px] shrink-0 truncate text-slate-600">
+            📦 Пруток 20мм, труба, 110 кг
+          </div>
+
+          <div class="w-[90px] shrink-0 text-right font-black text-slate-900">
+            15 000 ₽
+          </div>
+
+          <div class="w-[210px] shrink-0 truncate text-slate-700 flex items-center gap-1.5">
+            <span class="px-1.5 py-0.2 bg-slate-200 text-slate-800 rounded font-mono text-[10px] font-bold">
+              О188ТА196
+            </span>
+            <span class="font-medium truncate">Никифоров Д.В.</span>
+          </div>
+
+          <div class="w-[300px] shrink-0 flex items-center justify-end gap-1.5">
+            <button onclick="showDoc('xml')" class="px-2 py-0.8 bg-slate-800 hover:bg-slate-900 text-white rounded font-bold text-[10px] flex items-center gap-1 transition shadow-2xs">
+              <span>📥 XML ЭТрН</span>
+            </button>
+            <button onclick="showDoc('tn')" class="px-2 py-0.8 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[10px] flex items-center gap-1 transition shadow-2xs">
+              <span>📄 ТН (ПП 2116)</span>
+            </button>
+            <button onclick="showDoc('waybill')" class="px-2 py-0.8 bg-emerald-700 hover:bg-emerald-800 text-white rounded font-bold text-[10px] flex items-center gap-1 transition shadow-2xs">
+              <span>📋 Путевой 4-С</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Заявка №2 (В листе ожидания) */}
+        <div class="dense-row hover:bg-slate-50/80 transition" id="row-2">
+          <div class="flex items-center gap-2 w-[210px] shrink-0">
+            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-300">
+              📋 Назначен
+            </span>
+            <span class="font-bold text-slate-900">№ 693/2026</span>
+            <span class="text-[10px] text-slate-400">(02.11)</span>
+          </div>
+
+          <div class="flex items-center gap-1.5 w-[220px] shrink-0 truncate text-slate-700">
+            <span class="font-semibold text-slate-900">ВСМПО-АВИСМА</span>
+            <span class="text-slate-400">/</span>
+            <span class="text-slate-600">ИП Парфенов А.В.</span>
+          </div>
+
+          <div class="w-[160px] shrink-0 truncate font-medium text-slate-800">
+            📍 Екатеринбург → В.Салда
+          </div>
+
+          <div class="w-[200px] shrink-0 truncate text-slate-600">
+            📦 Металлопрокат, 3 444 кг
+          </div>
+
+          <div class="w-[90px] shrink-0 text-right font-black text-slate-900">
+            18 000 ₽
+          </div>
+
+          <div class="w-[210px] shrink-0 truncate text-slate-700 flex items-center gap-1.5">
+            <span class="px-1.5 py-0.2 bg-slate-200 text-slate-800 rounded font-mono text-[10px] font-bold">
+              О188ТА196
+            </span>
+            <span class="font-medium truncate">Никифоров Д.В.</span>
+          </div>
+
+          <div class="w-[300px] shrink-0 flex items-center justify-end gap-1.5">
+            <button onclick="simulateWialonDepart()" id="btn-wialon-2" class="px-2 py-0.8 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold text-[10px] flex items-center gap-1 transition shadow-2xs">
+              <span>🚀 Выезд Wialon</span>
+            </button>
+            <button onclick="showDoc('xml')" class="px-2 py-0.8 bg-slate-800 hover:bg-slate-900 text-white rounded font-bold text-[10px] flex items-center gap-1 transition shadow-2xs">
+              <span>📥 XML</span>
+            </button>
+            <button onclick="showDoc('tn')" class="px-2 py-0.8 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[10px] flex items-center gap-1 transition shadow-2xs">
+              <span>📄 ТН</span>
+            </button>
+            <button onclick="showDoc('waybill')" class="px-2 py-0.8 bg-emerald-700 hover:bg-emerald-800 text-white rounded font-bold text-[10px] flex items-center gap-1 transition shadow-2xs">
+              <span>📋 ПЛ 4-С</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* БЛОК ПРОСМОТРА СГЕНЕРИРОВАННЫХ ДОКУМЕНТОВ */}
+    <div id="doc-viewer-block" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📑</span>
+          <div>
+            <h2 id="doc-viewer-title" class="font-bold text-sm text-slate-900">
+              Титул грузоотправителя XML ЭТрН (ФНС КНД 1110339, windows-1251)
+            </h2>
+            <p class="text-xs text-slate-500">Автоматически сгенерирован для заявки № 752/2026-1 (ИП Нигамедьянов А.С. • ВСМПО-АВИСМА)</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs font-bold">
+          <button onclick="showDoc('xml')" id="tab-doc-xml" class="px-3 py-1 bg-slate-900 text-white rounded-lg">
+            XML ЭТрН
+          </button>
+          <button onclick="showDoc('tn')" id="tab-doc-tn" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg">
+            ТН (ПП РФ 2116)
+          </button>
+          <button onclick="showDoc('waybill')" id="tab-doc-waybill" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg">
+            Путевой лист № 4-С
+          </button>
+        </div>
+      </div>
+
+      {/* Контейнер документов */}
+      <div id="doc-content-xml" class="space-y-2">
+        <div class="flex justify-between items-center text-xs text-slate-500 bg-slate-50 p-2 rounded-lg font-mono">
+          <span>Файл: <b>ON_TRNACLGROT_2BM-660704814106-..._1_20261103_a488499c.xml</b> (Кодировка: windows-1251)</span>
+          <button onclick="downloadXmlFile()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded shadow-xs">
+            💾 Скачать файл *.xml
+          </button>
+        </div>
+        <pre class="bg-slate-900 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-x-auto max-h-[450px] leading-relaxed">
+&lt;?xml version="1.0" encoding="windows-1251"?&gt;
+&lt;Файл ИдФайл="ON_TRNACLGROT_2BM-660704814106-20260506082129781701600000000_2BM-6607000556-2013011605491613718210000000000_2BM-6609002301-2026101500000000000000000000000_1_20261103_a488499c-9f14-4c87-8e15-617753d575ba" ВерсФорм="5.01" ВерсПрог="Diadoc 1.0"&gt;
+  &lt;ИдПолИной&gt;2BM-660700184414--2016060605481636716910000000&lt;/ИдПолИной&gt;
+  &lt;ИдПолИной&gt;2BM-6607000556-2013011605491613718210000000000&lt;/ИдПолИной&gt;
+  &lt;Документ КНД="1110339" ПоФактХЖ="Транспортная накладная, информация грузоотправителя" ДатИнфГО="03.11.2026" ВрИнфГО="09:30:00" НаимЭкСубСост="ИП Парфенов Андрей Виталиевич, ИНН 660700184414"&gt;
+    &lt;ОснДовОргСост НаимДок="Поручение экспедитору" НомерДок="752/2026-1" ДатаДок="30.10.2026"&gt;
+      &lt;ИдРекСост&gt;&lt;ИННФЛ&gt;660700184414&lt;/ИННФЛ&gt;&lt;/ИдРекСост&gt;
+      &lt;ИдРекСост&gt;&lt;ИННЮЛ&gt;6607000556&lt;/ИННЮЛ&gt;&lt;/ИдРекСост&gt;
+    &lt;/ОснДовОргСост&gt;
+    &lt;СодИнфГО СодОпер="Лицом, осуществляющим погрузку груза, при указанных обстоятельствах передан водителю груз с указанными характеристиками" НомерТрН="752/2026-1" ДатаТрН="30.10.2026" НомЗак="693/2026" ДатаЗак="30.10.2026"&gt;
+      &lt;СвГО ГОЭксп="1"&gt;
+        &lt;РекИдентГО&gt;
+          &lt;ИдСв&gt;&lt;СвЮЛУч НаимОрг="ПАО «Корпорация ВСМПО-АВИСМА»" ИННЮЛ="6607000556" КПП="997550001" /&gt;&lt;/ИдСв&gt;
+          &lt;Адрес&gt;&lt;АдрРФ Индекс="624760" КодРегион="66" Район="м.о. Верхнесалдинский" Город="Верхняя Салда" Улица="ул. Парковая" Дом="д 1" /&gt;&lt;/Адрес&gt;
+          &lt;Контакт&gt;&lt;Тлф&gt;+79667100167&lt;/Тлф&gt;&lt;/Контакт&gt;
+        &lt;/РекИдентГО&gt;
+      &lt;/СвГО&gt;
+      &lt;СвЗак&gt;
+        &lt;РекИдентЗак&gt;
+          &lt;ИдСв&gt;&lt;СвЮЛУч НаимОрг="ПАО «Корпорация ВСМПО-АВИСМА»" ИННЮЛ="6607000556" КПП="997550001" /&gt;&lt;/ИдСв&gt;
+          &lt;Адрес&gt;&lt;АдрРФ Индекс="624760" КодРегион="66" Район="м.о. Верхнесалдинский" Город="Верхняя Салда" Улица="ул. Парковая" Дом="д 1" /&gt;&lt;/Адрес&gt;
+          &lt;Контакт&gt;&lt;Тлф&gt;+79667100167&lt;/Тлф&gt;&lt;/Контакт&gt;
+        &lt;/РекИдентЗак&gt;
+        &lt;ДогУслПер НаимДок="договор" НомерДок="10676" ДатаДок="01.08.2012"&gt;
+          &lt;ИдРекСост&gt;&lt;ИННФЛ&gt;660700184414&lt;/ИННФЛ&gt;&lt;/ИдРекСост&gt;
+          &lt;ИдРекСост&gt;&lt;ИННЮЛ&gt;6607000556&lt;/ИННЮЛ&gt;&lt;/ИдРекСост&gt;
+        &lt;/ДогУслПер&gt;
+      &lt;/СвЗак&gt;
+      &lt;СвГП&gt;
+        &lt;РекИдентГП&gt;
+          &lt;ИдСв&gt;&lt;СвЮЛУч НаимОрг="ПАО «Корпорация ВСМПО-АВИСМА»" ИННЮЛ="6607000556" КПП="997550001" /&gt;&lt;/ИдСв&gt;
+          &lt;Адрес&gt;&lt;АдрРФ Индекс="624760" КодРегион="66" Район="м.о. Верхнесалдинский" Город="Верхняя Салда" Улица="ул. Парковая" Дом="д 1" /&gt;&lt;/Адрес&gt;
+        &lt;/РекИдентГП&gt;
+        &lt;АдресДостГр&gt;&lt;АдресРФ Индекс="624760" КодРегион="66" Город="Верхняя Салда" Улица="Площадка Б" Дом="склад 0802" /&gt;&lt;/АдресДостГр&gt;
+      &lt;/СвГП&gt;
+      &lt;СвГруз&gt;
+        &lt;ОпГруз НаимГруз="Пруток 20мм, труба нерж.сталь" СостГруз="без повреждений" СпУпак="палетты" ВидТар="00" КолМестГр="1" УчГосСист="0"&gt;
+          &lt;Марк&gt;отсутствует&lt;/Марк&gt;
+          &lt;ПлМасГруз МасБрутЗнач="110" /&gt;
+        &lt;/ОпГруз&gt;
+      &lt;/СвГруз&gt;
+      &lt;СвПер&gt;
+        &lt;ИдСв&gt;
+          &lt;СвИП ИННФЛ="660704814106" ОГРНИП="321665800053976"&gt;
+            &lt;ФИО Фамилия="Нигамедьянов" Имя="Александр" Отчество="Сергеевич" /&gt;
+          &lt;/СвИП&gt;
+        &lt;/ИдСв&gt;
+        &lt;Адрес&gt;&lt;АдрРФ Индекс="624760" КодРегион="66" Район="м.о. Верхнесалдинский" Город="Верхняя Салда" Улица="25 октября" Дом="11" Кварт="22" /&gt;&lt;/Адрес&gt;
+        &lt;Контакт&gt;&lt;Тлф&gt;+79222970911&lt;/Тлф&gt;&lt;/Контакт&gt;
+      &lt;/СвПер&gt;
+      &lt;СвВодит НомВУ="273350" СерВУ="9945" ДатаВыдВУ="09.09.2026" ИННФЛ="660704282934"&gt;
+        &lt;Тлф&gt;+79221672787&lt;/Тлф&gt;
+        &lt;ФИО Фамилия="Никифоров" Имя="Денис" Отчество="Викторович" /&gt;
+      &lt;/СвВодит&gt;
+      &lt;СвТС&gt;
+        &lt;ТС РегНомер="О188ТА196" ТипВлад="1"&gt;
+          &lt;ПарТС Тип="Грузовой автомобиль" Марка="Валдай" Грузопод="3.1" Вместим="40" /&gt;
+        &lt;/ТС&gt;
+      &lt;/СвТС&gt;
+      &lt;СвПогруз ЗаявПогр="02.11.2026T08:00:00+05:00" НалКоорТочВрЗаяв="1" ФДатВрПриб="02.11.2026T08:15:00+05:00" НалКоорТочВрФПогр="1" ФДатВрУбыт="02.11.2026T09:00:00+05:00" НалКоорТочВрФУбыт="1" МасБрутОтгр="110" МетОпрМасс="01" КолМестПрием="1"&gt;
+        &lt;ФАдресПогр&gt;&lt;АдресРФ Индекс="624250" КодРегион="66" Город="Заречный" Улица="ул. Промзона БЗСК" Дом="строение 2" /&gt;&lt;/ФАдресПогр&gt;
+        &lt;СвЛицПогрГр СовпГОП="2"&gt;
+          &lt;РекЛицПогрГр&gt;
+            &lt;ИдСв&gt;&lt;СвЮЛУч НаимОрг="ООО &amp;quot;Континенталь&amp;quot;" ИННЮЛ="6609002301" КПП="668301001" /&gt;&lt;/ИдСв&gt;
+            &lt;Адрес&gt;&lt;АдрРФ Индекс="624250" КодРегион="66" Город="Заречный" Улица="ул. Промзона БЗСК" Дом="строение 2" /&gt;&lt;/Адрес&gt;
+          &lt;/РекЛицПогрГр&gt;
+          &lt;РабЛицПогрГр Должность="Представитель"&gt;
+            &lt;ОДолжОб&gt;Должностные обязанности&lt;/ОДолжОб&gt;
+            &lt;ФИО Фамилия="Гончарова" Имя="Марина" Отчество="Владимировна" /&gt;
+          &lt;/РабЛицПогрГр&gt;
+        &lt;/СвЛицПогрГр&gt;
+        &lt;ВладИнфр СовпГОВ="2"&gt;
+          &lt;РекВладИнф&gt;
+            &lt;ИдСв&gt;&lt;СвЮЛУч НаимОрг="ООО &amp;quot;Континенталь&amp;quot;" ИННЮЛ="6609002301" КПП="668301001" /&gt;&lt;/ИдСв&gt;
+          &lt;/РекВладИнф&gt;
+        &lt;/ВладИнфр&gt;
+      &lt;/СвПогруз&gt;
+    &lt;/СодИнфГО&gt;
+    &lt;Подписант СтатПодп="5" Должн="Сотрудник" ИдСистХран="https://m4d.nalog.gov.ru/emchd/check-status?guid=532497b2-e630-4925-b6dd-947e6d26534a"&gt;
+      &lt;ФИО Фамилия="Симанова" Имя="Олеся" Отчество="Витальевна" /&gt;
+      &lt;СвДовер ДатаДовер="01.09.2026" НомерДовер="532497b2-e630-4925-b6dd-947e6d26534a" ИдентДовер="532497b2-e630-4925-b6dd-947e6d26534a" СведСистОтм="https://m4d.nalog.gov.ru/emchd/check-status?guid=532497b2-e630-4925-b6dd-947e6d26534a" /&gt;
+    &lt;/Подписант&gt;
+  &lt;/Документ&gt;
+&lt;/Файл&gt;
+        </pre>
+      </div>
+
+      <div id="doc-content-tn" class="hidden">
+        <iframe src="http://localhost:3000/api/orders/740b1dfc-602e-4a91-812d-ef15e5d4dba2/docs/tn-pdf" class="w-full h-[600px] border border-slate-200 rounded-xl"></iframe>
+      </div>
+
+      <div id="doc-content-waybill" class="hidden">
+        <iframe src="http://localhost:3000/api/orders/740b1dfc-602e-4a91-812d-ef15e5d4dba2/docs/waybill-4c" class="w-full h-[600px] border border-slate-200 rounded-xl"></iframe>
+      </div>
+    </div>
+  </div>
+
+  {/* МОДАЛЬНОЕ ОКНО СОЗДАНИЯ ЗАЯВКИ */}
+  <div id="order-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl p-5 max-w-3xl w-full shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <div>
+          <h3 class="font-bold text-sm text-slate-900">Создание заявки на перевозку</h3>
+          <p class="text-xs text-slate-400">Авто-парсинг PDF «Поручение экспедитору» или пресет в 1 клик</p>
+        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-base cursor-pointer">✕</button>
+      </div>
+
+      {/* Переключатель */}
+      <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-lg text-xs font-bold">
+        <button onclick="switchMode('parser')" id="btn-mode-parser" class="flex-1 py-1.5 rounded-md bg-white text-indigo-700 shadow-xs">
+          📄 Режим 1: Загрузить Поручение экспедитору (PDF)
+        </button>
+        <button onclick="switchMode('preset')" id="btn-mode-preset" class="flex-1 py-1.5 rounded-md text-slate-600">
+          ⚡ Режим 2: Пресет в 1 клик / Быстрый опросник
+        </button>
+      </div>
+
+      {/* Дропзона PDF */}
+      <div id="box-parser" class="border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-xl p-4 text-center space-y-2">
+        <div class="text-2xl">📥</div>
+        <div class="text-xs font-bold text-slate-700">Перетащите сюда файл PDF «Поручение экспедитору»</div>
+        <p class="text-[11px] text-slate-500">Система автоматически распознает ИНН, адреса с ГАР, номер договора, груз и ставку</p>
+        <button onclick="simulatePdfParse()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer">
+          ✨ Сэмулировать авто-парсинг PDF поручения № 752/2026-1
+        </button>
+      </div>
+
+      <div id="box-preset" class="hidden flex flex-wrap items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+        <span class="text-xs font-bold text-slate-700">Типовой пресет:</span>
+        <button onclick="applyDemoPreset()" class="px-2.5 py-1 bg-white border border-indigo-300 text-indigo-700 text-xs font-semibold rounded-lg shadow-2xs hover:bg-indigo-50 cursor-pointer">
+          ⭐ ВСМПО-АВИСМА через экспедитора ИП Парфенов А.В.
+        </button>
+      </div>
+
+      <div id="banner-parsed" class="p-2 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold flex items-center justify-between">
+        <span>✨ PDF распознан: Поручение № 752/2026-1 от 30.10.2026. Данные предзаполнены.</span>
+        <span class="text-emerald-600 text-[10px]">100% совпадение</span>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div>
+          <label class="font-bold text-slate-700 block mb-0.5">№ Поручения</label>
+          <input type="text" id="m-doc-num" value="752/2026-1" class="w-full p-1.5 border border-slate-300 rounded bg-slate-50 font-bold" />
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-0.5">Дата</label>
+          <input type="date" id="m-doc-date" value="2026-10-30" class="w-full p-1.5 border border-slate-300 rounded bg-slate-50" />
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-0.5">Заказчик</label>
+          <input type="text" readonly value="ПАО ВСМПО-АВИСМА" class="w-full p-1.5 border border-slate-200 rounded bg-slate-100 text-slate-600" />
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-0.5">Экспедитор</label>
+          <input type="text" readonly value="ИП Парфенов А.В." class="w-full p-1.5 border border-slate-200 rounded bg-slate-100 text-slate-600" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
+        <div>
+          <label class="font-bold text-slate-700 block mb-0.5">📍 Пункт погрузки (Откуда)</label>
+          <input type="text" value="624250, г. Заречный, ул. Промзона БЗСК, д 2" class="w-full p-1.5 border border-slate-300 rounded bg-white" />
+          <div class="text-[11px] text-slate-500 mt-1">Организация на погрузке: <b>ООО "Континенталь"</b></div>
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-0.5">🏁 Пункт выгрузки (Куда)</label>
+          <input type="text" value="624760, г. Верхняя Салда, ул. Парковая, д 1, склад 0802" class="w-full p-1.5 border border-slate-300 rounded bg-white" />
+          <div class="text-[11px] text-slate-500 mt-1">Грузополучатель: <b>ПАО ВСМПО-АВИСМА</b></div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div class="col-span-2">
+          <label class="font-bold text-slate-700 block mb-0.5">Груз</label>
+          <input type="text" value="Пруток 20мм, труба нерж.сталь" class="w-full p-1.5 border border-slate-300 rounded bg-slate-50" />
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-0.5">Масса (кг)</label>
+          <input type="number" value="110" class="w-full p-1.5 border border-slate-300 rounded bg-slate-50 font-bold" />
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-0.5">Фрахт без НДС</label>
+          <input type="number" value="15000" class="w-full p-1.5 border border-slate-300 rounded bg-slate-50 font-black text-indigo-700" />
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeModal()" class="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-bold text-xs cursor-pointer">
+          Отмена
+        </button>
+        <button onclick="saveDemoOrder()" class="px-5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer">
+          Создать заявку (В лист ожидания)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function filterStatus(status) {
+      document.querySelectorAll('#tab-all, #tab-waiting_vehicle, #tab-assigned, #tab-in_progress, #tab-pending_review').forEach(b => {
+        b.className = 'px-3 py-1 text-slate-600 hover:text-slate-900 rounded-md';
+      });
+      document.getElementById('tab-' + status).className = 'px-3 py-1 bg-white text-indigo-700 rounded-md shadow-xs';
+    }
+
+    function openModal() {
+      document.getElementById('order-modal').classList.remove('hidden');
+    }
+    function closeModal() {
+      document.getElementById('order-modal').classList.add('hidden');
+    }
+
+    function switchMode(mode) {
+      if (mode === 'parser') {
+        document.getElementById('box-parser').classList.remove('hidden');
+        document.getElementById('box-preset').classList.add('hidden');
+        document.getElementById('btn-mode-parser').className = 'flex-1 py-1.5 rounded-md bg-white text-indigo-700 shadow-xs';
+        document.getElementById('btn-mode-preset').className = 'flex-1 py-1.5 rounded-md text-slate-600';
+      } else {
+        document.getElementById('box-parser').classList.add('hidden');
+        document.getElementById('box-preset').classList.remove('hidden');
+        document.getElementById('btn-mode-preset').className = 'flex-1 py-1.5 rounded-md bg-white text-indigo-700 shadow-xs';
+        document.getElementById('btn-mode-parser').className = 'flex-1 py-1.5 rounded-md text-slate-600';
+      }
+    }
+
+    function simulatePdfParse() {
+      alert('✨ PDF успешно распарсен! Все поля сопоставлены с базой (ВСМПО, ИП Парфенов, Заречный БЗСК, 15000 руб.).');
+    }
+
+    function applyDemoPreset() {
+      alert('⭐ Применен пресет ВСМПО-АВИСМА: реквизиты, договор 10676, перевозчик ИП Нигамедьянов и МЧД подставлены.');
+    }
+
+    function saveDemoOrder() {
+      closeModal();
+      alert('✅ Заявка создана и добавлена в Лист ожидания!');
+    }
+
+    function simulateWialonDepart() {
+      const btn = document.getElementById('btn-wialon-2');
+      btn.innerText = '🏁 Возврат (Ревью)';
+      btn.className = 'px-2 py-0.8 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-[10px] flex items-center gap-1 transition shadow-2xs';
+      btn.onclick = function() {
+        alert('🏁 Wialon зафиксировал возврат в Верхнюю Салду!\nПробег: 350 км (3500 ₽) + Суточные: 1 дн (1000 ₽) = Итого ЗП: 4500 ₽.\nРейс отправлен на ревью руководителю.');
+        btn.innerText = '✅ На ревью';
+        btn.disabled = true;
+      };
+      alert('🚀 Wialon зафиксировал выезд грузовика О188ТА196 из Верхней Салды!\nСтатус изменен на [В ПУТИ], активирован рейс trips с начальным одометром 120 500 км.');
+    }
+
+    function showDoc(type) {
+      document.getElementById('tab-doc-xml').className = 'px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg';
+      document.getElementById('tab-doc-tn').className = 'px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg';
+      document.getElementById('tab-doc-waybill').className = 'px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg';
+
+      document.getElementById('doc-content-xml').classList.add('hidden');
+      document.getElementById('doc-content-tn').classList.add('hidden');
+      document.getElementById('doc-content-waybill').classList.add('hidden');
+
+      if (type === 'xml') {
+        document.getElementById('tab-doc-xml').className = 'px-3 py-1 bg-slate-900 text-white rounded-lg';
+        document.getElementById('doc-content-xml').classList.remove('hidden');
+        document.getElementById('doc-viewer-title').innerText = 'Титул грузоотправителя XML ЭТрН (ФНС КНД 1110339, windows-1251)';
+      } else if (type === 'tn') {
+        document.getElementById('tab-doc-tn').className = 'px-3 py-1 bg-blue-600 text-white rounded-lg';
+        document.getElementById('doc-content-tn').classList.remove('hidden');
+        document.getElementById('doc-viewer-title').innerText = 'Печатная Транспортная накладная (Форма Приложения № 4 ПП РФ № 2116)';
+      } else if (type === 'waybill') {
+        document.getElementById('tab-doc-waybill').className = 'px-3 py-1 bg-emerald-700 text-white rounded-lg';
+        document.getElementById('doc-content-waybill').classList.remove('hidden');
+        document.getElementById('doc-viewer-title').innerText = 'Путевой лист грузового автомобиля № 4-С (ОКУД 0345004)';
+      }
+    }
+
+    function downloadXmlFile() {
+      window.location.href = 'http://localhost:3000/api/orders/740b1dfc-602e-4a91-812d-ef15e5d4dba2/docs/etrn-xml';
+    }
+  </script>
+</body>
+</html>
