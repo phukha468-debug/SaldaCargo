@@ -10,7 +10,14 @@
         "NEXT_PUBLIC_SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
-        "MAX_BOT_TOKEN"
+        "SUPABASE_PROJECT_REF",
+        "MAX_BOT_TOKEN",
+        "TBANK_API_TOKEN",
+        "WIALON_HOST",
+        "WIALON_TOKEN",
+        "WIALON_BASE_LAT",
+        "WIALON_BASE_LON",
+        "WIALON_BASE_RADIUS_METERS"
       ]
     },
     "lint": {
