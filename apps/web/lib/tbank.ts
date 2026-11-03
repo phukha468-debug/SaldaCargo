@@ -271,11 +271,9 @@ export async function syncTBankBalance(forceRefresh = false): Promise<{
         typeof targetAccount.balance?.authorized === 'number'
           ? targetAccount.balance.authorized
           : 0;
-      // Полный баланс расчётного счёта в Т-Банке (включая авторизованные суммы/холды по картам)
+      // Фактический доступный остаток расчётного счёта в Т-Банке (otb)
       const realBalance =
-        typeof targetAccount.balance?.otb === 'number'
-          ? otb + authorized
-          : Number(targetAccount.balance) || 0;
+        typeof targetAccount.balance?.otb === 'number' ? otb : Number(targetAccount.balance) || 0;
 
       const adjustmentString = '0.00';
 

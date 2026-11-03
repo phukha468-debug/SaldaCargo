@@ -86,6 +86,7 @@ export async function GET(request: Request) {
     }
 
     let apiBalance: number | null = null;
+    let apiAuthorized = 0;
     let isApiSynced = false;
     const token = process.env.TBANK_API_TOKEN || TBANK_FALLBACK_TOKEN;
 
@@ -96,9 +97,10 @@ export async function GET(request: Request) {
           const target =
             accounts.find((a: any) => a.accountNumber === TARGET_ACCOUNT_NUMBER) || accounts[0];
           const otb = typeof target?.balance?.otb === 'number' ? target.balance.otb : 0;
-          const authorized =
+          apiAuthorized =
             typeof target?.balance?.authorized === 'number' ? target.balance.authorized : 0;
-          apiBalance = otb + authorized;
+          // Фактический доступный остаток Р/С (otb), совпадающий с ЛК Т-Банка
+          apiBalance = otb;
           isApiSynced = true;
         }
       } catch (e) {
@@ -244,6 +246,7 @@ export async function GET(request: Request) {
         id: BANK_ID,
         name: 'Расчётный счёт',
         balance: bankBalance.toFixed(2),
+        authorized: apiAuthorized.toFixed(2),
         api_synced: isApiSynced,
         synced_at: new Date().toISOString(),
         account_number: TARGET_ACCOUNT_NUMBER,
