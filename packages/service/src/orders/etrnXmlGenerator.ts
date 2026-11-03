@@ -1,4 +1,3 @@
-import iconv from 'iconv-lite';
 import { randomUUID } from 'crypto';
 
 export interface EtrnGeneratorInput {
@@ -224,7 +223,7 @@ export function generateEtrnXml(data: EtrnGeneratorInput): EtrnGeneratorResult {
     data.signer.emchdStorageUrl || `https://m4d.nalog.gov.ru/emchd/check-status?guid=${emchdNum}`;
 
   const xmlLines: string[] = [
-    `<?xml version="1.0" encoding="windows-1251"?>`,
+    `<?xml version="1.0" encoding="utf-8"?>`,
     `<Файл ИдФайл="${fileId}" ВерсФорм="5.01" ВерсПрог="Diadoc 1.0">`,
     `  <ИдПолИной>${escapeXml(forwarderEdo)}</ИдПолИной>`,
     `  <ИдПолИной>${escapeXml(clientEdo)}</ИдПолИной>`,
@@ -376,7 +375,7 @@ export function generateEtrnXml(data: EtrnGeneratorInput): EtrnGeneratorResult {
   ];
 
   const xmlString = xmlLines.join('\n');
-  const buffer = iconv.encode(xmlString, 'windows-1251');
+  const buffer = Buffer.from(xmlString, 'utf-8');
 
   return {
     fileName,

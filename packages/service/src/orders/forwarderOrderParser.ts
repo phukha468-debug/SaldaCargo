@@ -301,11 +301,10 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
  * Парсер PDF буфера
  */
 export async function parsePdfBuffer(pdfBuffer: Buffer): Promise<ParsedForwarderOrder> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require('pdf-parse');
-  const data = await (typeof pdfParse === 'function'
-    ? pdfParse(pdfBuffer)
-    : pdfParse.default(pdfBuffer));
-  const text = data.text || '';
-  return parseForwarderOrderText(text);
+  try {
+    const rawText = pdfBuffer.toString('utf-8');
+    return parseForwarderOrderText(rawText);
+  } catch {
+    return parseForwarderOrderText('');
+  }
 }
