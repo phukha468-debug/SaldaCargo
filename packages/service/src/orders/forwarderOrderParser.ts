@@ -298,13 +298,37 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
 }
 
 /**
- * Парсер PDF буфера
+ * Парсер PDF буфера (с распаковкой FlateDecode стримов через zlib)
  */
 export async function parsePdfBuffer(pdfBuffer: Buffer): Promise<ParsedForwarderOrder> {
   try {
-    const rawText = pdfBuffer.toString('utf-8');
-    return parseForwarderOrderText(rawText);
+    const zlib = await import('zlib');
+    let combinedText = '';
+
+    const latinStr = pdfBuffer.toString('latin1');
+    const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+    let match;
+
+    while ((match = streamRegex.exec(latinStr)) !== null) {
+      const newlineIdx = match[0].indexOf('\n');
+      const start = match.index + newlineIdx + 1;
+      const end = match.index + match[0].lastIndexOf('endstream');
+      if (end > start) {
+        const rawStream = pdfBuffer.subarray(start, end);
+        try {
+          const decompressed = zlib.inflateSync(rawStream);
+          combinedText += ' ' + decompressed.toString('utf-8');
+        } catch {
+          // не сжато flate или бинарная графика
+        }
+      }
+    }
+
+    // Добавляем прямой utf-8 текст (на случай несжатого PDF)
+    combinedText += ' ' + pdfBuffer.toString('utf-8');
+
+    return parseForwarderOrderText(combinedText);
   } catch {
-    return parseForwarderOrderText('');
+    return parseForwarderOrderText(pdfBuffer.toString('utf-8'));
   }
 }
