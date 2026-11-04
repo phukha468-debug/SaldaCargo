@@ -80,7 +80,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         phone: '+79222970911',
       },
       driver: {
-        fio: order.driver?.name || 'Никифоров Д.В.',
+        fio: order.driver?.name || (order as any).driver_name || 'Шахмаев А.С.',
         phone: order.driver?.phone || '+79221672787',
         licenseSeries: order.driver?.license_series || '9945',
         licenseNumber: order.driver?.license_number || '273350',
@@ -111,7 +111,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           '624760, Свердловская область, г. Верхняя Салда, ул. Парковая, д 1, склад 0802',
         plannedAt: order.planned_delivery_at?.slice(0, 16).replace('T', ' '),
         actualArrivalAt: order.actual_loading_departure_at?.slice(0, 16).replace('T', ' '),
-        contactFio: 'Черникова К.В. (Кладовщик скл. 813)',
+        contactFio: (order as any).unloading_contact_fio || 'Кладовщик скл. 813 / Черникова Н.В.',
       },
       finance: {
         priceWithoutVat: order.price_without_vat || 15000,
