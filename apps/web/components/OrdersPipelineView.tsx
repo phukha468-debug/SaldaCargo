@@ -487,15 +487,26 @@ export function OrdersPipelineView() {
                       </a>
                     </div>
 
-                    <a
-                      href={`/api/orders/${order.id}/docs/waybill-4c`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Печать Путевого листа № 4-С (ОКУД 0345004)"
-                      className="px-2 py-0.8 bg-emerald-700 hover:bg-emerald-800 text-white rounded font-bold flex items-center gap-1 transition"
-                    >
-                      <span>📋 ПЛ</span>
-                    </a>
+                    <div className="flex items-center rounded overflow-hidden shadow-xs border border-emerald-800/60">
+                      <a
+                        href={`/api/orders/${order.id}/docs/waybill-4c`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Печать Путевого листа № 4-С (с данными заявки, доступно редактирование)"
+                        className="px-2 py-0.8 bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center gap-1 transition"
+                      >
+                        <span>📋 ПЛ</span>
+                      </a>
+                      <a
+                        href={`/api/orders/${order.id}/docs/waybill-4c?empty=1`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Распечатать чистый пустой бланк ПЛ (ОКУД 0345004)"
+                        className="px-1.5 py-0.8 bg-emerald-900 hover:bg-emerald-950 text-emerald-200 hover:text-white font-bold text-[10px] transition border-l border-emerald-600/40"
+                      >
+                        ⬜
+                      </a>
+                    </div>
 
                     <button
                       onClick={() =>
