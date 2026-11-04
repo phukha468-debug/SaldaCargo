@@ -427,15 +427,26 @@ export function OrdersPipelineView() {
                       <span>📥 XML</span>
                     </a>
 
-                    <a
-                      href={`/api/orders/${order.id}/docs/tn-pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Печать Транспортной накладной (ПП РФ № 2116)"
-                      className="px-2 py-0.8 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold flex items-center gap-1 transition"
-                    >
-                      <span>📄 ТН</span>
-                    </a>
+                    <div className="inline-flex items-center rounded overflow-hidden shadow-xs">
+                      <a
+                        href={`/api/orders/${order.id}/docs/tn-pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Печать Транспортной накладной (с данными заявки, доступно редактирование)"
+                        className="px-2 py-0.8 bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1 transition"
+                      >
+                        <span>📄 ТН</span>
+                      </a>
+                      <a
+                        href={`/api/orders/${order.id}/docs/tn-pdf?empty=1`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Распечатать чистый пустой бланк ТН (ПП РФ № 2116)"
+                        className="px-1.5 py-0.8 bg-blue-800 hover:bg-blue-900 text-blue-200 hover:text-white font-bold text-[10px] transition border-l border-blue-500/40"
+                      >
+                        ⬜
+                      </a>
+                    </div>
 
                     <a
                       href={`/api/orders/${order.id}/docs/waybill-4c`}
