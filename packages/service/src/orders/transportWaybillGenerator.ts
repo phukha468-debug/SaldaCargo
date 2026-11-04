@@ -372,13 +372,12 @@ export function generateTransportWaybillHtml(
     
     .tn-page {
       width: 210mm;
-      height: 297mm;
+      min-height: 297mm;
       margin: 0 auto 20px auto;
       background: #fff;
       padding: 5mm 6mm 5mm 6mm;
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
       position: relative;
-      overflow: hidden;
     }
     @media print {
       body {
@@ -690,7 +689,7 @@ export function generateTransportWaybillHtml(
 
       <!-- Раздел 4. Сопроводительные документы на груз (при наличии) -->
       <tr>
-        <td colspan="2" class="sec-title" style="text-align: left; padding-left: 4px;">4. Сопроводительные документы на груз (при наличии)</td>
+        <td colspan="2" class="sec-title">4. Сопроводительные документы на груз (при наличии)</td>
       </tr>
       <!-- [Линия 22] -->
       <tr>
@@ -730,7 +729,7 @@ export function generateTransportWaybillHtml(
 
       <!-- Раздел 5. Указания грузоотправителя по особым условиям перевозки (СТРОГО 50% / 50%) -->
       <tr>
-        <td colspan="2" class="sec-title" style="text-align: left; padding-left: 4px;">5. Указания грузоотправителя по особым условиям перевозки</td>
+        <td colspan="2" class="sec-title">5. Указания грузоотправителя по особым условиям перевозки</td>
       </tr>
       <!-- [Линия 29] -->
       <tr>
