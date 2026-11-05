@@ -624,76 +624,82 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
   <!-- ======================== БЛАНК ФОРМЫ 4-С ======================== -->
   <div class="pl-page" id="waybillPage">
     
-    <!-- 1. ВЕРХНЯЯ ШАПКА ДОКУМЕНТА (35 мм) -->
-    <div style="height: 29mm; margin-bottom: 1.5mm;">
+    <!-- 1. ВЕРХНЯЯ ШАПКА ДОКУМЕНТА -->
+    <div style="margin-bottom: 3mm;">
       
       <!-- Верхний ярус: Штамп организации слева, Путевой лист по центру, Утверждение и Коды справа -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; height: 23mm;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         
         <!-- Слева: Место для штампа организации -->
-        <div style="width: 28%;">
-          <div class="stamp-box" style="width: 33mm; height: 16mm;">
+        <div style="width: 25%;">
+          <div class="stamp-box" style="width: 36mm; height: 18mm; font-size: 6.8pt; font-weight: bold;">
             <div>Место для штампа</div>
             <div>организации</div>
           </div>
         </div>
 
-        <!-- По центру: ПУТЕВОЙ ЛИСТ грузового автомобиля ... дата -->
-        <div style="width: 44%; text-align: center; padding-top: 0.5mm;">
-          <div style="font-size: 11.5pt; font-weight: bold; letter-spacing: 0.5px; line-height: 1.0;">
+        <!-- По центру: ПУТЕВОЙ ЛИСТ грузового автомобиля ... (Скриншот 1) -->
+        <div style="width: 48%; text-align: center; padding-top: 1mm;">
+          <div style="font-size: 14pt; font-weight: bold; letter-spacing: 2px; line-height: 1.1;">
             ПУТЕВОЙ ЛИСТ
           </div>
-          <div style="font-size: 8.5pt; margin-top: 2px; line-height: 1.1;">
-            грузового автомобиля &nbsp;№ <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="min-width: 60px; font-weight: bold; font-size: 9.5pt;">${v('docNumber')}</span>
+          <!-- Строка: грузового автомобиля (серия) № (Скриншот 1) -->
+          <div style="display: flex; justify-content: center; align-items: flex-end; margin-top: 2px; font-size: 9.8pt; font-weight: bold;">
+            <span style="white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">грузового автомобиля</span>
+            <div style="width: 26mm; margin-right: 6px;">
+              <span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="width: 100%; text-align: center; font-size: 9.5pt;">${v('docSeries')}</span>
+              <span class="sub-prompt" style="font-size: 6.2pt; margin-top: 0.5px;">(серия)</span>
+            </div>
+            <span style="white-space: nowrap; margin-right: 4px; padding-bottom: 3.5px;">№</span>
+            <div style="width: 40mm;">
+              <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="width: 100%; text-align: center; font-size: 11pt; font-weight: bold;">${v('docNumber')}</span>
+              <span style="display: block; height: 7px;"></span>
+            </div>
           </div>
-          <div style="font-size: 7.0pt; font-weight: 600; line-height: 1.0; margin-top: 1px;">
-            (серия &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="min-width: 30px; font-weight: bold;">${v('docSeries')}</span>)
-          </div>
-          <div style="font-size: 7.2pt; margin-top: 2.5px;">
-            «<span class="editable-field line-field" contenteditable="true" data-field="docDay" style="min-width: 18px; font-weight: bold; text-align: center;">${v('docDay')}</span>»
-            &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docMonth" style="min-width: 70px; font-weight: bold; text-align: center;">${v('docMonth')}</span>
-            &nbsp;20<span class="editable-field line-field" contenteditable="true" data-field="docYear" style="min-width: 18px; font-weight: bold; text-align: center;">${v('docYear')}</span> г.
+          <!-- Строка даты -->
+          <div style="display: flex; justify-content: center; align-items: baseline; font-size: 8.8pt; font-weight: bold; margin-top: 0.5px;">
+            «&nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docDay" style="width: 12mm; text-align: center;">${v('docDay')}</span>&nbsp;»
+            &nbsp; &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docMonth" style="width: 32mm; text-align: center;">${v('docMonth')}</span>&nbsp; &nbsp;
+            20&nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docYear" style="width: 12mm; text-align: center;">${v('docYear')}</span>&nbsp; г.
           </div>
         </div>
 
-        <!-- Справа: Утверждение формы и Таблица кодов ОКУД/ОКПО -->
-        <div style="width: 28%; text-align: right;">
-          <div style="font-size: 5.6pt; line-height: 1.15; color: #000;">
+        <!-- Справа: Утверждение формы и сплошная таблица Коды из 3 прямоугольников без разрывов, шрифт x2 (Скриншот 2) -->
+        <div style="width: 27%; text-align: right; display: flex; flex-direction: column; align-items: flex-end;">
+          <div style="font-size: 7.2pt; font-weight: bold; line-height: 1.2; color: #000; margin-bottom: 2px;">
             Типовая межотраслевая форма № 4-С<br>
             Утверждена постановлением Госкомстата России<br>
             от 28.11.97 № 78
           </div>
-          <div style="margin-top: 2px; display: flex; justify-content: flex-end;">
-            <table style="border-collapse: collapse; font-size: 6.0pt;">
-              <tr>
-                <td style="border: none; text-align: right; padding-right: 4px;"></td>
-                <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0; background: #fff;">Коды</td>
-              </tr>
-              <tr>
-                <td style="border: none; text-align: right; padding-right: 4px; white-space: nowrap;">Форма по ОКУД</td>
-                <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0;">0345004</td>
-              </tr>
-            </table>
-          </div>
+          <table style="border-collapse: collapse; font-size: 8.2pt; font-weight: bold; margin-top: 1px;">
+            <tr>
+              <td style="border: none; text-align: right; padding-right: 6px;"></td>
+              <td style="border: 2px solid #000; text-align: center; width: 30mm; height: 5.5mm; background: #fff;">Коды</td>
+            </tr>
+            <tr>
+              <td style="border: none; text-align: right; padding-right: 6px; white-space: nowrap;">Форма по ОКУД</td>
+              <td style="border: 2px solid #000; text-align: center; width: 30mm; height: 5.5mm;">0345004</td>
+            </tr>
+            <tr>
+              <td style="border: none; text-align: right; padding-right: 6px; white-space: nowrap;">по ОКПО</td>
+              <td style="border: 2px solid #000; text-align: center; width: 30mm; height: 5.5mm;">
+                <span class="editable-field" contenteditable="true" data-field="okpo">${v('okpo')}</span>
+              </td>
+            </tr>
+          </table>
         </div>
 
       </div>
 
-      <!-- Нижний ярус шапки: Организация под Путевым листом и датой, протянутая вплоть до блока кодов (по ОКПО)! (Скриншоты 1, 2, 3) -->
-      <div style="margin-top: 1mm; display: flex; align-items: flex-end;">
-        <div style="font-size: 7.0pt; white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">Организация</div>
+      <!-- Нижний ярус шапки: Организация крупным шрифтом (Пункт 3) -->
+      <div style="margin-top: 1.5mm; display: flex; align-items: flex-end;">
+        <div style="font-size: 9.2pt; font-weight: bold; white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">Организация</div>
         <div style="flex: 1; margin-right: 6px;">
-          <span class="editable-field line-field" contenteditable="true" data-field="orgAddressPhone" style="width: 100%; font-weight: bold; font-size: 6.8pt;">${v('orgAddressPhone')}</span>
-          <span class="sub-prompt" style="text-align: center;">(наименование, адрес и номер телефона)</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="orgAddressPhone" style="width: 100%; font-weight: bold; font-size: 8.0pt;">${v('orgAddressPhone')}</span>
+          <span class="sub-prompt" style="text-align: center; font-size: 6.2pt; margin-top: 0.5px;">(наименование, адрес и номер телефона)</span>
         </div>
-        <table style="border-collapse: collapse; font-size: 6.0pt; margin-bottom: 2.8mm;">
-          <tr>
-            <td style="border: none; text-align: right; padding-right: 4px; white-space: nowrap;">по ОКПО</td>
-            <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0;">
-              <span class="editable-field" contenteditable="true" data-field="okpo">${v('okpo')}</span>
-            </td>
-          </tr>
-        </table>
+        <!-- Распорка по ширине правого блока кодов (Форма по ОКУД / по ОКПО), чтобы подчеркивание Организации заканчивалось строго перед по ОКПО -->
+        <div style="width: 54mm;"></div>
       </div>
 
     </div>
@@ -704,150 +710,152 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       <!-- ЛЕВЫЙ БЛОК (С ЛИНИЯМИ И ДВУМЯ ТАБЛИЦАМИ КОДОВ) (51.5% ~ 142.2 мм) -->
       <div style="width: 51.5%; display: flex; justify-content: space-between; font-size: 6.0pt;">
         
-        <!-- Линии реквизитов слева от таблиц кодов (ширина 129.9 мм) -->
-        <div style="width: calc(100% - 13.5mm); display: flex; flex-direction: column; justify-content: space-between;">
+        <!-- Линии реквизитов слева от таблиц кодов (крупный шрифт, точные подчеркивания - Скриншот 3!) (ширина 129.9 мм) -->
+        <div style="width: calc(100% - 13.5mm); display: flex; flex-direction: column; justify-content: space-between; font-size: 7.8pt; font-weight: bold;">
           
-          <!-- Верхняя группа: Режим работы, Колонна, Бригада (БЕЗ ПОДЧЕРКИВАНИЙ - Скриншот 4!) -->
-          <div style="height: 27.5mm; display: flex; flex-direction: column; justify-content: space-between;">
-            <!-- Режим работы (чистый текст без полос и подчеркиваний) -->
-            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+          <!-- Верхняя группа: Режим работы, Колонна, Бригада, Марка авто, Номер, Водитель -->
+          <div style="display: flex; flex-direction: column; justify-content: space-between; height: 32mm;">
+            <!-- Режим работы (чистый текст) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.5mm; line-height: 4.5mm; font-size: 7.5pt;">
               Режим работы
             </div>
-            <!-- Колонна (чистый текст без полос и подчеркиваний) -->
-            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+            <!-- Колонна (чистый текст) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.5mm; line-height: 4.5mm; font-size: 7.5pt;">
               Колонна
             </div>
-            <!-- Бригада (чистый текст без полос и подчеркиваний) -->
-            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+            <!-- Бригада (чистый текст) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.5mm; line-height: 4.5mm; font-size: 7.5pt;">
               Бригада
             </div>
+            
             <!-- Разделительная линия под Бригадой -->
-            <div style="border-bottom: 1px solid #000; width: 100%; margin: 0.5px 0;"></div>
-            <!-- Марка автомобиля -->
-            <div style="display: flex; justify-content: space-between;">
-              <div style="width: 100%;">
-                Марка автомобиля &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="vehBrand" style="width: calc(100% - 75px); font-weight: bold;">${v('vehBrand')}</span>
-              </div>
+            <div style="border-bottom: 1.2px solid #000; width: 100%; margin: 0.5px 0 1px 0;"></div>
+            
+            <!-- Марка автомобиля (подчеркивание до блока КОД - Скриншот 3) -->
+            <div style="display: flex; align-items: baseline;">
+              <span style="white-space: nowrap; margin-right: 5px;">Марка автомобиля</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="vehBrand" style="flex: 1; font-size: 8.0pt; font-weight: bold;">${v('vehBrand')}</span>
             </div>
-            <!-- Государственный номерной знак / Гаражный номер -->
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-              <div style="width: 62%;">
-                Государственный номерной знак &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="vehReg" style="width: calc(100% - 130px); font-weight: bold; letter-spacing: 0.5px;">${v('vehReg')}</span>
-              </div>
-              <div style="width: 38%; text-align: right; padding-right: 3px;">
-                Гаражный номер
-              </div>
+            
+            <!-- Государственный номерной знак (подчеркивание до Гаражный номер - Скриншот 3) -->
+            <div style="display: flex; align-items: baseline;">
+              <span style="white-space: nowrap; margin-right: 5px;">Государственный номерной знак</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="vehReg" style="flex: 1; font-size: 8.2pt; font-weight: bold; letter-spacing: 0.5px; text-align: center; margin-right: 6px;">${v('vehReg')}</span>
+              <span style="white-space: nowrap; padding-right: 3px;">Гаражный номер</span>
             </div>
-            <!-- Водитель / Табельный номер -->
+            
+            <!-- Водитель (подчеркивание до Табельный номер с подстрочником фамилия, имя, отчество - Скриншот 3) -->
             <div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <div style="width: 62%;">
-                  Водитель &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="driverFio" style="width: calc(100% - 42px); font-weight: bold;">${v('driverFio')}</span>
-                </div>
-                <div style="width: 38%; text-align: right; padding-right: 3px;">
-                  Табельный номер
-                </div>
+              <div style="display: flex; align-items: baseline;">
+                <span style="white-space: nowrap; margin-right: 5px;">Водитель</span>
+                <span class="editable-field line-field" contenteditable="true" data-field="driverFio" style="flex: 1; font-size: 8.2pt; font-weight: bold; margin-right: 6px;">${v('driverFio')}</span>
+                <span style="white-space: nowrap; padding-right: 3px;">Табельный номер</span>
               </div>
-              <span class="sub-prompt" style="width: 62%; text-align: center;">(фамилия, имя, отчество)</span>
-            </div>
-          </div>
-
-          <!-- Средняя полоса (Удостоверение, Класс, Лицензионная карточка) -->
-          <div style="margin: 1.5px 0;">
-            <div style="display: flex; justify-content: space-between;">
-              <div style="width: 65%;">
-                Удостоверение № &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="driverLic" style="width: calc(100% - 75px); font-weight: bold;">${v('driverLic')}</span>
-              </div>
-              <div style="width: 35%;">
-                Класс &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="driverClass" style="width: calc(100% - 30px); font-weight: bold; text-align: center;">${v('driverClass')}</span>
-              </div>
-            </div>
-            <div style="margin-top: 1px;">
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <div>Лицензионная карточка &nbsp;<b><u>стандартная</u></b>, <s>ограниченная</s></div>
-                <div style="font-size: 6.6pt; color: #444;">(ненужное зачеркнуть)</div>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-top: 1px;">
-                <div style="width: 48%;">
-                  Регистрационный № &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="licRegNum" style="width: calc(100% - 82px);">${v('licRegNum')}</span>
-                </div>
-                <div style="width: 22%;">
-                  Серия &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="licSeries" style="width: calc(100% - 28px); text-align: center;">${v('licSeries')}</span>
-                </div>
-                <div style="width: 30%;">
-                  № &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="licNumber" style="width: calc(100% - 15px); text-align: center;">${v('licNumber')}</span>
-                </div>
+              <div style="display: flex;">
+                <span style="width: 50px;"></span>
+                <span class="sub-prompt" style="flex: 1; margin-right: 90px; font-size: 6.0pt;">(фамилия, имя, отчество)</span>
               </div>
             </div>
           </div>
 
-          <!-- Нижняя группа: Прицепы 1..4 и Гаражный номер -->
-          <div style="display: flex; flex-direction: column; gap: 1mm; margin-bottom: 1.5mm;">
+          <!-- Средняя группа: Удостоверение, Класс, Лицензионная карточка, Регистрационный №, Серия, № (Скриншот 3) -->
+          <div style="margin: 2px 0; font-size: 7.8pt;">
+            <!-- Удостоверение № ... Класс ... -->
+            <div style="display: flex; align-items: baseline;">
+              <span style="white-space: nowrap; margin-right: 4px;">Удостоверение №</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="driverLic" style="flex: 1; font-size: 8.0pt; font-weight: bold; margin-right: 8px;">${v('driverLic')}</span>
+              <span style="white-space: nowrap; margin-right: 4px;">Класс</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="driverClass" style="width: 32mm; font-size: 8.0pt; font-weight: bold; text-align: center;">${v('driverClass')}</span>
+            </div>
+
+            <!-- Лицензионная карточка: сверху стандартная, ограниченная, снизу ненужное зачеркнуть (Скриншот 3) -->
+            <div style="margin-top: 1.5px; display: flex; align-items: flex-end;">
+              <span style="white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">Лицензионная карточка</span>
+              <div style="width: 55mm;">
+                <div style="text-align: center; font-size: 7.8pt; border-bottom: 1.2px solid #000; padding-bottom: 1px;">
+                  <b><u>стандартная</u></b>, <s>ограниченная</s>
+                </div>
+                <span class="sub-prompt" style="font-size: 5.8pt; margin-top: 0.5px;">(ненужное зачеркнуть)</span>
+              </div>
+            </div>
+
+            <!-- Регистрационный № ... Серия ... № ... (Скриншот 3) -->
+            <div style="margin-top: 1.5px; display: flex; align-items: baseline;">
+              <span style="white-space: nowrap; margin-right: 4px;">Регистрационный №</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="licRegNum" style="flex: 1; font-size: 7.8pt; margin-right: 8px;">${v('licRegNum')}</span>
+              <span style="white-space: nowrap; margin-right: 4px;">Серия</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="licSeries" style="width: 20mm; font-size: 7.8pt; text-align: center; margin-right: 8px;">${v('licSeries')}</span>
+              <span style="white-space: nowrap; margin-right: 4px;">№</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="licNumber" style="width: 25mm; font-size: 7.8pt; text-align: center;">${v('licNumber')}</span>
+            </div>
+          </div>
+
+          <!-- Нижняя группа: Прицепы 1..4 и Сопровождающие лица -->
+          <div style="display: flex; flex-direction: column; gap: 1mm; font-size: 7.2pt;">
             <!-- Прицеп 1 -->
             <div>
               <div style="display: flex; justify-content: space-between; align-items: baseline;">
                 <div style="width: 30%;">
-                  Прицеп 1 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr1_brand" style="width: calc(100% - 40px);">${v('pr1_brand')}</span>
+                  Прицеп 1 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr1_brand" style="width: calc(100% - 45px);">${v('pr1_brand')}</span>
                 </div>
                 <div style="width: 44%;">
-                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr1_reg" style="width: calc(100% - 48px); text-align: center;">${v('pr1_reg')}</span>
+                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr1_reg" style="width: calc(100% - 55px); text-align: center;">${v('pr1_reg')}</span>
                 </div>
                 <div style="width: 26%; text-align: right; padding-right: 3px;">
                   Гаражный номер
                 </div>
               </div>
-              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 40px;">(марка)</span>
+              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 45px; font-size: 5.6pt;">(марка)</span>
             </div>
             <!-- Прицеп 2 -->
             <div>
               <div style="display: flex; justify-content: space-between; align-items: baseline;">
                 <div style="width: 30%;">
-                  Прицеп 2 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr2_brand" style="width: calc(100% - 40px);">${v('pr2_brand')}</span>
+                  Прицеп 2 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr2_brand" style="width: calc(100% - 45px);">${v('pr2_brand')}</span>
                 </div>
                 <div style="width: 44%;">
-                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr2_reg" style="width: calc(100% - 48px); text-align: center;">${v('pr2_reg')}</span>
+                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr2_reg" style="width: calc(100% - 55px); text-align: center;">${v('pr2_reg')}</span>
                 </div>
                 <div style="width: 26%; text-align: right; padding-right: 3px;">
                   Гаражный номер
                 </div>
               </div>
-              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 40px;">(марка)</span>
+              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 45px; font-size: 5.6pt;">(марка)</span>
             </div>
             <!-- Прицеп 3 -->
             <div>
               <div style="display: flex; justify-content: space-between; align-items: baseline;">
                 <div style="width: 30%;">
-                  Прицеп 3 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr3_brand" style="width: calc(100% - 40px);">${v('pr3_brand')}</span>
+                  Прицеп 3 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr3_brand" style="width: calc(100% - 45px);">${v('pr3_brand')}</span>
                 </div>
                 <div style="width: 44%;">
-                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr3_reg" style="width: calc(100% - 48px); text-align: center;">${v('pr3_reg')}</span>
+                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr3_reg" style="width: calc(100% - 55px); text-align: center;">${v('pr3_reg')}</span>
                 </div>
                 <div style="width: 26%; text-align: right; padding-right: 3px;">
                   Гаражный номер
                 </div>
               </div>
-              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 40px;">(марка)</span>
+              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 45px; font-size: 5.6pt;">(марка)</span>
             </div>
             <!-- Прицеп 4 -->
             <div>
               <div style="display: flex; justify-content: space-between; align-items: baseline;">
                 <div style="width: 30%;">
-                  Прицеп 4 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr4_brand" style="width: calc(100% - 40px);">${v('pr4_brand')}</span>
+                  Прицеп 4 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr4_brand" style="width: calc(100% - 45px);">${v('pr4_brand')}</span>
                 </div>
                 <div style="width: 44%;">
-                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr4_reg" style="width: calc(100% - 48px); text-align: center;">${v('pr4_reg')}</span>
+                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr4_reg" style="width: calc(100% - 55px); text-align: center;">${v('pr4_reg')}</span>
                 </div>
                 <div style="width: 26%; text-align: right; padding-right: 3px;">
                   Гаражный номер
                 </div>
               </div>
-              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 40px;">(марка)</span>
+              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 45px; font-size: 5.6pt;">(марка)</span>
             </div>
-          </div>
-
-          <!-- Сопровождающие лица -->
-          <div style="margin-top: 1px;">
-            Сопровождающие лица: &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="escortPersons" style="width: calc(100% - 95px);">${v('escortPersons')}</span>
+            <!-- Сопровождающие лица -->
+            <div style="margin-top: 0.5px;">
+              Сопровождающие лица: &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="escortPersons" style="width: calc(100% - 120px);">${v('escortPersons')}</span>
+            </div>
           </div>
 
         </div>
