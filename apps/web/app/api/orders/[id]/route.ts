@@ -29,7 +29,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: error?.message || 'Заявка не найдена' }, { status: 404 });
     }
 
-    return NextResponse.json({ order });
+    const enriched = {
+      ...order,
+      routes_json: order.routes_json || order.raw_parser_payload?.routes || [],
+      prevent_salda_auto_finish: Boolean(
+        order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
+      ),
+      salda_transit_count: Number(
+        order.salda_transit_count || order.raw_parser_payload?.salda_transit_count || 0,
+      ),
+    };
+
+    return NextResponse.json({ order: enriched });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -41,20 +52,36 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json();
     const supabase = createAdminClient();
 
+    // Загружаем текущий raw_parser_payload заявки, чтобы не потерять другие параметры
+    const { data: currentOrder } = await (supabase.from('orders') as any)
+      .select('raw_parser_payload')
+      .eq('id', id)
+      .single();
+
+    const existingPayload = currentOrder?.raw_parser_payload || {};
+
     const updatePayload: any = {
       ...body,
       updated_at: new Date().toISOString(),
     };
 
-    if (body.routes_json !== undefined || body.prevent_salda_auto_finish !== undefined) {
-      updatePayload.raw_parser_payload = {
-        ...(updatePayload.raw_parser_payload || {}),
-        ...(body.routes_json !== undefined ? { routes: body.routes_json } : {}),
-        ...(body.prevent_salda_auto_finish !== undefined
-          ? { prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish) }
-          : {}),
-      };
-    }
+    // Удаляем из верхнего уровня поля, которых нет в схеме таблицы orders
+    delete updatePayload.routes_json;
+    delete updatePayload.prevent_salda_auto_finish;
+    delete updatePayload.salda_transit_count;
+
+    // Сохраняем составные маршруты и флаг транзита внутри jsonb raw_parser_payload
+    updatePayload.raw_parser_payload = {
+      ...existingPayload,
+      ...(body.raw_parser_payload || {}),
+      ...(body.routes_json !== undefined ? { routes: body.routes_json } : {}),
+      ...(body.prevent_salda_auto_finish !== undefined
+        ? { prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish) }
+        : {}),
+      ...(body.salda_transit_count !== undefined
+        ? { salda_transit_count: Number(body.salda_transit_count) }
+        : {}),
+    };
 
     // Если назначили ТС и водителя, но статус был waiting_vehicle — переводим в assigned
     if (
@@ -87,7 +114,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ order: updated });
+    const enriched = {
+      ...updated,
+      routes_json: updated.raw_parser_payload?.routes || [],
+      prevent_salda_auto_finish: Boolean(updated.raw_parser_payload?.prevent_salda_auto_finish),
+      salda_transit_count: Number(updated.raw_parser_payload?.salda_transit_count || 0),
+    };
+
+    return NextResponse.json({ order: enriched });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

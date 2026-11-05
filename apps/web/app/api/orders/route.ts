@@ -33,7 +33,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ orders: data || [] });
+    const enriched = (data || []).map((o: any) => ({
+      ...o,
+      routes_json: o.routes_json || o.raw_parser_payload?.routes || [],
+      prevent_salda_auto_finish: Boolean(
+        o.prevent_salda_auto_finish || o.raw_parser_payload?.prevent_salda_auto_finish,
+      ),
+      salda_transit_count: Number(
+        o.salda_transit_count || o.raw_parser_payload?.salda_transit_count || 0,
+      ),
+    }));
+
+    return NextResponse.json({ orders: enriched });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -89,13 +100,13 @@ export async function POST(req: Request) {
 
       assigned_vehicle_id: body.assigned_vehicle_id || null,
       assigned_driver_id: body.assigned_driver_id || null,
-      routes_json: body.routes_json || [],
-      prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish),
-      salda_transit_count: Number(body.salda_transit_count) || 0,
+
+      // Сохраняем составные маршруты и флаги транзита внутри jsonb raw_parser_payload
       raw_parser_payload: {
         ...(body.raw_parser_payload || {}),
-        routes: body.routes_json || [],
+        routes: body.routes_json || body.raw_parser_payload?.routes || [],
         prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish),
+        salda_transit_count: Number(body.salda_transit_count) || 0,
       },
     };
 
@@ -121,7 +132,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ order: created });
+    const enriched = {
+      ...created,
+      routes_json: created.raw_parser_payload?.routes || [],
+      prevent_salda_auto_finish: Boolean(created.raw_parser_payload?.prevent_salda_auto_finish),
+      salda_transit_count: Number(created.raw_parser_payload?.salda_transit_count || 0),
+    };
+
+    return NextResponse.json({ order: enriched });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
