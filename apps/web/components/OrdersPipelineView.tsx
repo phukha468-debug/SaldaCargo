@@ -250,7 +250,7 @@ export function OrdersPipelineView() {
     onSuccess: (data) => {
       if (data.transit) {
         alert(
-          `🔄 Зафиксирован промежуточный заезд в Верхнюю Салду (заезд #${data.salda_transit_count})!\nРейс продолжается в статусе «В ПУТИ».`,
+          `🔄 Зафиксирован промежуточный заезд в Верхнюю Салду (заезд #${data.salda_transit_count})!\nГалочка составного рейса автоматически снята. Рейс продолжается в статусе «В ПУТИ» — второй заезд в Салду автоматически закроет заявку.`,
         );
       } else if (data.status === 'pending_review') {
         alert(
@@ -817,7 +817,7 @@ export function OrdersPipelineView() {
             autoProgressMutation.mutate({
               orderId: selectedDetailsOrder.id,
               action: 'arrive',
-              forceFinish: true,
+              forceFinish: false,
             })
           }
           onComplete={() => completeOrderMutation.mutate(selectedDetailsOrder.id)}
@@ -1075,8 +1075,12 @@ function OrderDetailsModal({
                 <span className="text-[11px] text-slate-600">
                   {order.status === 'in_progress' ? (
                     <span className="text-purple-700 font-bold">
-                      Грузовик покинул Салду. Одометр старта: {order.trip?.odometer_start || 120500}{' '}
-                      км
+                      Грузовик покинул Салду. Одометр: {order.trip?.odometer_start || 120500} км.
+                      {isTransit
+                        ? ' Включен составной маршрут (1-й заезд снимет галочку, 2-й закроет).'
+                        : (order.salda_transit_count || 0) > 0
+                          ? ` Промежуточный транзит пройден (следующий заезд завершит).`
+                          : ''}
                     </span>
                   ) : order.status === 'assigned' ? (
                     <span className="text-sky-700 font-bold">
@@ -1112,9 +1116,13 @@ function OrderDetailsModal({
               {order.status === 'in_progress' && (
                 <button
                   onClick={onArrive}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
+                  className={`px-3 py-1.5 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px] ${
+                    isTransit
+                      ? 'bg-amber-600 hover:bg-amber-700'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
                 >
-                  🏁 Возврат (Ревью)
+                  {isTransit ? '🔄 Заезд (транзит, снять флаг)' : '🏁 Возврат в Салду (Ревью)'}
                 </button>
               )}
               {order.status === 'pending_review' && (
@@ -2113,13 +2121,13 @@ function CreateSmartOrderModal({
               />
               <div className="text-xs">
                 <span>
-                  🔄 Составной / круговой маршрут (промежуточный заезд в Верхнюю Салду без
-                  завершения рейса)
+                  🔄 Составной маршрут (1-й заезд в Салду — транзит, снимает галочку; 2-й заезд —
+                  завершает)
                 </span>
                 <span className="block font-normal text-[10.5px] text-amber-800 mt-0.5">
-                  Если маршрут требует повторного заезда в Салду между точками погрузки/выгрузки,
-                  Wialon не завершит рейс автоматически, а зафиксирует промежуточный транзит. Рейс
-                  останется в статусе «В пути».
+                  При первом заезде в геозону Салды Wialon фиксирует промежуточную отметку и
+                  автоматически снимает эту галочку. Второй заезд в Салду штатно завершит рейс и
+                  переведет заявку на ревью.
                 </span>
               </div>
             </label>

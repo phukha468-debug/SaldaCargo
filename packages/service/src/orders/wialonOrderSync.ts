@@ -252,9 +252,16 @@ export async function handleVehicleArrival(
       })
       .eq('id', trip.id);
 
+    // Однократный промежуточный заезд в зону: фиксируем транзит и автоматически СНИМАЕМ галочку prevent_salda_auto_finish.
+    // Второй заезд в Салду уже штатно завершит заявку и переведет её на ревью.
     await supabase
       .from('orders')
       .update({
+        prevent_salda_auto_finish: false,
+        raw_parser_payload: {
+          ...(order.raw_parser_payload || {}),
+          prevent_salda_auto_finish: false,
+        },
         salda_transit_count: transitCount,
         updated_at: new Date().toISOString(),
       })
@@ -263,10 +270,11 @@ export async function handleVehicleArrival(
     return {
       success: true,
       transit: true,
+      prevent_salda_auto_finish_cleared: true,
       salda_transit_count: transitCount,
       orderId: order.id,
       tripId: trip.id,
-      message: `Промежуточный заезд в Салду (заезд #${transitCount}). Рейс продолжается без авто-завершения.`,
+      message: `Промежуточный заезд в Салду (заезд #${transitCount}). Флаг составного рейса автоматически снят — следующий заезд закроет заявку.`,
     };
   }
 

@@ -41,7 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         vehicleId: order.assigned_vehicle_id,
         odometer: odoEnd,
         timestamp: body.timestamp || new Date().toISOString(),
-        forceFinish: body.forceFinish !== undefined ? Boolean(body.forceFinish) : true,
+        forceFinish: body.forceFinish !== undefined ? Boolean(body.forceFinish) : false,
       });
       return NextResponse.json(res);
     }
