@@ -402,13 +402,13 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     }
     @page {
       size: A4 landscape;
-      margin: 4mm 8mm 4mm 8mm;
+      margin: 8mm 8mm 4mm 8mm;
     }
     html, body {
       margin: 0;
       padding: 0;
       font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
-      font-size: 6.2pt;
+      font-size: 7.0pt; font-weight: 600;
       line-height: 1.1;
       color: #000;
       background: #334155;
@@ -477,7 +477,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         padding: 0 !important;
         margin: 0 !important;
         width: 297mm !important;
-        height: 210mm !important;
+        height: auto !important;
       }
       .print-hide {
         display: none !important;
@@ -488,7 +488,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       }
       .pl-page {
         width: 100% !important;
-        height: 100% !important;
+        height: auto !important;
         max-height: none !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -522,25 +522,26 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     }
     table.pl-table td, table.pl-table th {
       border: 1.2px solid #000;
-      padding: 0.5px 1.5px;
+      padding: 1px 2px;
       vertical-align: middle;
-      font-size: 5.5pt;
-      line-height: 1.05;
+      font-size: 6.5pt;
+      line-height: 1.1;
+      font-weight: bold;
     }
     th.col-header {
       background-color: #fff;
       font-weight: normal;
       text-align: center;
-      font-size: 5.2pt;
+      font-size: 6.2pt;
     }
     th.col-num {
       text-align: center;
-      font-size: 5.0pt;
+      font-size: 6.0pt;
       font-weight: normal;
       padding: 0.5px !important;
     }
     .sub-prompt {
-      font-size: 4.8pt;
+      font-size: 6.6pt;
       line-height: 1.0;
       text-align: center;
       font-weight: bold;
@@ -561,7 +562,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 5.8pt;
+      font-size: 6.6pt;
       line-height: 1.15;
     }
     .code-table {
@@ -572,7 +573,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     .code-table td {
       border: 1px solid #000;
       padding: 1px 4px;
-      font-size: 5.8pt;
+      font-size: 6.6pt;
       text-align: center;
     }
 
@@ -587,7 +588,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       border: 1px solid #000;
       text-align: center;
       padding: 0;
-      font-size: 5.8pt;
+      font-size: 6.6pt;
       vertical-align: middle;
     }
     table.v-code-table th {
@@ -624,7 +625,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
   <div class="pl-page" id="waybillPage">
     
     <!-- 1. ВЕРХНЯЯ ШАПКА ДОКУМЕНТА (35 мм) -->
-    <div style="height: 35mm; margin-bottom: 1.5mm;">
+    <div style="height: 29mm; margin-bottom: 1.5mm;">
       
       <!-- Верхний ярус: Штамп организации слева, Путевой лист по центру, Утверждение и Коды справа -->
       <div style="display: flex; justify-content: space-between; align-items: flex-start; height: 23mm;">
@@ -645,7 +646,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           <div style="font-size: 8.5pt; margin-top: 2px; line-height: 1.1;">
             грузового автомобиля &nbsp;№ <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="min-width: 60px; font-weight: bold; font-size: 9.5pt;">${v('docNumber')}</span>
           </div>
-          <div style="font-size: 6.2pt; line-height: 1.0; margin-top: 1px;">
+          <div style="font-size: 7.0pt; font-weight: 600; line-height: 1.0; margin-top: 1px;">
             (серия &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="min-width: 30px; font-weight: bold;">${v('docSeries')}</span>)
           </div>
           <div style="font-size: 7.2pt; margin-top: 2.5px;">
@@ -698,7 +699,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     </div>
 
     <!-- 2. СРЕДНИЙ БЛОК: СЛЕВА (ТС, ВОДИТЕЛЬ, ТАБЛИЦЫ КОДОВ) | СПРАВА (ТАБЛИЦА 1 И ТАБЛИЦА 2) (73 мм) -->
-    <div style="display: flex; justify-content: space-between; height: 73mm; margin-bottom: 2mm;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 2.5mm;">
       
       <!-- ЛЕВЫЙ БЛОК (С ЛИНИЯМИ И ДВУМЯ ТАБЛИЦАМИ КОДОВ) (51.5% ~ 142.2 мм) -->
       <div style="width: 51.5%; display: flex; justify-content: space-between; font-size: 6.0pt;">
@@ -764,7 +765,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <div style="margin-top: 1px;">
               <div style="display: flex; justify-content: space-between; align-items: baseline;">
                 <div>Лицензионная карточка &nbsp;<b><u>стандартная</u></b>, <s>ограниченная</s></div>
-                <div style="font-size: 4.8pt; color: #444;">(ненужное зачеркнуть)</div>
+                <div style="font-size: 6.6pt; color: #444;">(ненужное зачеркнуть)</div>
               </div>
               <div style="display: flex; justify-content: space-between; margin-top: 1px;">
                 <div style="width: 48%;">
@@ -781,7 +782,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           </div>
 
           <!-- Нижняя группа: Прицепы 1..4 и Гаражный номер -->
-          <div style="height: 25.5mm; display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="display: flex; flex-direction: column; gap: 1mm; margin-bottom: 1.5mm;">
             <!-- Прицеп 1 -->
             <div>
               <div style="display: flex; justify-content: space-between; align-items: baseline;">
@@ -855,7 +856,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <div style="width: 12.3mm; display: flex; flex-direction: column; justify-content: space-between;">
           
           <!-- 1. Верхняя таблица Код (Режим, Колонна, Бригада, Гар. номер, Таб. номер) -->
-          <table class="v-code-table" style="height: 27.5mm;">
+          <table class="v-code-table" style="width: 100%;">
             <thead>
               <tr style="height: 4.5mm;">
                 <th>Код</th>
@@ -925,10 +926,10 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         
         <!-- ================= Таблица 1: Работа водителя и автомобиля ================= -->
         <div>
-          <div style="text-align: center; font-weight: bold; font-size: 6.2pt; letter-spacing: 1px; margin-bottom: 0.5px;">
+          <div style="text-align: center; font-weight: bold; font-size: 7.0pt; font-weight: 600; letter-spacing: 1px; margin-bottom: 0.5px;">
             Р а б о т а &nbsp; в о д и т е л я &nbsp; и &nbsp; а в т о м о б и л я
           </div>
-          <table class="pl-table" style="height: 27.5mm;">
+          <table class="pl-table" style="width: 100%;">
             <colgroup>
               <col style="width: 16.7%;">
               <col style="width: 7.4%;">
@@ -948,10 +949,10 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
                 <th rowspan="2" class="col-header">время фактическое,<br>число, месяц, ч. мин.</th>
               </tr>
               <tr style="height: 3.2mm;">
-                <th class="col-header" style="font-size: 4.8pt;">число</th>
-                <th class="col-header" style="font-size: 4.8pt;">месяц</th>
-                <th class="col-header" style="font-size: 4.8pt;">ч.</th>
-                <th class="col-header" style="font-size: 4.8pt;">мин.</th>
+                <th class="col-header" style="font-size: 6.6pt;">число</th>
+                <th class="col-header" style="font-size: 6.6pt;">месяц</th>
+                <th class="col-header" style="font-size: 6.6pt;">ч.</th>
+                <th class="col-header" style="font-size: 6.6pt;">мин.</th>
               </tr>
               <tr style="height: 3.2mm;">
                 <th class="col-num">1</th>
@@ -991,7 +992,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
         <!-- ================= Таблица 2: Движение горючего ================= -->
         <div>
-          <div style="text-align: center; font-weight: bold; font-size: 6.2pt; letter-spacing: 1px; margin-bottom: 0.5px;">
+          <div style="text-align: center; font-weight: bold; font-size: 7.0pt; font-weight: 600; letter-spacing: 1px; margin-bottom: 0.5px;">
             Д в и ж е н и е &nbsp; г о р ю ч е г о
           </div>
           <table class="pl-table" style="height: 38.4mm;">
@@ -1016,12 +1017,12 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
                 <th colspan="2" class="col-header">Время работы, ч. мин.</th>
               </tr>
               <tr style="height: 5.8mm;">
-                <th class="col-header" style="font-size: 4.8pt;">марка</th>
-                <th class="col-header" style="font-size: 4.8pt;">код марки</th>
-                <th class="col-header" style="font-size: 4.8pt;">выезде, л</th>
-                <th class="col-header" style="font-size: 4.8pt;">возвращении, л</th>
-                <th class="col-header" style="font-size: 4.8pt;">спецоборудования</th>
-                <th class="col-header" style="font-size: 4.8pt;">двигателя</th>
+                <th class="col-header" style="font-size: 6.6pt;">марка</th>
+                <th class="col-header" style="font-size: 6.6pt;">код марки</th>
+                <th class="col-header" style="font-size: 6.6pt;">выезде, л</th>
+                <th class="col-header" style="font-size: 6.6pt;">возвращении, л</th>
+                <th class="col-header" style="font-size: 6.6pt;">спецоборудования</th>
+                <th class="col-header" style="font-size: 6.6pt;">двигателя</th>
               </tr>
               <tr style="height: 4.0mm;">
                 <th class="col-num">9</th>
@@ -1060,14 +1061,27 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
               </tr>
-              <!-- Строка 3: Подписи лиц -->
-              <tr style="height: 6.8mm; font-size: 5.0pt;">
-                <td colspan="2" style="text-align: center; font-weight: bold; letter-spacing: 1px;">п о д п и с ь</td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler" style="font-size: 4.8pt;">${v('t2_sig_refueler')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_out" style="font-size: 4.8pt;">${v('t2_sig_mech_out')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_in" style="font-size: 4.8pt;">${v('t2_sig_mech_in')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler_ret" style="font-size: 4.8pt;">${v('t2_sig_refueler_ret')}</span></td>
-                <td colspan="3" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_disp" style="font-size: 4.8pt;">${v('t2_sig_disp')}</span></td>
+              <!-- Строка 3: п о д п и с ь (по центру длинной строки на всю ширину таблицы - Скриншот пользователя!) -->
+              <tr style="height: 3.5mm;">
+                <td colspan="9" style="text-align: center; font-weight: bold; font-size: 6.8pt; letter-spacing: 3px; background: #fafafa;">
+                  п о д п и с ь
+                </td>
+              </tr>
+              <!-- Строка 4: наименования должностей (заправщика, механика, механика, заправщика, диспетчера) -->
+              <tr style="height: 3.5mm; font-size: 6.2pt;">
+                <td colspan="3" style="text-align: center; font-weight: bold;">заправщика</td>
+                <td style="text-align: center; font-weight: bold;">механика</td>
+                <td style="text-align: center; font-weight: bold;">механика</td>
+                <td colspan="2" style="text-align: center; font-weight: bold;">заправщика</td>
+                <td colspan="2" style="text-align: center; font-weight: bold;">диспетчера</td>
+              </tr>
+              <!-- Строка 5: места где они должны подписываться -->
+              <tr style="height: 5.0mm; font-size: 6.2pt;">
+                <td colspan="3" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler">${v('t2_sig_refueler')}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_out">${v('t2_sig_mech_out')}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_in">${v('t2_sig_mech_in')}</span></td>
+                <td colspan="2" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler_ret">${v('t2_sig_refueler_ret')}</span></td>
+                <td colspan="2" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_disp">${v('t2_sig_disp')}</span></td>
               </tr>
             </tbody>
           </table>
@@ -1077,24 +1091,24 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
     </div>
 
-    <!-- 3. ТАБЛИЦА 3: ЗАДАНИЕ ВОДИТЕЛЮ (3 СТРОКИ МАРШРУТА - Пункт 3!) (31 мм) -->
-    <div style="height: 31mm; margin-bottom: 2mm;">
-      <div style="text-align: center; font-weight: bold; font-size: 7.2pt; letter-spacing: 2px; margin-bottom: 1px;">
+    <!-- 3. ТАБЛИЦА 3: ЗАДАНИЕ ВОДИТЕЛЮ (3 СТРОКИ МАРШРУТА - ВЫСОКИЕ СТРОКИ) (36 мм) -->
+    <div style="margin-bottom: 3mm;">
+      <div style="text-align: center; font-weight: bold; font-size: 8.0pt; letter-spacing: 2px; margin-bottom: 1px;">
         З А Д А Н И Е &nbsp; &nbsp; В О Д И Т Е Л Ю
       </div>
-      <table class="pl-table" style="height: 27mm;">
+      <table class="pl-table" style="width: 100%;">
         <colgroup>
-          <col style="width: 12.7%;">
-          <col style="width: 12.1%;">
-          <col style="width: 20.3%;">
-          <col style="width: 18.8%;">
-          <col style="width: 18.9%;">
-          <col style="width: 5.8%;">
-          <col style="width: 5.9%;">
-          <col style="width: 5.5%;">
+          <col style="width: 14.0%;">
+          <col style="width: 11.0%;">
+          <col style="width: 20.0%;">
+          <col style="width: 19.0%;">
+          <col style="width: 18.0%;">
+          <col style="width: 6.0%;">
+          <col style="width: 6.0%;">
+          <col style="width: 6.0%;">
         </colgroup>
         <thead>
-          <tr style="height: 7.5mm;">
+          <tr style="height: 6.5mm;">
             <th rowspan="2" class="col-header">в чье распоряжение (наиме-<br>нование и адрес заказчика)</th>
             <th rowspan="2" class="col-header">время прибытия,<br>ч. мин.</th>
             <th colspan="2" class="col-header">адрес пункта</th>
@@ -1104,10 +1118,10 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <th rowspan="2" class="col-header">перевезти<br>тонн</th>
           </tr>
           <tr style="height: 3.5mm;">
-            <th class="col-header" style="font-size: 4.8pt;">погрузки</th>
-            <th class="col-header" style="font-size: 4.8pt;">разгрузки</th>
+            <th class="col-header" style="font-size: 5.6pt;">погрузки</th>
+            <th class="col-header" style="font-size: 5.6pt;">разгрузки</th>
           </tr>
-          <tr style="height: 3.2mm;">
+          <tr style="height: 3.0mm;">
             <th class="col-num">18</th>
             <th class="col-num">19</th>
             <th class="col-num">20</th>
@@ -1119,8 +1133,8 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           </tr>
         </thead>
         <tbody>
-          <!-- Маршрут 1 -->
-          <tr style="height: 4.2mm;">
+          <!-- Маршрут 1 (высота 5.8 мм) -->
+          <tr style="height: 5.8mm;">
             <td><span class="editable-field" contenteditable="true" data-field="t3_client_1" style="font-weight: bold;">${v('t3_client_1')}</span></td>
             <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_1">${v('t3_arr_time_1')}</span></td>
             <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_1">${v('t3_load_addr_1')}</span></td>
@@ -1130,8 +1144,8 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_dist_1">${v('t3_dist_1')}</span></td>
             <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_tons_1">${v('t3_tons_1')}</span></td>
           </tr>
-          <!-- Маршрут 2 -->
-          <tr style="height: 3.8mm;">
+          <!-- Маршрут 2 (высота 5.5 мм) -->
+          <tr style="height: 5.5mm;">
             <td><span class="editable-field" contenteditable="true" data-field="t3_client_2">${v('t3_client_2')}</span></td>
             <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_2">${v('t3_arr_time_2')}</span></td>
             <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_2">${v('t3_load_addr_2')}</span></td>
@@ -1141,8 +1155,8 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_2">${v('t3_dist_2')}</span></td>
             <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_2">${v('t3_tons_2')}</span></td>
           </tr>
-          <!-- Маршрут 3 -->
-          <tr style="height: 3.8mm;">
+          <!-- Маршрут 3 (высота 5.5 мм) -->
+          <tr style="height: 5.5mm;">
             <td><span class="editable-field" contenteditable="true" data-field="t3_client_3">${v('t3_client_3')}</span></td>
             <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_3">${v('t3_arr_time_3')}</span></td>
             <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_3">${v('t3_load_addr_3')}</span></td>
@@ -1152,18 +1166,18 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_3">${v('t3_dist_3')}</span></td>
             <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_3">${v('t3_tons_3')}</span></td>
           </tr>
-          <!-- Строка Итого -->
-          <tr style="height: 4.2mm; font-weight: bold;">
-            <td colspan="5" style="border: none; border-left: 1px solid #000; border-bottom: 1px solid #000;"></td>
-            <td colspan="2" style="text-align: right; border: 1px solid #000; padding-right: 6px;">Итого</td>
-            <td style="text-align: center; border: 1px solid #000;"><span class="editable-field" contenteditable="true" data-field="t3_total_tons">${v('t3_total_tons')}</span></td>
+          <!-- Строка Итого (высота 5.5 мм) -->
+          <tr style="height: 5.5mm; font-weight: bold;">
+            <td colspan="5" style="border: none; border-left: 1.8px solid #000; border-bottom: 1.8px solid #000;"></td>
+            <td colspan="2" style="text-align: right; border: 1.8px solid #000; padding-right: 6px;">Итого</td>
+            <td style="text-align: center; border: 1.8px solid #000;"><span class="editable-field" contenteditable="true" data-field="t3_total_tons">${v('t3_total_tons')}</span></td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <!-- 4. НИЖНИЙ БЛОК: 3 ОСМЫСЛЕННЫХ БЛОКА С ОТСТУПАМИ СО ВСЕХ СТОРОН (ЛЕВЫЙ: ДИСПЕТЧЕР/МЕДИК | ЦЕНТРАЛЬНЫЙ: МЕХАНИК/ВОЗВРАЩЕНИЕ | ПРАВЫЙ: ОТМЕТКИ ОРГАНИЗАЦИИ) -->
-    <div style="display: flex; justify-content: space-between; gap: 7mm; height: 41mm; font-size: 5.7pt; line-height: 1.2; margin-top: 2.5mm; padding: 0 1mm;">
+    <div style="display: flex; justify-content: space-between; gap: 7mm; height: 38mm; font-size: 6.5pt; line-height: 1.2; margin-top: 2.5mm; padding: 0 1mm;">
       
       <!-- ================= БЛОК 1: ДИСПЕТЧЕР И МЕДИК (Скриншот 1) (~31% ~ 85 мм) ================= -->
       <div style="width: 31%; display: flex; flex-direction: column; justify-content: space-between;">
@@ -1194,7 +1208,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <!-- Строка 4 и 5: Медицинский допуск (Водитель по состоянию здоровья к управлению допущен) -->
         <div style="margin-top: 1.5px;">
           <div style="display: flex; align-items: flex-end;">
-            <div style="font-size: 5.2pt; line-height: 1.1; margin-right: 4px; white-space: nowrap; padding-bottom: 3px;">
+            <div style="font-size: 6.2pt; line-height: 1.1; margin-right: 4px; white-space: nowrap; padding-bottom: 3px;">
               Водитель по состоянию<br>
               здоровья к управлению<br>
               допущен
@@ -1219,7 +1233,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         </div>
 
         <!-- Строка 6: Место для штампа (без рамки - Скриншот 1) -->
-        <div style="font-size: 5.3pt; line-height: 1.15; padding-left: 1mm; margin-bottom: 0.5mm;">
+        <div style="font-size: 6.2pt; line-height: 1.15; padding-left: 1mm; margin-bottom: 0.5mm;">
           Место для<br>
           штампа
         </div>
@@ -1264,7 +1278,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <!-- Линия 4: При возвращении автомобиль исправен / неисправен -->
         <div style="display: flex; align-items: center; margin-top: 1px;">
           <span style="margin-right: 8px;">При возвращении автомобиль</span>
-          <div style="text-align: center; font-size: 5.2pt; line-height: 1.05;">
+          <div style="text-align: center; font-size: 6.2pt; line-height: 1.05;">
             <div><b>исправен</b></div>
             <div style="border-top: 1px solid #000; width: 22mm; margin: 0 auto;"></div>
             <div style="color: #666;">неисправен</div>
@@ -1304,32 +1318,32 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         
         <!-- Заголовок: 2 строчки (Отметки организации-владельца / автотранспорта: ___ ) -->
         <div>
-          <div style="font-size: 5.5pt; line-height: 1.15;">Отметки организации-владельца</div>
+          <div style="font-size: 6.5pt; line-height: 1.15;">Отметки организации-владельца</div>
           <div style="display: flex; align-items: baseline; margin-top: 1px;">
-            <span style="font-size: 5.5pt; white-space: nowrap; margin-right: 3px;">автотранспорта:</span>
+            <span style="font-size: 6.5pt; white-space: nowrap; margin-right: 3px;">автотранспорта:</span>
             <!-- Подчеркивание 1 -->
-            <span class="editable-field line-field" contenteditable="true" data-field="note1" style="flex: 1; font-size: 5.4pt;">${v('note1')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="note1" style="flex: 1; font-size: 6.2pt;">${v('note1')}</span>
           </div>
         </div>
 
         <!-- Подчеркивание 2 -->
         <div style="margin-top: 2px;">
-          <span class="editable-field line-field" contenteditable="true" data-field="note2" style="width: 100%; font-size: 5.4pt;">${v('note2')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note2" style="width: 100%; font-size: 6.2pt;">${v('note2')}</span>
         </div>
 
         <!-- Подчеркивание 3 -->
         <div style="margin-top: 2px;">
-          <span class="editable-field line-field" contenteditable="true" data-field="note3" style="width: 100%; font-size: 5.4pt;">${v('note3')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note3" style="width: 100%; font-size: 6.2pt;">${v('note3')}</span>
         </div>
 
         <!-- Подчеркивание 4 -->
         <div style="margin-top: 2px;">
-          <span class="editable-field line-field" contenteditable="true" data-field="note4" style="width: 100%; font-size: 5.4pt;">${v('note4')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note4" style="width: 100%; font-size: 6.2pt;">${v('note4')}</span>
         </div>
 
         <!-- Подчеркивание 5 -->
         <div style="margin-top: 2px; margin-bottom: 0.5mm;">
-          <span class="editable-field line-field" contenteditable="true" data-field="note5" style="width: 100%; font-size: 5.4pt;">${v('note5')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note5" style="width: 100%; font-size: 6.2pt;">${v('note5')}</span>
         </div>
 
       </div>
