@@ -190,7 +190,7 @@ export async function handleVehicleDeparture(
  */
 export async function handleVehicleArrival(
   supabase: SupabaseClient<any, any, any>,
-  params: { vehicleId: string; timestamp?: string; odometer: number },
+  params: { vehicleId: string; timestamp?: string; odometer: number; forceFinish?: boolean },
 ) {
   const arrivalTime = params.timestamp || new Date().toISOString();
 
@@ -221,6 +221,53 @@ export async function handleVehicleArrival(
 
   if (tripFetchErr || !trip) {
     throw new Error(`Связанный рейс не найден: ${tripFetchErr?.message}`);
+  }
+
+  // Проверка: Составной / круговой маршрут с промежуточным заездом в Верхнюю Салду
+  const isTransitAllowed = Boolean(
+    order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
+  );
+
+  if (isTransitAllowed && !params.forceFinish) {
+    const transitCount = (order.salda_transit_count || 0) + 1;
+    console.log(
+      `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount}. Заявка НЕ закрывается!`,
+    );
+
+    // Обновляем одометр актива и фиксируем промежуточную отметку в рейсе и заявке
+    await supabase
+      .from('assets')
+      .update({ odometer_current: params.odometer, updated_at: new Date().toISOString() })
+      .eq('id', params.vehicleId);
+
+    const prevNote = trip.driver_note || '';
+    const newNote =
+      `${prevNote}\n[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`.trim();
+
+    await supabase
+      .from('trips')
+      .update({
+        driver_note: newNote,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', trip.id);
+
+    await supabase
+      .from('orders')
+      .update({
+        salda_transit_count: transitCount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id);
+
+    return {
+      success: true,
+      transit: true,
+      salda_transit_count: transitCount,
+      orderId: order.id,
+      tripId: trip.id,
+      message: `Промежуточный заезд в Салду (заезд #${transitCount}). Рейс продолжается без авто-завершения.`,
+    };
   }
 
   const odoStart = trip.odometer_start || params.odometer;

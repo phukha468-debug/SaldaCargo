@@ -89,7 +89,14 @@ export async function POST(req: Request) {
 
       assigned_vehicle_id: body.assigned_vehicle_id || null,
       assigned_driver_id: body.assigned_driver_id || null,
-      raw_parser_payload: body.raw_parser_payload || {},
+      routes_json: body.routes_json || [],
+      prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish),
+      salda_transit_count: Number(body.salda_transit_count) || 0,
+      raw_parser_payload: {
+        ...(body.raw_parser_payload || {}),
+        routes: body.routes_json || [],
+        prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish),
+      },
     };
 
     if (insertPayload.assigned_vehicle_id && !insertPayload.waybill_number) {

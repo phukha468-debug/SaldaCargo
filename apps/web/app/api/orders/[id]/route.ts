@@ -46,6 +46,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       updated_at: new Date().toISOString(),
     };
 
+    if (body.routes_json !== undefined || body.prevent_salda_auto_finish !== undefined) {
+      updatePayload.raw_parser_payload = {
+        ...(updatePayload.raw_parser_payload || {}),
+        ...(body.routes_json !== undefined ? { routes: body.routes_json } : {}),
+        ...(body.prevent_salda_auto_finish !== undefined
+          ? { prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish) }
+          : {}),
+      };
+    }
+
     // Если назначили ТС и водителя, но статус был waiting_vehicle — переводим в assigned
     if (
       updatePayload.assigned_vehicle_id &&

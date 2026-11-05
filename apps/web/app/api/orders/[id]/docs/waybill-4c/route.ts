@@ -96,6 +96,28 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           tripsCount: 1,
           distanceKm: odoEnd && odoStart ? odoEnd - odoStart : 350,
         },
+        routes: (
+          (order.routes_json && Array.isArray(order.routes_json) && order.routes_json.length > 0
+            ? order.routes_json
+            : order.raw_parser_payload?.routes && Array.isArray(order.raw_parser_payload.routes)
+              ? order.raw_parser_payload.routes
+              : undefined) as any[] | undefined
+        )?.map((r: any) => ({
+          clientName:
+            r.clientName || r.client_name || order.client?.name || 'ПАО «Корпорация ВСМПО-АВИСМА»',
+          arrivalTime: r.arrivalTime || r.arrival_time || '09:30',
+          loadingAddress: r.loadingAddress || r.loading_address || 'г. Заречный',
+          unloadingAddress: r.unloadingAddress || r.unloading_address || 'г. Верхняя Салда',
+          cargoName: r.cargoName || r.cargo_name || order.cargo_name || 'Металлопрокат',
+          tripsCount: Number(r.tripsCount || r.trips_count || 1),
+          distanceKm: Number(r.distanceKm || r.distance_km || 350),
+          weightTons:
+            r.weightTons !== undefined
+              ? Number(r.weightTons)
+              : r.weight_gross_kg !== undefined
+                ? Number(r.weight_gross_kg) / 1000
+                : (order.weight_gross_kg || 3100) / 1000,
+        })),
         execution: {
           phase,
           odometerStart: odoStart,
