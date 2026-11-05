@@ -237,9 +237,17 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
   const route2: WaybillRouteItem = data.routes?.[1] || {};
   const route3: WaybillRouteItem = data.routes?.[2] || {};
+  const route4: WaybillRouteItem = data.routes?.[3] || {};
+  const route5: WaybillRouteItem = data.routes?.[4] || {};
+  const route6: WaybillRouteItem = data.routes?.[5] || {};
 
   const totalTons =
-    (route1.weightTons || 0) + (route2.weightTons || 0) + (route3.weightTons || 0) ||
+    (route1.weightTons || 0) +
+      (route2.weightTons || 0) +
+      (route3.weightTons || 0) +
+      (route4.weightTons || 0) +
+      (route5.weightTons || 0) +
+      (route6.weightTons || 0) ||
     data.assignment.weightTons ||
     3.1;
   const totalTonsFormatted = totalTons ? totalTons.toFixed(2) : '';
@@ -351,6 +359,33 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     t3_trips_3: route3.tripsCount ? String(route3.tripsCount) : '',
     t3_dist_3: route3.distanceKm ? String(route3.distanceKm) : '',
     t3_tons_3: route3.weightTons ? route3.weightTons.toFixed(2) : '',
+
+    t3_client_4: route4.clientName || '',
+    t3_arr_time_4: route4.arrivalTime || '',
+    t3_load_addr_4: route4.loadingAddress || '',
+    t3_unload_addr_4: route4.unloadingAddress || '',
+    t3_cargo_4: route4.cargoName || '',
+    t3_trips_4: route4.tripsCount ? String(route4.tripsCount) : '',
+    t3_dist_4: route4.distanceKm ? String(route4.distanceKm) : '',
+    t3_tons_4: route4.weightTons ? route4.weightTons.toFixed(2) : '',
+
+    t3_client_5: route5.clientName || '',
+    t3_arr_time_5: route5.arrivalTime || '',
+    t3_load_addr_5: route5.loadingAddress || '',
+    t3_unload_addr_5: route5.unloadingAddress || '',
+    t3_cargo_5: route5.cargoName || '',
+    t3_trips_5: route5.tripsCount ? String(route5.tripsCount) : '',
+    t3_dist_5: route5.distanceKm ? String(route5.distanceKm) : '',
+    t3_tons_5: route5.weightTons ? route5.weightTons.toFixed(2) : '',
+
+    t3_client_6: route6.clientName || '',
+    t3_arr_time_6: route6.arrivalTime || '',
+    t3_load_addr_6: route6.loadingAddress || '',
+    t3_unload_addr_6: route6.unloadingAddress || '',
+    t3_cargo_6: route6.cargoName || '',
+    t3_trips_6: route6.tripsCount ? String(route6.tripsCount) : '',
+    t3_dist_6: route6.distanceKm ? String(route6.distanceKm) : '',
+    t3_tons_6: route6.weightTons ? route6.weightTons.toFixed(2) : '',
 
     t3_total_tons: totalTonsFormatted,
 
@@ -647,20 +682,20 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           <div style="display: flex; justify-content: center; align-items: flex-end; margin-top: 2px; font-size: 9.8pt; font-weight: bold;">
             <span style="white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">грузового автомобиля</span>
             <div style="width: 26mm; margin-right: 6px;">
-              <span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="width: 100%; text-align: center; font-size: 9.5pt;">${v('docSeries')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="width: 100%; text-align: center; font-size: 9.5pt;">${'docSeries'}</span>
               <span class="sub-prompt" style="font-size: 6.2pt; margin-top: 0.5px;">(серия)</span>
             </div>
             <span style="white-space: nowrap; margin-right: 4px; padding-bottom: 3.5px;">№</span>
             <div style="width: 40mm;">
-              <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="width: 100%; text-align: center; font-size: 11pt; font-weight: bold;">${v('docNumber')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="width: 100%; text-align: center; font-size: 11pt; font-weight: bold;">${'docNumber'}</span>
               <span style="display: block; height: 7px;"></span>
             </div>
           </div>
           <!-- Строка даты -->
           <div style="display: flex; justify-content: center; align-items: baseline; font-size: 8.8pt; font-weight: bold; margin-top: 0.5px;">
-            «&nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docDay" style="width: 12mm; text-align: center;">${v('docDay')}</span>&nbsp;»
-            &nbsp; &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docMonth" style="width: 32mm; text-align: center;">${v('docMonth')}</span>&nbsp; &nbsp;
-            20&nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docYear" style="width: 12mm; text-align: center;">${v('docYear')}</span>&nbsp; г.
+            «&nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docDay" style="width: 12mm; text-align: center;">${'docDay'}</span>&nbsp;»
+            &nbsp; &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docMonth" style="width: 32mm; text-align: center;">${'docMonth'}</span>&nbsp; &nbsp;
+            20&nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docYear" style="width: 12mm; text-align: center;">${'docYear'}</span>&nbsp; г.
           </div>
         </div>
 
@@ -683,7 +718,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <tr>
               <td style="border: none; text-align: right; padding-right: 6px; white-space: nowrap;">по ОКПО</td>
               <td style="border: 2px solid #000; text-align: center; width: 30mm; height: 5.5mm;">
-                <span class="editable-field" contenteditable="true" data-field="okpo">${v('okpo')}</span>
+                <span class="editable-field" contenteditable="true" data-field="okpo">${'okpo'}</span>
               </td>
             </tr>
           </table>
@@ -695,7 +730,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       <div style="margin-top: 1.5mm; display: flex; align-items: flex-end;">
         <div style="font-size: 9.2pt; font-weight: bold; white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">Организация</div>
         <div style="flex: 1; margin-right: 6px;">
-          <span class="editable-field line-field" contenteditable="true" data-field="orgAddressPhone" style="width: 100%; font-weight: bold; font-size: 8.0pt;">${v('orgAddressPhone')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="orgAddressPhone" style="width: 100%; font-weight: bold; font-size: 8.0pt;">${'orgAddressPhone'}</span>
           <span class="sub-prompt" style="text-align: center; font-size: 6.2pt; margin-top: 0.5px;">(наименование, адрес и номер телефона)</span>
         </div>
         <!-- Распорка по ширине правого блока кодов (Форма по ОКУД / по ОКПО), чтобы подчеркивание Организации заканчивалось строго перед по ОКПО -->
@@ -704,233 +739,223 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
     </div>
 
-    <!-- 2. СРЕДНИЙ БЛОК: СЛЕВА (ТС, ВОДИТЕЛЬ, ТАБЛИЦЫ КОДОВ) | СПРАВА (ТАБЛИЦА 1 И ТАБЛИЦА 2) (73 мм) -->
-    <div style="display: flex; justify-content: space-between; margin-bottom: 2.5mm;">
+    <!-- 2. СРЕДНИЙ БЛОК: СЛЕВА (ВОДИТЕЛЬ, ТС, 2 ТАБЛИЦЫ КОД) | СПРАВА (ТАБЛИЦА 1 И ТАБЛИЦА 2) (72 мм) -->
+    <div style="display: flex; justify-content: space-between; margin-bottom: 2.0mm; height: 72mm;">
       
-      <!-- ЛЕВЫЙ БЛОК (С ЛИНИЯМИ И ДВУМЯ ТАБЛИЦАМИ КОДОВ) (51.5% ~ 142.2 мм) -->
-      <div style="width: 51.5%; display: flex; justify-content: space-between; font-size: 6.0pt;">
+      <!-- ЛЕВАЯ КОЛОНКА (Инфо о ТС и водителе + вертикальные таблицы КОД) (52%) -->
+      <div style="width: 52%; display: flex; justify-content: space-between; height: 100%;">
         
-        <!-- Линии реквизитов слева от таблиц кодов (крупный шрифт, точные подчеркивания - Скриншот 3!) (ширина 129.9 мм) -->
-        <div style="width: calc(100% - 13.5mm); display: flex; flex-direction: column; justify-content: space-between; font-size: 7.8pt; font-weight: bold;">
+        <!-- Текстовые поля слева от таблицы Код (ширина calc(100% - 17.5mm)) -->
+        <div style="width: calc(100% - 17.5mm); display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
           
-          <!-- Верхняя группа: Режим работы, Колонна, Бригада, Марка авто, Номер, Водитель -->
-          <div style="display: flex; flex-direction: column; justify-content: space-between; height: 32mm;">
-            <!-- Режим работы (чистый текст) -->
-            <div style="text-align: right; padding-right: 5px; height: 4.5mm; line-height: 4.5mm; font-size: 7.5pt;">
+          <!-- 1. Верхний блок: Режим, Колонна, Бригада, Марка, Госномер, Водитель (точно 27.5 мм - состыкован с Таблицей Код 1) -->
+          <div style="height: 27.5mm; display: flex; flex-direction: column; justify-content: space-between; font-size: 7.6pt; font-weight: bold;">
+            <!-- Режим работы -->
+            <div style="text-align: right; padding-right: 5px; height: 3.9mm; line-height: 3.9mm;">
               Режим работы
             </div>
-            <!-- Колонна (чистый текст) -->
-            <div style="text-align: right; padding-right: 5px; height: 4.5mm; line-height: 4.5mm; font-size: 7.5pt;">
+            <!-- Колонна -->
+            <div style="text-align: right; padding-right: 5px; height: 3.9mm; line-height: 3.9mm;">
               Колонна
             </div>
-            <!-- Бригада (чистый текст) -->
-            <div style="text-align: right; padding-right: 5px; height: 4.5mm; line-height: 4.5mm; font-size: 7.5pt;">
+            <!-- Бригада -->
+            <div style="text-align: right; padding-right: 5px; height: 3.9mm; line-height: 3.9mm;">
               Бригада
             </div>
             
-            <!-- Разделительная линия под Бригадой -->
-            <div style="border-bottom: 1.2px solid #000; width: 100%; margin: 0.5px 0 1px 0;"></div>
+            <!-- Горизонтальная линия под Бригадой -->
+            <div style="border-bottom: 1.2px solid #000; width: 100%; margin: 0;"></div>
             
-            <!-- Марка автомобиля (подчеркивание до блока КОД - Скриншот 3) -->
-            <div style="display: flex; align-items: baseline;">
+            <!-- Марка автомобиля (пустая ячейка в Код напротив нее) -->
+            <div style="display: flex; align-items: baseline; height: 3.9mm; line-height: 3.9mm;">
               <span style="white-space: nowrap; margin-right: 5px;">Марка автомобиля</span>
-              <span class="editable-field line-field" contenteditable="true" data-field="vehBrand" style="flex: 1; font-size: 8.0pt; font-weight: bold;">${v('vehBrand')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="vehBrand" style="flex: 1; font-size: 7.8pt; font-weight: bold;">${'vehBrand'}</span>
             </div>
             
-            <!-- Государственный номерной знак (подчеркивание до Гаражный номер - Скриншот 3) -->
-            <div style="display: flex; align-items: baseline;">
+            <!-- Государственный номерной знак -->
+            <div style="display: flex; align-items: baseline; height: 3.9mm; line-height: 3.9mm;">
               <span style="white-space: nowrap; margin-right: 5px;">Государственный номерной знак</span>
-              <span class="editable-field line-field" contenteditable="true" data-field="vehReg" style="flex: 1; font-size: 8.2pt; font-weight: bold; letter-spacing: 0.5px; text-align: center; margin-right: 6px;">${v('vehReg')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="vehReg" style="flex: 1; font-size: 8.0pt; font-weight: bold; letter-spacing: 0.5px; text-align: center; margin-right: 6px;">${'vehReg'}</span>
               <span style="white-space: nowrap; padding-right: 3px;">Гаражный номер</span>
             </div>
             
-            <!-- Водитель (подчеркивание до Табельный номер с подстрочником фамилия, имя, отчество - Скриншот 3) -->
-            <div>
-              <div style="display: flex; align-items: baseline;">
+            <!-- Водитель -->
+            <div style="height: 4.8mm;">
+              <div style="display: flex; align-items: baseline; height: 3.6mm;">
                 <span style="white-space: nowrap; margin-right: 5px;">Водитель</span>
-                <span class="editable-field line-field" contenteditable="true" data-field="driverFio" style="flex: 1; font-size: 8.2pt; font-weight: bold; margin-right: 6px;">${v('driverFio')}</span>
+                <span class="editable-field line-field" contenteditable="true" data-field="driverFio" style="flex: 1; font-size: 8.0pt; font-weight: bold; margin-right: 6px;">${'driverFio'}</span>
                 <span style="white-space: nowrap; padding-right: 3px;">Табельный номер</span>
               </div>
-              <div style="display: flex;">
-                <span style="width: 50px;"></span>
-                <span class="sub-prompt" style="flex: 1; margin-right: 90px; font-size: 6.0pt;">(фамилия, имя, отчество)</span>
+              <div style="display: flex; height: 1.2mm;">
+                <span style="width: 45px;"></span>
+                <span class="sub-prompt" style="flex: 1; margin-right: 90px; font-size: 5.6pt; line-height: 1;">(фамилия, имя, отчество)</span>
               </div>
             </div>
           </div>
 
-          <!-- Средняя группа: Удостоверение, Класс, Лицензионная карточка, Регистрационный №, Серия, № (Скриншот 3) -->
-          <div style="margin: 2px 0; font-size: 7.8pt;">
+          <!-- 2. Средний блок: Удостоверение, Класс, Лицензионная карточка, Рег. номер (~13.5 мм) -->
+          <div style="font-size: 7.4pt; font-weight: bold; display: flex; flex-direction: column; justify-content: space-around; height: 13.5mm;">
             <!-- Удостоверение № ... Класс ... -->
             <div style="display: flex; align-items: baseline;">
               <span style="white-space: nowrap; margin-right: 4px;">Удостоверение №</span>
-              <span class="editable-field line-field" contenteditable="true" data-field="driverLic" style="flex: 1; font-size: 8.0pt; font-weight: bold; margin-right: 8px;">${v('driverLic')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="driverLic" style="flex: 1; font-size: 7.8pt; font-weight: bold; margin-right: 8px;">${'driverLic'}</span>
               <span style="white-space: nowrap; margin-right: 4px;">Класс</span>
-              <span class="editable-field line-field" contenteditable="true" data-field="driverClass" style="width: 32mm; font-size: 8.0pt; font-weight: bold; text-align: center;">${v('driverClass')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="driverClass" style="width: 28mm; font-size: 7.8pt; font-weight: bold; text-align: center;">${'driverClass'}</span>
             </div>
 
-            <!-- Лицензионная карточка: сверху стандартная, ограниченная, снизу ненужное зачеркнуть (Скриншот 3) -->
-            <div style="margin-top: 1.5px; display: flex; align-items: flex-end;">
-              <span style="white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">Лицензионная карточка</span>
-              <div style="width: 55mm;">
-                <div style="text-align: center; font-size: 7.8pt; border-bottom: 1.2px solid #000; padding-bottom: 1px;">
+            <!-- Лицензионная карточка -->
+            <div style="display: flex; align-items: flex-end;">
+              <span style="white-space: nowrap; margin-right: 6px; padding-bottom: 1.5px;">Лицензионная карточка</span>
+              <div style="width: 52mm;">
+                <div style="text-align: center; font-size: 7.4pt; border-bottom: 1.2px solid #000; padding-bottom: 0.5px;">
                   <b><u>стандартная</u></b>, <s>ограниченная</s>
                 </div>
-                <span class="sub-prompt" style="font-size: 5.8pt; margin-top: 0.5px;">(ненужное зачеркнуть)</span>
+                <span class="sub-prompt" style="font-size: 5.4pt; margin-top: 0.2px;">(ненужное зачеркнуть)</span>
               </div>
             </div>
 
-            <!-- Регистрационный № ... Серия ... № ... (Скриншот 3) -->
-            <div style="margin-top: 1.5px; display: flex; align-items: baseline;">
+            <!-- Регистрационный № ... Серия ... № ... -->
+            <div style="display: flex; align-items: baseline;">
               <span style="white-space: nowrap; margin-right: 4px;">Регистрационный №</span>
-              <span class="editable-field line-field" contenteditable="true" data-field="licRegNum" style="flex: 1; font-size: 7.8pt; margin-right: 8px;">${v('licRegNum')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="licRegNum" style="flex: 1; font-size: 7.4pt; margin-right: 8px;">${'licRegNum'}</span>
               <span style="white-space: nowrap; margin-right: 4px;">Серия</span>
-              <span class="editable-field line-field" contenteditable="true" data-field="licSeries" style="width: 20mm; font-size: 7.8pt; text-align: center; margin-right: 8px;">${v('licSeries')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="licSeries" style="width: 18mm; font-size: 7.4pt; text-align: center; margin-right: 8px;">${'licSeries'}</span>
               <span style="white-space: nowrap; margin-right: 4px;">№</span>
-              <span class="editable-field line-field" contenteditable="true" data-field="licNumber" style="width: 25mm; font-size: 7.8pt; text-align: center;">${v('licNumber')}</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="licNumber" style="width: 22mm; font-size: 7.4pt; text-align: center;">${'licNumber'}</span>
             </div>
           </div>
 
-          <!-- Нижняя группа: Прицепы 1..4 и Сопровождающие лица -->
-          <div style="display: flex; flex-direction: column; gap: 1mm; font-size: 7.2pt;">
+          <!-- 3. Нижний блок: Прицепы 1..4 и Сопровождающие лица (состыкован со 2-й Таблицей Код) -->
+          <div style="display: flex; flex-direction: column; justify-content: space-between; height: 26mm; font-size: 7.0pt; font-weight: bold;">
             <!-- Прицеп 1 -->
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <div style="width: 30%;">
-                  Прицеп 1 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr1_brand" style="width: calc(100% - 45px);">${v('pr1_brand')}</span>
-                </div>
-                <div style="width: 44%;">
-                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr1_reg" style="width: calc(100% - 55px); text-align: center;">${v('pr1_reg')}</span>
-                </div>
-                <div style="width: 26%; text-align: right; padding-right: 3px;">
-                  Гаражный номер
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="width: 32%;">
+                Прицеп 1 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr1_brand" style="width: calc(100% - 48px); font-size: 7.0pt;">${'pr1_brand'}</span>
               </div>
-              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 45px; font-size: 5.6pt;">(марка)</span>
+              <div style="width: 42%;">
+                Гос. № &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr1_reg" style="width: calc(100% - 48px); text-align: center; font-size: 7.0pt;">${'pr1_reg'}</span>
+              </div>
+              <div style="width: 26%; text-align: right; padding-right: 3px;">
+                Гаражный номер
+              </div>
             </div>
             <!-- Прицеп 2 -->
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <div style="width: 30%;">
-                  Прицеп 2 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr2_brand" style="width: calc(100% - 45px);">${v('pr2_brand')}</span>
-                </div>
-                <div style="width: 44%;">
-                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr2_reg" style="width: calc(100% - 55px); text-align: center;">${v('pr2_reg')}</span>
-                </div>
-                <div style="width: 26%; text-align: right; padding-right: 3px;">
-                  Гаражный номер
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="width: 32%;">
+                Прицеп 2 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr2_brand" style="width: calc(100% - 48px); font-size: 7.0pt;">${'pr2_brand'}</span>
               </div>
-              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 45px; font-size: 5.6pt;">(марка)</span>
+              <div style="width: 42%;">
+                Гос. № &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr2_reg" style="width: calc(100% - 48px); text-align: center; font-size: 7.0pt;">${'pr2_reg'}</span>
+              </div>
+              <div style="width: 26%; text-align: right; padding-right: 3px;">
+                Гаражный номер
+              </div>
             </div>
             <!-- Прицеп 3 -->
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <div style="width: 30%;">
-                  Прицеп 3 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr3_brand" style="width: calc(100% - 45px);">${v('pr3_brand')}</span>
-                </div>
-                <div style="width: 44%;">
-                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr3_reg" style="width: calc(100% - 55px); text-align: center;">${v('pr3_reg')}</span>
-                </div>
-                <div style="width: 26%; text-align: right; padding-right: 3px;">
-                  Гаражный номер
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="width: 32%;">
+                Прицеп 3 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr3_brand" style="width: calc(100% - 48px); font-size: 7.0pt;">${'pr3_brand'}</span>
               </div>
-              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 45px; font-size: 5.6pt;">(марка)</span>
+              <div style="width: 42%;">
+                Гос. № &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr3_reg" style="width: calc(100% - 48px); text-align: center; font-size: 7.0pt;">${'pr3_reg'}</span>
+              </div>
+              <div style="width: 26%; text-align: right; padding-right: 3px;">
+                Гаражный номер
+              </div>
             </div>
             <!-- Прицеп 4 -->
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <div style="width: 30%;">
-                  Прицеп 4 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr4_brand" style="width: calc(100% - 45px);">${v('pr4_brand')}</span>
-                </div>
-                <div style="width: 44%;">
-                  Гос. номер &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr4_reg" style="width: calc(100% - 55px); text-align: center;">${v('pr4_reg')}</span>
-                </div>
-                <div style="width: 26%; text-align: right; padding-right: 3px;">
-                  Гаражный номер
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div style="width: 32%;">
+                Прицеп 4 &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr4_brand" style="width: calc(100% - 48px); font-size: 7.0pt;">${'pr4_brand'}</span>
               </div>
-              <span class="sub-prompt" style="width: 30%; text-align: left; padding-left: 45px; font-size: 5.6pt;">(марка)</span>
+              <div style="width: 42%;">
+                Гос. № &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="pr4_reg" style="width: calc(100% - 48px); text-align: center; font-size: 7.0pt;">${'pr4_reg'}</span>
+              </div>
+              <div style="width: 26%; text-align: right; padding-right: 3px;">
+                Гаражный номер
+              </div>
             </div>
             <!-- Сопровождающие лица -->
-            <div style="margin-top: 0.5px;">
-              Сопровождающие лица: &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="escortPersons" style="width: calc(100% - 120px);">${v('escortPersons')}</span>
+            <div style="display: flex; align-items: baseline; height: 3.5mm;">
+              <span style="white-space: nowrap; margin-right: 4px;">Сопровождающие лица:</span>
+              <span class="editable-field line-field" contenteditable="true" data-field="escortPersons" style="flex: 1; font-size: 7.0pt;">${'escortPersons'}</span>
             </div>
           </div>
 
         </div>
 
-        <!-- КОЛОНКА ВЕРТИКАЛЬНЫХ ТАБЛИЦ «КОД» (ширина 12.3 мм) -->
-        <div style="width: 12.3mm; display: flex; flex-direction: column; justify-content: space-between;">
+        <!-- КОЛОНКА ВЕРТИКАЛЬНЫХ ТАБЛИЦ «КОД» (ширина 16 мм - жирные рамки, высота состыкована) -->
+        <div style="width: 16mm; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
           
-          <!-- 1. Верхняя таблица Код (Режим, Колонна, Бригада, Гар. номер, Таб. номер) -->
-          <table class="v-code-table" style="width: 100%;">
+          <!-- 1. Верхняя таблица Код: 6 строчек, высота ровно как Таблица 1 (27.5 мм), рамки жирнее, ширина 16 мм - Скриншот пользователя! -->
+          <table class="v-code-table" style="width: 100%; border: 2px solid #000; height: 27.5mm;">
             <thead>
-              <tr style="height: 4.5mm;">
-                <th>Код</th>
+              <tr style="height: 4.1mm;">
+                <th style="border: 1.2px solid #000; font-size: 7.2pt; font-weight: bold; background: #fff;">Код</th>
               </tr>
             </thead>
             <tbody>
-              <!-- Режим работы -->
-              <tr style="height: 4.2mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="code_workMode">${v('code_workMode')}</span></td>
+              <!-- 1. Режим работы -->
+              <tr style="height: 3.9mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="code_workMode">${'code_workMode'}</span></td>
               </tr>
-              <!-- Колонна -->
-              <tr style="height: 4.2mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="code_col">${v('code_col')}</span></td>
+              <!-- 2. Колонна -->
+              <tr style="height: 3.9mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="code_col">${'code_col'}</span></td>
               </tr>
-              <!-- Бригада -->
-              <tr style="height: 4.2mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="code_brig">${v('code_brig')}</span></td>
+              <!-- 3. Бригада -->
+              <tr style="height: 3.9mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="code_brig">${'code_brig'}</span></td>
               </tr>
-              <!-- Гаражный номер авто -->
-              <tr style="height: 5.2mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="vehGarage">${v('vehGarage')}</span></td>
+              <!-- 4. Пустая ячейка под разделительной чертой (Скриншот пользователя!) -->
+              <tr style="height: 3.9mm;">
+                <td style="border: 1.2px solid #000;">&nbsp;</td>
               </tr>
-              <!-- Табельный номер водителя -->
-              <tr style="height: 5.2mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="driverTab">${v('driverTab')}</span></td>
+              <!-- 5. Гаражный номер авто -->
+              <tr style="height: 3.9mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="vehGarage">${'vehGarage'}</span></td>
+              </tr>
+              <!-- 6. Табельный номер водителя -->
+              <tr style="height: 3.9mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="driverTab">${'driverTab'}</span></td>
               </tr>
             </tbody>
           </table>
 
-          <!-- Промежуток между верхней и нижней таблицами Код (соответствует удостоверению и лицензии) -->
-          <div style="height: 14mm;"></div>
+          <!-- Промежуток между верхней и нижней таблицей Код -->
+          <div style="flex: 1;"></div>
 
-          <!-- 2. Нижняя таблица Код (Гаражные номера 4-х прицепов) -->
-          <table class="v-code-table" style="height: 25.5mm;">
+          <!-- 2. Нижняя таблица Код (Прицепы 1..4) (высота ~21 мм, жирные рамки 2px) -->
+          <table class="v-code-table" style="width: 100%; border: 2px solid #000; height: 21mm; margin-bottom: 3.5mm;">
             <tbody>
               <!-- Прицеп 1 -->
-              <tr style="height: 6.3mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="code_pr1">${v('code_pr1')}</span></td>
+              <tr style="height: 5.25mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="code_pr1">${'code_pr1'}</span></td>
               </tr>
               <!-- Прицеп 2 -->
-              <tr style="height: 6.3mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="code_pr2">${v('code_pr2')}</span></td>
+              <tr style="height: 5.25mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="code_pr2">${'code_pr2'}</span></td>
               </tr>
               <!-- Прицеп 3 -->
-              <tr style="height: 6.3mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="code_pr3">${v('code_pr3')}</span></td>
+              <tr style="height: 5.25mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="code_pr3">${'code_pr3'}</span></td>
               </tr>
               <!-- Прицеп 4 -->
-              <tr style="height: 6.3mm;">
-                <td><span class="editable-field" contenteditable="true" data-field="code_pr4">${v('code_pr4')}</span></td>
+              <tr style="height: 5.25mm;">
+                <td style="border: 1.2px solid #000;"><span class="editable-field" contenteditable="true" data-field="code_pr4">${'code_pr4'}</span></td>
               </tr>
             </tbody>
           </table>
-
-          <!-- Отступ под сопровождающие лица -->
-          <div style="height: 4mm;"></div>
 
         </div>
 
       </div>
 
-      <!-- РАЗДЕЛИТЕЛЬНЫЙ ПРОМЕЖУТОК МЕЖДУ КОЛОНКАМИ (2.9% ~ 7.9 мм) -->
-      <div style="width: 2.9%;"></div>
+      <!-- РАЗДЕЛИТЕЛЬНЫЙ ПРОМЕЖУТОК МЕЖДУ КОЛОНКАМИ (1.2%) -->
+      <div style="width: 1.2%;"></div>
 
-      <!-- ПРАВЫЙ БЛОК: ТАБЛИЦА 1 И ТАБЛИЦА 2 (СТРОГО 45.6% ~ 125.6 мм) -->
-      <div style="width: 45.6%; display: flex; flex-direction: column; justify-content: space-between;">
+      <!-- ПРАВАЯ КОЛОНКА (ТАБЛИЦА 1 И ТАБЛИЦА 2) (46.8%) -->
+      <div style="width: 46.8%; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
         
         <!-- ================= Таблица 1: Работа водителя и автомобиля ================= -->
         <div>
@@ -939,20 +964,20 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           </div>
           <table class="pl-table" style="width: 100%;">
             <colgroup>
-              <col style="width: 16.7%;">
-              <col style="width: 7.4%;">
-              <col style="width: 7.6%;">
-              <col style="width: 7.6%;">
-              <col style="width: 7.4%;">
-              <col style="width: 7.1%;">
-              <col style="width: 14.3%;">
-              <col style="width: 31.9%;">
+              <col style="width: 16.5%;">
+              <col style="width: 6.8%;">
+              <col style="width: 6.8%;">
+              <col style="width: 6.8%;">
+              <col style="width: 6.8%;">
+              <col style="width: 9.3%;">
+              <col style="width: 14.5%;">
+              <col style="width: 32.5%;">
             </colgroup>
             <thead>
               <tr style="height: 6.4mm;">
                 <th rowspan="2" class="col-header">операция</th>
                 <th colspan="4" class="col-header">время по графику</th>
-                <th rowspan="2" class="col-header">нулевой<br>пробег,<br>км</th>
+                <th rowspan="2" class="col-header" style="font-size: 5.4pt; line-height: 1.05; padding: 0.5px;">нулевой<br>пробег,<br>км</th>
                 <th rowspan="2" class="col-header">показание<br>спидометра,<br>км</th>
                 <th rowspan="2" class="col-header">время фактическое,<br>число, месяц, ч. мин.</th>
               </tr>
@@ -976,23 +1001,23 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <tbody>
               <tr style="height: 5.0mm;">
                 <td style="font-weight: bold;">выезд из гаража</td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_day">${v('t1_dep_day')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_month">${v('t1_dep_month')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_h">${v('t1_dep_h')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_m">${v('t1_dep_m')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_zero">${v('t1_dep_zero')}</span></td>
-                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t1_odo_start">${v('t1_odo_start')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_act_dep">${v('t1_act_dep')}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_day">${'t1_dep_day'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_month">${'t1_dep_month'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_h">${'t1_dep_h'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_m">${'t1_dep_m'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_dep_zero">${'t1_dep_zero'}</span></td>
+                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t1_odo_start">${'t1_odo_start'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_act_dep">${'t1_act_dep'}</span></td>
               </tr>
               <tr style="height: 5.0mm;">
                 <td style="font-weight: bold;">возвращение в гараж</td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_day">${v('t1_arr_day')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_month">${v('t1_arr_month')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_h">${v('t1_arr_h')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_m">${v('t1_arr_m')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_zero">${v('t1_arr_zero')}</span></td>
-                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t1_odo_end">${v('t1_odo_end')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_act_arr">${v('t1_act_arr')}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_day">${'t1_arr_day'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_month">${'t1_arr_month'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_h">${'t1_arr_h'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_m">${'t1_arr_m'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_arr_zero">${'t1_arr_zero'}</span></td>
+                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t1_odo_end">${'t1_odo_end'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t1_act_arr">${'t1_act_arr'}</span></td>
               </tr>
             </tbody>
           </table>
@@ -1005,15 +1030,15 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           </div>
           <table class="pl-table" style="height: 38.4mm;">
             <colgroup>
-              <col style="width: 9.6%;">
-              <col style="width: 9.4%;">
-              <col style="width: 9.2%;">
-              <col style="width: 9.6%;">
-              <col style="width: 10.6%;">
-              <col style="width: 9.3%;">
-              <col style="width: 13.2%;">
-              <col style="width: 14.8%;">
-              <col style="width: 10.5%;">
+              <col style="width: 9.0%;">
+              <col style="width: 8.0%;">
+              <col style="width: 9.5%;">
+              <col style="width: 9.5%;">
+              <col style="width: 11.5%;">
+              <col style="width: 8.5%;">
+              <col style="width: 14.0%;">
+              <col style="width: 15.0%;">
+              <col style="width: 15.0%;">
             </colgroup>
             <thead>
               <tr style="height: 5.8mm;">
@@ -1028,9 +1053,9 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
                 <th class="col-header" style="font-size: 6.6pt;">марка</th>
                 <th class="col-header" style="font-size: 6.6pt;">код марки</th>
                 <th class="col-header" style="font-size: 6.6pt;">выезде, л</th>
-                <th class="col-header" style="font-size: 6.6pt;">возвращении, л</th>
-                <th class="col-header" style="font-size: 6.6pt;">спецоборудования</th>
-                <th class="col-header" style="font-size: 6.6pt;">двигателя</th>
+                <th class="col-header" style="font-size: 5.4pt; line-height: 1.05; padding: 0.5px;">возвра-<br>щении,<br>л</th>
+                <th class="col-header" style="font-size: 5.2pt; line-height: 1.05; padding: 0.5px;">спец-<br>оборудо-<br>вания</th>
+                <th class="col-header" style="font-size: 5.4pt; line-height: 1.05; padding: 0.5px;">двига-<br>теля</th>
               </tr>
               <tr style="height: 4.0mm;">
                 <th class="col-num">9</th>
@@ -1047,15 +1072,15 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <tbody>
               <!-- Строка 1: Данные по топливу -->
               <tr style="height: 5.3mm;">
-                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t2_fuelBrand">${v('t2_fuelBrand')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_fuelCode">${v('t2_fuelCode')}</span></td>
-                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t2_fuelGiven">${v('t2_fuelGiven')}</span></td>
-                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t2_fuelStart">${v('t2_fuelStart')}</span></td>
-                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t2_fuelEnd">${v('t2_fuelEnd')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_fuelReturn">${v('t2_fuelReturn')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_fuelCoeff">${v('t2_fuelCoeff')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_specTime">${v('t2_specTime')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_engTime">${v('t2_engTime')}</span></td>
+                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t2_fuelBrand">${'t2_fuelBrand'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_fuelCode">${'t2_fuelCode'}</span></td>
+                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t2_fuelGiven">${'t2_fuelGiven'}</span></td>
+                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t2_fuelStart">${'t2_fuelStart'}</span></td>
+                <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t2_fuelEnd">${'t2_fuelEnd'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_fuelReturn">${'t2_fuelReturn'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_fuelCoeff">${'t2_fuelCoeff'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_specTime">${'t2_specTime'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_engTime">${'t2_engTime'}</span></td>
               </tr>
               <!-- Строка 2: Пустая строка -->
               <tr style="height: 5.3mm;">
@@ -1085,11 +1110,11 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
               </tr>
               <!-- Строка 5: места где они должны подписываться -->
               <tr style="height: 5.0mm; font-size: 6.2pt;">
-                <td colspan="3" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler">${v('t2_sig_refueler')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_out">${v('t2_sig_mech_out')}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_in">${v('t2_sig_mech_in')}</span></td>
-                <td colspan="2" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler_ret">${v('t2_sig_refueler_ret')}</span></td>
-                <td colspan="2" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_disp">${v('t2_sig_disp')}</span></td>
+                <td colspan="3" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler">${'t2_sig_refueler'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_out">${'t2_sig_mech_out'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_in">${'t2_sig_mech_in'}</span></td>
+                <td colspan="2" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler_ret">${'t2_sig_refueler_ret'}</span></td>
+                <td colspan="2" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_disp">${'t2_sig_disp'}</span></td>
               </tr>
             </tbody>
           </table>
@@ -1099,24 +1124,24 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
     </div>
 
-    <!-- 3. ТАБЛИЦА 3: ЗАДАНИЕ ВОДИТЕЛЮ (3 СТРОКИ МАРШРУТА - ВЫСОКИЕ СТРОКИ) (36 мм) -->
-    <div style="margin-bottom: 3mm;">
-      <div style="text-align: center; font-weight: bold; font-size: 8.0pt; letter-spacing: 2px; margin-bottom: 1px;">
+    <!-- 3. ТАБЛИЦА 3: ЗАДАНИЕ ВОДИТЕЛЮ (6 СТРОК МАРШРУТА + ИТОГО - Пункт 1!) -->
+    <div style="margin-bottom: 2.0mm;">
+      <div style="text-align: center; font-weight: bold; font-size: 7.8pt; letter-spacing: 2px; margin-bottom: 1px;">
         З А Д А Н И Е &nbsp; &nbsp; В О Д И Т Е Л Ю
       </div>
       <table class="pl-table" style="width: 100%;">
         <colgroup>
-          <col style="width: 14.0%;">
-          <col style="width: 11.0%;">
-          <col style="width: 20.0%;">
-          <col style="width: 19.0%;">
-          <col style="width: 18.0%;">
-          <col style="width: 6.0%;">
-          <col style="width: 6.0%;">
-          <col style="width: 6.0%;">
+          <col style="width: 22.5%;"> <!-- в чье распоряжение (широкая колонка - имя заказчика строго в 1 строку!) -->
+          <col style="width: 8.5%;">  <!-- время прибытия -->
+          <col style="width: 16.0%;"> <!-- погрузки -->
+          <col style="width: 16.0%;"> <!-- разгрузки -->
+          <col style="width: 17.0%;"> <!-- наименование груза -->
+          <col style="width: 6.0%;">  <!-- количество ездок -->
+          <col style="width: 7.0%;">  <!-- расстояние -->
+          <col style="width: 7.0%;">  <!-- перевезти тонн -->
         </colgroup>
         <thead>
-          <tr style="height: 6.5mm;">
+          <tr style="height: 5.2mm;">
             <th rowspan="2" class="col-header">в чье распоряжение (наиме-<br>нование и адрес заказчика)</th>
             <th rowspan="2" class="col-header">время прибытия,<br>ч. мин.</th>
             <th colspan="2" class="col-header">адрес пункта</th>
@@ -1125,11 +1150,11 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <th rowspan="2" class="col-header">расстояние,<br>км</th>
             <th rowspan="2" class="col-header">перевезти<br>тонн</th>
           </tr>
-          <tr style="height: 3.5mm;">
-            <th class="col-header" style="font-size: 5.6pt;">погрузки</th>
-            <th class="col-header" style="font-size: 5.6pt;">разгрузки</th>
-          </tr>
           <tr style="height: 3.0mm;">
+            <th class="col-header" style="font-size: 5.4pt;">погрузки</th>
+            <th class="col-header" style="font-size: 5.4pt;">разгрузки</th>
+          </tr>
+          <tr style="height: 2.6mm;">
             <th class="col-num">18</th>
             <th class="col-num">19</th>
             <th class="col-num">20</th>
@@ -1141,44 +1166,77 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           </tr>
         </thead>
         <tbody>
-          <!-- Маршрут 1 (высота 5.8 мм) -->
-          <tr style="height: 5.8mm;">
-            <td><span class="editable-field" contenteditable="true" data-field="t3_client_1" style="font-weight: bold;">${v('t3_client_1')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_1">${v('t3_arr_time_1')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_1">${v('t3_load_addr_1')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_1">${v('t3_unload_addr_1')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_1" style="font-weight: bold;">${v('t3_cargo_1')}</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_trips_1">${v('t3_trips_1')}</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_dist_1">${v('t3_dist_1')}</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_tons_1">${v('t3_tons_1')}</span></td>
+          <!-- Маршрут 1 (1 строка заказчика) -->
+          <tr style="height: 3.6mm;">
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_1" style="font-weight: bold; white-space: nowrap;">${'t3_client_1'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_1">${'t3_arr_time_1'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_1">${'t3_load_addr_1'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_1">${'t3_unload_addr_1'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_1" style="font-weight: bold;">${'t3_cargo_1'}</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_trips_1">${'t3_trips_1'}</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_dist_1">${'t3_dist_1'}</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_tons_1">${'t3_tons_1'}</span></td>
           </tr>
-          <!-- Маршрут 2 (высота 5.5 мм) -->
-          <tr style="height: 5.5mm;">
-            <td><span class="editable-field" contenteditable="true" data-field="t3_client_2">${v('t3_client_2')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_2">${v('t3_arr_time_2')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_2">${v('t3_load_addr_2')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_2">${v('t3_unload_addr_2')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_2">${v('t3_cargo_2')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_2">${v('t3_trips_2')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_2">${v('t3_dist_2')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_2">${v('t3_tons_2')}</span></td>
+          <!-- Маршрут 2 -->
+          <tr style="height: 3.6mm;">
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_2">${'t3_client_2'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_2">${'t3_arr_time_2'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_2">${'t3_load_addr_2'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_2">${'t3_unload_addr_2'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_2">${'t3_cargo_2'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_2">${'t3_trips_2'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_2">${'t3_dist_2'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_2">${'t3_tons_2'}</span></td>
           </tr>
-          <!-- Маршрут 3 (высота 5.5 мм) -->
-          <tr style="height: 5.5mm;">
-            <td><span class="editable-field" contenteditable="true" data-field="t3_client_3">${v('t3_client_3')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_3">${v('t3_arr_time_3')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_3">${v('t3_load_addr_3')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_3">${v('t3_unload_addr_3')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_3">${v('t3_cargo_3')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_3">${v('t3_trips_3')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_3">${v('t3_dist_3')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_3">${v('t3_tons_3')}</span></td>
+          <!-- Маршрут 3 -->
+          <tr style="height: 3.6mm;">
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_3">${'t3_client_3'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_3">${'t3_arr_time_3'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_3">${'t3_load_addr_3'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_3">${'t3_unload_addr_3'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_3">${'t3_cargo_3'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_3">${'t3_trips_3'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_3">${'t3_dist_3'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_3">${'t3_tons_3'}</span></td>
           </tr>
-          <!-- Строка Итого (высота 5.5 мм) -->
-          <tr style="height: 5.5mm; font-weight: bold;">
+          <!-- Маршрут 4 -->
+          <tr style="height: 3.6mm;">
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_4">${'t3_client_4'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_4">${'t3_arr_time_4'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_4">${'t3_load_addr_4'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_4">${'t3_unload_addr_4'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_4">${'t3_cargo_4'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_4">${'t3_trips_4'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_4">${'t3_dist_4'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_4">${'t3_tons_4'}</span></td>
+          </tr>
+          <!-- Маршрут 5 -->
+          <tr style="height: 3.6mm;">
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_5">${'t3_client_5'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_5">${'t3_arr_time_5'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_5">${'t3_load_addr_5'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_5">${'t3_unload_addr_5'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_5">${'t3_cargo_5'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_5">${'t3_trips_5'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_5">${'t3_dist_5'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_5">${'t3_tons_5'}</span></td>
+          </tr>
+          <!-- Маршрут 6 -->
+          <tr style="height: 3.6mm;">
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_6">${'t3_client_6'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_6">${'t3_arr_time_6'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_6">${'t3_load_addr_6'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_6">${'t3_unload_addr_6'}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_6">${'t3_cargo_6'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_6">${'t3_trips_6'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_6">${'t3_dist_6'}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_6">${'t3_tons_6'}</span></td>
+          </tr>
+          <!-- Строка Итого -->
+          <tr style="height: 3.6mm; font-weight: bold;">
             <td colspan="5" style="border: none; border-left: 1.8px solid #000; border-bottom: 1.8px solid #000;"></td>
             <td colspan="2" style="text-align: right; border: 1.8px solid #000; padding-right: 6px;">Итого</td>
-            <td style="text-align: center; border: 1.8px solid #000;"><span class="editable-field" contenteditable="true" data-field="t3_total_tons">${v('t3_total_tons')}</span></td>
+            <td style="text-align: center; border: 1.8px solid #000;"><span class="editable-field" contenteditable="true" data-field="t3_total_tons">${'t3_total_tons'}</span></td>
           </tr>
         </tbody>
       </table>
@@ -1195,7 +1253,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           <div>Водительское удостоверение проверил, задание выдал,</div>
           <div style="display: flex; align-items: baseline; margin-top: 1.5px;">
             <span style="white-space: nowrap; margin-right: 3px;">выдать горючего</span>
-            <span class="editable-field line-field" contenteditable="true" data-field="fuelGivenDisp" style="flex: 1; text-align: center; font-weight: bold;">${v('fuelGivenDisp')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="fuelGivenDisp" style="flex: 1; text-align: center; font-weight: bold;">${'fuelGivenDisp'}</span>
             <span style="white-space: nowrap; margin-left: 3px;">литров</span>
           </div>
         </div>
@@ -1204,11 +1262,11 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <div style="display: flex; align-items: flex-end; margin-top: 1.5px;">
           <span style="font-weight: bold; margin-right: 4px; padding-bottom: 3px;">Диспетчер</span>
           <div style="width: 20mm; margin-right: 4px;">
-            <span class="editable-field line-field" contenteditable="true" data-field="dispSig" style="width: 100%; text-align: center;">${v('dispSig')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="dispSig" style="width: 100%; text-align: center;">${'dispSig'}</span>
             <span class="sub-prompt">(подпись)</span>
           </div>
           <div style="flex: 1;">
-            <span class="editable-field line-field" contenteditable="true" data-field="dispFio" style="width: 100%; text-align: center; font-weight: bold;">${v('dispFio')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="dispFio" style="width: 100%; text-align: center; font-weight: bold;">${'dispFio'}</span>
             <span class="sub-prompt">(расшифровка подписи)</span>
           </div>
         </div>
@@ -1224,15 +1282,15 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
             <div style="flex: 1;">
               <div style="display: flex; gap: 3px;">
                 <div style="width: 18mm;">
-                  <span class="editable-field line-field" contenteditable="true" data-field="medRole" style="width: 100%; text-align: center; font-size: 5.1pt;">${v('medRole')}</span>
+                  <span class="editable-field line-field" contenteditable="true" data-field="medRole" style="width: 100%; text-align: center; font-size: 5.1pt;">${'medRole'}</span>
                   <span class="sub-prompt">(должность)</span>
                 </div>
                 <div style="width: 14mm;">
-                  <span class="editable-field line-field" contenteditable="true" data-field="medSig" style="width: 100%; text-align: center; font-size: 5.1pt;">${v('medSig')}</span>
+                  <span class="editable-field line-field" contenteditable="true" data-field="medSig" style="width: 100%; text-align: center; font-size: 5.1pt;">${'medSig'}</span>
                   <span class="sub-prompt">(подпись)</span>
                 </div>
                 <div style="flex: 1;">
-                  <span class="editable-field line-field" contenteditable="true" data-field="medFio" style="width: 100%; text-align: center; font-weight: bold; font-size: 5.1pt;">${v('medFio')}</span>
+                  <span class="editable-field line-field" contenteditable="true" data-field="medFio" style="width: 100%; text-align: center; font-weight: bold; font-size: 5.1pt;">${'medFio'}</span>
                   <span class="sub-prompt">(расшифровка подписи)</span>
                 </div>
               </div>
@@ -1254,18 +1312,18 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <!-- Линия 1: Автомобиль технически исправен. + длинное подчеркивание -->
         <div style="display: flex; align-items: baseline;">
           <span style="white-space: nowrap; margin-right: 4px;">Автомобиль технически исправен.</span>
-          <span class="editable-field line-field" contenteditable="true" data-field="techNote" style="flex: 1;">${v('techNote')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="techNote" style="flex: 1;">${'techNote'}</span>
         </div>
 
         <!-- Линия 2: Выезд разрешен. Механик (подпись, расшифровка подписи) -->
         <div style="display: flex; align-items: flex-end;">
           <span style="white-space: nowrap; margin-right: 4px; padding-bottom: 3px;">Выезд разрешен. &nbsp;<b>Механик</b></span>
           <div style="width: 22mm; margin-right: 4px;">
-            <span class="editable-field line-field" contenteditable="true" data-field="mechOutSig" style="width: 100%; text-align: center;">${v('mechOutSig')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="mechOutSig" style="width: 100%; text-align: center;">${'mechOutSig'}</span>
             <span class="sub-prompt">(подпись)</span>
           </div>
           <div style="flex: 1;">
-            <span class="editable-field line-field" contenteditable="true" data-field="mechOutFio" style="width: 100%; text-align: center; font-weight: bold;">${v('mechOutFio')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="mechOutFio" style="width: 100%; text-align: center; font-weight: bold;">${'mechOutFio'}</span>
             <span class="sub-prompt">(расшифровка подписи)</span>
           </div>
         </div>
@@ -1274,11 +1332,11 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <div style="display: flex; align-items: flex-end;">
           <span style="white-space: nowrap; margin-right: 4px; padding-bottom: 3px;">Автомобиль принял <b>Водитель</b></span>
           <div style="width: 22mm; margin-right: 4px;">
-            <span class="editable-field line-field" contenteditable="true" data-field="driverAcceptSig" style="width: 100%; text-align: center;">${v('driverAcceptSig')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="driverAcceptSig" style="width: 100%; text-align: center;">${'driverAcceptSig'}</span>
             <span class="sub-prompt">(подпись)</span>
           </div>
           <div style="flex: 1;">
-            <span class="editable-field line-field" contenteditable="true" data-field="driverAcceptFio" style="width: 100%; text-align: center; font-weight: bold;">${v('driverAcceptFio')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="driverAcceptFio" style="width: 100%; text-align: center; font-weight: bold;">${'driverAcceptFio'}</span>
             <span class="sub-prompt">(расшифровка подписи)</span>
           </div>
         </div>
@@ -1297,11 +1355,11 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <div style="display: flex; align-items: flex-end;">
           <span style="white-space: nowrap; margin-right: 4px; padding-bottom: 3px;">Сдал &nbsp;<b>водитель</b></span>
           <div style="width: 22mm; margin-right: 4px;">
-            <span class="editable-field line-field" contenteditable="true" data-field="retDriverSig" style="width: 100%; text-align: center;">${v('retDriverSig')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="retDriverSig" style="width: 100%; text-align: center;">${'retDriverSig'}</span>
             <span class="sub-prompt">(подпись)</span>
           </div>
           <div style="flex: 1;">
-            <span class="editable-field line-field" contenteditable="true" data-field="retDriverFio" style="width: 100%; text-align: center; font-weight: bold;">${v('retDriverFio')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="retDriverFio" style="width: 100%; text-align: center; font-weight: bold;">${'retDriverFio'}</span>
             <span class="sub-prompt">(расшифровка подписи)</span>
           </div>
         </div>
@@ -1310,11 +1368,11 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <div style="display: flex; align-items: flex-end;">
           <span style="white-space: nowrap; margin-right: 4px; padding-bottom: 3px;">Принял &nbsp;<b>механик</b></span>
           <div style="width: 22mm; margin-right: 4px;">
-            <span class="editable-field line-field" contenteditable="true" data-field="retMechSig" style="width: 100%; text-align: center;">${v('retMechSig')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="retMechSig" style="width: 100%; text-align: center;">${'retMechSig'}</span>
             <span class="sub-prompt">(подпись)</span>
           </div>
           <div style="flex: 1;">
-            <span class="editable-field line-field" contenteditable="true" data-field="retMechFio" style="width: 100%; text-align: center; font-weight: bold;">${v('retMechFio')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="retMechFio" style="width: 100%; text-align: center; font-weight: bold;">${'retMechFio'}</span>
             <span class="sub-prompt">(расшифровка подписи)</span>
           </div>
         </div>
@@ -1330,28 +1388,28 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           <div style="display: flex; align-items: baseline; margin-top: 1px;">
             <span style="font-size: 6.5pt; white-space: nowrap; margin-right: 3px;">автотранспорта:</span>
             <!-- Подчеркивание 1 -->
-            <span class="editable-field line-field" contenteditable="true" data-field="note1" style="flex: 1; font-size: 6.2pt;">${v('note1')}</span>
+            <span class="editable-field line-field" contenteditable="true" data-field="note1" style="flex: 1; font-size: 6.2pt;">${'note1'}</span>
           </div>
         </div>
 
         <!-- Подчеркивание 2 -->
         <div style="margin-top: 2px;">
-          <span class="editable-field line-field" contenteditable="true" data-field="note2" style="width: 100%; font-size: 6.2pt;">${v('note2')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note2" style="width: 100%; font-size: 6.2pt;">${'note2'}</span>
         </div>
 
         <!-- Подчеркивание 3 -->
         <div style="margin-top: 2px;">
-          <span class="editable-field line-field" contenteditable="true" data-field="note3" style="width: 100%; font-size: 6.2pt;">${v('note3')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note3" style="width: 100%; font-size: 6.2pt;">${'note3'}</span>
         </div>
 
         <!-- Подчеркивание 4 -->
         <div style="margin-top: 2px;">
-          <span class="editable-field line-field" contenteditable="true" data-field="note4" style="width: 100%; font-size: 6.2pt;">${v('note4')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note4" style="width: 100%; font-size: 6.2pt;">${'note4'}</span>
         </div>
 
         <!-- Подчеркивание 5 -->
         <div style="margin-top: 2px; margin-bottom: 0.5mm;">
-          <span class="editable-field line-field" contenteditable="true" data-field="note5" style="width: 100%; font-size: 6.2pt;">${v('note5')}</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note5" style="width: 100%; font-size: 6.2pt;">${'note5'}</span>
         </div>
 
       </div>
