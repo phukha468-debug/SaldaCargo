@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Транспортная накладная (Форма ПП РФ № 2116) — Превью бланка</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    @page {
+      size: A4 portrait;
+      margin: 15mm 10mm 15mm 10mm;
+    }
+    body {
+      font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+      font-size: 7.0pt;
+      line-height: 1.08;
+      color: #000;
+      background: #334155;
+      margin: 0;
+      padding: 15px 0;
+    }
+    .print-hide {
+      max-width: 210mm;
+      margin: 0 auto 14px auto;
+      padding: 10px 16px;
+      background: #0f172a;
+      color: #fff;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      color: #fff;
+      border: none;
+      padding: 7px 14px;
+      font-weight: 600;
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .btn-primary { background: #2563eb; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: #475569; }
+    .btn-secondary:hover { background: #64748b; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    
+    .tn-page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto 20px auto;
+      background: #fff;
+      padding: 15mm 10mm 15mm 10mm;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+      position: relative;
+      box-sizing: border-box;
+    }
+    @media print {
+      body {
+        background: #fff !important;
+        padding: 0 !important;
+      }
+      .print-hide {
+        display: none !important;
+      }
+      .editable-field:hover, .editable-field:focus {
+        background: transparent !important;
+        outline: none !important;
+      }
+      .tn-page {
+        width: 100% !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        page-break-after: always;
+        break-after: page;
+      }
+    }
+
+    .top-annex {
+      text-align: right;
+      font-size: 6.0pt;
+      line-height: 1.1;
+      margin-bottom: 2px;
+    }
+
+    table.tn-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-top: 1px solid #000;
+      border-left: 1px solid #000;
+      border-right: 1px solid #000;
+      border-bottom: 1px solid #000;
+      table-layout: fixed;
+    }
+
+    /* ==================== СТРАНИЦА 1 ==================== */
+    table.page1-table {
+      height: 256.5mm;
+    }
+    table.page1-table td, table.page1-table th {
+      border: 1px solid #000;
+      padding: 0 2px !important;
+      vertical-align: middle;
+      font-size: 7.0pt !important;
+      line-height: 1.08 !important;
+    }
+    table.page1-table .sec-title {
+      font-weight: bold;
+      text-align: center;
+      font-size: 7.4pt !important;
+      line-height: 1.0 !important;
+      height: 1em !important;
+      padding: 0 2px !important;
+      text-transform: uppercase;
+      background: #fff;
+    }
+    
+    /* old */
+
+    table.page1-table .header-data-cell {
+      height: 32px !important;
+      font-size: 7.2pt !important;
+      font-weight: bold;
+      vertical-align: middle;
+      padding: 0 2px !important;
+    }
+    table.page1-table .header-doc-cell {
+      height: 24px !important;
+      font-size: 7.0pt !important;
+      vertical-align: middle;
+      padding: 0 2px !important;
+    }
+/* old */
+
+      height: 26px !important;
+      font-size: 7.2pt !important;
+      line-height: 1.15 !important;
+      vertical-align: middle;
+    }
+    table.page1-table .header-doc-row {
+      height: 22px !important;
+      font-size: 7.2pt !important;
+      line-height: 1.15 !important;
+      vertical-align: middle;
+    }
+    table.page1-table .input-cell {
+      height: 11px !important;
+      font-size: 7.0pt !important;
+      line-height: 1.08 !important;
+      color: #000;
+      font-weight: normal;
+      vertical-align: middle;
+    }
+    table.page1-table .input-cell-bold {
+      height: 11px !important;
+      font-size: 7.0pt !important;
+      line-height: 1.08 !important;
+      color: #000;
+      font-weight: bold;
+      vertical-align: middle;
+    }
+    table.page1-table .input-sign {
+      height: 26px !important;
+      vertical-align: bottom;
+      padding-bottom: 1px !important;
+    }
+    table.page1-table .sub-prompt {
+      font-size: 5.0pt !important;
+      line-height: 1.0 !important;
+      text-align: center;
+      color: #000;
+      padding: 0 1px !important;
+      background: #fff;
+      vertical-align: middle;
+      font-weight: bold !important;
+    }
+
+    /* ==================== СТРАНИЦА 2 (Пустота <= 27%, крупный комфортный шрифт) ==================== */
+    table.page2-table td, table.page2-table th {
+      border: 1px solid #000;
+      padding: 4px 4px !important;
+      vertical-align: middle;
+      font-size: 8.5pt !important;
+      line-height: 1.25 !important;
+    }
+    table.page2-table .sec-title {
+      font-weight: bold;
+      text-align: center;
+      font-size: 8.5pt !important;
+      line-height: 1.0 !important;
+      height: 1em !important;
+      padding: 0 2px !important;
+      text-transform: uppercase;
+      background: #fff;
+    }
+    table.page2-table .input-cell {
+      height: 25px !important;
+      font-size: 8.5pt !important;
+      line-height: 1.25 !important;
+      color: #000;
+      font-weight: normal;
+      vertical-align: middle;
+    }
+    table.page2-table .input-cell-bold {
+      height: 25px !important;
+      font-size: 8.5pt !important;
+      line-height: 1.25 !important;
+      color: #000;
+      font-weight: bold;
+      vertical-align: middle;
+    }
+    table.page2-table .input-sign {
+      height: 52px !important;
+      vertical-align: bottom;
+      padding-bottom: 5px !important;
+    }
+    table.page2-table .sub-prompt {
+      font-size: 6.2pt !important;
+      line-height: 1.15 !important;
+      text-align: center;
+      color: #000;
+      padding: 2px 2px !important;
+      background: #fff;
+      vertical-align: middle;
+      font-weight: bold !important;
+    }
+
+    .editable-field {
+      outline: none;
+      min-height: 10px;
+      cursor: text;
+    }
+    .editable-field:hover {
+      background: #f0fdf4;
+    }
+    .editable-field:focus {
+      background: #fef08a;
+      box-shadow: inset 0 0 0 1px #ca8a04;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-hide">
+    <div>
+      <strong>Форма ТН (ПП РФ № 2116)</strong> | <b>Заявки Грузовики</b>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="resetDefaultData()">🔄 Загрузить из заявки</button>
+      <button class="btn btn-danger" onclick="clearAllFields()">🧹 Чистый бланк</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Печать PDF</button>
+    </div>
+  </div>
+
+  <!-- =============================== СТРАНИЦА 1 =============================== -->
+  <div class="tn-page">
+    
+    <div class="top-annex" style="margin-bottom: 1px;">
+      Приложение № 4 к Правилам перевозок грузов автомобильным транспортом<br>
+      (в ред. Постановления Правительства РФ от 30.11.2021 № 2116)
+    </div>
+    <div style="text-align: center; font-weight: bold; font-size: 7.4pt; text-transform: uppercase; line-height: 1.0; margin-bottom: 2px;">
+      ТРАНСПОРТНАЯ НАКЛАДНАЯ (ФОРМА)
+    </div>
+
+    <!-- Таблица с колонками СТРОГО 50% и 50% -->
+    <table class="tn-table page1-table">
+      <colgroup>
+        <col style="width: 50%;">
+        <col style="width: 50%;">
+      </colgroup>
+
+      <!-- [Линия 1 = верхняя рамка] -->
+      <!-- Шапка документа и раздел 1/1а имеют смещение 58% / 42% через внутреннюю таблицу -->
+      <tr style="height: 1px;">
+        <td colspan="2" style="padding: 0; border: none; height: 1px;">
+          <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+            <colgroup>
+              <col style="width: 58%;">
+              <col style="width: 42%;">
+            </colgroup>
+            <!-- 1-я строка таблицы: Транспортная накладная | Заказ (заявка) -->
+            <tr>
+              <td class="sec-title" style="border: 1px solid #000; border-top: none; border-left: none; text-align: center; height: 13px; line-height: 13px; padding: 0 2px;">Транспортная накладная</td>
+              <td class="sec-title" style="border: 1px solid #000; border-top: none; border-right: none; text-align: center; height: 13px; line-height: 13px; padding: 0 2px;">Заказ (заявка)</td>
+            </tr>
+            <!-- [Линия 2]: Дата и N -->
+            <tr>
+              <td style="padding: 0; border: 1px solid #000; border-left: none;">
+                <table style="width: 100%; border-collapse: collapse; border: none;">
+                  <tr>
+                    <td style="width: 50%; border: none; border-right: 1px solid #000; height: 13px; padding: 0 2px;">
+                      Дата &nbsp;<b class="editable-field" contenteditable="true" data-field="orderDate">2.11.2026</b>
+                    </td>
+                    <td style="width: 50%; border: none; height: 13px; padding: 0 2px;">
+                      N &nbsp;<b class="editable-field" contenteditable="true" data-field="orderNumber">10676</b>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+              <td style="padding: 0; border: 1px solid #000; border-right: none;">
+                <table style="width: 100%; border-collapse: collapse; border: none;">
+                  <tr>
+                    <td style="width: 50%; border: none; border-right: 1px solid #000; height: 13px; padding: 0 2px;">
+                      Дата &nbsp;<b class="editable-field" contenteditable="true" data-field="orderDate">2.11.2026</b>
+                    </td>
+                    <td style="width: 50%; border: none; height: 13px; padding: 0 2px;">
+                      N &nbsp;<b class="editable-field" contenteditable="true" data-field="orderNumber">10676</b>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <!-- [Линия 3]: Экземпляр N -->
+            <tr>
+              <td style="height: 13px; border: 1px solid #000; border-left: none; padding: 0 2px;">
+                Экземпляр N &nbsp;<b class="editable-field" contenteditable="true" data-field="copyNumber">1</b>
+              </td>
+              <td style="height: 13px; border: 1px solid #000; border-right: none;">&nbsp;</td>
+            </tr>
+            <!-- [Линия 4]: 1. Грузоотправитель и 1а. Заказчик -->
+            <tr>
+              <td class="input-cell-bold" style="border: 1px solid #000; border-left: none; height: 13px; padding: 0 2px;">
+                1. Грузоотправитель
+              </td>
+              <td rowspan="2" class="input-cell-bold" style="border: 1px solid #000; border-right: none; vertical-align: top; padding: 2px 4px;">
+                1а Заказчик услуг по организации перевозки груза (при наличии)
+              </td>
+            </tr>
+            <!-- [Линия 5]: является экспедитором -->
+            <tr>
+              <td class="input-cell" style="border: 1px solid #000; border-left: none; height: 13px; padding: 0 2px;">
+                является экспедитором &nbsp; [ <span class="editable-field" contenteditable="true" data-field="isForwarder">&nbsp;&nbsp;</span> ]
+              </td>
+            </tr>
+            <!-- [Линия 6]: ПУСТАЯ СТРОКА РЕКВИЗИТОВ (над подстрочником реквизитов) -->
+            <tr>
+              <td class="header-data-cell" style="border: 1px solid #000; border-left: none;">
+                <div class="editable-field" contenteditable="true" data-field="shipperName">ПАО "Корпорация ВСМПО-АВИСМА"</div>
+              </td>
+              <td class="header-data-cell" style="border: 1px solid #000; border-right: none; text-align: center;">
+                <div class="editable-field" contenteditable="true" data-field="clientName">ПАО "Корпорация ВСМПО-АВИСМА"</div>
+              </td>
+            </tr>
+            <!-- [Линия 7]: Подстрочник реквизитов -->
+            <tr>
+              <td class="sub-prompt" style="border: 1px solid #000; border-left: none;">
+                (реквизиты, позволяющие идентифицировать Грузоотправителя)
+              </td>
+              <td class="sub-prompt" style="border: 1px solid #000; border-right: none;">
+                (реквизиты, позволяющие идентифицировать Заказчика услуг по организации перевозки груза)
+              </td>
+            </tr>
+            <!-- [Линия 8]: ПУСТАЯ СТРОКА ДОКУМЕНТОВ/ДОГОВОРА (над подстрочником договора) -->
+            <tr>
+              <td class="header-doc-cell" style="border: 1px solid #000; border-left: none;">
+                <div class="editable-field" contenteditable="true" data-field="shipperDoc">&nbsp;</div>
+              </td>
+              <td class="header-doc-cell" style="border: 1px solid #000; border-right: none; text-align: center;">
+                <div class="editable-field" contenteditable="true" data-field="contractInfo">Договор № 10676 от 01.08.2012</div>
+              </td>
+            </tr>
+            <!-- [Линия 9]: Подстрочник документа и договора -->
+            <tr>
+              <td class="sub-prompt" style="border: 1px solid #000; border-left: none; border-bottom: none;">
+                (реквизиты документа, определяющего основания осуществления расчетов по договору перевозки иным лицом, отличным от грузоотправителя (при наличии))
+              </td>
+              <td class="sub-prompt" style="border: 1px solid #000; border-right: none; border-bottom: none;">
+                (реквизиты договора на выполнение услуг по организации перевозки груза)
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- Раздел 2. Грузополучатель (НА ВСЮ ШИРИНУ, НЕТ вертикальной линии!) -->
+      <tr>
+        <td colspan="2" class="sec-title" style="text-align: center;">2. Грузополучатель</td>
+      </tr>
+      <!-- [Линия 10] -->
+      <tr>
+        <td colspan="2" class="input-cell-bold" style="text-align: center;">
+          <span class="editable-field" contenteditable="true" data-field="consigneeName">ПАО "Корпорация ВСМПО-АВИСМА", ИНН 6607000556</span>
+        </td>
+      </tr>
+      <!-- [Линия 11] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (реквизиты, позволяющие идентифицировать Грузополучателя)
+        </td>
+      </tr>
+      <!-- [Линия 12] -->
+      <tr>
+        <td colspan="2" class="input-cell-bold" style="text-align: center;">
+          <span class="editable-field" contenteditable="true" data-field="deliveryAddress">624760, Свердловская область, г. Верхняя Салда, ул. Парковая, д 1</span>
+        </td>
+      </tr>
+      <!-- [Линия 13] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (адрес места доставки груза)
+        </td>
+      </tr>
+      <!-- [Линия 14] -->
+
+      <!-- ================= НАЧИНАЯ ОТСЮДА ВСЕ ВЕРТИКАЛЬНЫЕ ЛИНИИ СТРОГО ПО СЕРЕДИНЕ (50% / 50%) ================= -->
+
+      <!-- Раздел 3. Груз -->
+      <tr>
+        <td colspan="2" class="sec-title">3. Груз</td>
+      </tr>
+      <!-- [Линия 15] -->
+      <tr>
+        <td class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="cargoName">Метизы</div>
+        </td>
+        <td class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="cargoPlaces">1 место</div>
+        </td>
+      </tr>
+      <!-- [Линия 16] -->
+      <tr>
+        <td class="sub-prompt">
+          (отгрузочное наименование груза (для опасных грузов - в соответствии с ДОПОГ), его состояние и другая необходимая информация о грузе)
+        </td>
+        <td class="sub-prompt">
+          (количество грузовых мест, маркировка, вид тары и способ упаковки)
+        </td>
+      </tr>
+      <!-- [Линия 17] -->
+      <tr>
+        <td colspan="2" class="input-cell-bold" style="text-align: center;">
+          <span class="editable-field" contenteditable="true" data-field="cargoWeightAndDims">127 кг &nbsp;&nbsp;&nbsp;&nbsp; 50*50*30</span>
+        </td>
+      </tr>
+      <!-- [Линия 18] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (масса груза брутто в килограммах, масса груза нетто в килограммах (при возможности ее определения), размеры (высота, ширина, длина) в метрах (при перевозке крупногабаритного груза), объем груза в кубических метрах и плотность груза в соответствии с документацией на груз (при необходимости), дополнительные характеристики груза, учитывающие отраслевые особенности (при необходимости))
+        </td>
+      </tr>
+      <!-- [Линия 19] -->
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="dangerousCargo">&nbsp;</div></td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="declaredValue">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 20] -->
+      <tr>
+        <td class="sub-prompt">
+          (в случае перевозки опасного груза - информация по каждому опасному веществу, материалу или изделию в соответствии с пунктом 5.4.1 ДОПОГ)
+        </td>
+        <td class="sub-prompt">
+          (объявленная стоимость (ценность) груза (при необходимости))
+        </td>
+      </tr>
+      <!-- [Линия 21] -->
+
+      <!-- Раздел 4. Сопроводительные документы на груз (при наличии) -->
+      <tr>
+        <td colspan="2" class="sec-title">4. Сопроводительные документы на груз (при наличии)</td>
+      </tr>
+      <!-- [Линия 22] -->
+      <tr>
+        <td colspan="2" class="input-cell"><div class="editable-field" contenteditable="true" data-field="docDopog">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 23] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (перечень прилагаемых к транспортной накладной документов, предусмотренных ДОПОГ, санитарными, таможенными (при наличии), карантинными, иными правилами в соответствии с законодательством Российской Федерации, либо регистрационные номера указанных документов, если такие документы (сведения о таких документах) содержатся в государственных информационных системах)
+        </td>
+      </tr>
+      <!-- [Линия 24] -->
+      <tr>
+        <td colspan="2" class="input-cell" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="docCert">Паспорт качества / Сертификат соответствия</div>
+        </td>
+      </tr>
+      <!-- [Линия 25] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (перечень прилагаемых к грузу сертификатов, паспортов качества, удостоверений и других документов, наличие которых установлено законодательством Российской Федерации, либо регистрационные номера указанных документов, если такие документы (сведения о таких документах) содержатся в государственных информационных системах)
+        </td>
+      </tr>
+      <!-- [Линия 26] -->
+      <tr>
+        <td colspan="2" class="input-cell" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="docWaybillOrder">Поручение экспедитору № 10676 от 2.11.2026</div>
+        </td>
+      </tr>
+      <!-- [Линия 27] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (реквизиты, позволяющие идентифицировать документ(-ы), подтверждающий(-ие) отгрузку товаров (при наличии), реквизиты сопроводительной ведомости (при перевозке груженых контейнеров или порожних контейнеров))
+        </td>
+      </tr>
+      <!-- [Линия 28] -->
+
+      <!-- Раздел 5. Указания грузоотправителя по особым условиям перевозки (СТРОГО 50% / 50%) -->
+      <tr>
+        <td colspan="2" class="sec-title">5. Указания грузоотправителя по особым условиям перевозки</td>
+      </tr>
+      <!-- [Линия 29] -->
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="specialRoute">&nbsp;</div></td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="specialContacts">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 30] -->
+      <tr>
+        <td class="sub-prompt">
+          (маршрут перевозки, дата и время/сроки доставки груза (при необходимости))
+        </td>
+        <td class="sub-prompt">
+          (контактная информация о лицах, по указанию которых может осуществляться переадресовка)
+        </td>
+      </tr>
+      <!-- [Линия 31] -->
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="sanitaryReq">&nbsp;</div></td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="tempReq">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 32] -->
+      <tr>
+        <td class="sub-prompt">
+          (указания, необходимые для выполнения фитосанитарных, санитарных, карантинных, таможенных и прочих требований, установленных законодательством Российской Федерации)
+        </td>
+        <td class="sub-prompt">
+          (температурный режим перевозки груза (при необходимости), сведения о запорно-пломбировочных устройствах (в случае их предоставления грузоотправителем), запрещение перегрузки груза)
+        </td>
+      </tr>
+      <!-- [Линия 33] -->
+
+      <!-- Раздел 6. Перевозчик (СТРОГО 50% / 50%) -->
+      <tr>
+        <td colspan="2" class="sec-title">6. Перевозчик</td>
+      </tr>
+      <!-- [Линия 34] -->
+      <tr>
+        <td class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="carrierName">ИП Нигамедьянов Александр Сергеевич, ИНН 660704814106</div>
+        </td>
+        <td style="text-align: center;" class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="driverFio">ШАХМАЕВ А С</div>
+        </td>
+      </tr>
+      <!-- [Линия 35] -->
+      <tr>
+        <td class="sub-prompt">
+          (реквизиты, позволяющие идентифицировать Перевозчика)
+        </td>
+        <td class="sub-prompt">
+          (реквизиты, позволяющие идентифицировать водителя(ей))
+        </td>
+      </tr>
+      <!-- [Линия 36] -->
+
+      <!-- Раздел 7. Транспортное средство (СТРОГО 50% / 50%) -->
+      <tr>
+        <td colspan="2" class="sec-title">7. Транспортное средство</td>
+      </tr>
+      <!-- [Линия 37] -->
+      <tr>
+        <td class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="vehicleModel">Грузовой автомобиль, Валдай, 3.1 т, 40 м3</div>
+        </td>
+        <td style="text-align: center;" class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="vehicleRegNumber">О188ТА196</div>
+        </td>
+      </tr>
+      <!-- [Линия 38] -->
+      <tr>
+        <td class="sub-prompt">
+          (тип, марка, грузоподъемность (в тоннах), вместимость (в кубических метрах))
+        </td>
+        <td class="sub-prompt">
+          (регистрационный номер транспортного средства)
+        </td>
+      </tr>
+      <!-- [Линия 39] -->
+      <tr>
+        <td colspan="2" style="font-size: 7.2pt; padding: 0 2px; height: 11px;">
+          Тип владения: 1 - собственность; 2 - совместная собственность супругов; 3 - аренда; 4 - лизинг; 5 - безвозмездное пользование &nbsp; <b>[ <span class="editable-field" contenteditable="true" data-field="vehicleOwnership">1</span> ]</b>
+        </td>
+      </tr>
+      <!-- [Линия 40] -->
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="vehicleDoc">&nbsp;</div></td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="vehiclePermit">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 41] -->
+      <tr>
+        <td class="sub-prompt">
+          (реквизиты документа(-ов), подтверждающего(-их) основание владения грузовым автомобилем (тягачом, а также прицепом (полуприцепом) (для типов владения 3, 4, 5))
+        </td>
+        <td class="sub-prompt">
+          (номер, дата и срок действия специального разрешения, установленный маршрут движения тяжеловесного и (или) крупногабаритного транспортного средства или транспортного средства, перевозящего опасный груз) (при наличии))
+        </td>
+      </tr>
+      <!-- [Линия 42] -->
+
+      <!-- Раздел 8. Прием груза -->
+      <tr>
+        <td colspan="2" class="sec-title">8. Прием груза</td>
+      </tr>
+      <!-- [Линия 43] -->
+      <tr>
+        <td colspan="2" class="input-cell-bold" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="loadingOrg">ООО "Стиль Пресс" &nbsp; +7 965 520 38 37 &nbsp; МАКСИМ</div>
+        </td>
+      </tr>
+      <!-- [Линия 44] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (реквизиты лица, осуществляющего погрузку груза в транспортное средство)
+        </td>
+      </tr>
+      <!-- [Линия 45] -->
+      <tr>
+        <td colspan="2" class="input-cell"><div class="editable-field" contenteditable="true" data-field="loadingOwnerInn">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 46] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (наименование (ИНН) владельца объекта инфраструктуры пункта погрузки)
+        </td>
+      </tr>
+      <!-- [Линия 47] -->
+      <tr>
+        <td colspan="2" class="input-cell-bold" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="loadingAddress">г. Екатеринбург, ул. Шефская 3</div>
+        </td>
+      </tr>
+      <!-- [Линия 48] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (адрес места погрузки)
+        </td>
+      </tr>
+      <!-- [Линия 49] -->
+      <tr>
+        <td colspan="2" class="input-cell"><div class="editable-field" contenteditable="true" data-field="loadingPlannedAt">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 50] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (заявленные дата и время подачи транспортного средства под погрузку)
+        </td>
+      </tr>
+      <!-- [Линия 51] -->
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="loadingActualArrival">&nbsp;</div></td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="loadingActualDeparture">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 52] -->
+      <tr>
+        <td class="sub-prompt">
+          (фактические дата и время прибытия под погрузку)
+        </td>
+        <td class="sub-prompt">
+          (фактические дата и время убытия)
+        </td>
+      </tr>
+      <!-- [Линия 53] -->
+      <tr>
+        <td colspan="2" class="input-cell-bold" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="loadingWeight">127 кг &nbsp; расчетная масса груза</div>
+        </td>
+      </tr>
+      <!-- [Линия 54] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (масса груза брутто в килограммах и метод ее определения (определение разницы между массой транспортного средства после погрузки и перед погрузкой по общей массе или взвешиванием поосно или расчетная масса груза))
+        </td>
+      </tr>
+      <!-- [Линия 55] -->
+      <tr>
+        <td style="text-align: center;" class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="loadingPlacesCount">1</div>
+        </td>
+        <td style="text-align: center;" class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="loadingPkg">место</div>
+        </td>
+      </tr>
+      <!-- [Линия 56] -->
+      <tr>
+        <td class="sub-prompt">
+          (количество грузовых мест)
+        </td>
+        <td class="sub-prompt">
+          (тара, упаковка (при наличии))
+        </td>
+      </tr>
+      <!-- [Линия 57] -->
+      <tr>
+        <td colspan="2" class="input-cell"><div class="editable-field" contenteditable="true" data-field="carrierRemarks">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 58] -->
+      <tr>
+        <td colspan="2" class="sub-prompt">
+          (оговорки и замечания перевозчика (при наличии) о дате и времени прибытия/убытия, о состоянии, креплении груза, тары, упаковки, маркировки, опломбирования, о массе груза и количестве грузовых мест, о проведении погрузочных работ)
+        </td>
+      </tr>
+      <!-- [Линия 59] -->
+      <tr>
+        <td class="input-sign">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px;">
+            <span class="editable-field" contenteditable="true" data-field="loadingSignFio">Гончарова М.В.</span>
+            <span>/ &nbsp;___________________</span>
+          </div>
+        </td>
+        <td class="input-sign">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px;">
+            <span style="font-weight: bold;" class="editable-field" contenteditable="true" data-field="driverSignFio">ШАХМАЕВ А С</span>
+            <span>/ &nbsp;___________________</span>
+          </div>
+        </td>
+      </tr>
+      <!-- [Линия 60] -->
+      <tr>
+        <td class="sub-prompt">
+          (подпись, расшифровка подписи лица, осуществившего погрузку груза, с указанием реквизитов документа, подтверждающего полномочия лица на погрузку груза)
+        </td>
+        <td class="sub-prompt">
+          (подпись, расшифровка подписи водителя, принявшего груз для перевозки)
+        </td>
+      </tr>
+      <!-- [Линия 61] -->
+
+      <!-- Раздел 9. Переадресовка (при наличии) (СТРОГО 50% / 50%) -->
+      <tr>
+        <td colspan="2" class="sec-title">9. Переадресовка (при наличии)</td>
+      </tr>
+      <!-- [Линия 62] -->
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="redirDate">&nbsp;</div></td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="redirNewAddress">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 63] -->
+      <tr>
+        <td class="sub-prompt">
+          (дата, вид переадресовки на бумажном носителе или в электронном виде (с указанием вида доставки документа))
+        </td>
+        <td class="sub-prompt">
+          (адрес нового пункта выгрузки, новые дата и время подачи транспортного средства под выгрузку)
+        </td>
+      </tr>
+      <!-- [Линия 64] -->
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="redirPerson">&nbsp;</div></td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="redirNewConsignee">&nbsp;</div></td>
+      </tr>
+      <!-- [Линия 65] -->
+      <tr>
+        <td class="sub-prompt">
+          (реквизиты лица, от которого получено указание на переадресовку)
+        </td>
+        <td class="sub-prompt">
+          (при изменении получателя груза - реквизиты нового получателя)
+        </td>
+      </tr>
+      <!-- [Линия 66 = нижняя закрывающая рамка таблицы] -->
+    </table>
+    
+  </div>
+
+
+  <!-- =============================== СТРАНИЦА 2 =============================== -->
+  <div class="tn-page">
+    
+    <div class="top-annex">
+      Приложение № 4 к Правилам перевозок грузов автомобильным транспортом<br>
+      (в ред. Постановления Правительства РФ от 30.11.2021 № 2116)
+    </div>
+
+    <table class="tn-table page2-table">
+      <colgroup>
+        <col style="width: 50%;">
+        <col style="width: 50%;">
+      </colgroup>
+
+      <!-- Раздел 10. Выдача груза (СТРОГО 50% / 50%) -->
+      <tr>
+        <td colspan="2" class="sec-title">10. Выдача груза</td>
+      </tr>
+      <tr>
+        <td class="input-cell-bold" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="unloadingAddress">В. Салда ул. Парковая 1 ПЛ А скл. 813</div>
+        </td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="unloadingPlannedAt">&nbsp;</div></td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(адрес места выгрузки)</td>
+        <td class="sub-prompt">(заявленные дата и время подачи транспортного средства под выгрузку)</td>
+      </tr>
+      <tr>
+        <td class="input-cell-bold" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="unloadingActualArrival">02 НОЯ 2026</div>
+        </td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="unloadingActualDeparture">&nbsp;</div></td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(фактические дата и время прибытия)</td>
+        <td class="sub-prompt">(фактические дата и время убытия)</td>
+      </tr>
+      <tr>
+        <td class="input-cell" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="cargoState">без повреждений</div>
+        </td>
+        <td class="input-cell-bold" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="cargoPlacesUnload">1 место</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(фактическое состояние груза, тары, упаковки, маркировки, опломбирования)</td>
+        <td class="sub-prompt">(количество грузовых мест)</td>
+      </tr>
+      <tr>
+        <td class="input-cell-bold" style="text-align: center;">
+          <div class="editable-field" contenteditable="true" data-field="unloadingWeight">127 кг</div>
+        </td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="unloadingRemarks">&nbsp;</div></td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(масса груза брутто в килограммах, масса груза нетто в килограммах (при возможности ее определения), плотность груза в соответствии с документацией на груз (при необходимости))</td>
+        <td class="sub-prompt">(оговорки и замечания перевозчика (при наличии) о дате и времени прибытия/убытия, о состоянии груза, тары, упаковки, маркировки, опломбирования, о массе груза и количестве грузовых мест)</td>
+      </tr>
+      <tr>
+        <td class="input-sign">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px;">
+            <span style="font-weight: bold; font-size: 7pt;" class="editable-field" contenteditable="true" data-field="unloadingSignFio">КЛАДОВЩИК СКЛ. 813 ЧЕРНИКОВА Н.В.</span>
+            <span>/ &nbsp;___________________</span>
+          </div>
+        </td>
+        <td class="input-sign">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px;">
+            <span style="font-weight: bold;" class="editable-field" contenteditable="true" data-field="driverUnloadSign">Шахмаев А.С.</span>
+            <span>/ &nbsp;___________________</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(должность, подпись, расшифровка подписи грузополучателя или уполномоченного грузоотправителем лица)</td>
+        <td class="sub-prompt">(подпись, расшифровка подписи водителя, сдавшего груз грузополучателю или уполномоченному грузополучателем лицу)</td>
+      </tr>
+
+      <!-- Раздел 11. Отметки (3 колонки) -->
+      <tr>
+        <td colspan="2" class="sec-title" style="text-align: center;">11. Отметки грузоотправителей, грузополучателей, перевозчиков (при необходимости)</td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding: 0;">
+          <table style="width: 100%; border-collapse: collapse; border: none;">
+            <tr>
+              <td style="width: 68%; border: none; border-right: 1px solid #000; height: 12px; padding: 0 2px;">
+                <div class="editable-field" contenteditable="true" data-field="actsNotes">&nbsp;</div>
+              </td>
+              <td style="width: 16%; border: none; border-right: 1px solid #000; height: 12px; padding: 0 2px;">
+                <div class="editable-field" contenteditable="true" data-field="penaltyNotes">&nbsp;</div>
+              </td>
+              <td style="width: 16%; border: none; height: 12px; padding: 0 2px;">
+                <div class="editable-field" contenteditable="true" data-field="signDateNotes">&nbsp;</div>
+              </td>
+            </tr>
+            <tr style="border-top: 1px solid #000;">
+              <td style="border: none; border-right: 1px solid #000;" class="sub-prompt">
+                (краткое описание обстоятельств, послуживших основанием для отметки, сведения о коммерческих и иных актах, в том числе о погрузке/выгрузке груза)
+              </td>
+              <td style="border: none; border-right: 1px solid #000;" class="sub-prompt">(расчет и размер штрафа)</td>
+              <td style="border: none;" class="sub-prompt">(подпись, дата)</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- Раздел 12. Стоимость перевозки груза -->
+      <tr>
+        <td colspan="2" class="sec-title">12. Стоимость перевозки груза (установленная плата) в рублях (при необходимости)</td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding: 0;">
+          <table style="width: 100%; border-collapse: collapse; border: none;">
+            <tr>
+              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 12px; text-align: center; font-weight: bold; font-size: 7.5pt;">
+                <div class="editable-field" contenteditable="true" data-field="priceNoVat">9 000 рублей</div>
+              </td>
+              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 12px; text-align: center; font-size: 7.5pt;">
+                <div class="editable-field" contenteditable="true" data-field="vatRate">без НДС</div>
+              </td>
+              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 12px; text-align: center; font-size: 7.5pt;">
+                <div class="editable-field" contenteditable="true" data-field="vatAmount">0 руб.</div>
+              </td>
+              <td style="width: 25%; border: none; height: 12px; text-align: center; font-weight: bold; font-size: 7.5pt;">
+                <div class="editable-field" contenteditable="true" data-field="priceTotal">9 000 рублей</div>
+              </td>
+            </tr>
+            <tr style="border-top: 1px solid #000;">
+              <td style="border: none; border-right: 1px solid #000;" class="sub-prompt">(стоимость перевозки без налога - всего)</td>
+              <td style="border: none; border-right: 1px solid #000;" class="sub-prompt">(налоговая ставка)</td>
+              <td style="border: none; border-right: 1px solid #000;" class="sub-prompt">(сумма налога, предъявляемая покупателю)</td>
+              <td style="border: none;" class="sub-prompt">(стоимость перевозки с налогом - всего)</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" class="input-cell"><div class="editable-field" contenteditable="true" data-field="calcMechanism">&nbsp;</div></td>
+      </tr>
+      <tr>
+        <td colspan="2" class="sub-prompt">(порядок (механизм) расчета (исчисления) платы) (при наличии порядка (механизма))</td>
+      </tr>
+      <tr>
+        <td class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="carrierEcon">ИП Нигамедьянов Александр Сергеевич, ИНН 660704814106</div>
+        </td>
+        <td class="input-cell-bold">
+          <div class="editable-field" contenteditable="true" data-field="shipperEcon">ПАО "Корпорация ВСМПО-АВИСМА", ИНН 6607000556</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(реквизиты, позволяющие идентифицировать Экономического субъекта, составляющего первичный учетный документ о факте хозяйственной жизни со стороны Перевозчика)</td>
+        <td class="sub-prompt">(реквизиты, позволяющие идентифицировать Экономического субъекта, составляющего первичный учетный документ о факте хозяйственной жизни со стороны Грузоотправителя)</td>
+      </tr>
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="carrierBasis">Договор перевозки</div></td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="shipperBasis">Договор № 10676 от 01.08.2012</div></td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(основание, по которому Экономический субъект является составителем документа о факте хозяйственной жизни)</td>
+        <td class="sub-prompt">(основание, по которому Экономический субъект является составителем документа о факте хозяйственной жизни)</td>
+      </tr>
+      <tr>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="payerEmpty">&nbsp;</div></td>
+        <td class="input-cell-bold" style="text-align: right; padding-right: 8px;">
+          <div class="editable-field" contenteditable="true" data-field="payerName">ПАО "Корпорация ВСМПО-АВИСМА"</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">&nbsp;</td>
+        <td class="sub-prompt">(реквизиты, позволяющие идентифицировать лицо, от которого будут поступать денежные средства)</td>
+      </tr>
+      <tr>
+        <td class="input-sign">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px;">
+            <span style="font-weight: bold;" class="editable-field" contenteditable="true" data-field="carrierSign12">ИП Нигамедьянов А.С.</span>
+            <span>/ &nbsp;___________________</span>
+          </div>
+        </td>
+        <td class="input-sign">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 4px;">
+            <span style="font-weight: bold;" class="editable-field" contenteditable="true" data-field="shipperSign12">Представитель заказчика</span>
+            <span>/ &nbsp;___________________</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(подпись, расшифровка подписи лица, ответственного за оформление факта хозяйственной жизни со стороны Перевозчика (уполномоченного лица))</td>
+        <td class="sub-prompt">(подпись, расшифровка подписи лица, ответственного за оформление факта хозяйственной жизни со стороны Грузоотправителя (уполномоченного лица))</td>
+      </tr>
+      <tr>
+        <td class="input-cell">
+          <div class="editable-field" contenteditable="true" data-field="carrierPower">Индивидуальный предприниматель, 2.11.2026 г.</div>
+        </td>
+        <td class="input-cell"><div class="editable-field" contenteditable="true" data-field="shipperPower">&nbsp;</div></td>
+      </tr>
+      <tr>
+        <td class="sub-prompt">(должность, основание полномочий физического лица, уполномоченного Перевозчиком (уполномоченным лицом), дата подписания)</td>
+        <td class="sub-prompt">(должность, основание полномочий физического лица, уполномоченного Грузоотправителем (уполномоченным лицом), дата подписания)</td>
+      </tr>
+    </table>
+  </div>
+
+  <script>
+    const defaultData = {
+      orderDate: '2.11.2026',
+      orderNumber: '10676',
+      copyNumber: '1',
+      shipperName: 'ПАО "Корпорация ВСМПО-АВИСМА"',
+      isForwarder: '  ',
+      clientName: 'ПАО "Корпорация ВСМПО-АВИСМА"',
+      shipperDoc: ' ',
+      contractInfo: 'Договор № 10676 от 01.08.2012',
+      consigneeName: 'ПАО "Корпорация ВСМПО-АВИСМА", ИНН 6607000556',
+      deliveryAddress: '624760, Свердловская область, г. Верхняя Салда, ул. Парковая, д 1',
+      cargoName: 'Метизы',
+      cargoPlaces: '1 место',
+      cargoWeightAndDims: '127 кг         50*50*30',
+      dangerousCargo: ' ',
+      declaredValue: ' ',
+      docDopog: ' ',
+      docCert: 'Паспорт качества / Сертификат соответствия',
+      docWaybillOrder: 'Поручение экспедитору № 10676 от 2.11.2026',
+      specialRoute: ' ',
+      specialContacts: ' ',
+      sanitaryReq: ' ',
+      tempReq: ' ',
+      carrierName: 'ИП Нигамедьянов Александр Сергеевич, ИНН 660704814106',
+      driverFio: 'ШАХМАЕВ А С',
+      vehicleModel: 'Грузовой автомобиль, Валдай, 3.1 т, 40 м3',
+      vehicleRegNumber: 'О188ТА196',
+      vehicleOwnership: '1',
+      vehicleDoc: ' ',
+      vehiclePermit: ' ',
+      loadingOrg: 'ООО "Стиль Пресс"   +7 965 520 38 37   МАКСИМ',
+      loadingOwnerInn: ' ',
+      loadingAddress: 'г. Екатеринбург, ул. Шефская 3',
+      loadingPlannedAt: ' ',
+      loadingActualArrival: ' ',
+      loadingActualDeparture: ' ',
+      loadingWeight: '127 кг   расчетная масса груза',
+      loadingPlacesCount: '1',
+      loadingPkg: 'место',
+      carrierRemarks: ' ',
+      loadingSignFio: 'Гончарова М.В.',
+      driverSignFio: 'ШАХМАЕВ А С',
+      redirDate: ' ',
+      redirNewAddress: ' ',
+      redirPerson: ' ',
+      redirNewConsignee: ' ',
+      unloadingAddress: 'В. Салда ул. Парковая 1 ПЛ А скл. 813',
+      unloadingPlannedAt: ' ',
+      unloadingActualArrival: '02 НОЯ 2026',
+      unloadingActualDeparture: ' ',
+      cargoState: 'без повреждений',
+      cargoPlacesUnload: '1 место',
+      unloadingWeight: '127 кг',
+      unloadingRemarks: ' ',
+      unloadingSignFio: 'КЛАДОВЩИК СКЛ. 813 ЧЕРНИКОВА Н.В.',
+      driverUnloadSign: 'Шахмаев А.С.',
+      actsNotes: ' ',
+      penaltyNotes: ' ',
+      signDateNotes: ' ',
+      priceNoVat: '9 000 рублей',
+      vatRate: 'без НДС',
+      vatAmount: '0 руб.',
+      priceTotal: '9 000 рублей',
+      calcMechanism: ' ',
+      carrierEcon: 'ИП Нигамедьянов Александр Сергеевич, ИНН 660704814106',
+      shipperEcon: 'ПАО "Корпорация ВСМПО-АВИСМА", ИНН 6607000556',
+      carrierBasis: 'Договор перевозки',
+      shipperBasis: 'Договор № 10676 от 01.08.2012',
+      payerEmpty: ' ',
+      payerName: 'ПАО "Корпорация ВСМПО-АВИСМА"',
+      carrierSign12: 'ИП Нигамедьянов А.С.',
+      shipperSign12: 'Представитель заказчика',
+      carrierPower: 'Индивидуальный предприниматель, 2.11.2026 г.',
+      shipperPower: ' '
+    };
+
+        function clearAllFields() {
+      if (!confirm('Очистить все заполняемые поля и сделать бланк полностью пустым?')) return;
+      document.querySelectorAll('.editable-field').forEach(el => {
+        el.innerHTML = '&nbsp;';
+      });
+    }
+
+    function resetDefaultData() {
+      document.querySelectorAll('.editable-field').forEach(el => {
+        const field = el.getAttribute('data-field');
+        if (field && defaultData[field] !== undefined) {
+          el.innerHTML = defaultData[field];
+        }
+      });
+    }
+      });
+    }
+  </script>
+</body>
+</html>

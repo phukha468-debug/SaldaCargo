@@ -319,12 +319,12 @@ export function generateTransportWaybillHtml(
     }
     @page {
       size: A4 portrait;
-      margin: 5mm 6mm 5mm 6mm;
+      margin: 15mm 10mm 15mm 10mm;
     }
     body {
       font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
-      font-size: 7pt;
-      line-height: 1.1;
+      font-size: 7.0pt;
+      line-height: 1.08;
       color: #000;
       background: #334155;
       margin: 0;
@@ -362,6 +362,7 @@ export function generateTransportWaybillHtml(
       align-items: center;
       gap: 5px;
       transition: all 0.15s ease;
+      user-select: none;
     }
     .btn-primary { background: #2563eb; }
     .btn-primary:hover { background: #1d4ed8; }
@@ -375,9 +376,10 @@ export function generateTransportWaybillHtml(
       min-height: 297mm;
       margin: 0 auto 20px auto;
       background: #fff;
-      padding: 5mm 6mm 5mm 6mm;
+      padding: 15mm 10mm 15mm 10mm;
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
       position: relative;
+      box-sizing: border-box;
     }
     @media print {
       body {
@@ -393,6 +395,7 @@ export function generateTransportWaybillHtml(
       }
       .tn-page {
         width: 100% !important;
+        min-height: 0 !important;
         height: auto !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -404,12 +407,11 @@ export function generateTransportWaybillHtml(
 
     .top-annex {
       text-align: right;
-      font-size: 6.5pt;
-      line-height: 1.15;
+      font-size: 6.0pt;
+      line-height: 1.1;
       margin-bottom: 2px;
     }
 
-    /* Главная таблица с делением СТРОГО 50% / 50% */
     table.tn-table {
       width: 100%;
       border-collapse: collapse;
@@ -419,56 +421,127 @@ export function generateTransportWaybillHtml(
       border-bottom: 1px solid #000;
       table-layout: fixed;
     }
-    table.tn-table td, table.tn-table th {
-      border: 1px solid #000;
-      padding: 1px 3px;
-      vertical-align: middle;
-      font-size: 7.2pt;
-    }
 
-    .sec-title {
+    /* ==================== СТРАНИЦА 1 ==================== */
+    table.page1-table {
+      height: 256.5mm;
+    }
+    table.page1-table td, table.page1-table th {
+      border: 1px solid #000;
+      padding: 0 2px !important;
+      vertical-align: middle;
+      font-size: 7.0pt !important;
+      line-height: 1.08 !important;
+    }
+    table.page1-table .sec-title {
       font-weight: bold;
       text-align: center;
-      font-size: 7.5pt;
-      padding: 2px 2px;
+      font-size: 7.4pt !important;
+      line-height: 1.0 !important;
+      height: 1em !important;
+      padding: 0 2px !important;
       text-transform: uppercase;
       background: #fff;
     }
-
-    .input-cell {
-      height: 15px;
-      font-size: 7.5pt;
+    
+    table.page1-table .header-data-cell {
+      height: 32px !important;
+      font-size: 7.2pt !important;
+      font-weight: bold;
+      vertical-align: middle;
+      padding: 0 2px !important;
+    }
+    table.page1-table .header-doc-cell {
+      height: 24px !important;
+      font-size: 7.0pt !important;
+      vertical-align: middle;
+      padding: 0 2px !important;
+    }
+    table.page1-table .input-cell {
+      height: 11px !important;
+      font-size: 7.0pt !important;
+      line-height: 1.08 !important;
       color: #000;
       font-weight: normal;
       vertical-align: middle;
     }
-    .input-cell-bold {
-      height: 15px;
-      font-size: 7.5pt;
+    table.page1-table .input-cell-bold {
+      height: 11px !important;
+      font-size: 7.0pt !important;
+      line-height: 1.08 !important;
       color: #000;
       font-weight: bold;
       vertical-align: middle;
     }
-    .input-sign {
-      height: 32px;
+    table.page1-table .input-sign {
+      height: 26px !important;
       vertical-align: bottom;
-      padding-bottom: 2px;
+      padding-bottom: 1px !important;
     }
-
-    .sub-prompt {
-      font-size: 5.5pt;
-      line-height: 1.05;
+    table.page1-table .sub-prompt {
+      font-size: 5.0pt !important;
+      line-height: 1.0 !important;
       text-align: center;
       color: #000;
-      padding: 1px 2px;
+      padding: 0 1px !important;
       background: #fff;
       vertical-align: middle;
+      font-weight: bold !important;
     }
 
-    /* Подсветка редактируемых полей */
+    /* ==================== СТРАНИЦА 2 (Пустота <= 27%, крупный комфортный шрифт) ==================== */
+    table.page2-table td, table.page2-table th {
+      border: 1px solid #000;
+      padding: 4px 4px !important;
+      vertical-align: middle;
+      font-size: 8.5pt !important;
+      line-height: 1.25 !important;
+    }
+    table.page2-table .sec-title {
+      font-weight: bold;
+      text-align: center;
+      font-size: 8.5pt !important;
+      line-height: 1.0 !important;
+      height: 1em !important;
+      padding: 0 2px !important;
+      text-transform: uppercase;
+      background: #fff;
+    }
+    table.page2-table .input-cell {
+      height: 25px !important;
+      font-size: 8.5pt !important;
+      line-height: 1.25 !important;
+      color: #000;
+      font-weight: normal;
+      vertical-align: middle;
+    }
+    table.page2-table .input-cell-bold {
+      height: 25px !important;
+      font-size: 8.5pt !important;
+      line-height: 1.25 !important;
+      color: #000;
+      font-weight: bold;
+      vertical-align: middle;
+    }
+    table.page2-table .input-sign {
+      height: 52px !important;
+      vertical-align: bottom;
+      padding-bottom: 5px !important;
+    }
+    table.page2-table .sub-prompt {
+      font-size: 6.2pt !important;
+      line-height: 1.15 !important;
+      text-align: center;
+      color: #000;
+      padding: 2px 2px !important;
+      background: #fff;
+      vertical-align: middle;
+      font-weight: bold !important;
+    }
+
     .editable-field {
       outline: none;
-      min-height: 13px;
+      min-height: 10px;
       cursor: text;
     }
     .editable-field:hover {
@@ -484,25 +557,28 @@ export function generateTransportWaybillHtml(
 
   <div class="print-hide">
     <div>
-      <strong>Форма ТН (ПП РФ № 2116)</strong> | Заявка № ${data.orderNumber} &nbsp;|&nbsp; 
-      <span style="color: #94a3b8; font-size: 11px;">Кликните в любую ячейку бланка для изменения или очистки</span>
+      <strong>Форма ТН (ПП РФ № 2116)</strong> | Заявка № 
     </div>
     <div class="btn-group">
-      <button class="btn btn-secondary" onclick="resetDefaultData()">🔄 Заполнить из заявки</button>
-      <button class="btn btn-danger" onclick="clearAllFields()">🧹 Очистить всё (Пустой бланк)</button>
-      <button class="btn btn-primary" onclick="window.print()">🖨️ Печать / Сохранить в PDF</button>
+      <button class="btn btn-secondary" onclick="resetDefaultData()">🔄 Загрузить из заявки</button>
+      <button class="btn btn-danger" onclick="clearAllFields()">🧹 Чистый бланк</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Печать PDF</button>
     </div>
   </div>
 
   <!-- =============================== СТРАНИЦА 1 =============================== -->
   <div class="tn-page">
-    <div class="top-annex">
+    
+    <div class="top-annex" style="margin-bottom: 1px;">
       Приложение № 4 к Правилам перевозок грузов автомобильным транспортом<br>
       (в ред. Постановления Правительства РФ от 30.11.2021 № 2116)
     </div>
+    <div style="text-align: center; font-weight: bold; font-size: 7.4pt; text-transform: uppercase; line-height: 1.0; margin-bottom: 2px;">
+      ТРАНСПОРТНАЯ НАКЛАДНАЯ (ФОРМА)
+    </div>
 
     <!-- Таблица с колонками СТРОГО 50% и 50% -->
-    <table class="tn-table">
+    <table class="tn-table page1-table">
       <colgroup>
         <col style="width: 50%;">
         <col style="width: 50%;">
@@ -510,27 +586,27 @@ export function generateTransportWaybillHtml(
 
       <!-- [Линия 1 = верхняя рамка] -->
       <!-- Шапка документа и раздел 1/1а имеют смещение 58% / 42% через внутреннюю таблицу -->
-      <tr>
-        <td colspan="2" style="padding: 0; border: none;">
+      <tr style="height: 1px;">
+        <td colspan="2" style="padding: 0; border: none; height: 1px;">
           <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
             <colgroup>
               <col style="width: 58%;">
               <col style="width: 42%;">
             </colgroup>
-            <!-- Заголовки шапки -->
+            <!-- 1-я строка таблицы: Транспортная накладная | Заказ (заявка) -->
             <tr>
-              <td class="sec-title" style="border: 1px solid #000; border-top: none; border-left: none;">ТРАНСПОРТНАЯ НАКЛАДНАЯ (ФОРМА)</td>
-              <td class="sec-title" style="border: 1px solid #000; border-top: none; border-right: none;">Заказ (заявка)</td>
+              <td class="sec-title" style="border: 1px solid #000; border-top: none; border-left: none; text-align: center; height: 13px; line-height: 13px; padding: 0 2px;">Транспортная накладная</td>
+              <td class="sec-title" style="border: 1px solid #000; border-top: none; border-right: none; text-align: center; height: 13px; line-height: 13px; padding: 0 2px;">Заказ (заявка)</td>
             </tr>
-            <!-- [Линия 2] -->
+            <!-- [Линия 2]: Дата и N -->
             <tr>
               <td style="padding: 0; border: 1px solid #000; border-left: none;">
                 <table style="width: 100%; border-collapse: collapse; border: none;">
                   <tr>
-                    <td style="width: 50%; border: none; border-right: 1px solid #000; height: 16px; padding: 1px 3px;">
+                    <td style="width: 50%; border: none; border-right: 1px solid #000; height: 13px; padding: 0 2px;">
                       Дата &nbsp;<b class="editable-field" contenteditable="true" data-field="orderDate">${initialValues.orderDate}</b>
                     </td>
-                    <td style="width: 50%; border: none; height: 16px; padding: 1px 3px;">
+                    <td style="width: 50%; border: none; height: 13px; padding: 0 2px;">
                       N &nbsp;<b class="editable-field" contenteditable="true" data-field="orderNumber">${initialValues.orderNumber}</b>
                     </td>
                   </tr>
@@ -539,41 +615,48 @@ export function generateTransportWaybillHtml(
               <td style="padding: 0; border: 1px solid #000; border-right: none;">
                 <table style="width: 100%; border-collapse: collapse; border: none;">
                   <tr>
-                    <td style="width: 50%; border: none; border-right: 1px solid #000; height: 16px; padding: 1px 3px;">
+                    <td style="width: 50%; border: none; border-right: 1px solid #000; height: 13px; padding: 0 2px;">
                       Дата &nbsp;<b class="editable-field" contenteditable="true" data-field="orderDate">${initialValues.orderDate}</b>
                     </td>
-                    <td style="width: 50%; border: none; height: 16px; padding: 1px 3px;">
+                    <td style="width: 50%; border: none; height: 13px; padding: 0 2px;">
                       N &nbsp;<b class="editable-field" contenteditable="true" data-field="orderNumber">${initialValues.orderNumber}</b>
                     </td>
                   </tr>
                 </table>
               </td>
             </tr>
-            <!-- [Линия 3] -->
+            <!-- [Линия 3]: Экземпляр N -->
             <tr>
-              <td style="height: 15px; border: 1px solid #000; border-left: none;">Экземпляр N &nbsp;<b class="editable-field" contenteditable="true" data-field="copyNumber">${initialValues.copyNumber}</b></td>
-              <td style="height: 15px; border: 1px solid #000; border-right: none;">&nbsp;</td>
-            </tr>
-            <!-- [Линия 4] -->
-            <!-- Раздел 1 и 1а -->
-            <tr>
-              <td class="input-cell-bold" style="border: 1px solid #000; border-left: none;">
-                1. Грузоотправитель &nbsp; <span class="editable-field" contenteditable="true" data-field="shipperName">${initialValues.shipperName}</span>
+              <td style="height: 13px; border: 1px solid #000; border-left: none; padding: 0 2px;">
+                Экземпляр N &nbsp;<b class="editable-field" contenteditable="true" data-field="copyNumber">${initialValues.copyNumber}</b>
               </td>
-              <td class="input-cell-bold" style="border: 1px solid #000; border-right: none;">
-                1а. Заказчик услуг по организации перевозки груза (при наличии)
+              <td style="height: 13px; border: 1px solid #000; border-right: none;">&nbsp;</td>
+            </tr>
+            <!-- [Линия 4]: 1. Грузоотправитель и 1а. Заказчик -->
+            <tr>
+              <td class="input-cell-bold" style="border: 1px solid #000; border-left: none; height: 13px; padding: 0 2px;">
+                1. Грузоотправитель
+              </td>
+              <td rowspan="2" class="input-cell-bold" style="border: 1px solid #000; border-right: none; vertical-align: top; padding: 2px 4px;">
+                1а Заказчик услуг по организации перевозки груза (при наличии)
               </td>
             </tr>
-            <!-- [Линия 5] -->
+            <!-- [Линия 5]: является экспедитором -->
             <tr>
-              <td class="input-cell" style="border: 1px solid #000; border-left: none;">
+              <td class="input-cell" style="border: 1px solid #000; border-left: none; height: 13px; padding: 0 2px;">
                 является экспедитором &nbsp; [ <span class="editable-field" contenteditable="true" data-field="isForwarder">${initialValues.isForwarder}</span> ]
               </td>
-              <td class="input-cell-bold" style="text-align: center; border: 1px solid #000; border-right: none;">
-                <span class="editable-field" contenteditable="true" data-field="clientName">${initialValues.clientName}</span>
+            </tr>
+            <!-- [Линия 6]: ПУСТАЯ СТРОКА РЕКВИЗИТОВ (над подстрочником реквизитов) -->
+            <tr>
+              <td class="header-data-cell" style="border: 1px solid #000; border-left: none;">
+                <div class="editable-field" contenteditable="true" data-field="shipperName">${initialValues.shipperName}</div>
+              </td>
+              <td class="header-data-cell" style="border: 1px solid #000; border-right: none; text-align: center;">
+                <div class="editable-field" contenteditable="true" data-field="clientName">${initialValues.clientName}</div>
               </td>
             </tr>
-            <!-- [Линия 6] -->
+            <!-- [Линия 7]: Подстрочник реквизитов -->
             <tr>
               <td class="sub-prompt" style="border: 1px solid #000; border-left: none;">
                 (реквизиты, позволяющие идентифицировать Грузоотправителя)
@@ -582,32 +665,31 @@ export function generateTransportWaybillHtml(
                 (реквизиты, позволяющие идентифицировать Заказчика услуг по организации перевозки груза)
               </td>
             </tr>
-            <!-- [Линия 7] -->
+            <!-- [Линия 8]: ПУСТАЯ СТРОКА ДОКУМЕНТОВ/ДОГОВОРА (над подстрочником договора) -->
             <tr>
-              <td class="input-cell" style="border: 1px solid #000; border-left: none;">
+              <td class="header-doc-cell" style="border: 1px solid #000; border-left: none;">
                 <div class="editable-field" contenteditable="true" data-field="shipperDoc">${initialValues.shipperDoc}</div>
               </td>
-              <td class="input-cell" style="text-align: center; border: 1px solid #000; border-right: none;">
-                <span class="editable-field" contenteditable="true" data-field="contractInfo">${initialValues.contractInfo}</span>
+              <td class="header-doc-cell" style="border: 1px solid #000; border-right: none; text-align: center;">
+                <div class="editable-field" contenteditable="true" data-field="contractInfo">${initialValues.contractInfo}</div>
               </td>
             </tr>
-            <!-- [Линия 8] -->
+            <!-- [Линия 9]: Подстрочник документа и договора -->
             <tr>
-              <td class="sub-prompt" style="border: 1px solid #000; border-left: none;">
+              <td class="sub-prompt" style="border: 1px solid #000; border-left: none; border-bottom: none;">
                 (реквизиты документа, определяющего основания осуществления расчетов по договору перевозки иным лицом, отличным от грузоотправителя (при наличии))
               </td>
-              <td class="sub-prompt" style="border: 1px solid #000; border-right: none;">
+              <td class="sub-prompt" style="border: 1px solid #000; border-right: none; border-bottom: none;">
                 (реквизиты договора на выполнение услуг по организации перевозки груза)
               </td>
             </tr>
           </table>
         </td>
       </tr>
-      <!-- [Линия 9] -->
 
       <!-- Раздел 2. Грузополучатель (НА ВСЮ ШИРИНУ, НЕТ вертикальной линии!) -->
       <tr>
-        <td colspan="2" class="sec-title" style="text-align: left; padding-left: 4px;">2. Грузополучатель</td>
+        <td colspan="2" class="sec-title" style="text-align: center;">2. Грузополучатель</td>
       </tr>
       <!-- [Линия 10] -->
       <tr>
@@ -809,7 +891,7 @@ export function generateTransportWaybillHtml(
       </tr>
       <!-- [Линия 39] -->
       <tr>
-        <td colspan="2" style="font-size: 7.2pt; padding: 2px 4px; height: 16px;">
+        <td colspan="2" style="font-size: 7.2pt; padding: 0 2px; height: 11px;">
           Тип владения: 1 - собственность; 2 - совместная собственность супругов; 3 - аренда; 4 - лизинг; 5 - безвозмездное пользование &nbsp; <b>[ <span class="editable-field" contenteditable="true" data-field="vehicleOwnership">${initialValues.vehicleOwnership}</span> ]</b>
         </td>
       </tr>
@@ -991,17 +1073,20 @@ export function generateTransportWaybillHtml(
       </tr>
       <!-- [Линия 66 = нижняя закрывающая рамка таблицы] -->
     </table>
+    
   </div>
 
 
   <!-- =============================== СТРАНИЦА 2 =============================== -->
   <div class="tn-page">
-    <div class="top-annex">
+    
+    <div class="top-annex" style="margin-bottom: 1px;">
       Приложение № 4 к Правилам перевозок грузов автомобильным транспортом<br>
       (в ред. Постановления Правительства РФ от 30.11.2021 № 2116)
     </div>
-
-    <table class="tn-table">
+    <div style="text-align: center; font-weight: bold; font-size: 7.4pt; text-transform: uppercase; line-height: 1.0; margin-bottom: 2px;">
+      ТРАНСПОРТНАЯ НАКЛАДНАЯ (ФОРМА)
+    </div><table class="tn-table page2-table">
       <colgroup>
         <col style="width: 50%;">
         <col style="width: 50%;">
@@ -1074,19 +1159,19 @@ export function generateTransportWaybillHtml(
 
       <!-- Раздел 11. Отметки (3 колонки) -->
       <tr>
-        <td colspan="2" class="sec-title" style="text-align: left; padding-left: 4px;">11. Отметки грузоотправителей, грузополучателей, перевозчиков (при необходимости)</td>
+        <td colspan="2" class="sec-title" style="text-align: center;">11. Отметки грузоотправителей, грузополучателей, перевозчиков (при необходимости)</td>
       </tr>
       <tr>
         <td colspan="2" style="padding: 0;">
           <table style="width: 100%; border-collapse: collapse; border: none;">
             <tr>
-              <td style="width: 68%; border: none; border-right: 1px solid #000; height: 18px; padding: 2px 4px;">
+              <td style="width: 68%; border: none; border-right: 1px solid #000; height: 12px; padding: 0 2px;">
                 <div class="editable-field" contenteditable="true" data-field="actsNotes">${initialValues.actsNotes}</div>
               </td>
-              <td style="width: 16%; border: none; border-right: 1px solid #000; height: 18px; padding: 2px 4px;">
+              <td style="width: 16%; border: none; border-right: 1px solid #000; height: 12px; padding: 0 2px;">
                 <div class="editable-field" contenteditable="true" data-field="penaltyNotes">${initialValues.penaltyNotes}</div>
               </td>
-              <td style="width: 16%; border: none; height: 18px; padding: 2px 4px;">
+              <td style="width: 16%; border: none; height: 12px; padding: 0 2px;">
                 <div class="editable-field" contenteditable="true" data-field="signDateNotes">${initialValues.signDateNotes}</div>
               </td>
             </tr>
@@ -1109,16 +1194,16 @@ export function generateTransportWaybillHtml(
         <td colspan="2" style="padding: 0;">
           <table style="width: 100%; border-collapse: collapse; border: none;">
             <tr>
-              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 18px; text-align: center; font-weight: bold; font-size: 7.5pt;">
+              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 12px; text-align: center; font-weight: bold; font-size: 7.5pt;">
                 <div class="editable-field" contenteditable="true" data-field="priceNoVat">${initialValues.priceNoVat}</div>
               </td>
-              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 18px; text-align: center; font-size: 7.5pt;">
+              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 12px; text-align: center; font-size: 7.5pt;">
                 <div class="editable-field" contenteditable="true" data-field="vatRate">${initialValues.vatRate}</div>
               </td>
-              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 18px; text-align: center; font-size: 7.5pt;">
+              <td style="width: 25%; border: none; border-right: 1px solid #000; height: 12px; text-align: center; font-size: 7.5pt;">
                 <div class="editable-field" contenteditable="true" data-field="vatAmount">${initialValues.vatAmount}</div>
               </td>
-              <td style="width: 25%; border: none; height: 18px; text-align: center; font-weight: bold; font-size: 7.5pt;">
+              <td style="width: 25%; border: none; height: 12px; text-align: center; font-weight: bold; font-size: 7.5pt;">
                 <div class="editable-field" contenteditable="true" data-field="priceTotal">${initialValues.priceTotal}</div>
               </td>
             </tr>
@@ -1196,12 +1281,13 @@ export function generateTransportWaybillHtml(
         <td class="sub-prompt">(должность, основание полномочий физического лица, уполномоченного Грузоотправителем (уполномоченным лицом), дата подписания)</td>
       </tr>
     </table>
+    
   </div>
 
   <script>
     const defaultData = ${defaultDataJson};
 
-    function clearAllFields() {
+        function clearAllFields() {
       if (!confirm('Очистить все заполняемые поля и сделать бланк полностью пустым?')) return;
       document.querySelectorAll('.editable-field').forEach(el => {
         el.innerHTML = '&nbsp;';
