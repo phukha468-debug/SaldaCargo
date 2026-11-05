@@ -1,3 +1,14 @@
+export interface WaybillRouteItem {
+  clientName?: string;
+  arrivalTime?: string;
+  loadingAddress?: string;
+  unloadingAddress?: string;
+  cargoName?: string;
+  tripsCount?: number;
+  distanceKm?: number;
+  weightTons?: number;
+}
+
 export interface WaybillData {
   series: string;
   number: string;
@@ -44,6 +55,9 @@ export interface WaybillData {
     arrivalPlanned?: string;
     departurePlanned?: string;
   };
+
+  // Поддержка до 3 маршрутов в путевом листе
+  routes?: WaybillRouteItem[];
 
   // Фаза 1 и Фаза 2: Выезд и возвращение
   execution: {
@@ -187,8 +201,6 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       ? data.execution.odometerEnd - data.execution.odometerStart
       : 350);
 
-  const weightTonsFormatted = (data.assignment.weightTons || 3.1).toFixed(2);
-
   const fuelGiven = data.execution.fuelGivenLiters ?? 150;
   const fuelStart = data.execution.fuelStartLiters ?? 45;
   const fuelEnd = isCompleted ? (data.execution.fuelEndLiters ?? 65) : '';
@@ -203,12 +215,34 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
   const medSurname = getSurname(data.dispatchAndControl.medicName, 'Шахмаева');
 
   const orgAddressPhone = [
+    data.organization.name || 'ИП Нигамедьянов Александр Сергеевич',
     data.organization.address ||
       '624760, Свердловская обл., г. Верхняя Салда, ул. 25 Октября, д. 11, кв. 22',
     data.organization.phone ? `тел. ${data.organization.phone}` : '',
   ]
     .filter(Boolean)
     .join(', ');
+
+  // Маршруты (до 3 строк задания водителю)
+  const route1: WaybillRouteItem = data.routes?.[0] || {
+    clientName: data.assignment.clientName || 'ПАО «Корпорация ВСМПО-АВИСМА»',
+    arrivalTime: data.assignment.arrivalPlanned || '09:30',
+    loadingAddress: data.assignment.loadingAddress || 'г. Заречный, промзона БЗСК, д 2',
+    unloadingAddress: data.assignment.unloadingAddress || 'г. Верхняя Салда, ул. Парковая, д 1',
+    cargoName: data.assignment.cargoName || 'Металлопрокат',
+    tripsCount: data.assignment.tripsCount || 1,
+    distanceKm: distance,
+    weightTons: data.assignment.weightTons || 3.1,
+  };
+
+  const route2: WaybillRouteItem = data.routes?.[1] || {};
+  const route3: WaybillRouteItem = data.routes?.[2] || {};
+
+  const totalTons =
+    (route1.weightTons || 0) + (route2.weightTons || 0) + (route3.weightTons || 0) ||
+    data.assignment.weightTons ||
+    3.1;
+  const totalTonsFormatted = totalTons ? totalTons.toFixed(2) : '';
 
   const defaultFields: Record<string, string> = {
     docSeries: series,
@@ -217,13 +251,8 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     docMonth: dateParts.month,
     docYear: dateParts.year,
 
-    orgName: data.organization.name || 'ИП Нигамедьянов Александр Сергеевич',
     orgAddressPhone,
     okpo: data.organization.okpo || '32166580',
-
-    workMode: 'Основной',
-    columnNum: '1',
-    brigadeNum: '1',
 
     // Колонки таблицы Код
     code_workMode: '1',
@@ -295,16 +324,35 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     t2_sig_refueler_ret: isCompleted ? dispSurname : '',
     t2_sig_disp: dispSurname,
 
-    // Таблица 3: Задание водителю
-    t3_client: data.assignment.clientName || 'ПАО «Корпорация ВСМПО-АВИСМА»',
-    t3_arr_time: data.assignment.arrivalPlanned || '09:30',
-    t3_load_addr: data.assignment.loadingAddress || 'г. Заречный, промзона БЗСК, д 2',
-    t3_unload_addr: data.assignment.unloadingAddress || 'г. Верхняя Салда, ул. Парковая, д 1',
-    t3_cargo: data.assignment.cargoName || 'Металлопрокат',
-    t3_trips: String(data.assignment.tripsCount || 1),
-    t3_dist: String(distance),
-    t3_tons: weightTonsFormatted,
-    t3_total_tons: weightTonsFormatted,
+    // Таблица 3: Задание водителю (3 строки)
+    t3_client_1: route1.clientName || '',
+    t3_arr_time_1: route1.arrivalTime || '',
+    t3_load_addr_1: route1.loadingAddress || '',
+    t3_unload_addr_1: route1.unloadingAddress || '',
+    t3_cargo_1: route1.cargoName || '',
+    t3_trips_1: route1.tripsCount ? String(route1.tripsCount) : '',
+    t3_dist_1: route1.distanceKm ? String(route1.distanceKm) : '',
+    t3_tons_1: route1.weightTons ? route1.weightTons.toFixed(2) : '',
+
+    t3_client_2: route2.clientName || '',
+    t3_arr_time_2: route2.arrivalTime || '',
+    t3_load_addr_2: route2.loadingAddress || '',
+    t3_unload_addr_2: route2.unloadingAddress || '',
+    t3_cargo_2: route2.cargoName || '',
+    t3_trips_2: route2.tripsCount ? String(route2.tripsCount) : '',
+    t3_dist_2: route2.distanceKm ? String(route2.distanceKm) : '',
+    t3_tons_2: route2.weightTons ? route2.weightTons.toFixed(2) : '',
+
+    t3_client_3: route3.clientName || '',
+    t3_arr_time_3: route3.arrivalTime || '',
+    t3_load_addr_3: route3.loadingAddress || '',
+    t3_unload_addr_3: route3.unloadingAddress || '',
+    t3_cargo_3: route3.cargoName || '',
+    t3_trips_3: route3.tripsCount ? String(route3.tripsCount) : '',
+    t3_dist_3: route3.distanceKm ? String(route3.distanceKm) : '',
+    t3_tons_3: route3.weightTons ? route3.weightTons.toFixed(2) : '',
+
+    t3_total_tons: totalTonsFormatted,
 
     // Нижний блок: подписи, медосмотр, допуск
     fuelGivenDisp: String(fuelGiven),
@@ -518,7 +566,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     }
     .code-table {
       border-collapse: collapse;
-      border: 1px solid #000;
+      border: 1.5px solid #000;
       margin-left: auto;
     }
     .code-table td {
@@ -528,7 +576,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       text-align: center;
     }
 
-    /* Вертикальные таблицы Код (со скриншота оригинала) */
+    /* Вертикальные таблицы Код (со скриншота пользователя) */
     table.v-code-table {
       border-collapse: collapse;
       border: 1.5px solid #000;
@@ -561,7 +609,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       <div>
         <div style="font-weight: 700; font-size: 13px;">Путевой лист грузового автомобиля (Типовая форма № 4-С, ОКУД 0345004)</div>
         <div style="font-size: 11px; color: #94a3b8;">
-          100% точное соответствие оригиналу Госкомстата РФ (с таблицами кодов и точными пропорциями) • Строго 1 лист A4
+          100% точное соответствие оригиналу Госкомстата РФ • Строго 1 лист A4 Альбомная
         </div>
       </div>
     </div>
@@ -575,68 +623,76 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
   <!-- ======================== БЛАНК ФОРМЫ 4-С ======================== -->
   <div class="pl-page" id="waybillPage">
     
-    <!-- 1. ВЕРХНЯЯ ШАПКА ДОКУМЕНТА (33 мм) -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; height: 33mm; margin-bottom: 1.5mm;">
+    <!-- 1. ВЕРХНЯЯ ШАПКА ДОКУМЕНТА (35 мм) -->
+    <div style="height: 35mm; margin-bottom: 1.5mm;">
       
-      <!-- Левая часть: Штамп организации и Наименование -->
-      <div style="width: 44%;">
-        <div style="display: flex; gap: 8px; align-items: flex-start;">
-          <div class="stamp-box" style="width: 32mm; height: 16.5mm; flex-shrink: 0;">
+      <!-- Верхний ярус: Штамп организации слева, Путевой лист по центру, Утверждение и Коды справа -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; height: 23mm;">
+        
+        <!-- Слева: Место для штампа организации -->
+        <div style="width: 28%;">
+          <div class="stamp-box" style="width: 33mm; height: 16mm;">
             <div>Место для штампа</div>
             <div>организации</div>
           </div>
-          <div style="flex: 1; padding-top: 1px;">
-            <div style="font-size: 6.8pt;">
-              Организация &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="orgName" style="width: calc(100% - 68px); font-weight: bold;">${v('orgName')}</span>
-            </div>
-            <div style="margin-top: 2px;">
-              <span class="editable-field line-field" contenteditable="true" data-field="orgAddressPhone" style="width: 100%;">${v('orgAddressPhone')}</span>
-              <span class="sub-prompt">(наименование, адрес и номер телефона)</span>
-            </div>
+        </div>
+
+        <!-- По центру: ПУТЕВОЙ ЛИСТ грузового автомобиля ... дата -->
+        <div style="width: 44%; text-align: center; padding-top: 0.5mm;">
+          <div style="font-size: 11.5pt; font-weight: bold; letter-spacing: 0.5px; line-height: 1.0;">
+            ПУТЕВОЙ ЛИСТ
+          </div>
+          <div style="font-size: 8.5pt; margin-top: 2px; line-height: 1.1;">
+            грузового автомобиля &nbsp;№ <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="min-width: 60px; font-weight: bold; font-size: 9.5pt;">${v('docNumber')}</span>
+          </div>
+          <div style="font-size: 6.2pt; line-height: 1.0; margin-top: 1px;">
+            (серия &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="min-width: 30px; font-weight: bold;">${v('docSeries')}</span>)
+          </div>
+          <div style="font-size: 7.2pt; margin-top: 2.5px;">
+            «<span class="editable-field line-field" contenteditable="true" data-field="docDay" style="min-width: 18px; font-weight: bold; text-align: center;">${v('docDay')}</span>»
+            &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docMonth" style="min-width: 70px; font-weight: bold; text-align: center;">${v('docMonth')}</span>
+            &nbsp;20<span class="editable-field line-field" contenteditable="true" data-field="docYear" style="min-width: 18px; font-weight: bold; text-align: center;">${v('docYear')}</span> г.
           </div>
         </div>
+
+        <!-- Справа: Утверждение формы и Таблица кодов ОКУД/ОКПО -->
+        <div style="width: 28%; text-align: right;">
+          <div style="font-size: 5.6pt; line-height: 1.15; color: #000;">
+            Типовая межотраслевая форма № 4-С<br>
+            Утверждена постановлением Госкомстата России<br>
+            от 28.11.97 № 78
+          </div>
+          <div style="margin-top: 2px; display: flex; justify-content: flex-end;">
+            <table style="border-collapse: collapse; font-size: 6.0pt;">
+              <tr>
+                <td style="border: none; text-align: right; padding-right: 4px;"></td>
+                <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0; background: #fff;">Коды</td>
+              </tr>
+              <tr>
+                <td style="border: none; text-align: right; padding-right: 4px; white-space: nowrap;">Форма по ОКУД</td>
+                <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0;">0345004</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Центральная часть: ПУТЕВОЙ ЛИСТ № ... -->
-      <div style="width: 32%; text-align: center; padding-top: 0.5mm;">
-        <div style="font-size: 11.5pt; font-weight: bold; letter-spacing: 0.5px; line-height: 1.0;">
-          ПУТЕВОЙ ЛИСТ
+      <!-- Нижний ярус шапки: Организация под Путевым листом и датой, протянутая вплоть до блока кодов (по ОКПО)! (Скриншоты 1, 2, 3) -->
+      <div style="margin-top: 1mm; display: flex; align-items: flex-end;">
+        <div style="font-size: 7.0pt; white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">Организация</div>
+        <div style="flex: 1; margin-right: 6px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="orgAddressPhone" style="width: 100%; font-weight: bold; font-size: 6.8pt;">${v('orgAddressPhone')}</span>
+          <span class="sub-prompt" style="text-align: center;">(наименование, адрес и номер телефона)</span>
         </div>
-        <div style="font-size: 8.5pt; margin-top: 2px; line-height: 1.1;">
-          грузового автомобиля &nbsp;№ <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="min-width: 60px; font-weight: bold; font-size: 9.5pt;">${v('docNumber')}</span>
-        </div>
-        <div style="font-size: 6.2pt; line-height: 1.0; margin-top: 1px;">
-          (серия &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="min-width: 30px; font-weight: bold;">${v('docSeries')}</span>)
-        </div>
-        <div style="font-size: 7.2pt; margin-top: 2.5px;">
-          «<span class="editable-field line-field" contenteditable="true" data-field="docDay" style="min-width: 18px; font-weight: bold; text-align: center;">${v('docDay')}</span>»
-          &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docMonth" style="min-width: 70px; font-weight: bold; text-align: center;">${v('docMonth')}</span>
-          &nbsp;20<span class="editable-field line-field" contenteditable="true" data-field="docYear" style="min-width: 18px; font-weight: bold; text-align: center;">${v('docYear')}</span> г.
-        </div>
-      </div>
-
-      <!-- Правая часть: Утверждение формы и Таблица кодов -->
-      <div style="width: 24%; text-align: right;">
-        <div style="font-size: 5.6pt; line-height: 1.15; color: #000;">
-          Типовая межотраслевая форма № 4-С<br>
-          Утверждена постановлением Госкомстата России<br>
-          от 28.11.97 № 78
-        </div>
-        <div style="margin-top: 2.5px; display: flex; justify-content: flex-end;">
-          <table class="code-table">
-            <tr>
-              <td style="font-weight: bold; background: #fff;" colspan="2">Коды</td>
-            </tr>
-            <tr>
-              <td style="text-align: left; padding: 1px 4px;">Форма по ОКУД</td>
-              <td style="font-weight: bold; padding: 1px 6px;">0345004</td>
-            </tr>
-            <tr>
-              <td style="text-align: left; padding: 1px 4px;">по ОКПО</td>
-              <td style="font-weight: bold; padding: 1px 6px;"><span class="editable-field" contenteditable="true" data-field="okpo">${v('okpo')}</span></td>
-            </tr>
-          </table>
-        </div>
+        <table style="border-collapse: collapse; font-size: 6.0pt; margin-bottom: 2.8mm;">
+          <tr>
+            <td style="border: none; text-align: right; padding-right: 4px; white-space: nowrap;">по ОКПО</td>
+            <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0;">
+              <span class="editable-field" contenteditable="true" data-field="okpo">${v('okpo')}</span>
+            </td>
+          </tr>
+        </table>
       </div>
 
     </div>
@@ -650,19 +706,19 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         <!-- Линии реквизитов слева от таблиц кодов (ширина 129.9 мм) -->
         <div style="width: calc(100% - 13.5mm); display: flex; flex-direction: column; justify-content: space-between;">
           
-          <!-- Верхняя группа (Режим работы, Колонна, Бригада, Марка, Госномер, Водитель) -->
+          <!-- Верхняя группа: Режим работы, Колонна, Бригада (БЕЗ ПОДЧЕРКИВАНИЙ - Скриншот 4!) -->
           <div style="height: 27.5mm; display: flex; flex-direction: column; justify-content: space-between;">
-            <!-- Режим работы -->
-            <div style="text-align: right; padding-right: 3px;">
-              Режим работы &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="workMode" style="width: 38mm; text-align: left;">${v('workMode')}</span>
+            <!-- Режим работы (чистый текст без полос и подчеркиваний) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+              Режим работы
             </div>
-            <!-- Колонна -->
-            <div style="text-align: right; padding-right: 3px;">
-              Колонна &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="columnNum" style="width: 38mm; text-align: left;">${v('columnNum')}</span>
+            <!-- Колонна (чистый текст без полос и подчеркиваний) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+              Колонна
             </div>
-            <!-- Бригада -->
-            <div style="text-align: right; padding-right: 3px;">
-              Бригада &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="brigadeNum" style="width: 38mm; text-align: left;">${v('brigadeNum')}</span>
+            <!-- Бригада (чистый текст без полос и подчеркиваний) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+              Бригада
             </div>
             <!-- Разделительная линия под Бригадой -->
             <div style="border-bottom: 1px solid #000; width: 100%; margin: 0.5px 0;"></div>
@@ -1007,11 +1063,11 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
               <!-- Строка 3: Подписи лиц -->
               <tr style="height: 6.8mm; font-size: 5.0pt;">
                 <td colspan="2" style="text-align: center; font-weight: bold; letter-spacing: 1px;">п о д п и с ь</td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler" style="font-size: 4.8pt;">${v('t2_sig_refueler') || 'заправщика'}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_out" style="font-size: 4.8pt;">${v('t2_sig_mech_out') || 'механика'}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_in" style="font-size: 4.8pt;">${v('t2_sig_mech_in') || 'механика'}</span></td>
-                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler_ret" style="font-size: 4.8pt;">${v('t2_sig_refueler_ret') || 'заправщика'}</span></td>
-                <td colspan="3" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_disp" style="font-size: 4.8pt;">${v('t2_sig_disp') || 'диспетчера'}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler" style="font-size: 4.8pt;">${v('t2_sig_refueler')}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_out" style="font-size: 4.8pt;">${v('t2_sig_mech_out')}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_mech_in" style="font-size: 4.8pt;">${v('t2_sig_mech_in')}</span></td>
+                <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_refueler_ret" style="font-size: 4.8pt;">${v('t2_sig_refueler_ret')}</span></td>
+                <td colspan="3" style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t2_sig_disp" style="font-size: 4.8pt;">${v('t2_sig_disp')}</span></td>
               </tr>
             </tbody>
           </table>
@@ -1021,7 +1077,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
     </div>
 
-    <!-- 3. ТАБЛИЦА 3: ЗАДАНИЕ ВОДИТЕЛЮ (НА ВСЮ ШИРИНУ ЛИСТА) (31 мм) -->
+    <!-- 3. ТАБЛИЦА 3: ЗАДАНИЕ ВОДИТЕЛЮ (3 СТРОКИ МАРШРУТА - Пункт 3!) (31 мм) -->
     <div style="height: 31mm; margin-bottom: 2mm;">
       <div style="text-align: center; font-weight: bold; font-size: 7.2pt; letter-spacing: 2px; margin-bottom: 1px;">
         З А Д А Н И Е &nbsp; &nbsp; В О Д И Т Е Л Ю
@@ -1063,40 +1119,40 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           </tr>
         </thead>
         <tbody>
-          <!-- Строка 1: Основное задание рейса -->
+          <!-- Маршрут 1 -->
           <tr style="height: 4.2mm;">
-            <td><span class="editable-field" contenteditable="true" data-field="t3_client" style="font-weight: bold;">${v('t3_client')}</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time">${v('t3_arr_time')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr">${v('t3_load_addr')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr">${v('t3_unload_addr')}</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo" style="font-weight: bold;">${v('t3_cargo')}</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_trips">${v('t3_trips')}</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_dist">${v('t3_dist')}</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_tons">${v('t3_tons')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_1" style="font-weight: bold;">${v('t3_client_1')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_1">${v('t3_arr_time_1')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_1">${v('t3_load_addr_1')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_1">${v('t3_unload_addr_1')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_1" style="font-weight: bold;">${v('t3_cargo_1')}</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_trips_1">${v('t3_trips_1')}</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_dist_1">${v('t3_dist_1')}</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_tons_1">${v('t3_tons_1')}</span></td>
           </tr>
-          <!-- Строка 2: Пустая строка -->
+          <!-- Маршрут 2 -->
           <tr style="height: 3.8mm;">
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_2">${v('t3_client_2')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_2">${v('t3_arr_time_2')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_2">${v('t3_load_addr_2')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_2">${v('t3_unload_addr_2')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_2">${v('t3_cargo_2')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_2">${v('t3_trips_2')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_2">${v('t3_dist_2')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_2">${v('t3_tons_2')}</span></td>
           </tr>
-          <!-- Строка 3: Пустая строка -->
+          <!-- Маршрут 3 -->
           <tr style="height: 3.8mm;">
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_3">${v('t3_client_3')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_3">${v('t3_arr_time_3')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_3">${v('t3_load_addr_3')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_3">${v('t3_unload_addr_3')}</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_3">${v('t3_cargo_3')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_3">${v('t3_trips_3')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_3">${v('t3_dist_3')}</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_3">${v('t3_tons_3')}</span></td>
           </tr>
-          <!-- Строка 4: Итого -->
+          <!-- Строка Итого -->
           <tr style="height: 4.2mm; font-weight: bold;">
             <td colspan="5" style="border: none; border-left: 1px solid #000; border-bottom: 1px solid #000;"></td>
             <td colspan="2" style="text-align: right; border: 1px solid #000; padding-right: 6px;">Итого</td>
@@ -1106,7 +1162,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       </table>
     </div>
 
-    <!-- 4. НИЖНИЙ БЛОК: СЛЕВА (ПОДПИСИ, ДОПУСК, МЕДОСМОТР) | СПРАВА (ОТМЕТКИ ОРГАНИЗАЦИИ) (42 мм) -->
+    <!-- 4. НИЖНИЙ БЛОК: СЛЕВА (ПОДПИСИ, ДОПУСК, МЕДОСМОТР) | СПРАВА (ОТМЕТКИ ОРГАНИЗАЦИИ БЕЗ РАМКИ - Скриншот 5!) (42 мм) -->
     <div style="display: flex; justify-content: space-between; gap: 8px; height: 42mm;">
       
       <!-- Левая часть: Подписи и штампы допуска/осмотра (70.1% ~ 193.2 мм) -->
@@ -1197,27 +1253,28 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
       </div>
 
-      <!-- Правая часть: Отметки организации-владельца автотранспорта (29.8% ~ 82.1 мм) -->
-      <div style="width: 29.8%; border: 1px solid #000; padding: 2px 4px; display: flex; flex-direction: column;">
-        <div style="font-weight: bold; font-size: 5.8pt; text-align: center; margin-bottom: 2px;">
-          Отметки организации-владельца автотранспорта:
+      <!-- Правая часть: Отметки организации-владельца автотранспорта (БЕЗ РАМКИ, только нижние подчеркивания - Скриншот 5!) (29.8% ~ 82.1 мм) -->
+      <div style="width: 29.8%; display: flex; flex-direction: column; justify-content: space-between; padding-top: 1mm;">
+        <!-- Строка 1: Текст заголовка и продолжение линии справа от него -->
+        <div style="display: flex; align-items: baseline;">
+          <span style="font-size: 5.6pt; white-space: nowrap; margin-right: 4px;">Отметки организации-владельца автотранспорта:</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note1" style="flex: 1; font-size: 5.5pt;">${v('note1')}</span>
         </div>
-        <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-around;">
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note1">${v('note1')}</span>
-          </div>
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note2">${v('note2')}</span>
-          </div>
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note3">${v('note3')}</span>
-          </div>
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note4">${v('note4')}</span>
-          </div>
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note5">${v('note5')}</span>
-          </div>
+        <!-- Строка 2: Линия подчеркивания на всю ширину -->
+        <div style="margin-top: 2px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="note2" style="width: 100%; font-size: 5.5pt;">${v('note2')}</span>
+        </div>
+        <!-- Строка 3: Линия подчеркивания на всю ширину -->
+        <div style="margin-top: 2px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="note3" style="width: 100%; font-size: 5.5pt;">${v('note3')}</span>
+        </div>
+        <!-- Строка 4: Линия подчеркивания на всю ширину -->
+        <div style="margin-top: 2px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="note4" style="width: 100%; font-size: 5.5pt;">${v('note4')}</span>
+        </div>
+        <!-- Строка 5: Линия подчеркивания на всю ширину -->
+        <div style="margin-top: 2px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="note5" style="width: 100%; font-size: 5.5pt;">${v('note5')}</span>
         </div>
       </div>
 
@@ -1226,10 +1283,16 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
   </div>
 
   <script>
-    const defaultData = ${defaultDataJson};
+    const initialValues = ${defaultDataJson};
+    document.querySelectorAll('.editable-field').forEach(el => {
+      const field = el.getAttribute('data-field');
+      if (field) {
+        initialValues[field] = el.innerText;
+      }
+    });
 
     function clearAllFields() {
-      if (!confirm('Очистить все поля бланка? Документ станет абсолютно чистым для ручного заполнения.')) return;
+      if (!confirm('Очистить все поля бланка? Документ станет абсолютно пустым для ручного заполнения.')) return;
       document.querySelectorAll('.editable-field').forEach(el => {
         el.innerText = '';
       });
@@ -1238,12 +1301,13 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     function resetDefaultData() {
       document.querySelectorAll('.editable-field').forEach(el => {
         const field = el.getAttribute('data-field');
-        if (field && defaultData[field] !== undefined) {
-          el.innerText = defaultData[field];
+        if (field && initialValues[field] !== undefined) {
+          el.innerText = initialValues[field];
         }
       });
     }
   </script>
 </body>
-</html>`;
+</html>
+`;
 }

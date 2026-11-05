@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Путевой лист № 4-С (ОКУД 0345004)</title>
+  <title>Путевой лист грузового автомобиля № 4-С (ОКУД 0345004)</title>
   <style>
     * {
       box-sizing: border-box;
@@ -175,7 +175,7 @@
     }
     .code-table {
       border-collapse: collapse;
-      border: 1px solid #000;
+      border: 1.5px solid #000;
       margin-left: auto;
     }
     .code-table td {
@@ -218,7 +218,7 @@
       <div>
         <div style="font-weight: 700; font-size: 13px;">Путевой лист грузового автомобиля (Типовая форма № 4-С, ОКУД 0345004)</div>
         <div style="font-size: 11px; color: #94a3b8;">
-          100% точное соответствие оригиналу Госкомстата РФ (с таблицами кодов и точными пропорциями) • Строго 1 лист A4
+          100% точное соответствие оригиналу Госкомстата РФ • Строго 1 лист A4 Альбомная
         </div>
       </div>
     </div>
@@ -232,68 +232,76 @@
   <!-- ======================== БЛАНК ФОРМЫ 4-С ======================== -->
   <div class="pl-page" id="waybillPage">
     
-    <!-- 1. ВЕРХНЯЯ ШАПКА ДОКУМЕНТА (33 мм) -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; height: 33mm; margin-bottom: 1.5mm;">
+    <!-- 1. ВЕРХНЯЯ ШАПКА ДОКУМЕНТА (35 мм) -->
+    <div style="height: 35mm; margin-bottom: 1.5mm;">
       
-      <!-- Левая часть: Штамп организации и Наименование -->
-      <div style="width: 44%;">
-        <div style="display: flex; gap: 8px; align-items: flex-start;">
-          <div class="stamp-box" style="width: 32mm; height: 16.5mm; flex-shrink: 0;">
+      <!-- Верхний ярус: Штамп организации слева, Путевой лист по центру, Утверждение и Коды справа -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; height: 23mm;">
+        
+        <!-- Слева: Место для штампа организации -->
+        <div style="width: 28%;">
+          <div class="stamp-box" style="width: 33mm; height: 16mm;">
             <div>Место для штампа</div>
             <div>организации</div>
           </div>
-          <div style="flex: 1; padding-top: 1px;">
-            <div style="font-size: 6.8pt;">
-              Организация &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="orgName" style="width: calc(100% - 68px); font-weight: bold;">ИП Нигамедьянов Александр Сергеевич</span>
-            </div>
-            <div style="margin-top: 2px;">
-              <span class="editable-field line-field" contenteditable="true" data-field="orgAddressPhone" style="width: 100%;">624760, Свердловская обл., г. Верхняя Салда, ул. 25 Октября, д. 11, кв. 22, тел. +7 (922) 180-09-11</span>
-              <span class="sub-prompt">(наименование, адрес и номер телефона)</span>
-            </div>
+        </div>
+
+        <!-- По центру: ПУТЕВОЙ ЛИСТ грузового автомобиля ... дата -->
+        <div style="width: 44%; text-align: center; padding-top: 0.5mm;">
+          <div style="font-size: 11.5pt; font-weight: bold; letter-spacing: 0.5px; line-height: 1.0;">
+            ПУТЕВОЙ ЛИСТ
+          </div>
+          <div style="font-size: 8.5pt; margin-top: 2px; line-height: 1.1;">
+            грузового автомобиля &nbsp;№ <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="min-width: 60px; font-weight: bold; font-size: 9.5pt;">10676</span>
+          </div>
+          <div style="font-size: 6.2pt; line-height: 1.0; margin-top: 1px;">
+            (серия &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="min-width: 30px; font-weight: bold;">26</span>)
+          </div>
+          <div style="font-size: 7.2pt; margin-top: 2.5px;">
+            «<span class="editable-field line-field" contenteditable="true" data-field="docDay" style="min-width: 18px; font-weight: bold; text-align: center;">02</span>»
+            &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docMonth" style="min-width: 70px; font-weight: bold; text-align: center;">ноября</span>
+            &nbsp;20<span class="editable-field line-field" contenteditable="true" data-field="docYear" style="min-width: 18px; font-weight: bold; text-align: center;">26</span> г.
           </div>
         </div>
+
+        <!-- Справа: Утверждение формы и Таблица кодов ОКУД/ОКПО -->
+        <div style="width: 28%; text-align: right;">
+          <div style="font-size: 5.6pt; line-height: 1.15; color: #000;">
+            Типовая межотраслевая форма № 4-С<br>
+            Утверждена постановлением Госкомстата России<br>
+            от 28.11.97 № 78
+          </div>
+          <div style="margin-top: 2px; display: flex; justify-content: flex-end;">
+            <table style="border-collapse: collapse; font-size: 6.0pt;">
+              <tr>
+                <td style="border: none; text-align: right; padding-right: 4px;"></td>
+                <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0; background: #fff;">Коды</td>
+              </tr>
+              <tr>
+                <td style="border: none; text-align: right; padding-right: 4px; white-space: nowrap;">Форма по ОКУД</td>
+                <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0;">0345004</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Центральная часть: ПУТЕВОЙ ЛИСТ № ... -->
-      <div style="width: 32%; text-align: center; padding-top: 0.5mm;">
-        <div style="font-size: 11.5pt; font-weight: bold; letter-spacing: 0.5px; line-height: 1.0;">
-          ПУТЕВОЙ ЛИСТ
+      <!-- Нижний ярус шапки: Организация под Путевым листом и датой, протянутая вплоть до блока кодов (по ОКПО)! (Скриншоты 1, 2, 3) -->
+      <div style="margin-top: 1mm; display: flex; align-items: flex-end;">
+        <div style="font-size: 7.0pt; white-space: nowrap; margin-right: 6px; padding-bottom: 3.5px;">Организация</div>
+        <div style="flex: 1; margin-right: 6px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="orgAddressPhone" style="width: 100%; font-weight: bold; font-size: 6.8pt;">ИП Нигамедьянов Александр Сергеевич, 624760, Свердловская обл., г. Верхняя Салда, ул. 25 Октября, д. 11, кв. 22, тел. +7 (922) 180-09-11</span>
+          <span class="sub-prompt" style="text-align: center;">(наименование, адрес и номер телефона)</span>
         </div>
-        <div style="font-size: 8.5pt; margin-top: 2px; line-height: 1.1;">
-          грузового автомобиля &nbsp;№ <span class="editable-field line-field" contenteditable="true" data-field="docNumber" style="min-width: 60px; font-weight: bold; font-size: 9.5pt;">10676</span>
-        </div>
-        <div style="font-size: 6.2pt; line-height: 1.0; margin-top: 1px;">
-          (серия &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docSeries" style="min-width: 30px; font-weight: bold;">26</span>)
-        </div>
-        <div style="font-size: 7.2pt; margin-top: 2.5px;">
-          «<span class="editable-field line-field" contenteditable="true" data-field="docDay" style="min-width: 18px; font-weight: bold; text-align: center;">02</span>»
-          &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="docMonth" style="min-width: 70px; font-weight: bold; text-align: center;">ноября</span>
-          &nbsp;20<span class="editable-field line-field" contenteditable="true" data-field="docYear" style="min-width: 18px; font-weight: bold; text-align: center;">26</span> г.
-        </div>
-      </div>
-
-      <!-- Правая часть: Утверждение формы и Таблица кодов -->
-      <div style="width: 24%; text-align: right;">
-        <div style="font-size: 5.6pt; line-height: 1.15; color: #000;">
-          Типовая межотраслевая форма № 4-С<br>
-          Утверждена постановлением Госкомстата России<br>
-          от 28.11.97 № 78
-        </div>
-        <div style="margin-top: 2.5px; display: flex; justify-content: flex-end;">
-          <table class="code-table">
-            <tr>
-              <td style="font-weight: bold; background: #fff;" colspan="2">Коды</td>
-            </tr>
-            <tr>
-              <td style="text-align: left; padding: 1px 4px;">Форма по ОКУД</td>
-              <td style="font-weight: bold; padding: 1px 6px;">0345004</td>
-            </tr>
-            <tr>
-              <td style="text-align: left; padding: 1px 4px;">по ОКПО</td>
-              <td style="font-weight: bold; padding: 1px 6px;"><span class="editable-field" contenteditable="true" data-field="okpo">32166580</span></td>
-            </tr>
-          </table>
-        </div>
+        <table style="border-collapse: collapse; font-size: 6.0pt; margin-bottom: 2.8mm;">
+          <tr>
+            <td style="border: none; text-align: right; padding-right: 4px; white-space: nowrap;">по ОКПО</td>
+            <td style="border: 1.5px solid #000; text-align: center; font-weight: bold; width: 22mm; padding: 1px 0;">
+              <span class="editable-field" contenteditable="true" data-field="okpo">32166580</span>
+            </td>
+          </tr>
+        </table>
       </div>
 
     </div>
@@ -307,19 +315,19 @@
         <!-- Линии реквизитов слева от таблиц кодов (ширина 129.9 мм) -->
         <div style="width: calc(100% - 13.5mm); display: flex; flex-direction: column; justify-content: space-between;">
           
-          <!-- Верхняя группа (Режим работы, Колонна, Бригада, Марка, Госномер, Водитель) -->
+          <!-- Верхняя группа: Режим работы, Колонна, Бригада (БЕЗ ПОДЧЕРКИВАНИЙ - Скриншот 4!) -->
           <div style="height: 27.5mm; display: flex; flex-direction: column; justify-content: space-between;">
-            <!-- Режим работы -->
-            <div style="text-align: right; padding-right: 3px;">
-              Режим работы &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="workMode" style="width: 38mm; text-align: left;">Основной</span>
+            <!-- Режим работы (чистый текст без полос и подчеркиваний) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+              Режим работы
             </div>
-            <!-- Колонна -->
-            <div style="text-align: right; padding-right: 3px;">
-              Колонна &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="columnNum" style="width: 38mm; text-align: left;">1</span>
+            <!-- Колонна (чистый текст без полос и подчеркиваний) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+              Колонна
             </div>
-            <!-- Бригада -->
-            <div style="text-align: right; padding-right: 3px;">
-              Бригада &nbsp;<span class="editable-field line-field" contenteditable="true" data-field="brigadeNum" style="width: 38mm; text-align: left;">1</span>
+            <!-- Бригада (чистый текст без полос и подчеркиваний) -->
+            <div style="text-align: right; padding-right: 5px; height: 4.2mm; line-height: 4.2mm;">
+              Бригада
             </div>
             <!-- Разделительная линия под Бригадой -->
             <div style="border-bottom: 1px solid #000; width: 100%; margin: 0.5px 0;"></div>
@@ -678,7 +686,7 @@
 
     </div>
 
-    <!-- 3. ТАБЛИЦА 3: ЗАДАНИЕ ВОДИТЕЛЮ (НА ВСЮ ШИРИНУ ЛИСТА) (31 мм) -->
+    <!-- 3. ТАБЛИЦА 3: ЗАДАНИЕ ВОДИТЕЛЮ (3 СТРОКИ МАРШРУТА - Пункт 3!) (31 мм) -->
     <div style="height: 31mm; margin-bottom: 2mm;">
       <div style="text-align: center; font-weight: bold; font-size: 7.2pt; letter-spacing: 2px; margin-bottom: 1px;">
         З А Д А Н И Е &nbsp; &nbsp; В О Д И Т Е Л Ю
@@ -720,40 +728,40 @@
           </tr>
         </thead>
         <tbody>
-          <!-- Строка 1: Основное задание рейса -->
+          <!-- Маршрут 1 -->
           <tr style="height: 4.2mm;">
-            <td><span class="editable-field" contenteditable="true" data-field="t3_client" style="font-weight: bold;">ПАО «Корпорация ВСМПО-АВИСМА»</span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time">09:30</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr">г. Заречный, промзона БЗСК, д 2</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr">г. Верхняя Салда, ул. Парковая, д 1</span></td>
-            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo" style="font-weight: bold;">Металлопрокат</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_trips">1</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_dist">350</span></td>
-            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_tons">3.10</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_1" style="font-weight: bold;">ПАО «Корпорация ВСМПО-АВИСМА»</span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_1">09:30</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_1">г. Заречный, промзона БЗСК, д 2</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_1">г. Верхняя Салда, ул. Парковая, д 1</span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_1" style="font-weight: bold;">Металлопрокат</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_trips_1">1</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_dist_1">350</span></td>
+            <td style="text-align: center; font-weight: bold;"><span class="editable-field" contenteditable="true" data-field="t3_tons_1">3.10</span></td>
           </tr>
-          <!-- Строка 2: Пустая строка -->
+          <!-- Маршрут 2 -->
           <tr style="height: 3.8mm;">
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_2"></span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_2"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_2"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_2"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_2"></span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_2"></span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_2"></span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_2"></span></td>
           </tr>
-          <!-- Строка 3: Пустая строка -->
+          <!-- Маршрут 3 -->
           <tr style="height: 3.8mm;">
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
-            <td style="text-align: center;"><span class="editable-field" contenteditable="true"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_client_3"></span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_arr_time_3"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_load_addr_3"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_unload_addr_3"></span></td>
+            <td><span class="editable-field" contenteditable="true" data-field="t3_cargo_3"></span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_trips_3"></span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_dist_3"></span></td>
+            <td style="text-align: center;"><span class="editable-field" contenteditable="true" data-field="t3_tons_3"></span></td>
           </tr>
-          <!-- Строка 4: Итого -->
+          <!-- Строка Итого -->
           <tr style="height: 4.2mm; font-weight: bold;">
             <td colspan="5" style="border: none; border-left: 1px solid #000; border-bottom: 1px solid #000;"></td>
             <td colspan="2" style="text-align: right; border: 1px solid #000; padding-right: 6px;">Итого</td>
@@ -763,7 +771,7 @@
       </table>
     </div>
 
-    <!-- 4. НИЖНИЙ БЛОК: СЛЕВА (ПОДПИСИ, ДОПУСК, МЕДОСМОТР) | СПРАВА (ОТМЕТКИ ОРГАНИЗАЦИИ) (42 мм) -->
+    <!-- 4. НИЖНИЙ БЛОК: СЛЕВА (ПОДПИСИ, ДОПУСК, МЕДОСМОТР) | СПРАВА (ОТМЕТКИ ОРГАНИЗАЦИИ БЕЗ РАМКИ - Скриншот 5!) (42 мм) -->
     <div style="display: flex; justify-content: space-between; gap: 8px; height: 42mm;">
       
       <!-- Левая часть: Подписи и штампы допуска/осмотра (70.1% ~ 193.2 мм) -->
@@ -854,27 +862,28 @@
 
       </div>
 
-      <!-- Правая часть: Отметки организации-владельца автотранспорта (29.8% ~ 82.1 мм) -->
-      <div style="width: 29.8%; border: 1px solid #000; padding: 2px 4px; display: flex; flex-direction: column;">
-        <div style="font-weight: bold; font-size: 5.8pt; text-align: center; margin-bottom: 2px;">
-          Отметки организации-владельца автотранспорта:
+      <!-- Правая часть: Отметки организации-владельца автотранспорта (БЕЗ РАМКИ, только нижние подчеркивания - Скриншот 5!) (29.8% ~ 82.1 мм) -->
+      <div style="width: 29.8%; display: flex; flex-direction: column; justify-content: space-between; padding-top: 1mm;">
+        <!-- Строка 1: Текст заголовка и продолжение линии справа от него -->
+        <div style="display: flex; align-items: baseline;">
+          <span style="font-size: 5.6pt; white-space: nowrap; margin-right: 4px;">Отметки организации-владельца автотранспорта:</span>
+          <span class="editable-field line-field" contenteditable="true" data-field="note1" style="flex: 1; font-size: 5.5pt;">Замечаний к ТС и водителю нет.</span>
         </div>
-        <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-around;">
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note1">Замечаний к ТС и водителю нет.</span>
-          </div>
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note2">Груз сдан полностью по ТН № 10676.</span>
-          </div>
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note3"></span>
-          </div>
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note4"></span>
-          </div>
-          <div style="border-bottom: 1px solid #000; height: 5.5mm; font-size: 5.5pt; padding: 0 2px;">
-            <span class="editable-field" contenteditable="true" data-field="note5"></span>
-          </div>
+        <!-- Строка 2: Линия подчеркивания на всю ширину -->
+        <div style="margin-top: 2px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="note2" style="width: 100%; font-size: 5.5pt;">Груз сдан полностью по ТН № 10676.</span>
+        </div>
+        <!-- Строка 3: Линия подчеркивания на всю ширину -->
+        <div style="margin-top: 2px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="note3" style="width: 100%; font-size: 5.5pt;"></span>
+        </div>
+        <!-- Строка 4: Линия подчеркивания на всю ширину -->
+        <div style="margin-top: 2px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="note4" style="width: 100%; font-size: 5.5pt;"></span>
+        </div>
+        <!-- Строка 5: Линия подчеркивания на всю ширину -->
+        <div style="margin-top: 2px;">
+          <span class="editable-field line-field" contenteditable="true" data-field="note5" style="width: 100%; font-size: 5.5pt;"></span>
         </div>
       </div>
 
