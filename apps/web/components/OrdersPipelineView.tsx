@@ -225,6 +225,36 @@ export function OrdersPipelineView() {
     },
   });
 
+  // Фоновая и ручная синхронизация Wialon
+  const wialonSyncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/cron/wialon-sync', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Ошибка синхронизации Wialon');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicles-list'] });
+    },
+  });
+
+  useQuery({
+    queryKey: ['wialon-telematics-sync'],
+    queryFn: async () => {
+      const res = await fetch('/api/cron/wialon-sync');
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
+        queryClient.invalidateQueries({ queryKey: ['vehicles-list'] });
+      }
+      return res.ok ? res.json() : null;
+    },
+    refetchInterval: 45000,
+    refetchOnWindowFocus: true,
+  });
+
   // Мутация Wialon (выезд / приезд)
   const autoProgressMutation = useMutation({
     mutationFn: async ({
@@ -463,6 +493,13 @@ export function OrdersPipelineView() {
             onChange={(e) => setSearch(e.target.value)}
             className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 w-52"
           />
+          <button
+            onClick={() => wialonSyncMutation.mutate()}
+            disabled={wialonSyncMutation.isPending}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition active:scale-95 disabled:opacity-50"
+          >
+            <span>{wialonSyncMutation.isPending ? '⏳...' : '🛰️ Wialon'}</span>
+          </button>
           <button
             onClick={() => {
               setDriverModalInitialId(undefined);

@@ -52,7 +52,7 @@ export async function getWialonSession(host: string, token: string): Promise<str
     JSON.stringify({ token }),
   )}`;
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) {
     throw new Error(`Ошибка HTTP при авторизации в Wialon: ${res.statusText}`);
   }
@@ -98,7 +98,7 @@ export async function fetchWialonValdaiPositions(
     JSON.stringify(searchParams),
   )}&sid=${eid}`;
 
-  const res = await fetch(searchUrl);
+  const res = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) {
     throw new Error(`Ошибка запроса объектов Wialon: ${res.statusText}`);
   }

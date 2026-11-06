@@ -3,6 +3,10 @@
   "regions": ["fra1"],
   "crons": [
     {
+      "path": "/api/cron/wialon-sync",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/alerts",
       "schedule": "0 6 * * *"
     },
