@@ -185,6 +185,8 @@ export function CreatePrrModal({
 
   const selectedCounterparty = counterparties.find((c) => c.id === selectedCounterpartyId);
   const isInternal = isInternalCounterparty(selectedCounterparty?.name);
+  const isTerritory = isTerritoryCounterparty(selectedCounterparty?.name);
+  const isGeostroy = isGeostroyCounterparty(selectedCounterparty?.name);
 
   const tk501Cp = useMemo(
     () => counterparties.find((c) => isInternalCounterparty(c.name)),
@@ -312,8 +314,6 @@ export function CreatePrrModal({
 
     setSubmitting(true);
 
-    const isTerritory = isTerritoryCounterparty(selectedCounterparty?.name);
-    const isGeostroy = isGeostroyCounterparty(selectedCounterparty?.name);
     let finalDescription = description.trim();
     if (isTerritory) {
       if (!territoryAddress.trim()) {
@@ -341,6 +341,12 @@ export function CreatePrrModal({
         return;
       }
       finalDescription = formatGeostroyDescription(geostroyRoute, geostroyDate);
+    } else {
+      if (!description.trim()) {
+        setError('Укажите адрес работы');
+        setSubmitting(false);
+        return;
+      }
     }
 
     try {
@@ -405,21 +411,14 @@ export function CreatePrrModal({
     <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
       <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-zinc-200 max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 mb-0">
         {/* Шапка */}
-        <div className="px-5 py-3.5 border-b border-zinc-100 flex items-center justify-between bg-zinc-50 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-lg shrink-0">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between bg-zinc-50 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-base shrink-0">
               👷
             </div>
-            <div>
-              <h2 className="text-sm font-black text-zinc-900 leading-tight">
-                {role === 'loader' ? 'Создать заказ (ПРР)' : 'Погрузо-разгрузочные работы'}
-              </h2>
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">
-                {isInternal
-                  ? '🏢 ТК 501: 100% грузчикам (0% компании)'
-                  : 'Без авто · 70% грузчикам, 30% компании'}
-              </p>
-            </div>
+            <h2 className="text-sm font-black text-zinc-900 leading-tight">
+              {role === 'loader' ? 'Создать заказ' : 'Погрузо-разгрузочные работы'}
+            </h2>
           </div>
           <button
             type="button"
@@ -446,29 +445,9 @@ export function CreatePrrModal({
             </div>
           )}
 
-          {/* Тип заказа (для грузчиков только 1 вариант — ПРР без авто) */}
-          <div className="bg-amber-50/80 border border-amber-300/80 rounded-xl p-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-base">📦</span>
-              <div>
-                <div className="text-xs font-black text-amber-950">
-                  Тип заказа: Погрузо-разгрузочные работы (ПРР)
-                </div>
-                <div className="text-[10px] font-semibold text-amber-800">
-                  {role === 'loader'
-                    ? 'Только ПРР (без авто) · Для грузчиков доступен только этот вариант'
-                    : 'Без автомобиля · Назначение бригады грузчиков'}
-                </div>
-              </div>
-            </div>
-            <span className="text-[9px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md shrink-0">
-              Единственный вариант
-            </span>
-          </div>
-
           {/* 1. Клиент */}
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] font-black uppercase tracking-wider text-zinc-500">
                 Клиент
               </label>
@@ -479,128 +458,119 @@ export function CreatePrrModal({
               )}
             </div>
 
-            {/* Быстрые кнопки ключевых клиентов */}
-            <div className="flex items-center gap-1.5 mb-2 overflow-x-auto pb-0.5">
-              {tk501Cp && (
-                <button
-                  type="button"
-                  onClick={() => {
+            {/* Две кнопки: ТК 501 и Выбрать */}
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (tk501Cp) {
                     setSelectedCounterpartyId(tk501Cp.id);
                     setClientSearch('');
                     setShowClientList(false);
-                  }}
-                  className={cn(
-                    'px-2.5 py-1 rounded-lg text-xs font-black transition-all border shrink-0 flex items-center gap-1 cursor-pointer',
-                    selectedCounterpartyId === tk501Cp.id
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                      : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100',
-                  )}
-                >
-                  <span>🏢</span>
-                  <span>ТК 501 (100% себе)</span>
-                </button>
-              )}
-              {privateCp && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCounterpartyId(privateCp.id);
-                    setClientSearch('');
-                    setShowClientList(false);
-                  }}
-                  className={cn(
-                    'px-2.5 py-1 rounded-lg text-xs font-bold transition-all border shrink-0 flex items-center gap-1 cursor-pointer',
-                    selectedCounterpartyId === privateCp.id
-                      ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
-                      : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200',
-                  )}
-                >
-                  <span>👤</span>
-                  <span>Частный клиент (70/30)</span>
-                </button>
-              )}
-            </div>
+                  }
+                }}
+                className={cn(
+                  'w-full py-2.5 px-3 rounded-xl text-xs font-black transition-all border text-center cursor-pointer',
+                  isInternal
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50',
+                )}
+              >
+                ТК 501
+              </button>
 
-            <div className="relative">
-              <input
-                type="text"
-                value={clientSearch}
-                onChange={(e) => {
-                  setClientSearch(e.target.value);
+              <button
+                type="button"
+                onClick={() => {
+                  if (isInternal) {
+                    if (privateCp) {
+                      setSelectedCounterpartyId(privateCp.id);
+                    } else {
+                      setSelectedCounterpartyId('');
+                    }
+                  }
                   setShowClientList(true);
                 }}
-                onFocus={() => setShowClientList(true)}
-                placeholder={selectedCounterparty?.name || 'Поиск клиента...'}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-              />
-              {clientSearch && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setClientSearch('');
-                    setShowClientList(false);
-                  }}
-                  className="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-600 text-xs font-bold"
-                >
-                  ✕
-                </button>
-              )}
+                className={cn(
+                  'w-full py-2.5 px-3 rounded-xl text-xs font-black transition-all border text-center cursor-pointer',
+                  !isInternal
+                    ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50',
+                )}
+              >
+                Выбрать
+              </button>
             </div>
 
-            {/* Выпадающий список клиентов */}
-            {showClientList && (
-              <div className="mt-1.5 border border-zinc-200 rounded-xl bg-white shadow-lg max-h-48 overflow-y-auto p-1 divide-y divide-zinc-50">
-                {filteredClients.length === 0 ? (
-                  <div className="p-3 text-xs text-zinc-400 text-center font-bold">
-                    Клиент не найден
-                  </div>
-                ) : (
-                  filteredClients.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCounterpartyId(c.id);
-                        setClientSearch('');
-                        setShowClientList(false);
-                      }}
-                      className={cn(
-                        'w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-between',
-                        selectedCounterpartyId === c.id
-                          ? 'bg-orange-50 text-orange-800'
-                          : 'hover:bg-zinc-100 text-zinc-800',
-                      )}
-                    >
-                      <span>{c.name}</span>
-                      {c.is_legal_entity && (
-                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-700">
-                          Юрлицо
-                        </span>
-                      )}
-                    </button>
-                  ))
+            {/* Поле выбора/поиска клиента показывается только если НЕ выбрана ТК 501 */}
+            {!isInternal && (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={clientSearch}
+                  onChange={(e) => {
+                    setClientSearch(e.target.value);
+                    setShowClientList(true);
+                  }}
+                  onFocus={() => setShowClientList(true)}
+                  placeholder={selectedCounterparty?.name || 'Поиск клиента...'}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-sm font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                />
+                {clientSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClientSearch('');
+                      setShowClientList(false);
+                    }}
+                    className="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-600 text-xs font-bold"
+                  >
+                    ✕
+                  </button>
                 )}
-              </div>
-            )}
 
-            {isInternal && (
-              <div className="mt-2.5 p-3 bg-amber-50 border-2 border-amber-300 rounded-2xl text-xs space-y-1">
-                <div className="font-black text-amber-950 flex items-center gap-1.5">
-                  <span className="text-base">🏢</span>
-                  <span>Собственные хоз. работы (ТК501 / ТК510)</span>
-                </div>
-                <p className="text-[11px] text-amber-900 leading-snug">
-                  Это внутренний расход компании. Клиентский долг и выручка = 0 ₽. 100% указанной
-                  суммы пойдёт в начисление рабочим без удержания комиссии компании.
-                </p>
+                {showClientList && (
+                  <div className="mt-1.5 border border-zinc-200 rounded-xl bg-white shadow-lg max-h-48 overflow-y-auto p-1 divide-y divide-zinc-50">
+                    {filteredClients.length === 0 ? (
+                      <div className="p-3 text-xs text-zinc-400 text-center font-bold">
+                        Клиент не найден
+                      </div>
+                    ) : (
+                      filteredClients.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCounterpartyId(c.id);
+                            setClientSearch('');
+                            setShowClientList(false);
+                          }}
+                          className={cn(
+                            'w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-between',
+                            selectedCounterpartyId === c.id
+                              ? 'bg-orange-50 text-orange-800'
+                              : 'hover:bg-zinc-100 text-zinc-800',
+                          )}
+                        >
+                          <span>{c.name}</span>
+                          {c.is_legal_entity && (
+                            <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-700">
+                              Юрлицо
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* 2. Общая сумма заказа / бюджет на рабочих */}
+          {/* 2. Общая сумма заказа */}
           <div>
             <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
-              {isInternal ? 'Бюджет на оплату работникам (₽)' : 'Общая сумма заказа (₽)'}
+              Общая сумма заказа
             </label>
             <div className="relative">
               <input
@@ -610,36 +580,15 @@ export function CreatePrrModal({
                 step="50"
                 value={amountStr}
                 onChange={(e) => setAmountStr(e.target.value)}
-                placeholder={
-                  isInternal ? 'Сумма на всех рабочих (например: 4000)' : 'Например: 3000'
-                }
-                className="w-full px-4 py-3 rounded-xl border-2 border-zinc-300 text-lg font-black text-zinc-900 focus:outline-none focus:border-orange-500 bg-white"
+                placeholder="0"
+                className="w-full px-4 py-2.5 rounded-xl border-2 border-zinc-300 text-base font-black text-zinc-900 focus:outline-none focus:border-orange-500 bg-white"
               />
-              <span className="absolute right-4 top-3 text-lg font-black text-zinc-400">₽</span>
-            </div>
-
-            {/* Быстрые кнопки сумм */}
-            <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
-              {[1000, 1500, 2000, 3000, 5000, 7000].map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setAmountStr(String(val))}
-                  className={cn(
-                    'px-2.5 py-1 rounded-lg text-xs font-bold border transition-all shrink-0',
-                    amountStr === String(val)
-                      ? 'bg-orange-600 text-white border-orange-600'
-                      : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200',
-                  )}
-                >
-                  {val.toLocaleString('ru-RU')} ₽
-                </button>
-              ))}
+              <span className="absolute right-4 top-2.5 text-base font-black text-zinc-400">₽</span>
             </div>
           </div>
 
           {/* 3. Способ оплаты */}
-          {!isInternal ? (
+          {!isInternal && (
             <div>
               <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
                 Способ оплаты
@@ -655,40 +604,21 @@ export function CreatePrrModal({
                       disabled={disabled}
                       onClick={() => setPaymentMethod(pm.value)}
                       className={cn(
-                        'p-2.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between',
+                        'p-2.5 rounded-xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1',
                         disabled && 'opacity-40 cursor-not-allowed bg-zinc-100',
                         isSelected
                           ? pm.activeClass
                           : 'border-zinc-200 bg-white hover:border-zinc-300 text-zinc-700',
                       )}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-base">{pm.icon}</span>
-                        {isSelected && <span className="w-2 h-2 rounded-full bg-current"></span>}
-                      </div>
-                      <div className="mt-2">
-                        <div className="text-xs font-black">{pm.label}</div>
-                        <div className="text-[10px] font-medium opacity-70 truncate">{pm.desc}</div>
-                      </div>
+                      <span className="text-base">{pm.icon}</span>
+                      <span className="text-xs font-black">{pm.label}</span>
                     </button>
                   );
                 })}
               </div>
-              {isNoCash && (
-                <p className="text-[11px] font-bold text-rose-600 mt-1.5">
-                  ⚠️ Для корпоративных клиентов (ВСМПО и др.) оплата только по безналу/в долг!
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="p-3 bg-zinc-100 rounded-xl border border-zinc-200 text-xs">
-              <span className="font-bold text-zinc-700">Оплата: </span>
-              <span className="text-zinc-600 font-medium">
-                Внутренние расходы ТК501 (без образования дебиторской задолженности)
-              </span>
             </div>
           )}
-
           {/* 4. Выбор грузчиков */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -981,13 +911,16 @@ export function CreatePrrModal({
           ) : (
             <div>
               <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
-                Адрес / Заметка к заказу (опционально)
+                Адрес работы <span className="text-rose-600">*</span>
               </label>
               <input
                 type="text"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Например: ул. Ленина 45, 4 этаж, погрузка дивана"
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  if (error) setError('');
+                }}
+                placeholder="Адрес (например: ул. Ленина 45)"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
               />
             </div>
@@ -1020,22 +953,20 @@ export function CreatePrrModal({
             disabled={
               submitting ||
               (isInternal ? payroll.totalLoadersPay <= 0 : amount <= 0) ||
-              selectedLoaders.length === 0
+              selectedLoaders.length === 0 ||
+              (!isTerritory && !isGeostroy && !description.trim())
             }
             className={cn(
-              'w-full py-4 rounded-2xl text-white font-black text-sm uppercase tracking-wider shadow-lg transition-all active:scale-[0.98]',
+              'w-full py-3.5 rounded-2xl text-white font-black text-sm uppercase tracking-wider shadow-lg transition-all active:scale-[0.98]',
               submitting ||
                 (isInternal ? payroll.totalLoadersPay <= 0 : amount <= 0) ||
-                selectedLoaders.length === 0
+                selectedLoaders.length === 0 ||
+                (!isTerritory && !isGeostroy && !description.trim())
                 ? 'bg-zinc-300 cursor-not-allowed text-zinc-500'
                 : 'bg-orange-600 hover:bg-orange-700 shadow-orange-200',
             )}
           >
-            {submitting
-              ? 'Создаём заявку...'
-              : isInternal
-                ? '🏢 Провести внутренние работы'
-                : '🚀 Создать заказ ПРР'}
+            {submitting ? 'Создание...' : 'Создать заказ'}
           </button>
         </div>
       </div>

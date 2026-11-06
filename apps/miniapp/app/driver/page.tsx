@@ -279,20 +279,30 @@ export default function RootPage() {
       {/* Кнопка начала рейса */}
       <div>
         {!data?.activeTrip && (data?.reviewTrips ?? []).length === 0 && (
-          <button
-            onClick={handleStartTrip}
-            disabled={startingTrip}
-            className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white rounded-xl py-3 text-sm font-black shadow-md active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60"
-          >
-            <span>{activeAsset?.reg_number === 'БЕЗ АВТО' ? '👷' : '🚚'}</span>
-            <span>
-              {startingTrip
-                ? 'Создаём рейс...'
-                : activeAsset?.reg_number === 'БЕЗ АВТО'
-                  ? 'Начать рейс (без авто)'
-                  : 'Начать рейс'}
-            </span>
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={handleStartTrip}
+              disabled={startingTrip}
+              className="w-full flex items-center justify-center gap-2 bg-orange-600 text-white rounded-xl py-2.5 text-xs font-black shadow-sm active:bg-orange-700 active:scale-[0.98] transition-all uppercase tracking-wide disabled:opacity-60 cursor-pointer"
+            >
+              <span>{activeAsset?.reg_number === 'БЕЗ АВТО' ? '👷' : '🚚'}</span>
+              <span>
+                {startingTrip
+                  ? 'Создаём рейс...'
+                  : activeAsset?.reg_number === 'БЕЗ АВТО'
+                    ? 'Начать рейс (без авто)'
+                    : 'Начать рейс'}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setShowPrrModal(true)}
+              className="w-full flex items-center justify-center gap-2 bg-white border border-zinc-200 text-zinc-800 hover:bg-zinc-50 rounded-xl py-2 text-xs font-black shadow-2xs active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <span>👷</span>
+              <span>Создать заказ (ПРР)</span>
+            </button>
+          </div>
         )}
       </div>
 

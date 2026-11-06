@@ -327,25 +327,13 @@ export default function LoaderHomePage() {
 
       {/* ── Основное содержимое ───────────────────────────────── */}
       <main className="flex-1 max-w-lg w-full mx-auto p-3 space-y-2.5">
-        {/* ── Кнопка «Создать заказ» (Только 1 вариант — ПРР без авто) ──────── */}
+        {/* ── Кнопка «Создать заказ» ───────────────────────────────── */}
         <button
           onClick={() => setShowPrrModal(true)}
-          className="w-full flex items-center justify-between bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl py-2.5 px-3.5 shadow-sm active:scale-[0.99] transition-all cursor-pointer border border-amber-600/30"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl py-2.5 px-4 font-black shadow-xs active:scale-[0.99] transition-all cursor-pointer"
         >
-          <div className="flex items-center gap-2.5">
-            <span className="text-xl">📦</span>
-            <div className="text-left">
-              <span className="text-xs font-black uppercase tracking-wide block leading-tight">
-                Создать заказ
-              </span>
-              <span className="text-[10px] font-bold text-amber-100 block leading-tight">
-                Только ПРР (без авто) · Для грузчиков
-              </span>
-            </div>
-          </div>
-          <span className="text-[11px] font-black bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg">
-            + Создать
-          </span>
+          <span className="text-base">📦</span>
+          <span className="text-xs font-black uppercase tracking-wide">Создать заказ</span>
         </button>
 
         {/* ── Плашка 1: Статус для диспетчера (В 2 раза меньше по высоте) ──── */}
@@ -451,16 +439,14 @@ export default function LoaderHomePage() {
           )}
         </div>
 
-        {/* ── Плашка 2: Радар диспетчера (В 2 раза меньше по высоте — 1 строка) ── */}
+        {/* ── Плашка 2: Радар (1 строка) ── */}
         <div className="bg-white rounded-xl py-2 px-3 border border-slate-200 shadow-2xs flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
             <span className="text-sm shrink-0">📡</span>
             <div className="text-xs truncate">
               <span className="font-black text-slate-900">Радар: </span>
-              <span className="text-slate-600 font-medium">
-                {isOnline
-                  ? `Видны в топе заказов (адрес: ${currentAddress})`
-                  : 'В офлайне (включите «На линии»)'}
+              <span className="text-slate-600 font-bold">
+                {isOnline ? currentAddress : 'Офлайн'}
               </span>
             </div>
           </div>
