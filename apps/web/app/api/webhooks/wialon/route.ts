@@ -137,6 +137,13 @@ async function processWialonEvent(req: Request) {
       odometer = num > 2000000 ? Math.round(num / 1000) : Math.round(num);
     }
 
+    // Проверка секретного ключа (если задан в переменных окружения)
+    const expectedSecret = process.env.WIALON_WEBHOOK_SECRET;
+    const providedSecret = payload.secret || payload.token || req.headers.get('x-wialon-secret');
+    if (expectedSecret && providedSecret !== expectedSecret) {
+      return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 });
+    }
+
     if (!unitStr && !unitIdStr) {
       return NextResponse.json({ error: 'Параметр unit или unit_id обязателен' }, { status: 400 });
     }
@@ -145,10 +152,7 @@ async function processWialonEvent(req: Request) {
     const asset = await findAssetByWialonUnit(supabase, unitStr, unitIdStr);
 
     if (!asset) {
-      return NextResponse.json(
-        { error: `Автомобиль Wialon "${unitStr}" не найден в базе данных assets` },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
     }
 
     // Если Wialon не прислал значение одометра, берем текущий одометр актива
@@ -171,39 +175,24 @@ async function processWialonEvent(req: Request) {
       eventRaw.includes('приезд');
 
     if (isDeparture) {
-      const result = await handleVehicleDeparture(supabase, {
+      await handleVehicleDeparture(supabase, {
         vehicleId: asset.id,
         odometer: odoValue,
         timestamp: typeof timeStr === 'string' ? timeStr : new Date().toISOString(),
       });
-      return NextResponse.json({
-        success: true,
-        event: 'departure',
-        asset: { id: asset.id, reg_number: asset.reg_number },
-        result,
-      });
+      return NextResponse.json({ success: true });
     }
 
     if (isArrival) {
-      const result = await handleVehicleArrival(supabase, {
+      await handleVehicleArrival(supabase, {
         vehicleId: asset.id,
         odometer: odoValue,
         timestamp: typeof timeStr === 'string' ? timeStr : new Date().toISOString(),
       });
-      return NextResponse.json({
-        success: true,
-        event: 'arrival',
-        asset: { id: asset.id, reg_number: asset.reg_number },
-        result,
-      });
+      return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json(
-      {
-        error: `Неизвестный тип события Wialon: "${eventRaw}". Ожидается "departure" (выезд) или "arrival" (въезд).`,
-      },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Некорректный тип события' }, { status: 400 });
   } catch (err: any) {
     console.error('Ошибка обработки вебхука Wialon:', err);
     return NextResponse.json({ error: err?.message || 'Внутренняя ошибка' }, { status: 500 });
