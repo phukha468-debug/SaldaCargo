@@ -3543,6 +3543,12 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
   const activeWorks = (order.works ?? []).filter((w) => w.status !== 'cancelled');
   const parts = order.parts ?? [];
 
+  const totalMinutes = activeWorks.reduce(
+    (s, w) =>
+      s + Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1)),
+    0,
+  );
+
   const worksSum = activeWorks.reduce((s, w) => {
     const mins =
       Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
@@ -3592,6 +3598,7 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
     salaryPct,
     activeWorks,
     parts,
+    totalMinutes,
     worksSum,
     mechanicPay,
     partsUnitSum,
