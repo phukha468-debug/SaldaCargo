@@ -15,6 +15,8 @@ interface WorkItem {
   norm_minutes: number;
   actual_minutes: number;
   price_client?: string;
+  mechanic_id?: string;
+  second_mechanic_id?: string;
 }
 
 interface OrderDetail {
@@ -60,12 +62,35 @@ export default function OrderDetailPage() {
 
   const [workNameInput, setWorkNameInput] = useState('');
   const [workMinutesInput, setWorkMinutesInput] = useState('');
+  const [secondMechanicId, setSecondMechanicId] = useState<string>('');
+  const [workPerformerInput, setWorkPerformerInput] = useState<'both' | 'primary' | 'second'>(
+    'both',
+  );
+
   const [partsProvided, setPartsProvided] = useState<boolean | null>(null);
   const [partNameInput, setPartNameInput] = useState('');
   const [partQtyInput, setPartQtyInput] = useState('1');
   const [partUnitInput, setPartUnitInput] = useState('шт');
   const [odometerInput, setOdometerInput] = useState('');
   const [actionError, setActionError] = useState('');
+
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => fetch('/api/driver/me').then((r) => r.json()),
+    retry: false,
+  });
+
+  const { data: allMechanics = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['public-mechanics-list'],
+    queryFn: async () => {
+      const res = await fetch('/api/users/public?role=mechanic');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+
+  const otherMechanics = allMechanics.filter((m) => m.id !== me?.id);
 
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['order-detail', id],
@@ -85,6 +110,12 @@ export default function OrderDetailPage() {
       if (!cleanName) throw new Error('Введите наименование работы');
       if (mins <= 0) throw new Error('Укажите время выполнения в минутах');
 
+      const wMechId =
+        workPerformerInput === 'second' && secondMechanicId
+          ? secondMechanicId
+          : me?.id || undefined;
+      const wSecondId = workPerformerInput === 'both' && secondMechanicId ? secondMechanicId : null;
+
       const res = await fetch(`/api/mechanic/orders/${id}/works`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,6 +125,8 @@ export default function OrderDetailPage() {
           norm_minutes: mins,
           actual_minutes: mins,
           completed: true,
+          mechanic_id: wMechId,
+          second_mechanic_id: wSecondId,
         }),
       });
       const data = await res.json();
@@ -365,8 +398,15 @@ export default function OrderDetailPage() {
                     <p className="text-sm font-extrabold text-slate-900">
                       {idx + 1}. {name}
                     </p>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs font-bold text-slate-500">⏱ Время: {mins} мин</span>
+                      {w.mechanic_id && (
+                        <span className="text-[10px] font-extrabold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                          👤 {allMechanics.find((m) => m.id === w.mechanic_id)?.name || 'Механик'}
+                          {w.second_mechanic_id &&
+                            ` + ${allMechanics.find((m) => m.id === w.second_mechanic_id)?.name || 'Напарник'}`}
+                        </span>
+                      )}
                       <span className="text-xs font-extrabold text-[#21A038] bg-[#E8F7EC] px-2 py-0.5 rounded-md">
                         +{workPay.toLocaleString('ru-RU')} ₽ в ЗП
                       </span>
@@ -402,6 +442,77 @@ export default function OrderDetailPage() {
                 placeholder="Например: Замена глушителя (бочка)"
                 className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
               />
+            </div>
+
+            {/* Напарник / Второй механик */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  👥 Кто выполнял работу
+                </label>
+                {secondMechanicId && (
+                  <button
+                    type="button"
+                    onClick={() => setSecondMechanicId('')}
+                    className="text-[10px] font-bold text-rose-500 hover:underline"
+                  >
+                    Сбросить напарника
+                  </button>
+                )}
+              </div>
+              <select
+                value={secondMechanicId}
+                onChange={(e) => setSecondMechanicId(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800"
+              >
+                <option value="">Делал один (100% ЗП мне)</option>
+                {otherMechanics.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    Вместе с: {m.name}
+                  </option>
+                ))}
+              </select>
+
+              {secondMechanicId && (
+                <div className="grid grid-cols-3 gap-1 mt-1.5 bg-white p-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setWorkPerformerInput('both')}
+                    className={cn(
+                      'py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all',
+                      workPerformerInput === 'both'
+                        ? 'bg-[#E8F7EC] text-[#0E7C5B] border border-[#21A038]/30'
+                        : 'text-slate-500',
+                    )}
+                  >
+                    Вдвоём (50/50)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkPerformerInput('primary')}
+                    className={cn(
+                      'py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all',
+                      workPerformerInput === 'primary'
+                        ? 'bg-[#E8F7EC] text-[#0E7C5B] border border-[#21A038]/30'
+                        : 'text-slate-500',
+                    )}
+                  >
+                    Только я
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkPerformerInput('second')}
+                    className={cn(
+                      'py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all',
+                      workPerformerInput === 'second'
+                        ? 'bg-[#E8F7EC] text-[#0E7C5B] border border-[#21A038]/30'
+                        : 'text-slate-500',
+                    )}
+                  >
+                    Напарник
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>

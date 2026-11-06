@@ -40,6 +40,23 @@ export default function CreateOrderModal({
   const queryClient = useQueryClient();
   const todayStr = new Date().toISOString().split('T')[0] ?? '';
 
+  // 0. Режим: Взять наряд в работе на СТО или Открыть новый наряд
+  const [orderMode, setOrderMode] = useState<'existing' | 'new'>('existing');
+  const [selectedExistingOrderId, setSelectedExistingOrderId] = useState<string>('');
+
+  const { data: activeStationOrders = [] } = useQuery<any[]>({
+    queryKey: ['active-station-orders'],
+    queryFn: async () => {
+      const res = await fetch('/api/mechanic/orders?active_station=true');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open,
+    staleTime: 15000,
+  });
+
+  const selectedExistingOrder = activeStationOrders.find((o) => o.id === selectedExistingOrderId);
+
   // 1. Даты начала и окончания
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
@@ -101,7 +118,13 @@ export default function CreateOrderModal({
   const secondMechanic = otherMechanics.find((m) => m.id === secondMechanicId);
   const secondMechanicName = secondMechanic ? secondMechanic.name : '';
 
-  const activeRate = machineType === 'own' ? hourlyRateOwn : hourlyRateClient;
+  const effectiveMachineType =
+    orderMode === 'existing' && selectedExistingOrder
+      ? selectedExistingOrder.machine_type === 'own'
+        ? 'own'
+        : 'client'
+      : machineType;
+  const activeRate = effectiveMachineType === 'own' ? hourlyRateOwn : hourlyRateClient;
   const mechanicHourlyShare = Math.round((activeRate * salaryPct) / 100);
 
   const calcWorkShares = (mins: number, performer: 'both' | 'primary' | 'second' = 'both') => {
@@ -240,14 +263,20 @@ export default function CreateOrderModal({
         });
       }
 
-      if (machineType === 'own' && !selectedAssetId) {
-        throw new Error('Выберите автомобиль из нашего автопарка');
-      }
-      if (machineType === 'client') {
-        if (!clientModel.trim()) throw new Error('Укажите модель клиентского автомобиля');
-        if (!clientReg.trim()) throw new Error('Укажите госномер клиентского автомобиля');
-        if (!odometer.trim() || Number(odometer) <= 0) {
-          throw new Error('Для клиентского автомобиля обязательно укажите одометр (пробег)');
+      if (orderMode === 'existing') {
+        if (!selectedExistingOrderId) {
+          throw new Error('Выберите заказ-наряд в ремонте на СТО');
+        }
+      } else {
+        if (machineType === 'own' && !selectedAssetId) {
+          throw new Error('Выберите автомобиль из нашего автопарка');
+        }
+        if (machineType === 'client') {
+          if (!clientModel.trim()) throw new Error('Укажите модель клиентского автомобиля');
+          if (!clientReg.trim()) throw new Error('Укажите госномер клиентского автомобиля');
+          if (!odometer.trim() || Number(odometer) <= 0) {
+            throw new Error('Для клиентского автомобиля обязательно укажите одометр (пробег)');
+          }
         }
       }
 
@@ -255,34 +284,42 @@ export default function CreateOrderModal({
         throw new Error('Добавьте хотя бы одну работу и укажите время в минутах');
       }
 
+      const payload: any = {
+        mechanic_id: mechanicId,
+        second_mechanic_id: secondMechanicId || undefined,
+        works: finalWorks.map((w) => ({
+          name: w.name,
+          minutes: w.minutes,
+          mechanic_id: w.performer === 'second' ? secondMechanicId : mechanicId,
+          second_mechanic_id: w.performer === 'both' ? secondMechanicId : null,
+        })),
+        parts_provided_by_service: partsProvidedByService,
+        parts: partsProvidedByService
+          ? finalParts.map((p) => ({ name: p.name, quantity: p.quantity, unit: p.unit }))
+          : [],
+        mechanic_note: mechanicNote.trim() || undefined,
+        submit_immediately: submitImmediately,
+      };
+
+      if (orderMode === 'existing') {
+        payload.existing_order_id = selectedExistingOrderId;
+      } else {
+        payload.order_date = startDate;
+        payload.started_at = startDate;
+        payload.completed_at = endDate;
+        payload.machine_type = machineType;
+        payload.asset_id = machineType === 'own' ? selectedAssetId : undefined;
+        payload.client_vehicle_model = machineType === 'client' ? clientModel.trim() : undefined;
+        payload.client_vehicle_brand = machineType === 'client' ? clientModel.trim() : undefined;
+        payload.client_vehicle_reg =
+          machineType === 'client' ? clientReg.trim().toUpperCase() : undefined;
+        payload.odometer = odometer.trim() ? Number(odometer) : null;
+      }
+
       const res = await fetch('/api/mechanic/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mechanic_id: mechanicId,
-          second_mechanic_id: secondMechanicId || undefined,
-          order_date: startDate,
-          started_at: startDate,
-          completed_at: endDate,
-          machine_type: machineType,
-          asset_id: machineType === 'own' ? selectedAssetId : undefined,
-          client_vehicle_model: machineType === 'client' ? clientModel.trim() : undefined,
-          client_vehicle_brand: machineType === 'client' ? clientModel.trim() : undefined,
-          client_vehicle_reg: machineType === 'client' ? clientReg.trim().toUpperCase() : undefined,
-          odometer: odometer.trim() ? Number(odometer) : null,
-          works: finalWorks.map((w) => ({
-            name: w.name,
-            minutes: w.minutes,
-            mechanic_id: w.performer === 'second' ? secondMechanicId : mechanicId,
-            second_mechanic_id: w.performer === 'both' ? secondMechanicId : null,
-          })),
-          parts_provided_by_service: partsProvidedByService,
-          parts: partsProvidedByService
-            ? finalParts.map((p) => ({ name: p.name, quantity: p.quantity, unit: p.unit }))
-            : [],
-          mechanic_note: mechanicNote.trim() || undefined,
-          submit_immediately: submitImmediately,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -293,8 +330,11 @@ export default function CreateOrderModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
+      queryClient.invalidateQueries({ queryKey: ['active-station-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order-detail'] });
       queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
       // Сбрасываем форму
+      setSelectedExistingOrderId('');
       setSecondMechanicId('');
       setWorkPerformerInput('both');
       setWorks([]);
@@ -342,205 +382,311 @@ export default function CreateOrderModal({
 
         {/* Тело формы */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* ШАГ 1 и 2: Дата + Тип автомобиля (Свой / Клиентский) */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-4">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                1. Даты проведения работ (начало и окончание)
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="block text-[10px] font-bold text-slate-400 mb-1">Начат</span>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      if (endDate < e.target.value) setEndDate(e.target.value);
-                    }}
-                    className="w-full h-11 px-3 rounded-xl bg-[#F2F4F7] border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white transition-colors"
-                  />
-                </div>
-                <div>
-                  <span className="block text-[10px] font-bold text-slate-400 mb-1">Закончен</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    min={startDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full h-11 px-3 rounded-xl bg-[#F2F4F7] border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white transition-colors"
-                  />
-                </div>
-              </div>
+          {/* ВЫБОР РЕЖИМА: Добавить в существующий наряд или Открыть новый наряд */}
+          <div className="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-2xs space-y-2.5">
+            <div className="grid grid-cols-2 gap-1.5 bg-[#F2F4F7] p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderMode('existing');
+                  setErrorMsg('');
+                }}
+                className={cn(
+                  'py-2 px-2.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all',
+                  orderMode === 'existing'
+                    ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/40'
+                    : 'text-slate-500 hover:text-slate-800',
+                )}
+              >
+                <span>🔧 В наряд в работе</span>
+                {activeStationOrders.length > 0 && (
+                  <span className="bg-[#E8F7EC] text-[#21A038] text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                    {activeStationOrders.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderMode('new');
+                  setErrorMsg('');
+                }}
+                className={cn(
+                  'py-2 px-2.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all',
+                  orderMode === 'new'
+                    ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/40'
+                    : 'text-slate-500 hover:text-slate-800',
+                )}
+              >
+                <span>➕ Новый автомобиль</span>
+              </button>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  2. Чей автомобиль
+            {orderMode === 'existing' && (
+              <div className="space-y-2">
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  Выберите автомобиль / наряд, который сейчас в ремонте:
                 </label>
-                <span className="text-[11px] font-extrabold text-[#21A038] bg-[#E8F7EC] px-2.5 py-0.5 rounded-full">
-                  Ставка: {activeRate.toLocaleString('ru-RU')} ₽/ч · ЗП {mechanicHourlyShare} ₽/ч
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 bg-[#F2F4F7] p-1.5 rounded-2xl">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMachineType('own');
+                <select
+                  value={selectedExistingOrderId}
+                  onChange={(e) => {
+                    setSelectedExistingOrderId(e.target.value);
                     setErrorMsg('');
                   }}
-                  className={cn(
-                    'py-3 px-3 rounded-xl text-left transition-all',
-                    machineType === 'own'
-                      ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/40'
-                      : 'text-slate-500',
-                  )}
+                  className="w-full h-11 px-3 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold">🚛 Свой автопарк</span>
-                    {machineType === 'own' && (
-                      <span className="w-2 h-2 rounded-full bg-[#21A038]" />
-                    )}
-                  </div>
-                  <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                    {hourlyRateOwn.toLocaleString('ru-RU')} ₽/час
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMachineType('client');
-                    setErrorMsg('');
-                  }}
-                  className={cn(
-                    'py-3 px-3 rounded-xl text-left transition-all',
-                    machineType === 'client'
-                      ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/40'
-                      : 'text-slate-500',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold">🚗 Клиентский</span>
-                    {machineType === 'client' && (
-                      <span className="w-2 h-2 rounded-full bg-[#21A038]" />
-                    )}
-                  </div>
-                  <p className="text-[11px] font-semibold text-[#21A038] mt-0.5">
-                    {hourlyRateClient.toLocaleString('ru-RU')} ₽/час
-                  </p>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* ШАГ 3: Автомобиль и Одометр */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                3. Данные автомобиля
-              </label>
-              {machineType === 'client' && (
-                <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                  Все поля обязательны *
-                </span>
-              )}
-            </div>
-
-            {machineType === 'own' ? (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Машина из автопарка <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={selectedAssetId}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setSelectedAssetId(id);
-                      const found = assets.find((a) => a.id === id);
-                      if (found?.odometer_current && !odometer) {
-                        setOdometer(String(found.odometer_current));
-                      }
-                    }}
-                    className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
-                  >
-                    <option value="">— Выберите машину —</option>
-                    {assets.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.short_name} ({a.reg_number})
+                  <option value="">
+                    -- Выберите автомобиль в боксе СТО ({activeStationOrders.length}) --
+                  </option>
+                  {activeStationOrders.map((o) => {
+                    const carTitle =
+                      o.machine_type === 'own'
+                        ? o.asset?.short_name || o.asset?.reg_number || 'Автопарк'
+                        : `${o.client_vehicle_brand || ''} ${o.client_vehicle_model || ''} ${o.client_vehicle_reg ? `(${o.client_vehicle_reg})` : ''}`.trim();
+                    const desc = o.problem_description ? ` — ${o.problem_description}` : '';
+                    return (
+                      <option key={o.id} value={o.id}>
+                        №{o.order_number}: {carTitle}
+                        {desc.length > 40 ? desc.slice(0, 40) + '…' : desc}
                       </option>
-                    ))}
-                  </select>
-                </div>
+                    );
+                  })}
+                </select>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Одометр (пробег, км){' '}
-                    {hasOilWork ? (
-                      <span className="text-red-500 font-extrabold">* обязательно (ТО/масло)</span>
-                    ) : (
-                      <span className="text-slate-400 font-normal">(при наличии)</span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={odometer}
-                    onChange={(e) => setOdometer(e.target.value)}
-                    placeholder="Например: 185400"
-                    className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Модель автомобиля <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={clientModel}
-                    onChange={(e) => setClientModel(e.target.value)}
-                    placeholder="Например: ГАЗель Next / Лада Веста"
-                    className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Госномер <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={clientReg}
-                      onChange={(e) => setClientReg(e.target.value.toUpperCase())}
-                      placeholder="А123ВС 96"
-                      className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-extrabold uppercase text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
-                    />
+                {selectedExistingOrder && (
+                  <div className="bg-[#E8F7EC]/70 border border-[#21A038]/30 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-extrabold text-[#0E7C5B] truncate">
+                        Наряд #{selectedExistingOrder.order_number} ·{' '}
+                        {selectedExistingOrder.machine_type === 'own'
+                          ? selectedExistingOrder.asset?.short_name || 'Автопарк'
+                          : `${selectedExistingOrder.client_vehicle_brand || ''} ${selectedExistingOrder.client_vehicle_reg || ''}`}
+                      </p>
+                      {selectedExistingOrder.problem_description && (
+                        <p className="text-[11px] text-slate-600 truncate mt-0.5">
+                          {selectedExistingOrder.problem_description}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-black uppercase text-[#21A038] bg-white px-2 py-0.5 rounded-md border border-[#21A038]/30 shrink-0">
+                      {selectedExistingOrder.machine_type === 'own'
+                        ? `Свой · ${hourlyRateOwn} ₽/ч`
+                        : `Клиент · ${hourlyRateClient} ₽/ч`}
+                    </span>
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Одометр, км <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={odometer}
-                      onChange={(e) => setOdometer(e.target.value)}
-                      placeholder="142000"
-                      className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-extrabold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </div>
+
+          {orderMode === 'new' && (
+            <>
+              {/* ШАГ 1 и 2: Дата + Тип автомобиля (Свой / Клиентский) */}
+              <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    1. Даты проведения работ (начало и окончание)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-400 mb-1">Начат</span>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          if (endDate < e.target.value) setEndDate(e.target.value);
+                        }}
+                        className="w-full h-11 px-3 rounded-xl bg-[#F2F4F7] border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-400 mb-1">
+                        Закончен
+                      </span>
+                      <input
+                        type="date"
+                        value={endDate}
+                        min={startDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full h-11 px-3 rounded-xl bg-[#F2F4F7] border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white transition-colors"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      2. Чей автомобиль
+                    </label>
+                    <span className="text-[11px] font-extrabold text-[#21A038] bg-[#E8F7EC] px-2.5 py-0.5 rounded-full">
+                      Ставка: {activeRate.toLocaleString('ru-RU')} ₽/ч · ЗП {mechanicHourlyShare}{' '}
+                      ₽/ч
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-[#F2F4F7] p-1.5 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMachineType('own');
+                        setErrorMsg('');
+                      }}
+                      className={cn(
+                        'py-3 px-3 rounded-xl text-left transition-all',
+                        machineType === 'own'
+                          ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/40'
+                          : 'text-slate-500',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold">🚛 Свой автопарк</span>
+                        {machineType === 'own' && (
+                          <span className="w-2 h-2 rounded-full bg-[#21A038]" />
+                        )}
+                      </div>
+                      <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                        {hourlyRateOwn.toLocaleString('ru-RU')} ₽/час
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMachineType('client');
+                        setErrorMsg('');
+                      }}
+                      className={cn(
+                        'py-3 px-3 rounded-xl text-left transition-all',
+                        machineType === 'client'
+                          ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/40'
+                          : 'text-slate-500',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold">🚗 Клиентский</span>
+                        {machineType === 'client' && (
+                          <span className="w-2 h-2 rounded-full bg-[#21A038]" />
+                        )}
+                      </div>
+                      <p className="text-[11px] font-semibold text-[#21A038] mt-0.5">
+                        {hourlyRateClient.toLocaleString('ru-RU')} ₽/час
+                      </p>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ШАГ 3: Автомобиль и Одометр */}
+              <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    3. Данные автомобиля
+                  </label>
+                  {machineType === 'client' && (
+                    <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                      Все поля обязательны *
+                    </span>
+                  )}
+                </div>
+
+                {machineType === 'own' ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Машина из автопарка <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={selectedAssetId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setSelectedAssetId(id);
+                          const found = assets.find((a) => a.id === id);
+                          if (found?.odometer_current && !odometer) {
+                            setOdometer(String(found.odometer_current));
+                          }
+                        }}
+                        className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
+                      >
+                        <option value="">— Выберите машину —</option>
+                        {assets.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.short_name} ({a.reg_number})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Одометр (пробег, км){' '}
+                        {hasOilWork ? (
+                          <span className="text-red-500 font-extrabold">
+                            * обязательно (ТО/масло)
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">(при наличии)</span>
+                        )}
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={odometer}
+                        onChange={(e) => setOdometer(e.target.value)}
+                        placeholder="Например: 185400"
+                        className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Модель автомобиля <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={clientModel}
+                        onChange={(e) => setClientModel(e.target.value)}
+                        placeholder="Например: ГАЗель Next / Лада Веста"
+                        className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Госномер <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={clientReg}
+                          onChange={(e) => setClientReg(e.target.value.toUpperCase())}
+                          placeholder="А123ВС 96"
+                          className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-extrabold uppercase text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Одометр, км <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={odometer}
+                          onChange={(e) => setOdometer(e.target.value)}
+                          placeholder="142000"
+                          className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-extrabold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* ШАГ 3.5: Соисполнитель (напарник) */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-2.5">
@@ -904,21 +1050,27 @@ export default function CreateOrderModal({
           </div>
 
           <div className="flex gap-2.5">
-            <button
-              type="button"
-              onClick={() => createOrderMutation.mutate(false)}
-              disabled={createOrderMutation.isPending}
-              className="px-4 py-3.5 rounded-2xl border border-slate-200 bg-[#F2F4F7] text-slate-700 font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform disabled:opacity-50"
-            >
-              В работу
-            </button>
+            {orderMode === 'new' && (
+              <button
+                type="button"
+                onClick={() => createOrderMutation.mutate(false)}
+                disabled={createOrderMutation.isPending}
+                className="px-4 py-3.5 rounded-2xl border border-slate-200 bg-[#F2F4F7] text-slate-700 font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform disabled:opacity-50"
+              >
+                В работу
+              </button>
+            )}
             <button
               type="button"
               onClick={() => createOrderMutation.mutate(true)}
               disabled={createOrderMutation.isPending}
               className="flex-1 py-3.5 rounded-2xl bg-[#21A038] hover:bg-[#1b8a2f] text-white font-extrabold text-sm uppercase tracking-wide shadow-md shadow-[#21A038]/20 active:scale-[0.99] transition-all disabled:opacity-50"
             >
-              {createOrderMutation.isPending ? 'Сохранение...' : '✓ Записать и закрыть наряд'}
+              {createOrderMutation.isPending
+                ? 'Сохранение...'
+                : orderMode === 'existing'
+                  ? `✓ Записать работы в наряд #${selectedExistingOrder?.order_number || ''}`
+                  : '✓ Записать и закрыть наряд'}
             </button>
           </div>
         </div>
