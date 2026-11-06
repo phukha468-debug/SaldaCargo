@@ -57,7 +57,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       price_client: priceClient,
       quantity: 1,
       status: markCompleted ? 'completed' : 'pending',
-      mechanic_id: userId,
+      mechanic_id: body.mechanic_id || userId,
+      second_mechanic_id: body.second_mechanic_id || null,
     })
     .select(
       'id, custom_work_name, status, norm_minutes, actual_minutes, price_client, quantity, work_catalog:work_catalog(id, name, norm_minutes)',

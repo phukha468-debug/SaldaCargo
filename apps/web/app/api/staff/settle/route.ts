@@ -49,7 +49,9 @@ export async function GET(request: Request) {
   ] = await Promise.all([
     // Начисленная, но не выплаченная ЗП (отсутствует списание из кошелька)
     (supabase.from('transactions') as any)
-      .select('id, amount, description, created_at, category_id')
+      .select(
+        'id, amount, description, created_at, category_id, trip:trips(trip_number, lifecycle_status)',
+      )
       .eq('direction', 'expense')
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'pending')
@@ -109,7 +111,11 @@ export async function GET(request: Request) {
 
   const uncollectedCash = Math.max(0, Math.round((cashIn - cashSpent - cashCollected) * 100) / 100);
 
-  const salaryTotal = ((pendingPayroll as any[]) ?? []).reduce(
+  const activePending = ((pendingPayroll as any[]) ?? []).filter(
+    (t: any) => t.trip?.lifecycle_status !== 'cancelled',
+  );
+
+  const salaryTotal = activePending.reduce(
     (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
     0,
   );
@@ -274,7 +280,7 @@ export async function POST(request: Request) {
         .select(
           `
           id, amount, description, created_at, category_id, service_order_id, trip_id, direction, lifecycle_status, related_user_id, created_by,
-          trip:trips(trip_number, started_at)
+          trip:trips(trip_number, started_at, lifecycle_status)
         `,
         )
         .eq('direction', 'expense')
@@ -384,7 +390,23 @@ export async function POST(request: Request) {
             ? '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6'
             : 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 
-    if (!pendingPayroll || (pendingPayroll as any[]).length === 0) {
+    const activePendingPayroll = ((pendingPayroll as any[]) ?? []).filter((t: any) => {
+      if (t.trip?.lifecycle_status === 'cancelled') {
+        // Фоново аннулируем зависшую транзакцию отмененного рейса
+        (supabase.from('transactions') as any)
+          .update({
+            lifecycle_status: 'cancelled',
+            cancelled_reason: `Рейс №${t.trip?.trip_number || ''} отменён`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', t.id)
+          .then(() => {});
+        return false;
+      }
+      return true;
+    });
+
+    if (!activePendingPayroll || activePendingPayroll.length === 0) {
       if (partialAmountRaw && parseFloat(partialAmountRaw) > 0) {
         const directAmount = parseFloat(partialAmountRaw);
         const { splits, error: splitErr } = resolveSplits(body, directAmount);
@@ -433,7 +455,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Нет начисленной ЗП к выплате' }, { status: 400 });
     }
 
-    const salaryTotal = (pendingPayroll as any[]).reduce(
+    const salaryTotal = activePendingPayroll.reduce(
       (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
       0,
     );
@@ -457,7 +479,7 @@ export async function POST(request: Request) {
     if (partialAmountRaw !== undefined) {
       const requestedAmount = Math.min(Math.max(0, parseFloat(partialAmountRaw) || 0), salaryTotal);
 
-      const sorted = [...(pendingPayroll as any[])].sort(
+      const sorted = [...activePendingPayroll].sort(
         (a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
       );
 
@@ -489,7 +511,7 @@ export async function POST(request: Request) {
       actualOffset = usedOffset;
       actualPayout = Math.max(0, settledSalary - usedOffset);
     } else {
-      idsToSettle = (pendingPayroll as any[]).map((t: any) => t.id);
+      idsToSettle = activePendingPayroll.map((t: any) => t.id);
       actualOffset = offset;
       actualPayout = payout;
     }
@@ -506,8 +528,7 @@ export async function POST(request: Request) {
     }
 
     // Собираем детализацию по рейсам для описания транзакции выплаты
-    const settledTxns =
-      (pendingPayroll as any[])?.filter((t: any) => idsToSettle.includes(t.id)) ?? [];
+    const settledTxns = activePendingPayroll.filter((t: any) => idsToSettle.includes(t.id)) ?? [];
     if (splitTxn) settledTxns.push(splitTxn);
 
     const tripItems = settledTxns

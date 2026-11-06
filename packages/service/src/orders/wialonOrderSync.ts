@@ -229,7 +229,8 @@ export async function handleVehicleArrival(
   );
 
   if (isTransitAllowed && !params.forceFinish) {
-    const transitCount = (order.salda_transit_count || 0) + 1;
+    const transitCount =
+      ((order.raw_parser_payload?.salda_transit_count ?? order.salda_transit_count) || 0) + 1;
     console.log(
       `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount}. Заявка НЕ закрывается!`,
     );

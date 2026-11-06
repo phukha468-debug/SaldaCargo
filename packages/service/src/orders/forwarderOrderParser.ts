@@ -32,7 +32,12 @@ export interface ParsedForwarderOrder {
   consignee_name?: string;
 
   loading_address?: ParsedAddress;
+  loading_org_name?: string;
+  loading_org_inn?: string;
+
   unloading_address?: ParsedAddress;
+  unloading_contact_fio?: string;
+  unloading_contact_phone?: string;
 
   planned_loading_from?: string;
   planned_loading_to?: string;
@@ -87,28 +92,42 @@ export function parseAddressString(addressStr: string): ParsedAddress {
   }
 
   // Город
-  const cityMatch = addressStr.match(/г\.\s*([^,]+)/i) || addressStr.match(/Город="?([^",]+)"?/i);
+  const cityMatch =
+    addressStr.match(/(?:г\.|город)\s*([^,;\n]+)/i) || addressStr.match(/Город="?([^",]+)"?/i);
   if (cityMatch && cityMatch[1]) {
     result.city = cityMatch[1].trim();
   }
 
-  // Улица
+  // Улица / проспект / переулок
   const streetMatch =
-    addressStr.match(/ул\.\s*([^,]+)/i) || addressStr.match(/Улица="?([^",]+)"?/i);
+    addressStr.match(/((?:ул\.|пр-кт|проспект|переулок|пер\.|проезд|шоссе)\s*[^,;\n]+)/i) ||
+    addressStr.match(/Улица="?([^",]+)"?/i);
   if (streetMatch && streetMatch[1]) {
-    result.street = 'ул. ' + streetMatch[1].trim();
+    result.street = streetMatch[1].trim();
   }
 
   // Дом / Строение
-  const houseMatch = addressStr.match(/(?:д|д\.|дом|строение)\s*(\d+[а-яА-Я0-9\/-]*)/i);
+  const houseMatch = addressStr.match(/(?:д|д\.|дом|строение|стр|стр\.)\s*(\d+[а-яА-Я0-9\/-]*)/i);
   if (houseMatch && houseMatch[1]) {
-    result.house = 'д ' + houseMatch[1].trim();
+    result.house = houseMatch[0].trim();
   }
 
   // Квартира
   const flatMatch = addressStr.match(/(?:кв|кв\.|квартира)\s*(\d+)/i);
   if (flatMatch && flatMatch[1]) {
     result.flat = 'кв ' + flatMatch[1].trim();
+  }
+
+  // Чистый стандартизированный адрес для отображения в 1 строчку
+  const postIdx = addressStr.search(/\b\d{6}\b/);
+  if (postIdx !== -1) {
+    let clean = addressStr.slice(postIdx).replace(/\s+/g, ' ').replace(/\n/g, ', ').trim();
+    clean = clean
+      .replace(/\s*\(\d{2}\)/g, '')
+      .replace(/,\s*город\s+[^,]+/i, '')
+      .replace(/,\s*,/g, ',')
+      .replace(/^,\s*/, '');
+    result.raw = clean;
   }
 
   return result;
@@ -121,17 +140,33 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
   const result: ParsedForwarderOrder = {};
 
   // 1. Номер и дата поручения
-  const orderNumMatch =
-    rawText.match(/(\d{3,6}\/\d{4}-\d+)/) ||
-    rawText.match(/(\d{3,6}\/\d{4})/) ||
-    rawText.match(/№\s*([A-Za-zА-Яа-я0-9\/-]+)/);
-  if (orderNumMatch && orderNumMatch[1]) {
-    result.order_number = orderNumMatch[1].trim();
+  // Формат в ЭДО:
+  // "Электронное поручение экспедитору\n06.11.2026\n793/2026"
+  const docHeaderMatch = rawText.match(
+    /(?:Электронное\s+)?поручение\s+экспедитору\s*\n+(\d{2}\.\d{2}\.\d{4})\s*\n+([^\n\r]+)/i,
+  );
+  if (docHeaderMatch && docHeaderMatch[2] && docHeaderMatch[1]) {
+    result.order_number = docHeaderMatch[2].trim();
+    const parts = docHeaderMatch[1].split('.');
+    if (parts.length === 3) {
+      result.order_date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
   }
 
-  const dateMatch = rawText.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-  if (dateMatch && dateMatch[1] && dateMatch[2] && dateMatch[3]) {
-    result.order_date = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+  if (!result.order_number) {
+    const orderNumMatch =
+      rawText.match(/\b(\d{1,6}\/\d{4}(?:-\d+)?)\b/) ||
+      rawText.match(/(?:№|No|номер)\s*([A-Za-zА-Яа-я0-9\/-]+)/i);
+    if (orderNumMatch && orderNumMatch[1]) {
+      result.order_number = orderNumMatch[1].trim();
+    }
+  }
+
+  if (!result.order_date) {
+    const dateMatch = rawText.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+    if (dateMatch && dateMatch[1] && dateMatch[2] && dateMatch[3]) {
+      result.order_date = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+    }
   }
 
   // Внутренний номер заказа
@@ -145,15 +180,9 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
 
   // 2. Договор основания
   const contractMatch = rawText.match(
-    /Договор\s*(?:транспортной экспедиции)?\s*(?:Договор)?\s*№?\s*([0-9A-Za-z\/-]+)\s*от\s*(\d{2})\.(\d{2})\.(\d{4})/i,
+    /Договор\s*(?:транспортной\s+экспедиции)?\s*(?:Договор)?\s*(?:№|No|N|номер)?\s*([0-9A-Za-z\/-]+)\s*от\s*(\d{2})\.(\d{2})\.(\d{4})/i,
   );
-  if (
-    contractMatch &&
-    contractMatch[1] &&
-    contractMatch[2] &&
-    contractMatch[3] &&
-    contractMatch[4]
-  ) {
+  if (contractMatch && contractMatch[1]) {
     result.contract_number = contractMatch[1].trim();
     result.contract_date = `${contractMatch[4]}-${contractMatch[3]}-${contractMatch[2]}`;
   }
@@ -183,11 +212,23 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
   result.consignee_name = result.client_name;
 
   // 4. Адреса и ГАР
+  // Адрес приема груза (погрузка)
   const loadingAddrMatch = rawText.match(
-    /Адрес приема груза[^:]*:\s*([^]+?)(?:Адрес пункта назначения|Уведомления сторон|$)/i,
+    /Адрес приема груза[^\n]*\n+([\s\S]+?)(?=Адрес пункта назначения|Уведомления сторон|$)/i,
   );
   if (loadingAddrMatch && loadingAddrMatch[1]) {
-    result.loading_address = parseAddressString(loadingAddrMatch[1]);
+    const block = loadingAddrMatch[1].trim();
+    result.loading_address = parseAddressString(block);
+
+    const orgMatch = block.match(/((?:ООО|АО|ПАО|ЗАО|ИП)\s*["«][^"»]+["»])/i);
+    if (orgMatch && orgMatch[1]) {
+      result.loading_org_name = orgMatch[1].trim();
+    }
+    const orgInnMatch =
+      block.match(/ИНН(?:\s*ФЛ)?:\s*(\d{10,12})/i) || block.match(/ИНН\s*(\d{10,12})/i);
+    if (orgInnMatch && orgInnMatch[1]) {
+      result.loading_org_inn = orgInnMatch[1];
+    }
   } else if (rawText.includes('Заречный')) {
     result.loading_address = {
       raw: '624250, Свердловская область, г. Заречный, ул. Промзона БЗСК, д 2',
@@ -200,11 +241,19 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
     };
   }
 
+  // Адрес пункта назначения (выгрузка)
   const unloadingAddrMatch = rawText.match(
-    /Адрес пункта назначения[^:]*:\s*([^]+?)(?:Уведомления сторон|Сведения о транспорте|$)/i,
+    /Адрес пункта назначения[^\n]*\n+([\s\S]+?)(?=Уведомления сторон|Сведения о транспорте|$)/i,
   );
   if (unloadingAddrMatch && unloadingAddrMatch[1]) {
-    result.unloading_address = parseAddressString(unloadingAddrMatch[1]);
+    const block = unloadingAddrMatch[1].trim();
+    result.unloading_address = parseAddressString(block);
+
+    const contactMatch = block.match(/([А-Яа-яЁё]+ [А-Яа-яЁё]+)\s*тел\.?\s*(\+?\d+)/i);
+    if (contactMatch) {
+      result.unloading_contact_fio = contactMatch[1];
+      result.unloading_contact_phone = contactMatch[2];
+    }
   } else if (rawText.includes('Верхняя Салда') || rawText.includes('Парковая')) {
     result.unloading_address = {
       raw: '624760, Свердловская область, г. Верхняя Салда, ул. Парковая, д 1',
@@ -236,13 +285,14 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
 
   // 6. Стоимость перевозки
   const priceMatch =
+    rawText.match(/ставка\s*[:=-]?\s*(\d+)/i) ||
     rawText.match(/Стоимость перевозки без НДС\s*-\s*(\d+)/i) ||
-    rawText.match(/ставка\s*[:=-]?\s*(\d+)/i);
+    rawText.match(/(\d+)\s*(?:руб|рублей)?\s*без\s*НДС/i);
   if (priceMatch && priceMatch[1]) {
     result.price_without_vat = parseInt(priceMatch[1], 10);
   }
 
-  const declValMatch = rawText.match(/Объявленная стоимость[^:]*:\s*(\d[\d\s]*)/i);
+  const declValMatch = rawText.match(/Объявленная\s+стоимость[^:]*:\s*(\d[\d\s]*)/i);
   if (declValMatch && declValMatch[1]) {
     result.declared_value = parseInt(declValMatch[1].replace(/\s/g, ''), 10);
   }
@@ -255,80 +305,146 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
     result.places_count = 1;
   }
 
-  const netWeightMatch = rawText.match(/Вес нетто:\s*(\d+)/i);
+  const netWeightMatch = rawText.match(/Вес нетто:\s*(\d+(?:[.,]\d+)?)/i);
   if (netWeightMatch && netWeightMatch[1]) {
-    result.weight_net_kg = parseFloat(netWeightMatch[1]);
+    result.weight_net_kg = parseFloat(netWeightMatch[1].replace(',', '.'));
   }
+
   const grossWeightMatch =
-    rawText.match(/вес брутто:\s*(\d+)/i) || rawText.match(/МасБрутОтгр="?(\d+)"?/i);
+    rawText.match(/вес брутто:\s*(\d+(?:[.,]\d+)?)/i) ||
+    rawText.match(/МасБрутОтгр="?(\d+(?:[.,]\d+)?)"?/i);
   if (grossWeightMatch && grossWeightMatch[1]) {
-    result.weight_gross_kg = parseFloat(grossWeightMatch[1]);
+    result.weight_gross_kg = parseFloat(grossWeightMatch[1].replace(',', '.'));
   } else if (result.weight_net_kg) {
     result.weight_gross_kg = result.weight_net_kg;
   }
 
-  const cargoNameMatch =
-    rawText.match(/Наименование груза[^\n]*\n+([^\n]+)/i) ||
-    rawText.match(/(?:Пруток|Труба|Металлопрокат|Оборудование|Метизы)[^\n,.]+/i);
-  if (cargoNameMatch) {
-    result.cargo_name = cargoNameMatch[1]?.trim() || cargoNameMatch[0]?.trim();
-  } else {
-    result.cargo_name = 'Металлопрокат';
+  // Наименование груза
+  let cargoName: string | undefined;
+
+  // Способ 1: Строка непосредственно перед фразой "в составе груза отсутствует опасный груз"
+  const beforeDangerMatch = rawText.match(
+    /([^\n\r]+)\s*\n+в составе груза отсутствует опасный груз/i,
+  );
+  if (beforeDangerMatch && beforeDangerMatch[1]) {
+    const candidate = beforeDangerMatch[1].trim();
+    if (
+      candidate &&
+      !candidate.includes('запрещена') &&
+      !candidate.includes('отсутствует') &&
+      !candidate.includes('Россия') &&
+      !candidate.includes('контейнера')
+    ) {
+      cargoName = candidate;
+    }
   }
 
-  if (rawText.includes('палет') || rawText.includes('паллет')) {
-    result.packaging_type = 'палетты';
-  } else if (rawText.includes('Упаковка отсутствует')) {
+  // Способ 2: Сканирование строк таблицы снизу вверх от блока безопасности
+  if (!cargoName) {
+    const lines = rawText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const dangerIdx = lines.findIndex((l) =>
+      l.includes('в составе груза отсутствует опасный груз'),
+    );
+    if (dangerIdx > 0) {
+      for (let i = dangerIdx - 1; i >= Math.max(0, dangerIdx - 5); i--) {
+        const line = lines[i];
+        if (
+          line &&
+          !line.includes('запрещена') &&
+          !line.includes('Перегрузка') &&
+          !line.includes('Россия') &&
+          !line.includes('отсутствует') &&
+          !line.includes('контейнера') &&
+          !line.includes('стоимость') &&
+          !line.includes('Российский') &&
+          !line.includes('нетто') &&
+          !line.includes('брутто')
+        ) {
+          cargoName = line;
+          break;
+        }
+      }
+    }
+  }
+
+  // Способ 3: Поиск после "Наименование груза" если это не заголовок
+  if (!cargoName) {
+    const headerMatch = rawText.match(/Наименование груза\s*[:=-]?\s*([^\n\r]+)/i);
+    if (headerMatch && headerMatch[1]) {
+      const val = headerMatch[1].trim();
+      const isHeaderCol = /Кол-во|Вес|Объем|Маркировка|Упаковка|Код|Страна|Запрет/i.test(val);
+      if (!isHeaderCol && val.length > 1) {
+        cargoName = val;
+      }
+    }
+  }
+
+  // Способ 4: Ключевые слова видов груза
+  if (!cargoName) {
+    const kwMatch = rawText.match(
+      /(?:крепеж|метизы|пруток|труба|металлопрокат|пробы|оборудование|арматура|листы|заготовки|запчасти|материалы|детали|уголок|швеллер)[^\n,.]*/i,
+    );
+    if (kwMatch) {
+      cargoName = kwMatch[0].trim();
+    }
+  }
+
+  result.cargo_name = cargoName || 'крепеж, метизы';
+
+  if (rawText.includes('Упаковка отсутствует') || rawText.includes('отсутствует упаковка')) {
     result.packaging_type = 'без упаковки';
-  } else {
+  } else if (rawText.includes('палет') || rawText.includes('паллет')) {
     result.packaging_type = 'палетты';
+  } else {
+    result.packaging_type = 'без упаковки';
   }
 
   // 8. Подписи
-  const clientSignerMatch = rawText.match(/Клиент[^]+?Сотрудник,\s*([А-Яа-я\s]+)/i);
-  if (clientSignerMatch && clientSignerMatch[1]) {
-    result.client_signer_fio = clientSignerMatch[1].trim();
-  }
-  const forwarderSignerMatch = rawText.match(/Экспедитор[^]+?Сотрудник,\s*([А-Яа-я\s]+)/i);
-  if (forwarderSignerMatch && forwarderSignerMatch[1]) {
-    result.forwarder_signer_fio = forwarderSignerMatch[1].trim();
+  const signBlockMatch = rawText.match(/Подписи сторон[\s\S]+$/i);
+  if (signBlockMatch) {
+    const signBlock = signBlockMatch[0];
+    const clientMatch = signBlock.match(/Клиент[\s\S]+?Сотрудник,\s*([А-Яа-яЁё\s]+?)(?:,|$)/i);
+    if (clientMatch && clientMatch[1]) {
+      result.client_signer_fio = clientMatch[1].trim();
+    }
+    const forwarderMatch = signBlock.match(
+      /Экспедитор[\s\S]+?Сотрудник,\s*([А-Яа-яЁё\s]+?)(?:,|$)/i,
+    );
+    if (forwarderMatch && forwarderMatch[1]) {
+      result.forwarder_signer_fio = forwarderMatch[1].trim();
+    }
+  } else {
+    const clientSignerMatch = rawText.match(/Клиент[^]+?Сотрудник,\s*([А-Яа-я\s]+)/i);
+    if (clientSignerMatch && clientSignerMatch[1]) {
+      result.client_signer_fio = clientSignerMatch[1].trim();
+    }
+    const forwarderSignerMatch = rawText.match(/Экспедитор[^]+?Сотрудник,\s*([А-Яа-я\s]+)/i);
+    if (forwarderSignerMatch && forwarderSignerMatch[1]) {
+      result.forwarder_signer_fio = forwarderSignerMatch[1].trim();
+    }
   }
 
   return result;
 }
 
 /**
- * Парсер PDF буфера (с распаковкой FlateDecode стримов через zlib)
+ * Парсер PDF буфера с извлечением текста через pdf-parse
  */
 export async function parsePdfBuffer(pdfBuffer: Buffer): Promise<ParsedForwarderOrder> {
   try {
-    const zlib = await import('zlib');
-    let combinedText = '';
-
-    const latinStr = pdfBuffer.toString('latin1');
-    const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
-    let match;
-
-    while ((match = streamRegex.exec(latinStr)) !== null) {
-      const newlineIdx = match[0].indexOf('\n');
-      const start = match.index + newlineIdx + 1;
-      const end = match.index + match[0].lastIndexOf('endstream');
-      if (end > start) {
-        const rawStream = pdfBuffer.subarray(start, end);
-        try {
-          const decompressed = zlib.inflateSync(rawStream);
-          combinedText += ' ' + decompressed.toString('utf-8');
-        } catch {
-          // не сжато flate или бинарная графика
-        }
-      }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require('pdf-parse');
+    const data = await pdfParse(pdfBuffer);
+    if (data && data.text && data.text.trim().length > 0) {
+      return parseForwarderOrderText(data.text);
     }
-
-    // Добавляем прямой utf-8 текст (на случай несжатого PDF)
-    combinedText += ' ' + pdfBuffer.toString('utf-8');
-
-    return parseForwarderOrderText(combinedText);
-  } catch {
-    return parseForwarderOrderText(pdfBuffer.toString('utf-8'));
+  } catch (err) {
+    console.warn('pdf-parse error, falling back to raw text extraction:', err);
   }
+
+  // Fallback к поиску открытого текста
+  return parseForwarderOrderText(pdfBuffer.toString('utf-8'));
 }

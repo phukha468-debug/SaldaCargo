@@ -316,6 +316,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       .eq('id', id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const cookieStore = await cookies();
+    const adminId = cookieStore.get('salda_auth_token')?.value ?? null;
+    await syncTripFinancials(supabase, id, adminId);
+
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });

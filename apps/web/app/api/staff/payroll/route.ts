@@ -43,6 +43,10 @@ export async function GET(request: Request) {
       { data: walletsData },
       // Активные зафиксированные переносы подотчёта (holds)
       { data: activeHoldsData },
+      // Рейсы с наличными для расчёта подотчёта на руках
+      { data: tripsData },
+      // Инкассации наличных
+      { data: cashCollectionsData },
     ] = await Promise.all([
       (supabase as any)
         .from('users')
@@ -145,6 +149,17 @@ export async function GET(request: Request) {
         .eq('settlement_status', 'pending')
         .neq('lifecycle_status', 'cancelled')
         .not('related_user_id', 'is', null),
+
+      // Рейсы с наличными для расчёта остатка подотчёта
+      (supabase as any)
+        .from('trips')
+        .select(
+          'driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
+        )
+        .neq('lifecycle_status', 'cancelled'),
+
+      // Инкассации наличных
+      (supabase as any).from('cash_collections').select('driver_id, amount'),
     ]);
 
     const walletMap = new Map<string, { id: string; name: string; type: string }>();
@@ -180,6 +195,45 @@ export async function GET(request: Request) {
     for (const h of (activeHoldsData as any[]) ?? []) {
       const uid = h.related_user_id;
       if (uid) holdsMap.set(uid, (holdsMap.get(uid) ?? 0) + parseFloat(h.amount ?? '0'));
+    }
+
+    const uncollectedMap = new Map<string, number>();
+    const collectionsByUser = new Map<string, number>();
+    for (const c of (cashCollectionsData as any[]) ?? []) {
+      if (c.driver_id) {
+        collectionsByUser.set(
+          c.driver_id,
+          (collectionsByUser.get(c.driver_id) ?? 0) + parseFloat(c.amount ?? '0'),
+        );
+      }
+    }
+    const tripsByDriver = new Map<string, any[]>();
+    for (const t of (tripsData as any[]) ?? []) {
+      if (t.driver_id) {
+        const list = tripsByDriver.get(t.driver_id) ?? [];
+        list.push(t);
+        tripsByDriver.set(t.driver_id, list);
+      }
+    }
+    for (const [driverId, dTrips] of tripsByDriver.entries()) {
+      const cashIn = dTrips
+        .flatMap((t: any) => t.trip_orders ?? [])
+        .filter(
+          (o: any) =>
+            o.payment_method === 'cash' &&
+            o.lifecycle_status !== 'cancelled' &&
+            o.settlement_status === 'completed',
+        )
+        .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+      const cashSpent = dTrips
+        .flatMap((t: any) => t.trip_expenses ?? [])
+        .filter((e: any) => e.payment_method === 'cash')
+        .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
+      const cashCollected = collectionsByUser.get(driverId) ?? 0;
+      const calcCash = Math.max(0, Math.round((cashIn - cashSpent - cashCollected) * 100) / 100);
+      if (calcCash > 0) {
+        uncollectedMap.set(driverId, calcCash);
+      }
     }
 
     const countByUser = (rows: any[] | null) => {
@@ -359,6 +413,20 @@ export async function GET(request: Request) {
       const offsetNow = Math.min(pendingDebt, advanceBalance);
       const payoutNow = Math.max(0, pendingDebt - offsetNow);
 
+      let humanNotes: string | null = u.notes;
+      let passportData: Record<string, any> | null = null;
+      if (u.notes) {
+        try {
+          const parsed = JSON.parse(u.notes);
+          if (typeof parsed === 'object' && parsed !== null) {
+            passportData = parsed;
+            humanNotes = parsed.user_notes || null;
+          }
+        } catch {
+          // not json
+        }
+      }
+
       return {
         id: u.id,
         name: u.name,
@@ -367,7 +435,8 @@ export async function GET(request: Request) {
         max_user_id: u.max_user_id,
         pin_code: u.pin_code ?? null,
         phone: u.phone,
-        notes: u.notes,
+        notes: humanNotes,
+        passport_data: passportData,
         is_officially_employed: Boolean(u.is_officially_employed),
         official_salary_amount: parseFloat(u.official_salary_amount ?? '22500').toFixed(2),
         official_salary_day: parseInt(u.official_salary_day ?? '25', 10),
@@ -386,7 +455,8 @@ export async function GET(request: Request) {
         advance_balance: advanceBalance.toFixed(2), // остаток долга по авансу
         advance_offset: offsetNow.toFixed(2), // сколько зачтётся
         payout: payoutNow.toFixed(2), // сколько реально выплатить деньгами
-        accountable_hold: holdsMap.get(u.id) ?? 0, // зафиксированный подотчёт на руках
+        accountable_hold:
+          (holdsMap.get(u.id) ?? 0) > 0 ? holdsMap.get(u.id)! : (uncollectedMap.get(u.id) ?? 0), // зафиксированный подотчёт или расчётный остаток на руках
         // Статистика
         all_time_paid: paidAlltime.toFixed(2),
         // История выплат и авансов

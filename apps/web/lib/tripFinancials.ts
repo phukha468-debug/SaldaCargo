@@ -29,7 +29,8 @@ export async function syncTripFinancials(
       driver:users!trips_driver_id_fkey(id, name),
       trip_orders(
         id, amount, payment_method, settlement_status, lifecycle_status, description,
-        driver_pay, loader_id, loader_pay, loader2_id, loader2_pay,
+        direction, is_driver_loader, driver_car_pay, driver_loader_pay, driver_pay,
+        loaders_data, loader_id, loader_pay, loader2_id, loader2_pay,
         counterparty:counterparties(name),
         loader:users!trip_orders_loader_id_fkey(id, name),
         loader2:users!trip_orders_loader2_id_fkey(id, name)
@@ -40,6 +41,19 @@ export async function syncTripFinancials(
     .single();
 
   if (fetchErr || !trip) return;
+
+  if (trip.lifecycle_status === 'cancelled') {
+    // Рейс отменён — аннулируем все связанные транзакции рейса
+    await (supabase.from('transactions') as any)
+      .update({
+        lifecycle_status: 'cancelled',
+        cancelled_reason: `Рейс №${trip.trip_number} отменён`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('trip_id', tripId)
+      .neq('lifecycle_status', 'cancelled');
+    return;
+  }
 
   // Only approved trips participate in financial balances, wallets and receivables
   if (trip.lifecycle_status !== 'approved') return;
@@ -228,16 +242,28 @@ export async function syncTripFinancials(
     }
   }
 
-  // 6. Sync Loader Payroll
+  // 6. Sync Loader Payroll (поддержка динамического loaders_data + fallback на loader_id / loader2_id)
   const loaderPayMap = new Map<string, { name: string; pay: number }>();
   for (const o of orders) {
-    if (o.loader_id && parseFloat(o.loader_pay ?? '0') > 0) {
-      const prev = loaderPayMap.get(o.loader_id) ?? { name: o.loader?.name ?? 'Грузчик', pay: 0 };
-      loaderPayMap.set(o.loader_id, { ...prev, pay: prev.pay + parseFloat(o.loader_pay) });
-    }
-    if (o.loader2_id && parseFloat(o.loader2_pay ?? '0') > 0) {
-      const prev = loaderPayMap.get(o.loader2_id) ?? { name: o.loader2?.name ?? 'Грузчик', pay: 0 };
-      loaderPayMap.set(o.loader2_id, { ...prev, pay: prev.pay + parseFloat(o.loader2_pay) });
+    if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+      for (const item of o.loaders_data) {
+        if (item?.id && parseFloat(item.pay ?? '0') > 0) {
+          const prev = loaderPayMap.get(item.id) ?? { name: item.name ?? 'Грузчик', pay: 0 };
+          loaderPayMap.set(item.id, { ...prev, pay: prev.pay + parseFloat(item.pay) });
+        }
+      }
+    } else {
+      if (o.loader_id && parseFloat(o.loader_pay ?? '0') > 0) {
+        const prev = loaderPayMap.get(o.loader_id) ?? { name: o.loader?.name ?? 'Грузчик', pay: 0 };
+        loaderPayMap.set(o.loader_id, { ...prev, pay: prev.pay + parseFloat(o.loader_pay) });
+      }
+      if (o.loader2_id && parseFloat(o.loader2_pay ?? '0') > 0) {
+        const prev = loaderPayMap.get(o.loader2_id) ?? {
+          name: o.loader2?.name ?? 'Грузчик',
+          pay: 0,
+        };
+        loaderPayMap.set(o.loader2_id, { ...prev, pay: prev.pay + parseFloat(o.loader2_pay) });
+      }
     }
   }
 

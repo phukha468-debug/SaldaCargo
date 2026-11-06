@@ -180,22 +180,41 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
 
   // 1. НАЧИСЛЕНО (Заработок за рейсы / заказ-наряды)
   // В недельном режиме:
-  // Если у сотрудника есть невыплаченные смены (pending), именно они составляют текущий расчётный лист к выплате в пятницу!
-  // Прошлая выплата за пятницу (которая закрывала прошлую неделю) не должна смешиваться с новыми сменами.
+  // Если у сотрудника есть невыплаченные смены (userDebt > 0), именно они составляют текущий расчётный лист к выплате!
+  // Период считается от даты прошлой выплаты (или начала расчетного цикла) до сегодняшнего дня.
+  // Предыдущие завершенные выплаты (включая субботние/пятничные выплаты старой недели) ни в коем случае не вычитаются из новых смен!
   let accruals: PayrollHistoryItem[] = [];
   let debtRepayments: PayrollHistoryItem[] = [];
   let salaryPayouts: PayrollHistoryItem[] = [];
 
-  // Хелпер: выплата или зачёт в прошлую пятницу (день закрытия старой недели)
-  const isOldFridayAction = (rawDate: string | null | undefined) => {
-    if (!rawDate) return false;
-    const d = new Date(rawDate);
-    return (
-      d.getFullYear() === weekCycle.start.getFullYear() &&
-      d.getMonth() === weekCycle.start.getMonth() &&
-      d.getDate() === weekCycle.start.getDate()
+  // Поиск завершенных выплат ЗП, отсортированных от свежих к старым
+  const completedPayouts = allHistory
+    .filter((t) => isSalaryPayout(t) && t.settlement_status === 'completed')
+    .sort(
+      (a, b) =>
+        new Date(b.transaction_date || b.created_at).getTime() -
+        new Date(a.transaction_date || a.created_at).getTime(),
     );
-  };
+
+  let cycleStartDate: Date;
+  let cycleEndDate: Date;
+
+  if (userDebt > 0) {
+    // Есть открытый долг к выплате — считаем с момента предыдущей выплаты по текущий момент (сегодня)
+    cycleEndDate = now;
+    const p0 = completedPayouts[0];
+    if (p0) {
+      cycleStartDate = new Date(p0.transaction_date || p0.created_at);
+    } else {
+      cycleStartDate = weekCycle.start;
+    }
+  } else {
+    // Долг закрыт — лист показывает уже закрытый цикл: с предпоследней выплаты по последнюю
+    const p0 = completedPayouts[0];
+    const p1 = completedPayouts[1];
+    cycleEndDate = p0 ? new Date(p0.transaction_date || p0.created_at) : now;
+    cycleStartDate = p1 ? new Date(p1.transaction_date || p1.created_at) : weekCycle.start;
+  }
 
   if (periodMode === 'valday') {
     // 🚛 ВАЛДАЙ: По факту / все невыплаченные рейсы без отсечения четвергом
@@ -204,14 +223,11 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
       if (accruals.length === 0) {
         accruals = allHistory.filter(
           (t) =>
-            isSalaryAccrual(t) && new Date(t.transaction_date || t.created_at) >= weekCycle.start,
+            isSalaryAccrual(t) && new Date(t.transaction_date || t.created_at) >= cycleStartDate,
         );
       }
       debtRepayments = allHistory.filter(
-        (t) =>
-          isDebtRepayment(t) &&
-          !isOldFridayAction(t.transaction_date || t.created_at) &&
-          new Date(t.transaction_date || t.created_at) > weekCycle.start,
+        (t) => isDebtRepayment(t) && new Date(t.transaction_date || t.created_at) > cycleStartDate,
       );
       if (debtRepayments.length === 0 && userAdvanceOffset > 0) {
         debtRepayments = [
@@ -232,26 +248,27 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         (t) =>
           isSalaryPayout(t) &&
           t.settlement_status === 'completed' &&
-          !isOldFridayAction(t.transaction_date || t.created_at) &&
-          new Date(t.transaction_date || t.created_at) > weekCycle.start,
+          new Date(t.transaction_date || t.created_at) > cycleStartDate,
       );
     } else {
       accruals = allHistory.filter(
         (t) =>
-          isSalaryAccrual(t) && new Date(t.transaction_date || t.created_at) >= weekCycle.start,
+          isSalaryAccrual(t) &&
+          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
+          new Date(t.transaction_date || t.created_at) <= cycleEndDate,
       );
       debtRepayments = allHistory.filter(
         (t) =>
           isDebtRepayment(t) &&
-          !isOldFridayAction(t.transaction_date || t.created_at) &&
-          new Date(t.transaction_date || t.created_at) >= weekCycle.start,
+          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
+          new Date(t.transaction_date || t.created_at) <= cycleEndDate,
       );
       salaryPayouts = allHistory.filter(
         (t) =>
           isSalaryPayout(t) &&
           t.settlement_status === 'completed' &&
-          !isOldFridayAction(t.transaction_date || t.created_at) &&
-          new Date(t.transaction_date || t.created_at) >= weekCycle.start,
+          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
+          new Date(t.transaction_date || t.created_at) <= cycleEndDate,
       );
     }
   } else if (periodMode === 'gazelle') {
@@ -272,8 +289,7 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
       debtRepayments = allHistory.filter(
         (t) =>
           isDebtRepayment(t) &&
-          !isOldFridayAction(t.transaction_date || t.created_at) &&
-          new Date(t.transaction_date || t.created_at) > weekCycle.start &&
+          new Date(t.transaction_date || t.created_at) > cycleStartDate &&
           new Date(t.transaction_date || t.created_at) <= weekCycle.end,
       );
       if (debtRepayments.length === 0 && userAdvanceOffset > 0) {
@@ -295,31 +311,28 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         (t) =>
           isSalaryPayout(t) &&
           t.settlement_status === 'completed' &&
-          !isOldFridayAction(t.transaction_date || t.created_at) &&
-          new Date(t.transaction_date || t.created_at) > weekCycle.start &&
-          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
+          new Date(t.transaction_date || t.created_at) > cycleStartDate &&
+          new Date(t.transaction_date || t.created_at) <= now,
       );
     } else {
       accruals = allHistory.filter(
         (t) =>
           isSalaryAccrual(t) &&
-          new Date(t.transaction_date || t.created_at) >= weekCycle.start &&
+          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
           new Date(t.transaction_date || t.created_at) <= weekCycle.end,
       );
       debtRepayments = allHistory.filter(
         (t) =>
           isDebtRepayment(t) &&
-          !isOldFridayAction(t.transaction_date || t.created_at) &&
-          new Date(t.transaction_date || t.created_at) >= weekCycle.start &&
+          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
           new Date(t.transaction_date || t.created_at) <= weekCycle.end,
       );
       salaryPayouts = allHistory.filter(
         (t) =>
           isSalaryPayout(t) &&
           t.settlement_status === 'completed' &&
-          !isOldFridayAction(t.transaction_date || t.created_at) &&
-          new Date(t.transaction_date || t.created_at) >= weekCycle.start &&
-          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
+          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
+          new Date(t.transaction_date || t.created_at) <= now,
       );
     }
   } else if (periodMode === 'custom') {
@@ -384,18 +397,9 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         ? sumSalaryPayouts
         : Math.max(0, sumAccruals - sumDebtRepayments);
 
-  const actualStart =
-    accruals.length > 0
-      ? new Date(
-          Math.min(...accruals.map((a) => new Date(a.transaction_date || a.created_at).getTime())),
-        ).toLocaleDateString('ru-RU')
-      : weekCycle.start.toLocaleDateString('ru-RU');
-  const actualEnd =
-    accruals.length > 0
-      ? new Date(
-          Math.max(...accruals.map((a) => new Date(a.transaction_date || a.created_at).getTime())),
-        ).toLocaleDateString('ru-RU')
-      : weekCycle.end.toLocaleDateString('ru-RU');
+  // Период недели считается честно: от даты прошлой выплаты (или начала цикла) до сегодняшнего дня
+  const actualStart = cycleStartDate.toLocaleDateString('ru-RU');
+  const actualEnd = cycleEndDate.toLocaleDateString('ru-RU');
   const dynamicCycleLabel = `${actualStart} — ${actualEnd}`;
 
   const customLabel = `${new Date(customStart + 'T00:00:00').toLocaleDateString('ru-RU')} — ${new Date(customEnd + 'T23:59:59').toLocaleDateString('ru-RU')}`;
@@ -726,6 +730,18 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
               <span className="font-mono text-slate-950">{user.phone || '—'}</span>
             </div>
           </div>
+
+          {Boolean(user.accountable_hold && user.accountable_hold > 0) && (
+            <div className="bg-amber-50 print:bg-white p-1.5 rounded-lg border border-amber-300 print:border-slate-800 flex items-center justify-between text-[9.5px]">
+              <span className="text-amber-950 print:text-slate-900 font-black flex items-center gap-1.5">
+                <span>💵</span>
+                <span>Подотчётные средства на руках (подлежат сдаче в кассу компании):</span>
+              </span>
+              <span className="font-mono font-black text-amber-950 print:text-slate-950 px-2 py-0.5 border border-amber-400 print:border-slate-800 rounded bg-white">
+                {user.accountable_hold!.toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
+          )}
 
           {/* ═════════════════════════════════════════════════════════════════════
               1. НАЧИСЛЕНО ЗА ПЕРИОД (БЕЛЫЙ ФОН, РАМКА/ЧЕРНЫЙ ТЕКСТ)

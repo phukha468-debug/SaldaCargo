@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -35,6 +36,7 @@ export type PayrollUser = {
   current_asset_id?: string | null;
   phone: string | null;
   notes: string | null;
+  passport_data?: Record<string, any> | null;
   is_officially_employed?: boolean;
   official_salary_amount?: string;
   official_salary_day?: number;
@@ -91,6 +93,7 @@ type StaffUser = {
   auto_settle: boolean;
   is_active: boolean;
   notes: string | null;
+  passport_data?: Record<string, any> | null;
   is_officially_employed?: boolean;
   official_salary_amount?: string;
   official_salary_day?: number;
@@ -185,6 +188,33 @@ const emptyForm = {
   court_order_notes: '',
 };
 
+export function parseUserNotesAndPassport(
+  user?: { notes?: string | null; passport_data?: Record<string, any> | null } | null,
+) {
+  let noteText: string | null = null;
+  let passport: Record<string, any> | null = user?.passport_data ?? null;
+
+  const raw = user?.notes;
+  if (raw) {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === 'object' && parsed !== null) {
+          if (!passport) passport = parsed;
+          noteText = parsed.user_notes || null;
+        }
+      } catch {
+        noteText = trimmed;
+      }
+    } else {
+      noteText = trimmed;
+    }
+  }
+
+  return { noteText, passport };
+}
+
 // ─── StaffModal ───────────────────────────────────────────────────────────────
 
 function StaffModal({
@@ -208,7 +238,7 @@ function StaffModal({
           roles: editUser.roles,
           current_asset_id: editUser.current_asset_id ?? '',
           auto_settle: editUser.auto_settle,
-          notes: editUser.notes ?? '',
+          notes: parseUserNotesAndPassport(editUser).noteText ?? '',
           is_officially_employed: editUser.is_officially_employed ?? false,
           official_salary_amount: editUser.official_salary_amount ?? '22500',
           official_salary_day: editUser.official_salary_day ?? 10,
@@ -830,6 +860,19 @@ function SettleModal({
           /* Обычная форма выплаты */
           <>
             <div className="p-6 space-y-3">
+              {/* Предупреждение о подотчёте на руках */}
+              {user.accountable_hold && user.accountable_hold > 0 && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-xs flex items-center justify-between text-amber-900 font-medium">
+                  <span className="flex items-center gap-1.5">
+                    <span>💵</span>
+                    <span>Подотчёт на руках:</span>
+                  </span>
+                  <span className="font-black text-amber-950">
+                    {user.accountable_hold.toLocaleString('ru-RU')} ₽ (долг в кассу)
+                  </span>
+                </div>
+              )}
+
               {/* Сумма к выплате */}
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1.5">
@@ -3750,6 +3793,158 @@ function PayrollHistoryModal({
   );
 }
 
+// ─── DriverPassportModal ───────────────────────────────────────────────────────
+
+function DriverPassportModal({
+  user,
+  passport,
+  onClose,
+}: {
+  user: PayrollUser;
+  passport: Record<string, any>;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const series = passport.passport_series || '';
+  const num = passport.passport_number || '';
+  const fullName = passport.full_name || user.name;
+  const issuedBy = passport.passport_issued_by || '';
+  const issueDate = passport.passport_issue_date || '';
+  const depCode = passport.passport_department_code || '';
+  const regAddress = passport.registration_address || '';
+  const birthDate = passport.birth_date || '';
+  const birthPlace = passport.birth_place || '';
+  const licenseUntil = passport.license_valid_until || '';
+  const experienceFrom = passport.experience_from || '';
+
+  const copyAll = () => {
+    const text = [
+      `ФИО: ${fullName}`,
+      birthDate ? `Дата рождения: ${birthDate} ${birthPlace ? `(${birthPlace})` : ''}` : '',
+      series && num ? `Паспорт РФ: серия ${series} № ${num}` : '',
+      issuedBy ? `Кем выдан: ${issuedBy}` : '',
+      issueDate ? `Дата выдачи: ${issueDate} (код: ${depCode})` : '',
+      regAddress ? `Адрес регистрации: ${regAddress}` : '',
+      licenseUntil ? `ВУ действительно до: ${licenseUntil}` : '',
+      experienceFrom ? `Стаж с: ${experienceFrom} г.` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🪪</span>
+            <h3 className="font-bold text-sm text-white">Паспорт и документы водителя</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white transition-colors text-lg leading-none cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 space-y-3 text-xs">
+          <div>
+            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+              Сотрудник
+            </p>
+            <p className="text-sm font-bold text-slate-900">{fullName}</p>
+          </div>
+
+          {(birthDate || birthPlace) && (
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 font-medium">Дата и место рождения:</span>{' '}
+                <span className="font-semibold text-slate-800">
+                  {birthDate} {birthPlace && `· ${birthPlace}`}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {(series || num) && (
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">Паспорт РФ:</span>
+                <span className="font-mono font-bold text-slate-900 text-xs">
+                  серия {series} № {num}
+                </span>
+              </div>
+              {issuedBy && (
+                <div className="text-[11px] text-slate-600">
+                  <span className="text-slate-400">Выдан:</span> {issuedBy}
+                </div>
+              )}
+              {(issueDate || depCode) && (
+                <div className="text-[11px] text-slate-500 flex items-center gap-3">
+                  {issueDate && <span>Дата: {issueDate}</span>}
+                  {depCode && <span>Код подразделения: {depCode}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {regAddress && (
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <p className="text-slate-400 text-[10px] uppercase font-bold mb-0.5">
+                Адрес регистрации
+              </p>
+              <p className="text-slate-800 font-medium leading-relaxed">{regAddress}</p>
+            </div>
+          )}
+
+          {(licenseUntil || experienceFrom) && (
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 font-medium">Водительское удостоверение:</span>{' '}
+                <span className="font-semibold text-slate-800">
+                  {licenseUntil ? `до ${licenseUntil}` : ''}
+                  {experienceFrom ? ` (стаж с ${experienceFrom} г.)` : ''}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+          <button
+            onClick={copyAll}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>📋</span>
+            <span>{copied ? 'Скопировано!' : 'Скопировать данные'}</span>
+          </button>
+          <button
+            onClick={onClose}
+            className="text-xs font-semibold px-4 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 transition-colors cursor-pointer"
+          >
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── PayrollRow ───────────────────────────────────────────────────────────────
 
 function PayrollRow({
@@ -3778,6 +3973,8 @@ function PayrollRow({
   const [expanded, setExpanded] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
   const deactivateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showPassportModal, setShowPassportModal] = useState(false);
+  const { noteText, passport } = parseUserNotesAndPassport(user);
 
   const debt = parseFloat(user.debt);
   const earned = parseFloat(user.earned);
@@ -4078,7 +4275,29 @@ function PayrollRow({
           {user.phone && (
             <span className="text-xs text-slate-500 font-mono">📞 {formatPhone(user.phone)}</span>
           )}
-          {user.notes && <span className="text-xs text-slate-400 italic">{user.notes}</span>}
+          {noteText && (
+            <span className="text-xs text-slate-500 italic max-w-xs truncate" title={noteText}>
+              {noteText}
+            </span>
+          )}
+          {passport && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPassportModal(true);
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition-colors cursor-pointer shrink-0"
+              title="Посмотреть паспорт и водительские данные"
+            >
+              <span>🪪</span>
+              <span>
+                {passport.passport_series && passport.passport_number
+                  ? `Паспорт ${passport.passport_series} ${passport.passport_number}`
+                  : 'Документы'}
+              </span>
+            </button>
+          )}
 
           <div className="ml-auto flex items-center gap-2">
             {onOpenShifts && (
@@ -4142,6 +4361,14 @@ function PayrollRow({
             </button>
           </div>
         </div>
+      )}
+
+      {showPassportModal && passport && (
+        <DriverPassportModal
+          user={user}
+          passport={passport}
+          onClose={() => setShowPassportModal(false)}
+        />
       )}
     </div>
   );
@@ -4794,8 +5021,14 @@ const GROUP_CONFIG: Record<
       'bg-white border border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700',
     countActive: 'bg-white/25 text-white',
     countInactive: 'bg-amber-100 text-amber-900 font-black',
-    getUsers: (p) => p.drivers.filter((d) => (d.accountable_hold ?? 0) > 0),
-    getCount: (p) => p.drivers.filter((d) => (d.accountable_hold ?? 0) > 0).length,
+    getUsers: (p) =>
+      [...(p.drivers || []), ...(p.loaders || []), ...(p.mechanics || [])]
+        .filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i)
+        .filter((d) => (d.accountable_hold ?? 0) > 0),
+    getCount: (p) =>
+      [...(p.drivers || []), ...(p.loaders || []), ...(p.mechanics || [])]
+        .filter((u, i, arr) => arr.findIndex((x) => x.id === u.id) === i)
+        .filter((d) => (d.accountable_hold ?? 0) > 0).length,
   },
 };
 

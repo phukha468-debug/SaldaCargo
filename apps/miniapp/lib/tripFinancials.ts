@@ -42,6 +42,19 @@ export async function syncTripFinancials(
 
   if (fetchErr || !trip) return;
 
+  if (trip.lifecycle_status === 'cancelled') {
+    // Рейс отменён — аннулируем все связанные транзакции рейса
+    await (supabase.from('transactions') as any)
+      .update({
+        lifecycle_status: 'cancelled',
+        cancelled_reason: `Рейс №${trip.trip_number} отменён`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('trip_id', tripId)
+      .neq('lifecycle_status', 'cancelled');
+    return;
+  }
+
   // Only approved trips participate in financial balances, wallets and receivables
   if (trip.lifecycle_status !== 'approved') return;
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import Link from 'next/link';
@@ -2790,7 +2791,23 @@ function GarageOrderEditModal({
 }) {
   const isOwn = order.machine_type === 'own';
   const hourlyRate = isOwn ? 1600 : 2000;
-  const salaryPct = Number(order.mechanic?.mechanic_salary_pct || 50);
+
+  const { data: mechanicsList = [] } = useQuery<
+    Array<{ id: string; name: string; roles?: string[]; mechanic_salary_pct?: number | string }>
+  >({
+    queryKey: ['mechanics-staff-list'],
+    queryFn: async () => {
+      const res = await fetch('/api/users?role=mechanic');
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const defaultPrimaryId = (order as any).assigned_mechanic_id || order.mechanic?.id || '';
+  const defaultSecondId = (order as any).second_mechanic_id || order.second_mechanic?.id || '';
+
+  const [assignedMechanicId, setAssignedMechanicId] = useState<string>(defaultPrimaryId);
+  const [secondMechanicId, setSecondMechanicId] = useState<string>(defaultSecondId);
 
   const defaultStartDate = order.started_at
     ? order.started_at.slice(0, 10)
@@ -2809,17 +2826,47 @@ function GarageOrderEditModal({
     order.client_vehicle_model || order.client_vehicle_brand || '',
   );
   const [clientReg, setClientReg] = useState<string>(order.client_vehicle_reg || '');
-  const [works, setWorks] = useState<Array<{ name: string; minutes: string; notes?: string }>>(
-    () => {
-      const active = (order.works ?? []).filter((w) => w.status !== 'cancelled');
-      if (active.length === 0) return [{ name: order.problem_description || '', minutes: '60' }];
-      return active.map((w) => ({
+
+  const [works, setWorks] = useState<
+    Array<{
+      name: string;
+      minutes: string;
+      notes?: string;
+      performer: 'both' | 'primary' | 'second';
+      mechanic_id?: string | null;
+      second_mechanic_id?: string | null;
+    }>
+  >(() => {
+    const active = (order.works ?? []).filter((w) => w.status !== 'cancelled');
+    if (active.length === 0) {
+      return [
+        {
+          name: order.problem_description || '',
+          minutes: '60',
+          performer: defaultSecondId ? 'both' : 'primary',
+          mechanic_id: defaultPrimaryId || null,
+          second_mechanic_id: defaultSecondId || null,
+        },
+      ];
+    }
+    return active.map((w) => {
+      let performer: 'both' | 'primary' | 'second' = 'primary';
+      if (w.second_mechanic_id) {
+        performer = 'both';
+      } else if (defaultSecondId && w.mechanic_id === defaultSecondId) {
+        performer = 'second';
+      }
+      return {
         name: w.custom_work_name || w.work_catalog?.name || w.work_description || '',
         minutes: String(w.actual_minutes || w.norm_minutes || 30),
         notes: w.notes || undefined,
-      }));
-    },
-  );
+        performer,
+        mechanic_id: w.mechanic_id || defaultPrimaryId || null,
+        second_mechanic_id: w.second_mechanic_id || null,
+      };
+    });
+  });
+
   const [parts, setParts] = useState<
     Array<{
       name: string;
@@ -2846,21 +2893,60 @@ function GarageOrderEditModal({
       };
     }),
   );
+
   const [manualPay, setManualPay] = useState<string>(order.mechanic_pay || '');
+  const [manualSecondPay, setManualSecondPay] = useState<string>(order.second_mechanic_pay || '');
   const [adminNote, setAdminNote] = useState<string>(order.admin_note || '');
   const [saving, setSaving] = useState(false);
 
-  const totalMinutes = works.reduce((s, w) => s + (parseInt(w.minutes, 10) || 0), 0);
-  const autoPay = works
-    .reduce((s, w) => {
-      const mins = parseInt(w.minutes, 10) || 0;
-      const customPctMatch = w.notes
-        ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
-        : null;
-      const wPct = customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
-      return s + (mins / 60) * hourlyRate * (wPct / 100);
-    }, 0)
-    .toFixed(2);
+  const primaryMech = mechanicsList.find((m) => m.id === assignedMechanicId) || order.mechanic;
+  const secondMech = mechanicsList.find((m) => m.id === secondMechanicId) || order.second_mechanic;
+
+  const primaryMechName = primaryMech?.name ?? 'Основной механик';
+  const secondMechName = secondMech?.name ?? 'Второй механик';
+
+  const pct1 = Number(primaryMech?.mechanic_salary_pct || 50);
+  const pct2 = Number(secondMech?.mechanic_salary_pct || 50);
+
+  const calcWorkPayShares = (w: (typeof works)[0]) => {
+    const mins = parseInt(w.minutes, 10) || 0;
+    const clientPrice = (mins / 60) * hourlyRate;
+    const customPctMatch = w.notes ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/) : null;
+    const workPct1 = customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : pct1;
+    const workPct2 = customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : pct2;
+
+    if (!secondMechanicId) {
+      return {
+        price: clientPrice,
+        pay1: (clientPrice * workPct1) / 100,
+        pay2: 0,
+      };
+    }
+
+    if (w.performer === 'both') {
+      const half = clientPrice / 2;
+      return {
+        price: clientPrice,
+        pay1: (half * workPct1) / 100,
+        pay2: (half * workPct2) / 100,
+      };
+    }
+    if (w.performer === 'second') {
+      return {
+        price: clientPrice,
+        pay1: 0,
+        pay2: (clientPrice * workPct2) / 100,
+      };
+    }
+    return {
+      price: clientPrice,
+      pay1: (clientPrice * workPct1) / 100,
+      pay2: 0,
+    };
+  };
+
+  const autoPay1 = works.reduce((s, w) => s + calcWorkPayShares(w).pay1, 0);
+  const autoPay2 = works.reduce((s, w) => s + calcWorkPayShares(w).pay2, 0);
 
   const totalPartsCost = parts.reduce((s, p) => {
     const qty = parseFloat(p.quantity) || 1;
@@ -2884,6 +2970,8 @@ function GarageOrderEditModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'edit_order',
+          assigned_mechanic_id: assignedMechanicId || null,
+          second_mechanic_id: secondMechanicId || null,
           started_at: startDate,
           completed_at: endDate,
           odometer_start: odometer ? Number(odometer) : null,
@@ -2894,6 +2982,8 @@ function GarageOrderEditModal({
             name: w.name,
             minutes: parseInt(w.minutes, 10) || 0,
             notes: w.notes,
+            mechanic_id: w.performer === 'second' ? secondMechanicId : assignedMechanicId || null,
+            second_mechanic_id: w.performer === 'both' ? secondMechanicId || null : null,
           })),
           parts: parts.map((p) => {
             const uPrice = parseFloat(p.unit_price) || 0;
@@ -2909,7 +2999,12 @@ function GarageOrderEditModal({
               client_price: cPrice,
             };
           }),
-          mechanic_pay: manualPay ? parseFloat(manualPay) : parseFloat(autoPay),
+          mechanic_pay: manualPay ? parseFloat(manualPay) : autoPay1,
+          second_mechanic_pay: secondMechanicId
+            ? manualSecondPay
+              ? parseFloat(manualSecondPay)
+              : autoPay2
+            : null,
           admin_note: adminNote,
         }),
       });
@@ -2931,8 +3026,9 @@ function GarageOrderEditModal({
               Редактировать заказ-наряд №{order.order_number}
             </h3>
             <p className="text-xs text-slate-500 font-bold">
-              {isOwn ? '🏢 Свой автопарк (1 600 ₽/ч)' : '🚗 Клиентский авто (2 000 ₽/ч)'} · Механик:{' '}
-              {order.mechanic?.name ?? '—'}
+              {isOwn ? '🏢 Свой автопарк (1 600 ₽/ч)' : '🚗 Клиентский авто (2 000 ₽/ч)'} ·{' '}
+              {primaryMechName}
+              {secondMechanicId ? ` + ${secondMechName}` : ''}
             </p>
           </div>
           <button
@@ -2941,6 +3037,46 @@ function GarageOrderEditModal({
           >
             ✕
           </button>
+        </div>
+
+        {/* Выбор исполнителей наряда (Основной + Второй механик) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div>
+            <label className="text-xs font-bold uppercase text-slate-500 block mb-1">
+              👨‍🔧 Основной механик
+            </label>
+            <select
+              value={assignedMechanicId}
+              onChange={(e) => setAssignedMechanicId(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800"
+            >
+              <option value="">— Не назначен —</option>
+              {mechanicsList.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.mechanic_salary_pct || 50}%)
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase text-slate-500 block mb-1">
+              👥 Второй механик (напарник)
+            </label>
+            <select
+              value={secondMechanicId}
+              onChange={(e) => setSecondMechanicId(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-800"
+            >
+              <option value="">— Нет (один механик) —</option>
+              {mechanicsList
+                .filter((m) => m.id !== assignedMechanicId)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.mechanic_salary_pct || 50}%)
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
 
         {!isOwn && (
@@ -3012,7 +3148,7 @@ function GarageOrderEditModal({
           </div>
         </div>
 
-        {/* Работы */}
+        {/* Работы (строго компактный Dense 1-Line Layout) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-slate-400">
@@ -3020,55 +3156,101 @@ function GarageOrderEditModal({
             </span>
             <button
               type="button"
-              onClick={() => setWorks((prev) => [...prev, { name: '', minutes: '30' }])}
+              onClick={() =>
+                setWorks((prev) => [
+                  ...prev,
+                  {
+                    name: '',
+                    minutes: '30',
+                    performer: secondMechanicId ? 'both' : 'primary',
+                    mechanic_id: assignedMechanicId || null,
+                    second_mechanic_id: secondMechanicId || null,
+                  },
+                ])
+              }
               className="text-xs font-black text-emerald-600 hover:text-emerald-700 cursor-pointer"
             >
               + Добавить работу
             </button>
           </div>
-          {works.map((w, idx) => (
-            <div
-              key={idx}
-              className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-2.5"
-            >
-              <span className="text-xs font-black text-slate-400">{idx + 1}.</span>
-              <input
-                type="text"
-                value={w.name}
-                onChange={(e) =>
-                  setWorks((prev) =>
-                    prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item)),
-                  )
-                }
-                placeholder="Наименование работы"
-                className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold"
-              />
-              <div className="flex items-center gap-1.5">
+          {works.map((w, idx) => {
+            const shares = calcWorkPayShares(w);
+            return (
+              <div
+                key={idx}
+                className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center gap-2"
+              >
+                <span className="text-xs font-black text-slate-400 shrink-0">{idx + 1}.</span>
                 <input
-                  type="number"
-                  value={w.minutes}
+                  type="text"
+                  value={w.name}
                   onChange={(e) =>
                     setWorks((prev) =>
-                      prev.map((item, i) =>
-                        i === idx ? { ...item, minutes: e.target.value } : item,
-                      ),
+                      prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item)),
                     )
                   }
-                  className="w-20 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm font-black text-center"
+                  placeholder="Наименование работы"
+                  className="flex-1 min-w-[140px] bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
                 />
-                <span className="text-xs text-slate-500 font-bold">мин</span>
-              </div>
-              {works.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setWorks((prev) => prev.filter((_, i) => i !== idx))}
-                  className="text-rose-500 hover:text-rose-700 text-sm font-black px-1.5 cursor-pointer"
+                {secondMechanicId && (
+                  <select
+                    value={w.performer}
+                    onChange={(e) =>
+                      setWorks((prev) =>
+                        prev.map((item, i) =>
+                          i === idx
+                            ? {
+                                ...item,
+                                performer: e.target.value as 'both' | 'primary' | 'second',
+                              }
+                            : item,
+                        ),
+                      )
+                    }
+                    className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-700 shrink-0"
+                  >
+                    <option value="both">👥 Вдвоём 50/50</option>
+                    <option value="primary">👤 {primaryMechName.split(' ')[0]}</option>
+                    <option value="second">👤 {secondMechName.split(' ')[0]}</option>
+                  </select>
+                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  <input
+                    type="number"
+                    value={w.minutes}
+                    onChange={(e) =>
+                      setWorks((prev) =>
+                        prev.map((item, i) =>
+                          i === idx ? { ...item, minutes: e.target.value } : item,
+                        ),
+                      )
+                    }
+                    className="w-16 bg-white border border-slate-200 rounded-lg px-1.5 py-1.5 text-xs font-black text-center"
+                  />
+                  <span className="text-[10px] text-slate-400 font-bold">мин</span>
+                </div>
+                <span
+                  className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-1 rounded-lg shrink-0 whitespace-nowrap"
+                  title={
+                    secondMechanicId && w.performer === 'both'
+                      ? `${primaryMechName.split(' ')[0]}: ${Math.round(shares.pay1)} ₽ + ${secondMechName.split(' ')[0]}: ${Math.round(shares.pay2)} ₽`
+                      : undefined
+                  }
                 >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
+                  {Math.round(shares.pay1 + shares.pay2)} ₽
+                </span>
+                {works.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setWorks((prev) => prev.filter((_, i) => i !== idx))}
+                    className="text-rose-500 hover:text-rose-700 text-sm font-black px-1 cursor-pointer shrink-0"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Запчасти с двумя графами (закупка + продажа клиенту с кнопкой +30%) */}
@@ -3169,7 +3351,6 @@ function GarageOrderEditModal({
                           prev.map((item, i) => {
                             if (i !== idx) return item;
                             const num = parseFloat(val) || 0;
-                            // Если клиентская цена была пустая или равна старой накрутке, обновим с +30%
                             return {
                               ...item,
                               unit_price: val,
@@ -3254,18 +3435,18 @@ function GarageOrderEditModal({
           )}
         </div>
 
-        {/* ЗП Механика */}
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-1.5">
+        {/* ЗП Механиков (Один или два механика) */}
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black text-emerald-900">
-              ЗП Механика (авторасчёт за {totalMinutes} мин: {autoPay} ₽)
+              ЗП: {primaryMechName} (авторасчёт: {Math.round(autoPay1)} ₽)
             </span>
             <button
               type="button"
-              onClick={() => setManualPay(autoPay)}
+              onClick={() => setManualPay(String(Math.round(autoPay1)))}
               className="text-xs font-black text-emerald-700 underline cursor-pointer"
             >
-              Сбросить на авторасчёт
+              Сбросить
             </button>
           </div>
           <input
@@ -3273,9 +3454,34 @@ function GarageOrderEditModal({
             step="0.01"
             value={manualPay}
             onChange={(e) => setManualPay(e.target.value)}
-            placeholder={autoPay}
+            placeholder={String(Math.round(autoPay1))}
             className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-2 text-sm font-black text-emerald-900"
           />
+
+          {secondMechanicId && (
+            <div className="pt-2 border-t border-emerald-200/70 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-sky-900">
+                  ЗП: {secondMechName} (авторасчёт: {Math.round(autoPay2)} ₽)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setManualSecondPay(String(Math.round(autoPay2)))}
+                  className="text-xs font-black text-sky-700 underline cursor-pointer"
+                >
+                  Сбросить
+                </button>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                value={manualSecondPay}
+                onChange={(e) => setManualSecondPay(e.target.value)}
+                placeholder={String(Math.round(autoPay2))}
+                className="w-full bg-white border border-sky-300 rounded-lg px-3 py-2 text-sm font-black text-sky-900"
+              />
+            </div>
+          )}
         </div>
 
         <div>
@@ -3337,12 +3543,6 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
   const activeWorks = (order.works ?? []).filter((w) => w.status !== 'cancelled');
   const parts = order.parts ?? [];
 
-  const totalMinutes = activeWorks.reduce(
-    (s, w) =>
-      s + Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1)),
-    0,
-  );
-
   const worksSum = activeWorks.reduce((s, w) => {
     const mins =
       Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
@@ -3392,7 +3592,6 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
     salaryPct,
     activeWorks,
     parts,
-    totalMinutes,
     worksSum,
     mechanicPay,
     partsUnitSum,
@@ -3431,7 +3630,6 @@ function GarageOrderRow({
     salaryPct,
     activeWorks,
     parts,
-    totalMinutes,
     worksSum,
     mechanicPay,
     partsUnitSum,
@@ -3496,8 +3694,9 @@ function GarageOrderRow({
               {vehicleTitle}
             </span>
             <span className="text-slate-300 text-xs">·</span>
-            <span className="text-xs text-slate-600 font-semibold truncate max-w-[120px]">
+            <span className="text-xs text-slate-600 font-semibold truncate max-w-[150px]">
               👨‍🔧 {order.mechanic?.name?.split(' ')[0] ?? '—'}
+              {order.second_mechanic && ` + ${order.second_mechanic?.name?.split(' ')[0]}`}
             </span>
             <span
               className={cn(
@@ -3531,12 +3730,16 @@ function GarageOrderRow({
               </span>
             </div>
             <span className="w-4 text-center text-slate-200 text-sm">−</span>
-            <div className="w-[95px] text-center">
+            <div className="w-[105px] text-center">
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                ЗП Механика
+                {order.second_mechanic ? 'ЗП Механиков' : 'ЗП Механика'}
               </span>
               <span className="text-sm font-bold text-amber-600">
-                <Money amount={mechanicPay.toFixed(2)} />
+                <Money
+                  amount={(
+                    mechanicPay + (parseFloat(order.second_mechanic_pay || '0') || 0)
+                  ).toFixed(2)}
+                />
               </span>
             </div>
             <span className="w-4 text-center text-slate-200 text-sm">+</span>
@@ -3649,23 +3852,27 @@ function GarageOrderRow({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">
-                  Время работ
-                </span>
-                <span className="font-black text-slate-800 text-sm">
-                  {totalMinutes} мин ({(totalMinutes / 60).toFixed(1)} ч)
-                </span>
-              </div>
+            <div className="flex items-center gap-2">
               <div className="text-right bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
                 <span className="text-[10px] font-black uppercase text-emerald-800 block">
-                  ЗП Механика
+                  ЗП: {order.mechanic?.name?.split(' ')[0] ?? 'Механик 1'}
                 </span>
                 <span className="font-black text-emerald-700 text-sm">
                   <Money amount={mechanicPay.toFixed(2)} />
                 </span>
               </div>
+              {order.second_mechanic && (
+                <div className="text-right bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-xl">
+                  <span className="text-[10px] font-black uppercase text-sky-800 block">
+                    ЗП: {order.second_mechanic?.name?.split(' ')[0] ?? 'Механик 2'}
+                  </span>
+                  <span className="font-black text-sky-700 text-sm">
+                    <Money
+                      amount={(parseFloat(order.second_mechanic_pay || '0') || 0).toFixed(2)}
+                    />
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -3699,6 +3906,18 @@ function GarageOrderRow({
                     : null;
                   const wPct =
                     customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+                  const isBoth = Boolean(w.second_mechanic_id);
+                  const isSecondOnly =
+                    order.second_mechanic &&
+                    w.mechanic_id === order.second_mechanic.id &&
+                    !w.second_mechanic_id;
+                  const performerLabel = isBoth
+                    ? '👥 Вдвоём 50/50'
+                    : isSecondOnly
+                      ? `👤 ${order.second_mechanic?.name?.split(' ')[0] ?? 'Второй'}`
+                      : order.second_mechanic
+                        ? `👤 ${order.mechanic?.name?.split(' ')[0] ?? 'Основной'}`
+                        : null;
                   const wPay = (wPrice * wPct) / 100;
                   return (
                     <div
@@ -3713,14 +3932,21 @@ function GarageOrderRow({
                             w.work_description ||
                             'Работа'}
                         </p>
-                        <p className="text-xs font-extrabold text-emerald-700 mt-0.5">
-                          ⏱ {mins} мин · ЗП: {Math.round(wPay).toLocaleString('ru-RU')} ₽
+                        <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                          <p className="text-xs font-extrabold text-emerald-700">
+                            ⏱ {mins} мин · ЗП: {Math.round(wPay).toLocaleString('ru-RU')} ₽
+                          </p>
+                          {performerLabel && (
+                            <span className="text-[10px] text-slate-600 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">
+                              {performerLabel}
+                            </span>
+                          )}
                           {customPctMatch && (
-                            <span className="text-[10px] text-emerald-600 font-bold ml-1.5 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
+                            <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
                               {wPct}%
                             </span>
                           )}
-                        </p>
+                        </div>
                       </div>
                       <span className="text-xs font-black text-slate-800 whitespace-nowrap bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
                         {Math.round(wPrice).toLocaleString('ru-RU')} ₽

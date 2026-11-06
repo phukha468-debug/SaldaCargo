@@ -229,7 +229,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     if (body.action === 'edit_order') {
       const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
-        .select('id, machine_type, assigned_mechanic_id, admin_note, mechanic_note')
+        .select(
+          'id, order_number, machine_type, assigned_mechanic_id, second_mechanic_id, lifecycle_status, admin_note, mechanic_note',
+        )
         .eq('id', targetId)
         .single();
       if (ordErr || !ord) {
@@ -246,6 +248,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           : parseFloat(sto?.hourly_rate_own ?? '1600') || 1600;
 
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (body.assigned_mechanic_id !== undefined) {
+        updates.assigned_mechanic_id = body.assigned_mechanic_id || null;
+      }
+      if (body.second_mechanic_id !== undefined) {
+        updates.second_mechanic_id = body.second_mechanic_id || null;
+      }
       if (body.odometer_start !== undefined) {
         updates.odometer_start =
           body.odometer_start != null && String(body.odometer_start).trim() !== ''
@@ -268,10 +276,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
       if (typeof body.admin_note === 'string') {
         updates.admin_note = body.admin_note.trim() || null;
-      }
-      if (body.mechanic_pay !== undefined) {
-        const mp = parseFloat(String(body.mechanic_pay));
-        updates.mechanic_pay = !isNaN(mp) && mp >= 0 ? mp.toFixed(2) : null;
       }
       if (body.started_at !== undefined) {
         const sVal = body.started_at ? String(body.started_at).trim() : null;
@@ -297,12 +301,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         delete updates.completed_at;
       }
 
+      const targetPrimary =
+        updates.assigned_mechanic_id !== undefined
+          ? updates.assigned_mechanic_id
+          : ord.assigned_mechanic_id;
+      const targetSecond =
+        updates.second_mechanic_id !== undefined
+          ? updates.second_mechanic_id
+          : ord.second_mechanic_id;
+
+      let validWorks: any[] = [];
       if (Array.isArray(body.works)) {
-        const validWorks = (body.works as any[])
+        validWorks = (body.works as any[])
           .map((w) => ({
             name: String(w.name || '').trim(),
             minutes: Math.max(1, Math.round(Number(w.minutes) || 0)),
             notes: typeof w.notes === 'string' && w.notes.trim() ? w.notes.trim() : null,
+            mechanic_id: w.mechanic_id || targetPrimary || null,
+            second_mechanic_id:
+              w.second_mechanic_id !== undefined
+                ? w.second_mechanic_id || null
+                : targetSecond || null,
             price_client:
               w.price_client != null && !isNaN(Number(w.price_client)) && Number(w.price_client) > 0
                 ? Number(w.price_client).toFixed(2)
@@ -324,11 +343,94 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               notes: w.notes,
               quantity: 1,
               status: 'completed',
-              mechanic_id: ord.assigned_mechanic_id,
+              mechanic_id: w.mechanic_id,
+              second_mechanic_id: w.second_mechanic_id,
             })),
           );
           updates.problem_description = validWorks.map((w) => w.name).join('; ');
         }
+      }
+
+      // Расчет ЗП механиков по работам
+      const involvedMechIds = Array.from(
+        new Set([
+          targetPrimary,
+          targetSecond,
+          ...validWorks.flatMap((w) => [w.mechanic_id, w.second_mechanic_id]),
+        ]),
+      ).filter(Boolean);
+
+      const userMap = new Map<string, { id: string; name: string; mechanic_salary_pct: number }>();
+      if (involvedMechIds.length > 0) {
+        const { data: mechsData } = await (supabase.from('users') as any)
+          .select('id, name, mechanic_salary_pct')
+          .in('id', involvedMechIds);
+        for (const m of mechsData ?? []) {
+          userMap.set(m.id, {
+            id: m.id,
+            name: m.name,
+            mechanic_salary_pct:
+              m.mechanic_salary_pct != null && !isNaN(Number(m.mechanic_salary_pct))
+                ? Number(m.mechanic_salary_pct)
+                : 50,
+          });
+        }
+      }
+
+      const getWorkPct = (w: any, defaultPct: number) => {
+        if (w.notes) {
+          const match = String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/);
+          if (match && match[1]) {
+            const p = parseFloat(match[1]);
+            if (p >= 0 && p <= 100) return p;
+          }
+        }
+        return defaultPct;
+      };
+
+      let primaryPayTotal = 0;
+      let secondPayTotal = 0;
+      const workPayByMechanic = new Map<string, number>();
+
+      for (const w of validWorks) {
+        const wPrice = parseFloat(w.price_client || '0');
+        if (wPrice <= 0) continue;
+        const isBoth = Boolean(w.mechanic_id && w.second_mechanic_id);
+        if (isBoth) {
+          const half = wPrice / 2;
+          const m1Data = userMap.get(w.mechanic_id);
+          const m2Data = userMap.get(w.second_mechanic_id);
+          const pct1 = getWorkPct(w, m1Data?.mechanic_salary_pct ?? 50);
+          const pct2 = getWorkPct(w, m2Data?.mechanic_salary_pct ?? 50);
+          const pay1 = (half * pct1) / 100;
+          const pay2 = (half * pct2) / 100;
+          workPayByMechanic.set(w.mechanic_id, (workPayByMechanic.get(w.mechanic_id) || 0) + pay1);
+          workPayByMechanic.set(
+            w.second_mechanic_id,
+            (workPayByMechanic.get(w.second_mechanic_id) || 0) + pay2,
+          );
+          if (w.mechanic_id === targetPrimary) primaryPayTotal += pay1;
+          if (w.second_mechanic_id === targetSecond) secondPayTotal += pay2;
+        } else if (w.mechanic_id) {
+          const mData = userMap.get(w.mechanic_id);
+          const pct = getWorkPct(w, mData?.mechanic_salary_pct ?? 50);
+          const pay = (wPrice * pct) / 100;
+          workPayByMechanic.set(w.mechanic_id, (workPayByMechanic.get(w.mechanic_id) || 0) + pay);
+          if (w.mechanic_id === targetPrimary) primaryPayTotal += pay;
+          else if (w.mechanic_id === targetSecond) secondPayTotal += pay;
+        }
+      }
+
+      updates.mechanic_pay = primaryPayTotal > 0 ? primaryPayTotal.toFixed(2) : null;
+      updates.second_mechanic_pay = secondPayTotal > 0 ? secondPayTotal.toFixed(2) : null;
+
+      if (body.mechanic_pay !== undefined) {
+        const mp = parseFloat(String(body.mechanic_pay));
+        if (!isNaN(mp) && mp >= 0) updates.mechanic_pay = mp.toFixed(2);
+      }
+      if (body.second_mechanic_pay !== undefined) {
+        const mp2 = parseFloat(String(body.second_mechanic_pay));
+        if (!isNaN(mp2) && mp2 >= 0) updates.second_mechanic_pay = mp2.toFixed(2);
       }
 
       if (Array.isArray(body.parts)) {
@@ -374,6 +476,43 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .update(updates)
         .eq('id', targetId);
       if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+      // Если заказ-наряд уже был утвержден (approved), синхронизируем транзакции ЗП
+      if (ord.lifecycle_status === 'approved') {
+        const CAT_PAYROLL_MECHANIC = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
+        await (supabase.from('transactions') as any)
+          .delete()
+          .eq('service_order_id', targetId)
+          .eq('category_id', CAT_PAYROLL_MECHANIC);
+
+        const newTxns: any[] = [];
+        for (const [mechId, amount] of workPayByMechanic.entries()) {
+          if (amount <= 0) continue;
+          const mUser = userMap.get(mechId);
+          newTxns.push({
+            direction: 'expense',
+            lifecycle_status: 'approved',
+            settlement_status: 'pending',
+            from_wallet_id: null,
+            employee_confirmed: false,
+            amount: amount.toFixed(2),
+            category_id: CAT_PAYROLL_MECHANIC,
+            related_user_id: mechId,
+            service_order_id: targetId,
+            created_by: null,
+            description: `ЗП механика ${mUser?.name ?? 'Механик'} — наряд #${ord.order_number}`,
+            idempotency_key: crypto.randomUUID(),
+          });
+        }
+
+        if (newTxns.length > 0) {
+          await (supabase.from('transactions') as any).insert(newTxns);
+          await (supabase.from('service_order_works') as any)
+            .update({ salary_paid: true })
+            .eq('service_order_id', targetId);
+        }
+      }
+
       return NextResponse.json({ ok: true, action: 'edited', id: targetId });
     }
 

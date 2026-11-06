@@ -1,0 +1,31 @@
+name: Wialon Telematics Sync (Kontur 2)
+
+on:
+  schedule:
+    # Запуск в облаке GitHub каждые 5 минут 24/7 без участия локального ПК
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  telematics-sync:
+    name: Sync Wialon Fleet & Geofences
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Wialon Sync Endpoint
+        run: |
+          echo "Triggering Kontur 2 Wialon background sync..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://salda-cargo-web.vercel.app/api/cron/wialon-sync" \
+            -H "User-Agent: GitHub-Actions-Kontur2/1.0" \
+            --max-time 25)
+
+          HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1 | cut -d':' -f2)
+
+          echo "Status: $HTTP_STATUS"
+          echo "Response: $HTTP_BODY"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "Wialon telematics sync completed successfully."
+          else
+            echo "Warning: Sync returned status $HTTP_STATUS"
+          fi

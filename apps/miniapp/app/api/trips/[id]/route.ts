@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { syncTripFinancials } from '@/lib/tripFinancials';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
@@ -108,5 +109,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await syncTripFinancials(supabase, id, callerId);
   return NextResponse.json({ ok: true });
 }

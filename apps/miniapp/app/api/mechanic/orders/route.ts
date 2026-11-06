@@ -231,7 +231,14 @@ export async function POST(request: Request) {
       client_vehicle_brand?: string;
       client_vehicle_reg?: string;
       odometer?: number | string | null;
-      works?: Array<{ name: string; minutes: number | string; work_catalog_id?: string }>;
+      second_mechanic_id?: string | null;
+      works?: Array<{
+        name: string;
+        minutes: number | string;
+        work_catalog_id?: string;
+        mechanic_id?: string;
+        second_mechanic_id?: string | null;
+      }>;
       parts_provided_by_service?: boolean;
       parts?: Array<{ name: string; quantity?: number | string; unit?: string }>;
       mechanic_note?: string;
@@ -274,6 +281,8 @@ export async function POST(request: Request) {
         name: (w.name || '').trim(),
         minutes: Math.max(0, Math.round(Number(w.minutes) || 0)),
         work_catalog_id: w.work_catalog_id || null,
+        mechanic_id: w.mechanic_id || null,
+        second_mechanic_id: w.second_mechanic_id || null,
       }))
       .filter((w) => w.name.length > 0 && w.minutes > 0);
 
@@ -312,6 +321,25 @@ export async function POST(request: Request) {
       mechUser?.mechanic_salary_pct != null && !isNaN(Number(mechUser.mechanic_salary_pct))
         ? Number(mechUser.mechanic_salary_pct)
         : 50;
+
+    let secondSalaryPct = 50;
+    const cleanSecondMechId =
+      body.second_mechanic_id && body.second_mechanic_id !== mechanicId
+        ? String(body.second_mechanic_id)
+        : null;
+
+    if (cleanSecondMechId) {
+      const { data: secondUser } = await (supabase.from('users') as any)
+        .select('id, name, mechanic_salary_pct')
+        .eq('id', cleanSecondMechId)
+        .maybeSingle();
+      if (
+        secondUser?.mechanic_salary_pct != null &&
+        !isNaN(Number(secondUser.mechanic_salary_pct))
+      ) {
+        secondSalaryPct = Number(secondUser.mechanic_salary_pct);
+      }
+    }
 
     // Для клиентского авто находим или создаём карточку в client_vehicles
     let clientVehicleId: string | null = null;
@@ -398,9 +426,22 @@ export async function POST(request: Request) {
     });
 
     let totalEstimatedMechanicPay = 0;
+    let totalEstimatedSecondPay = 0;
     for (const w of validWorks) {
       const workClientPrice = (w.minutes / 60) * hourlyRate;
-      totalEstimatedMechanicPay += (workClientPrice * salaryPct) / 100;
+      const isBoth = Boolean(w.second_mechanic_id || (cleanSecondMechId && !w.mechanic_id));
+      const isSecondOnly =
+        cleanSecondMechId && w.mechanic_id === cleanSecondMechId && !w.second_mechanic_id;
+
+      if (isBoth) {
+        const halfPrice = workClientPrice / 2;
+        totalEstimatedMechanicPay += (halfPrice * salaryPct) / 100;
+        totalEstimatedSecondPay += (halfPrice * secondSalaryPct) / 100;
+      } else if (isSecondOnly) {
+        totalEstimatedSecondPay += (workClientPrice * secondSalaryPct) / 100;
+      } else {
+        totalEstimatedMechanicPay += (workClientPrice * salaryPct) / 100;
+      }
     }
 
     const orderStatus = submit_immediately ? 'completed' : 'in_progress';
@@ -417,11 +458,13 @@ export async function POST(request: Request) {
       problem_description: problemSummary,
       mechanic_note: finalMechanicNote,
       assigned_mechanic_id: mechanicId,
+      second_mechanic_id: cleanSecondMechId,
       created_by: mechanicId,
       status: orderStatus,
       lifecycle_status: 'draft',
       payment_received: isOwn,
       mechanic_pay: totalEstimatedMechanicPay > 0 ? totalEstimatedMechanicPay.toFixed(2) : null,
+      second_mechanic_pay: totalEstimatedSecondPay > 0 ? totalEstimatedSecondPay.toFixed(2) : null,
       priority: 'normal',
       created_at: createdAtIso,
       updated_at: new Date().toISOString(),
@@ -458,6 +501,16 @@ export async function POST(request: Request) {
     if (validWorks.length > 0) {
       const worksInsert = validWorks.map((w) => {
         const priceClient = ((w.minutes / 60) * hourlyRate).toFixed(2);
+        const wMech1 =
+          w.mechanic_id && w.mechanic_id === cleanSecondMechId && !w.second_mechanic_id
+            ? cleanSecondMechId
+            : mechanicId;
+        const wMech2 =
+          w.second_mechanic_id ||
+          (cleanSecondMechId && (!w.mechanic_id || w.mechanic_id === mechanicId)
+            ? cleanSecondMechId
+            : null);
+
         return {
           service_order_id: createdOrder.id,
           work_catalog_id: w.work_catalog_id,
@@ -467,7 +520,8 @@ export async function POST(request: Request) {
           price_client: priceClient,
           quantity: 1,
           status: submit_immediately ? 'completed' : 'in_progress',
-          mechanic_id: mechanicId,
+          mechanic_id: wMech1,
+          second_mechanic_id: wMech2,
         };
       });
 

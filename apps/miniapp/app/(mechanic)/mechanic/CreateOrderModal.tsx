@@ -10,6 +10,7 @@ interface WorkDraft {
   id: string;
   name: string;
   minutes: number;
+  performer?: 'both' | 'primary' | 'second';
 }
 
 interface PartDraft {
@@ -50,12 +51,18 @@ export default function CreateOrderModal({
   const [clientReg, setClientReg] = useState<string>('');
   const [odometer, setOdometer] = useState<string>('');
 
-  // 4. Перечень работ
+  // 4. Напарник / Второй механик
+  const [secondMechanicId, setSecondMechanicId] = useState<string>('');
+  const [workPerformerInput, setWorkPerformerInput] = useState<'both' | 'primary' | 'second'>(
+    'both',
+  );
+
+  // 5. Перечень работ
   const [works, setWorks] = useState<WorkDraft[]>([]);
   const [workNameInput, setWorkNameInput] = useState<string>('');
   const [workMinutesInput, setWorkMinutesInput] = useState<string>('');
 
-  // 5. Чекбокс запчастей автосервиса
+  // 6. Чекбокс запчастей автосервиса
   const [partsProvidedByService, setPartsProvidedByService] = useState<boolean>(false);
   const [parts, setParts] = useState<PartDraft[]>([]);
   const [partNameInput, setPartNameInput] = useState<string>('');
@@ -77,16 +84,79 @@ export default function CreateOrderModal({
     staleTime: 60000,
   });
 
+  const { data: allMechanics = [] } = useQuery<
+    Array<{ id: string; name: string; roles?: string[] }>
+  >({
+    queryKey: ['public-mechanics-list'],
+    queryFn: async () => {
+      const res = await fetch('/api/users/public?role=mechanic');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open,
+    staleTime: 60000,
+  });
+
+  const otherMechanics = allMechanics.filter((m) => m.id !== mechanicId);
+  const secondMechanic = otherMechanics.find((m) => m.id === secondMechanicId);
+  const secondMechanicName = secondMechanic ? secondMechanic.name : '';
+
   const activeRate = machineType === 'own' ? hourlyRateOwn : hourlyRateClient;
   const mechanicHourlyShare = Math.round((activeRate * salaryPct) / 100);
 
-  const calcWorkPay = (mins: number) => Math.round(((mins / 60) * activeRate * salaryPct) / 100);
+  const calcWorkShares = (mins: number, performer: 'both' | 'primary' | 'second' = 'both') => {
+    const fullClientPrice = (mins / 60) * activeRate;
+    if (!secondMechanicId) {
+      return {
+        primary: Math.round((fullClientPrice * salaryPct) / 100),
+        second: 0,
+      };
+    }
+    if (performer === 'both') {
+      const halfPrice = fullClientPrice / 2;
+      return {
+        primary: Math.round((halfPrice * salaryPct) / 100),
+        second: Math.round((halfPrice * 50) / 100),
+      };
+    }
+    if (performer === 'second') {
+      return {
+        primary: 0,
+        second: Math.round((fullClientPrice * 50) / 100),
+      };
+    }
+    return {
+      primary: Math.round((fullClientPrice * salaryPct) / 100),
+      second: 0,
+    };
+  };
 
   // Учитываем в превью и уже добавленные работы, и текущую вводимую строку
   const pendingInputMins =
     workNameInput.trim() && Number(workMinutesInput) > 0 ? Number(workMinutesInput) : 0;
   const totalMinutes = works.reduce((sum, w) => sum + w.minutes, 0) + pendingInputMins;
-  const totalEstimatedPay = calcWorkPay(totalMinutes);
+
+  const totalShares = works.reduce(
+    (acc, w) => {
+      const s = calcWorkShares(w.minutes, w.performer || (secondMechanicId ? 'both' : 'primary'));
+      return {
+        primary: acc.primary + s.primary,
+        second: acc.second + s.second,
+      };
+    },
+    { primary: 0, second: 0 },
+  );
+
+  if (pendingInputMins > 0) {
+    const pendingShares = calcWorkShares(
+      pendingInputMins,
+      secondMechanicId ? workPerformerInput : 'primary',
+    );
+    totalShares.primary += pendingShares.primary;
+    totalShares.second += pendingShares.second;
+  }
+
+  const totalEstimatedPay = totalShares.primary;
 
   const hasOilWork =
     works.some((w) => isOilOrFilterWork(w.name)) || isOilOrFilterWork(workNameInput);
@@ -105,7 +175,12 @@ export default function CreateOrderModal({
     }
     setWorks((prev) => [
       ...prev,
-      { id: `${Date.now()}-${Math.random()}`, name: cleanName, minutes: mins },
+      {
+        id: `${Date.now()}-${Math.random()}`,
+        name: cleanName,
+        minutes: mins,
+        performer: secondMechanicId ? workPerformerInput : 'primary',
+      },
     ]);
     setWorkNameInput('');
     setWorkMinutesInput('');
@@ -151,6 +226,7 @@ export default function CreateOrderModal({
           id: 'auto-work',
           name: workNameInput.trim(),
           minutes: Math.round(Number(workMinutesInput)),
+          performer: secondMechanicId ? workPerformerInput : 'primary',
         });
       }
 
@@ -184,6 +260,7 @@ export default function CreateOrderModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mechanic_id: mechanicId,
+          second_mechanic_id: secondMechanicId || undefined,
           order_date: startDate,
           started_at: startDate,
           completed_at: endDate,
@@ -193,7 +270,12 @@ export default function CreateOrderModal({
           client_vehicle_brand: machineType === 'client' ? clientModel.trim() : undefined,
           client_vehicle_reg: machineType === 'client' ? clientReg.trim().toUpperCase() : undefined,
           odometer: odometer.trim() ? Number(odometer) : null,
-          works: finalWorks.map((w) => ({ name: w.name, minutes: w.minutes })),
+          works: finalWorks.map((w) => ({
+            name: w.name,
+            minutes: w.minutes,
+            mechanic_id: w.performer === 'second' ? secondMechanicId : mechanicId,
+            second_mechanic_id: w.performer === 'both' ? secondMechanicId : null,
+          })),
           parts_provided_by_service: partsProvidedByService,
           parts: partsProvidedByService
             ? finalParts.map((p) => ({ name: p.name, quantity: p.quantity, unit: p.unit }))
@@ -213,6 +295,8 @@ export default function CreateOrderModal({
       queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
       queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
       // Сбрасываем форму
+      setSecondMechanicId('');
+      setWorkPerformerInput('both');
       setWorks([]);
       setWorkNameInput('');
       setWorkMinutesInput('');
@@ -458,16 +542,62 @@ export default function CreateOrderModal({
             )}
           </div>
 
+          {/* ШАГ 3.5: Соисполнитель (напарник) */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <span>👥</span>
+                <span>Напарник / Второй механик</span>
+              </label>
+              {secondMechanicId && (
+                <button
+                  type="button"
+                  onClick={() => setSecondMechanicId('')}
+                  className="text-[11px] font-bold text-rose-500 hover:text-rose-600 active:scale-95 transition-transform"
+                >
+                  Убрать напарника
+                </button>
+              )}
+            </div>
+
+            <select
+              value={secondMechanicId}
+              onChange={(e) => setSecondMechanicId(e.target.value)}
+              className="w-full h-12 px-3.5 rounded-xl bg-[#F2F4F7] border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038] focus:bg-white"
+            >
+              <option value="">Делал один (без напарника)</option>
+              {otherMechanics.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+
+            {secondMechanicId && (
+              <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-2.5 text-[11px] font-bold text-emerald-800 flex items-center justify-between">
+                <span>Напарник: {secondMechanicName}</span>
+                <span className="text-emerald-700 font-extrabold">Работы делятся 50/50</span>
+              </div>
+            )}
+          </div>
+
           {/* ШАГ 4: Перечень работ (1 строка - название, 2 строка - время в минутах) */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3.5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-1">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 4. Перечень выполненных работ ({works.length})
               </label>
               {totalMinutes > 0 && (
-                <span className="text-xs font-extrabold text-[#21A038]">
-                  {totalMinutes} мин · +{totalEstimatedPay.toLocaleString('ru-RU')} ₽
-                </span>
+                <div className="text-right">
+                  <span className="text-xs font-extrabold text-[#21A038] block">
+                    Вам: +{totalShares.primary.toLocaleString('ru-RU')} ₽
+                  </span>
+                  {secondMechanicId && totalShares.second > 0 && (
+                    <span className="text-[10px] font-bold text-sky-700 block">
+                      Напарнику: +{totalShares.second.toLocaleString('ru-RU')} ₽
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
@@ -475,7 +605,10 @@ export default function CreateOrderModal({
             {works.length > 0 && (
               <div className="space-y-2">
                 {works.map((w, idx) => {
-                  const pay = calcWorkPay(w.minutes);
+                  const shares = calcWorkShares(
+                    w.minutes,
+                    w.performer || (secondMechanicId ? 'both' : 'primary'),
+                  );
                   return (
                     <div
                       key={w.id}
@@ -485,13 +618,27 @@ export default function CreateOrderModal({
                         <p className="text-sm font-extrabold text-slate-900 leading-snug">
                           {idx + 1}. {w.name}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center flex-wrap gap-2 mt-1">
                           <span className="text-xs font-bold text-slate-500">
                             ⏱ Время: {w.minutes} мин
                           </span>
                           <span className="text-xs font-extrabold text-[#21A038] bg-[#E8F7EC] px-2 py-0.5 rounded-md">
-                            +{pay.toLocaleString('ru-RU')} ₽ в ЗП
+                            +{shares.primary.toLocaleString('ru-RU')} ₽ вам
                           </span>
+                          {secondMechanicId && shares.second > 0 && (
+                            <span className="text-xs font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/60">
+                              +{shares.second.toLocaleString('ru-RU')} ₽ напарнику
+                            </span>
+                          )}
+                          {secondMechanicId && (
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                              {w.performer === 'both'
+                                ? '👥 Вдвоём (50/50)'
+                                : w.performer === 'second'
+                                  ? `👤 ${secondMechanicName.split(' ')[0]}`
+                                  : '👤 Только я'}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <button
@@ -507,7 +654,7 @@ export default function CreateOrderModal({
               </div>
             )}
 
-            {/* Поля ввода новой работы (в 2 строки: Название -> Время в минутах) */}
+            {/* Поля ввода новой работы */}
             <div className="bg-[#F2F4F7] rounded-2xl p-3 space-y-2.5 border border-slate-200/70">
               <div>
                 <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
@@ -522,6 +669,52 @@ export default function CreateOrderModal({
                 />
               </div>
 
+              {secondMechanicId && (
+                <div>
+                  <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                    Кто делал работу?
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setWorkPerformerInput('both')}
+                      className={cn(
+                        'py-2 px-1 rounded-xl text-xs font-black text-center transition-all',
+                        workPerformerInput === 'both'
+                          ? 'bg-[#21A038] text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-700',
+                      )}
+                    >
+                      👥 Вдвоём 50/50
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWorkPerformerInput('primary')}
+                      className={cn(
+                        'py-2 px-1 rounded-xl text-xs font-black text-center transition-all',
+                        workPerformerInput === 'primary'
+                          ? 'bg-[#21A038] text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-700',
+                      )}
+                    >
+                      👤 Только я
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWorkPerformerInput('second')}
+                      className={cn(
+                        'py-2 px-1 rounded-xl text-xs font-black text-center truncate transition-all',
+                        workPerformerInput === 'second'
+                          ? 'bg-[#21A038] text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-700',
+                      )}
+                    >
+                      👤 {secondMechanicName.split(' ')[0] || 'Напарник'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
@@ -529,7 +722,12 @@ export default function CreateOrderModal({
                   </label>
                   {Number(workMinutesInput) > 0 && (
                     <span className="text-[11px] font-extrabold text-[#21A038]">
-                      Начисление: +{calcWorkPay(Number(workMinutesInput)).toLocaleString('ru-RU')} ₽
+                      Начисление: +
+                      {calcWorkShares(
+                        Number(workMinutesInput),
+                        secondMechanicId ? workPerformerInput : 'primary',
+                      ).primary.toLocaleString('ru-RU')}{' '}
+                      ₽ вам
                     </span>
                   )}
                 </div>

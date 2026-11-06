@@ -121,20 +121,52 @@ async function processWialonEvent(req: Request) {
     });
 
     // Извлечение ключевых параметров Wialon
-    const eventRaw = String(payload.event || payload.action || payload.type || '').toLowerCase();
-    const unitStr = String(
+    const eventCandidate = String(
+      payload.event ||
+        payload.action ||
+        payload.type ||
+        payload.zone_status ||
+        payload.status ||
+        payload.notification ||
+        payload.text ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
+
+    let unitStr = String(
       payload.unit || payload.unit_name || payload.unitName || payload.name || '',
-    );
+    ).trim();
+
+    // Если имя объекта не передано отдельным полем, но есть текст уведомления
+    if (!unitStr && payload.text) {
+      unitStr = String(payload.text);
+    }
+
     const unitIdStr = payload.unit_id ? String(payload.unit_id) : undefined;
     const timeStr =
-      payload.time || payload.timestamp || payload.curr_time || new Date().toISOString();
+      payload.time ||
+      payload.timestamp ||
+      payload.pos_time ||
+      payload.curr_time ||
+      new Date().toISOString();
 
-    let rawOdo = payload.odometer || payload.odo || payload.mileage;
+    let rawOdo =
+      payload.odometer ?? payload.odo ?? payload.mileage ?? payload.mileage_km ?? payload.km;
     let odometer: number | undefined = undefined;
-    if (rawOdo !== undefined && rawOdo !== null && !isNaN(Number(rawOdo))) {
+    if (rawOdo !== undefined && rawOdo !== null) {
+      if (typeof rawOdo === 'string') {
+        const match = rawOdo
+          .replace(/\s+/g, '')
+          .replace(',', '.')
+          .match(/(\d+(?:\.\d+)?)/);
+        if (match && match[1]) rawOdo = match[1];
+      }
       const num = Number(rawOdo);
-      // Если одометр передан в метрах (> 1 000 000 для обычного пробега), переводим в км
-      odometer = num > 2000000 ? Math.round(num / 1000) : Math.round(num);
+      if (!isNaN(num) && num > 0) {
+        // Если одометр передан в метрах (> 2 000 000 для пробега), переводим в км
+        odometer = num > 2000000 ? Math.round(num / 1000) : Math.round(num);
+      }
     }
 
     // Проверка секретного ключа (если задан в переменных окружения)
@@ -152,6 +184,9 @@ async function processWialonEvent(req: Request) {
     const asset = await findAssetByWialonUnit(supabase, unitStr, unitIdStr);
 
     if (!asset) {
+      console.warn(
+        `[Wialon Webhook] Автомобиль не найден для unit="${unitStr}", unit_id="${unitIdStr}"`,
+      );
       return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
     }
 
@@ -160,19 +195,38 @@ async function processWialonEvent(req: Request) {
 
     // Определяем событие: выезд (старт) или въезд (финиш)
     const isDeparture =
-      eventRaw.includes('depart') ||
-      eventRaw.includes('exit') ||
-      eventRaw.includes('out') ||
-      eventRaw.includes('leave') ||
-      eventRaw.includes('выезд');
+      eventCandidate === '2' ||
+      eventCandidate.includes('выход') ||
+      eventCandidate.includes('выезд') ||
+      eventCandidate.includes('покинул') ||
+      eventCandidate.includes('уехал') ||
+      eventCandidate.includes('depart') ||
+      eventCandidate.includes('departure') ||
+      eventCandidate.includes('exit') ||
+      eventCandidate.includes('exited') ||
+      eventCandidate.includes('leave') ||
+      eventCandidate.includes('left') ||
+      eventCandidate.includes('outside') ||
+      eventCandidate === 'out';
 
     const isArrival =
-      eventRaw.includes('arrive') ||
-      eventRaw.includes('enter') ||
-      eventRaw.includes('in') ||
-      eventRaw.includes('return') ||
-      eventRaw.includes('въезд') ||
-      eventRaw.includes('приезд');
+      eventCandidate === '1' ||
+      eventCandidate.includes('вход') ||
+      eventCandidate.includes('въезд') ||
+      eventCandidate.includes('приезд') ||
+      eventCandidate.includes('заезд') ||
+      eventCandidate.includes('вошел') ||
+      eventCandidate.includes('прибыл') ||
+      eventCandidate.includes('arrive') ||
+      eventCandidate.includes('arrival') ||
+      eventCandidate.includes('enter') ||
+      eventCandidate.includes('entered') ||
+      eventCandidate.includes('inside') ||
+      eventCandidate === 'in';
+
+    console.log(
+      `[Wialon Webhook] Event: "${eventCandidate}" -> ${isDeparture ? 'DEPARTURE' : isArrival ? 'ARRIVAL' : 'UNKNOWN'} | Unit: ${unitStr} (Asset: ${asset.reg_number}, Odo: ${odoValue} km)`,
+    );
 
     if (isDeparture) {
       await handleVehicleDeparture(supabase, {

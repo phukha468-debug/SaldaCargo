@@ -1724,10 +1724,42 @@ function CreateSmartOrderModal({
         unloading_city: p.unloading_address?.city || prev.unloading_city,
         unloading_address: p.unloading_address?.raw || prev.unloading_address,
         client_id: p.matched_client_id || prev.client_id,
+        client_name: p.client_name || prev.client_name,
         forwarder_id: p.matched_forwarder_id || prev.forwarder_id,
+        forwarder_name: p.forwarder_name || prev.forwarder_name,
         loading_org_name: p.loading_org_name || prev.loading_org_name,
+        planned_loading_at: p.planned_loading_from?.slice(0, 16) || prev.planned_loading_at,
+        planned_delivery_at: p.planned_delivery_from?.slice(0, 16) || prev.planned_delivery_at,
       }));
-      setStatusMessage(`✨ PDF успешно распознан! Поручение № ${p.order_number || ''}`);
+
+      // Обновляем первый сегмент маршрута
+      setRoutes((prevRoutes) => {
+        if (prevRoutes.length <= 1) {
+          return [
+            {
+              id: prevRoutes[0]?.id || 'stop-1',
+              loading_city: p.loading_address?.city || prevRoutes[0]?.loading_city || '',
+              loading_address: p.loading_address?.raw || prevRoutes[0]?.loading_address || '',
+              loading_org: p.loading_org_name || prevRoutes[0]?.loading_org || '',
+              unloading_city: p.unloading_address?.city || prevRoutes[0]?.unloading_city || '',
+              unloading_address: p.unloading_address?.raw || prevRoutes[0]?.unloading_address || '',
+              unloading_org: p.client_name || prevRoutes[0]?.unloading_org || '',
+              cargo_name: p.cargo_name || prevRoutes[0]?.cargo_name || '',
+              weight_kg: p.weight_gross_kg || prevRoutes[0]?.weight_kg || 0,
+            },
+          ];
+        }
+        return prevRoutes;
+      });
+
+      const summaryParts = [
+        p.order_number ? `Поручение № ${p.order_number}` : '',
+        p.cargo_name ? p.cargo_name : '',
+        p.weight_gross_kg ? `${p.weight_gross_kg} кг` : '',
+        p.price_without_vat ? `${p.price_without_vat.toLocaleString('ru-RU')} ₽` : '',
+      ].filter(Boolean);
+
+      setStatusMessage(`✨ PDF распознан: ${summaryParts.join(' · ')}`);
     } catch (err: any) {
       alert(`Ошибка: ${err.message}`);
     } finally {

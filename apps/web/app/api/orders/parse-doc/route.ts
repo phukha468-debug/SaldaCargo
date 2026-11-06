@@ -66,18 +66,18 @@ export async function POST(req: Request) {
           lp.gar_guid === parsedData.loading_address.gar_guid
         )
           return true;
+        if (parsedData.loading_org_inn && lp.inn === parsedData.loading_org_inn) return true;
         if (
-          parsedData.loading_address?.city &&
-          lp.structured_address?.city?.toLowerCase() ===
-            parsedData.loading_address.city.toLowerCase()
+          parsedData.loading_org_name &&
+          lp.name?.toLowerCase().includes(parsedData.loading_org_name.toLowerCase())
         )
           return true;
         return false;
       });
       if (foundLp) {
         parsedData.matched_loading_point_id = foundLp.id;
-        parsedData.loading_org_name = foundLp.name;
-        parsedData.loading_org_inn = foundLp.inn;
+        if (!parsedData.loading_org_name) parsedData.loading_org_name = foundLp.name;
+        if (!parsedData.loading_org_inn) parsedData.loading_org_inn = foundLp.inn;
         parsedData.loading_org_kpp = foundLp.kpp;
         parsedData.loading_contact_fio = foundLp.contact_fio;
         parsedData.loading_contact_phone = foundLp.contact_phone;

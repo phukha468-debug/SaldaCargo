@@ -115,6 +115,55 @@ export async function fetchWialonBaseGeofence(
 }
 
 /**
+ * Проверка истории сообщений Wialon за интервал времени:
+ * Посещал ли объект геозону базы Салды в указанный период?
+ */
+export async function checkHistoricalBaseVisit(
+  host: string,
+  eid: string,
+  unitId: number,
+  timeFromSec: number,
+  timeToSec: number,
+  baseLat: number,
+  baseLon: number,
+  baseRadius: number,
+): Promise<{ visited: boolean; timeSec: number; distanceMeters: number } | null> {
+  try {
+    const cleanHost = host.replace(/\/+$/, '');
+    const url = `${cleanHost}/wialon/ajax.html?svc=messages/load_interval&params=${encodeURIComponent(
+      JSON.stringify({
+        itemId: unitId,
+        timeFrom: timeFromSec,
+        timeTo: timeToSec,
+        flags: 0,
+        flagsMask: 0,
+        loadCount: 1000,
+      }),
+    )}&sid=${eid}`;
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const msgs = data.messages || [];
+
+    for (const m of msgs) {
+      if (!m.pos) continue;
+      const dist = calculateDistanceMeters(m.pos.y, m.pos.x, baseLat, baseLon);
+      if (dist <= baseRadius) {
+        return {
+          visited: true,
+          timeSec: m.t,
+          distanceMeters: dist,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('[Wialon] Ошибка проверки истории сообщений:', e);
+  }
+  return null;
+}
+
+/**
  * 2. Опрос 4 Валдаев и получение их текущих координат и одометров
  */
 export async function fetchWialonValdaiPositions(
@@ -215,6 +264,13 @@ export async function syncValdaiTelematics(
     process.env.WIALON_TOKEN ||
     '561a6efcd9ed8d38d0ff3b80c29253f01653C6698177A6D92E360BBD0D70D0B6AF5240DE';
 
+  const cleanHost = host.replace(/\/+$/, '');
+  const eid = await getWialonSession(cleanHost, token);
+  const remoteGeo = await fetchWialonBaseGeofence(cleanHost, eid);
+  const baseLat = remoteGeo?.lat ?? SALDA_BASE_LAT;
+  const baseLon = remoteGeo?.lon ?? SALDA_BASE_LON;
+  const baseRadius = remoteGeo?.radiusMeters ?? SALDA_BASE_RADIUS;
+
   const positions = await fetchWialonValdaiPositions(host, token);
   const eventsTriggered: any[] = [];
 
@@ -275,6 +331,54 @@ export async function syncValdaiTelematics(
         distanceFromBaseKm: pos.distanceFromBaseKm,
         res,
       });
+    }
+
+    // СОБЫТИЕ 3: Ретроспективная проверка транзита (если машина сейчас снаружи, но за время рейса проезжала базу)
+    else if (!currentInside) {
+      const { data: activeOrder } = await supabase
+        .from('orders')
+        .select('id, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at)')
+        .eq('assigned_vehicle_id', asset.id)
+        .eq('status', 'in_progress')
+        .maybeSingle();
+
+      const isTransitAllowed = Boolean(activeOrder?.raw_parser_payload?.prevent_salda_auto_finish);
+
+      const tripObj = (
+        Array.isArray(activeOrder?.trip) ? activeOrder.trip[0] : activeOrder?.trip
+      ) as { id: string; started_at?: string } | undefined;
+
+      if (isTransitAllowed && tripObj?.started_at) {
+        const fromSec = Math.floor(new Date(tripObj.started_at).getTime() / 1000);
+        const toSec = Math.floor(Date.now() / 1000);
+        const visit = await checkHistoricalBaseVisit(
+          cleanHost,
+          eid,
+          pos.id,
+          fromSec,
+          toSec,
+          baseLat,
+          baseLon,
+          baseRadius,
+        );
+
+        if (visit?.visited) {
+          console.log(
+            `[Wialon Tracker] 🔄 Ретроспективно обнаружен транзит через Салду для ${pos.regNumber} в ${new Date(visit.timeSec * 1000).toLocaleTimeString('ru-RU')} (${(visit.distanceMeters / 1000).toFixed(2)} км от базы)`,
+          );
+          const res = await handleVehicleArrival(supabase, {
+            vehicleId: asset.id,
+            odometer: effectiveOdo,
+            timestamp: new Date(visit.timeSec * 1000).toISOString(),
+            forceFinish: false,
+          });
+          eventsTriggered.push({
+            event: 'transit_retrospective',
+            regNumber: pos.regNumber,
+            res,
+          });
+        }
+      }
     }
 
     // Сохраняем обновленное состояние в заметки актива
