@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
+const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 
 const PAYROLL_CATEGORY_IDS = [
   'd79213ee-3bc6-4433-b58a-ca7ea1040d00', // PAYROLL_DRIVER
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
     { data: advanceOffset },
     { data: userTrips },
     { data: userCollections },
+    { data: activeHolds },
   ] = await Promise.all([
     // Начисленная, но не выплаченная ЗП (отсутствует списание из кошелька)
     (supabase.from('transactions') as any)
@@ -87,6 +89,14 @@ export async function GET(request: Request) {
 
     // Инкассации
     (supabase.from('cash_collections') as any).select('amount').eq('driver_id', userId),
+
+    // Активные зафиксированные переносы подотчёта (holds)
+    (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('category_id', CASH_COLLECT_CAT)
+      .eq('settlement_status', 'pending')
+      .neq('lifecycle_status', 'cancelled')
+      .eq('related_user_id', userId),
   ]);
 
   const cashIn = ((userTrips as any[]) ?? [])
@@ -109,7 +119,15 @@ export async function GET(request: Request) {
     0,
   );
 
-  const uncollectedCash = Math.max(0, Math.round((cashIn - cashSpent - cashCollected) * 100) / 100);
+  const holdsCash = ((activeHolds as any[]) ?? []).reduce(
+    (s: number, h: any) => s + parseFloat(h.amount ?? '0'),
+    0,
+  );
+
+  const uncollectedCash = Math.max(
+    Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
+    holdsCash,
+  );
 
   const activePending = ((pendingPayroll as any[]) ?? []).filter(
     (t: any) => t.trip?.lifecycle_status !== 'cancelled',
@@ -275,6 +293,7 @@ export async function POST(request: Request) {
       { data: userRow },
       { data: userTrips },
       { data: userCollections },
+      { data: activeHolds },
     ] = await Promise.all([
       (supabase.from('transactions') as any)
         .select(
@@ -316,6 +335,14 @@ export async function POST(request: Request) {
         .neq('lifecycle_status', 'cancelled'),
 
       (supabase.from('cash_collections') as any).select('amount').eq('driver_id', body.user_id),
+
+      // Активные зафиксированные переносы подотчёта (holds)
+      (supabase.from('transactions') as any)
+        .select('id, amount')
+        .eq('category_id', CASH_COLLECT_CAT)
+        .eq('settlement_status', 'pending')
+        .neq('lifecycle_status', 'cancelled')
+        .eq('related_user_id', body.user_id),
     ]);
 
     const cashIn = ((userTrips as any[]) ?? [])
@@ -338,9 +365,14 @@ export async function POST(request: Request) {
       0,
     );
 
-    const uncollectedCash = Math.max(
+    const holdsCash = ((activeHolds as any[]) ?? []).reduce(
+      (s: number, h: any) => s + parseFloat(h.amount ?? '0'),
       0,
+    );
+
+    const uncollectedCash = Math.max(
       Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
+      holdsCash,
     );
 
     if (uncollectedCash > 0 && !body.is_netting && !body.allow_uncollected) {
@@ -661,6 +693,18 @@ export async function POST(request: Request) {
           created_by: adminId,
           idempotency_key: `${baseBatchKey}_surplus`,
         }),
+      );
+    }
+
+    if ((nettedAmount > 0 || body.collect_surplus) && ((activeHolds as any[]) ?? []).length > 0) {
+      const holdIds = (activeHolds as any[]).map((h) => h.id);
+      ops.push(
+        (supabase.from('transactions') as any)
+          .update({
+            settlement_status: 'completed',
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', holdIds),
       );
     }
 

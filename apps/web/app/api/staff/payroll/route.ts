@@ -133,7 +133,9 @@ export async function GET(request: Request) {
           'id, related_user_id, amount, direction, description, created_at, updated_at, transaction_date, settlement_status, category_id, employee_confirmed, from_wallet_id, service_order_id, trip_id',
         )
         .eq('lifecycle_status', 'approved')
-        .or(`category_id.in.(${[...SALARY_CATEGORY_IDS, ADVANCE_CATEGORY_ID].join(',')})`)
+        .or(
+          `category_id.in.(${[...SALARY_CATEGORY_IDS, ADVANCE_CATEGORY_ID, CASH_COLLECT_CAT].join(',')})`,
+        )
         .not('related_user_id', 'is', null)
         .order('created_at', { ascending: false })
         .limit(2000),

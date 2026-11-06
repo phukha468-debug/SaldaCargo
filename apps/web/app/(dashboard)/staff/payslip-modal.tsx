@@ -15,6 +15,7 @@ interface PayslipModalProps {
 type PayrollHistoryItem = NonNullable<PayrollUser['history']>[number] & {
   from_wallet?: { id: string; name: string; type: string } | null;
   transaction_date?: string | null;
+  lifecycle_status?: string | null;
   trip?: {
     id: string;
     trip_number: number;
@@ -138,7 +139,6 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   const weekCycle = getThursdayCycle(now);
 
   const allHistory: PayrollHistoryItem[] = user.history || [];
-  const userDebt = parseFloat(user.debt || '0');
   const userAdvanceOffset = parseFloat(user.advance_offset || '0');
 
   // Хелперы фильтрации типов записей
@@ -179,179 +179,94 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   };
 
   // 1. НАЧИСЛЕНО (Заработок за рейсы / заказ-наряды)
-  // В недельном режиме:
-  // Если у сотрудника есть невыплаченные смены (userDebt > 0), именно они составляют текущий расчётный лист к выплате!
-  // Период считается от даты прошлой выплаты (или начала расчетного цикла) до сегодняшнего дня.
-  // Предыдущие завершенные выплаты (включая субботние/пятничные выплаты старой недели) ни в коем случае не вычитаются из новых смен!
+  // Изолируем периоды выплат: смены после четверга (например пятница 06.11) относятся к следующей неделе!
   let accruals: PayrollHistoryItem[] = [];
   let debtRepayments: PayrollHistoryItem[] = [];
   let salaryPayouts: PayrollHistoryItem[] = [];
 
-  // Поиск завершенных выплат ЗП, отсортированных от свежих к старым
-  const completedPayouts = allHistory
-    .filter((t) => isSalaryPayout(t) && t.settlement_status === 'completed')
-    .sort(
-      (a, b) =>
-        new Date(b.transaction_date || b.created_at).getTime() -
-        new Date(a.transaction_date || a.created_at).getTime(),
-    );
+  if (periodMode === 'gazelle') {
+    // 🚚 НЕДЕЛЬНЫЙ РАСЧЁТ: Четверговый срез (Пт 00:00 - Чт 23:59:59)
+    // Строго отсекаем смены после четверга weekCycle.end!
+    accruals = allHistory.filter((t) => {
+      if (!isSalaryAccrual(t)) return false;
+      const rawDate = t.transaction_date || t.created_at;
+      if (!rawDate) return false;
+      const d = new Date(rawDate);
+      if (d > weekCycle.end) return false;
+      return d >= weekCycle.start || t.settlement_status === 'pending';
+    });
 
-  let cycleStartDate: Date;
-  let cycleEndDate: Date;
+    debtRepayments = allHistory.filter((t) => {
+      if (!isDebtRepayment(t)) return false;
+      const rawDate = t.transaction_date || t.created_at;
+      if (!rawDate) return false;
+      const d = new Date(rawDate);
+      return d >= weekCycle.start && d <= weekCycle.end;
+    });
 
-  if (userDebt > 0) {
-    // Есть открытый долг к выплате — считаем с момента предыдущей выплаты по текущий момент (сегодня)
-    cycleEndDate = now;
-    const p0 = completedPayouts[0];
-    if (p0) {
-      cycleStartDate = new Date(p0.transaction_date || p0.created_at);
-    } else {
-      cycleStartDate = weekCycle.start;
+    if (
+      debtRepayments.length === 0 &&
+      userAdvanceOffset > 0 &&
+      accruals.some((t) => t.settlement_status === 'pending')
+    ) {
+      const sumAcc = accruals.reduce((s, t) => s + parseFloat(t.amount || '0'), 0);
+      debtRepayments = [
+        {
+          id: 'current-advance-offset',
+          amount: Math.min(sumAcc, userAdvanceOffset).toFixed(2),
+          direction: 'income',
+          description: 'Зачёт аванса в счёт ЗП (Чт-срез)',
+          created_at: new Date().toISOString(),
+          transaction_date: new Date().toISOString(),
+          settlement_status: 'pending',
+          category_id: ADVANCE_CATEGORY_ID,
+          employee_confirmed: null,
+        },
+      ];
     }
-  } else {
-    // Долг закрыт — лист показывает уже закрытый цикл: с предпоследней выплаты по последнюю
-    const p0 = completedPayouts[0];
-    const p1 = completedPayouts[1];
-    cycleEndDate = p0 ? new Date(p0.transaction_date || p0.created_at) : now;
-    cycleStartDate = p1 ? new Date(p1.transaction_date || p1.created_at) : weekCycle.start;
-  }
-
-  if (periodMode === 'valday') {
-    // 🚛 ВАЛДАЙ: По факту / все невыплаченные рейсы без отсечения четвергом
-    if (userDebt > 0) {
-      accruals = allHistory.filter((t) => isSalaryAccrual(t) && t.settlement_status === 'pending');
-      if (accruals.length === 0) {
-        accruals = allHistory.filter(
-          (t) =>
-            isSalaryAccrual(t) && new Date(t.transaction_date || t.created_at) >= cycleStartDate,
-        );
-      }
-      debtRepayments = allHistory.filter(
-        (t) => isDebtRepayment(t) && new Date(t.transaction_date || t.created_at) > cycleStartDate,
-      );
-      if (debtRepayments.length === 0 && userAdvanceOffset > 0) {
-        debtRepayments = [
-          {
-            id: 'current-advance-offset',
-            amount: userAdvanceOffset.toFixed(2),
-            direction: 'income',
-            description: 'Зачёт аванса в счёт ЗП за текущий расчёт',
-            created_at: new Date().toISOString(),
-            transaction_date: new Date().toISOString(),
-            settlement_status: 'pending',
-            category_id: ADVANCE_CATEGORY_ID,
-            employee_confirmed: null,
-          },
-        ];
-      }
-      salaryPayouts = allHistory.filter(
-        (t) =>
-          isSalaryPayout(t) &&
-          t.settlement_status === 'completed' &&
-          new Date(t.transaction_date || t.created_at) > cycleStartDate,
-      );
-    } else {
-      accruals = allHistory.filter(
-        (t) =>
-          isSalaryAccrual(t) &&
-          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
-          new Date(t.transaction_date || t.created_at) <= cycleEndDate,
-      );
-      debtRepayments = allHistory.filter(
-        (t) =>
-          isDebtRepayment(t) &&
-          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
-          new Date(t.transaction_date || t.created_at) <= cycleEndDate,
-      );
-      salaryPayouts = allHistory.filter(
-        (t) =>
-          isSalaryPayout(t) &&
-          t.settlement_status === 'completed' &&
-          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
-          new Date(t.transaction_date || t.created_at) <= cycleEndDate,
-      );
+  } else if (periodMode === 'valday') {
+    // 🚛 ВАЛДАЙ / ПО ФАКТУ: Все невыплаченные смены
+    accruals = allHistory.filter((t) => isSalaryAccrual(t) && t.settlement_status === 'pending');
+    if (accruals.length === 0) {
+      accruals = allHistory.filter(isSalaryAccrual);
     }
-  } else if (periodMode === 'gazelle') {
-    // 🚚 ГАЗЕЛЬ: Четверговый срез (Пт 00:00 - Чт 23:59:59)
-    if (userDebt > 0) {
-      accruals = allHistory.filter((t) => {
-        if (!isSalaryAccrual(t)) return false;
-        if (t.settlement_status !== 'pending') return false;
-        const rawDate = t.transaction_date || t.created_at;
-        if (!rawDate) return true;
-        return new Date(rawDate) <= weekCycle.end;
-      });
-      if (accruals.length === 0) {
-        accruals = allHistory.filter(
-          (t) => isSalaryAccrual(t) && t.settlement_status === 'pending',
-        );
-      }
-      debtRepayments = allHistory.filter(
-        (t) =>
-          isDebtRepayment(t) &&
-          new Date(t.transaction_date || t.created_at) > cycleStartDate &&
-          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
-      );
-      if (debtRepayments.length === 0 && userAdvanceOffset > 0) {
-        debtRepayments = [
-          {
-            id: 'current-advance-offset',
-            amount: userAdvanceOffset.toFixed(2),
-            direction: 'income',
-            description: 'Зачёт аванса в счёт ЗП (Чт-срез)',
-            created_at: new Date().toISOString(),
-            transaction_date: new Date().toISOString(),
-            settlement_status: 'pending',
-            category_id: ADVANCE_CATEGORY_ID,
-            employee_confirmed: null,
-          },
-        ];
-      }
-      salaryPayouts = allHistory.filter(
-        (t) =>
-          isSalaryPayout(t) &&
-          t.settlement_status === 'completed' &&
-          new Date(t.transaction_date || t.created_at) > cycleStartDate &&
-          new Date(t.transaction_date || t.created_at) <= now,
-      );
-    } else {
-      accruals = allHistory.filter(
-        (t) =>
-          isSalaryAccrual(t) &&
-          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
-          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
-      );
-      debtRepayments = allHistory.filter(
-        (t) =>
-          isDebtRepayment(t) &&
-          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
-          new Date(t.transaction_date || t.created_at) <= weekCycle.end,
-      );
-      salaryPayouts = allHistory.filter(
-        (t) =>
-          isSalaryPayout(t) &&
-          t.settlement_status === 'completed' &&
-          new Date(t.transaction_date || t.created_at) >= cycleStartDate &&
-          new Date(t.transaction_date || t.created_at) <= now,
-      );
+    debtRepayments = allHistory.filter(isDebtRepayment);
+    if (
+      debtRepayments.length === 0 &&
+      userAdvanceOffset > 0 &&
+      accruals.some((t) => t.settlement_status === 'pending')
+    ) {
+      const sumAcc = accruals.reduce((s, t) => s + parseFloat(t.amount || '0'), 0);
+      debtRepayments = [
+        {
+          id: 'current-advance-offset',
+          amount: Math.min(sumAcc, userAdvanceOffset).toFixed(2),
+          direction: 'income',
+          description: 'Зачёт аванса в счёт ЗП (По факту)',
+          created_at: new Date().toISOString(),
+          transaction_date: new Date().toISOString(),
+          settlement_status: 'pending',
+          category_id: ADVANCE_CATEGORY_ID,
+          employee_confirmed: null,
+        },
+      ];
     }
   } else if (periodMode === 'custom') {
-    // 🗓️ ПРОИЗВОЛЬНЫЙ ВЫБОР ДАТ: С customStart ПО customEnd
+    // 🗓️ ВЫБОР ДАТ: С customStart ПО customEnd
     const sDate = new Date(customStart + 'T00:00:00');
     const eDate = new Date(customEnd + 'T23:59:59.999');
     accruals = allHistory.filter((t) => {
       if (!isSalaryAccrual(t)) return false;
-      const d = new Date(t.transaction_date || t.created_at);
+      const rawDate = t.transaction_date || t.created_at;
+      if (!rawDate) return false;
+      const d = new Date(rawDate);
       return d >= sDate && d <= eDate;
     });
     debtRepayments = allHistory.filter((t) => {
       if (!isDebtRepayment(t)) return false;
-      const d = new Date(t.transaction_date || t.created_at);
-      return d >= sDate && d <= eDate;
-    });
-    salaryPayouts = allHistory.filter((t) => {
-      if (!isSalaryPayout(t)) return false;
-      const d = new Date(t.transaction_date || t.created_at);
+      const rawDate = t.transaction_date || t.created_at;
+      if (!rawDate) return false;
+      const d = new Date(rawDate);
       return d >= sDate && d <= eDate;
     });
   } else {
@@ -365,7 +280,49 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
 
     accruals = monthHistory.filter(isSalaryAccrual);
     debtRepayments = monthHistory.filter(isDebtRepayment);
-    salaryPayouts = monthHistory.filter(isSalaryPayout);
+  }
+
+  // Сортировка начислений: от свежих к старым
+  accruals.sort(
+    (a, b) =>
+      new Date(b.transaction_date || b.created_at).getTime() -
+      new Date(a.transaction_date || a.created_at).getTime(),
+  );
+
+  // 2. ФИЛЬТРАЦИЯ ВЫПЛАТ ДЕНЬГАМИ:
+  // Выплаты ЗП, сделанные ДО даты начислений этого периода (например выплата 31.10 за прошлую неделю),
+  // ни в коем случае НЕ вычитаются из начислений нового периода (например нарядов от 04.11)!
+  const minAccrualTime =
+    accruals.length > 0
+      ? Math.min(...accruals.map((a) => new Date(a.transaction_date || a.created_at).getTime()))
+      : 0;
+
+  const allAccrualsPending =
+    accruals.length > 0 && accruals.every((t) => t.settlement_status === 'pending');
+
+  if (allAccrualsPending) {
+    // Начисления за этот период ещё не выплачивались — выдано 0 ₽
+    salaryPayouts = [];
+  } else {
+    salaryPayouts = allHistory.filter((t) => {
+      if (!isSalaryPayout(t) || t.settlement_status !== 'completed') return false;
+      const rawDate = t.transaction_date || t.created_at;
+      if (!rawDate) return false;
+      const tTime = new Date(rawDate).getTime();
+      // Выплата должна быть произведена НЕ раньше появления начислений этого периода
+      if (minAccrualTime > 0 && tTime < minAccrualTime - 60000) return false;
+
+      if (periodMode === 'custom') {
+        const sDate = new Date(customStart + 'T00:00:00').getTime();
+        const eDate = new Date(customEnd + 'T23:59:59.999').getTime();
+        return tTime >= sDate && tTime <= eDate + 86400000;
+      }
+      if (periodMode === 'month') {
+        const d = new Date(rawDate);
+        return d.getFullYear() === year && d.getMonth() + 1 === monthNumber;
+      }
+      return true;
+    });
   }
 
   // Подсчёт сумм за выбранный период
@@ -373,42 +330,56 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   const sumDebtRepayments = debtRepayments.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
   const sumSalaryPayouts = salaryPayouts.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0);
 
-  // Остаток долга и сумма к выдаче
-  const advanceBalanceCurrent = parseFloat(user.advance_balance || '0');
-
-  // Расчёт остатка к выдаче на руки за период:
-  const periodNetPayout = Math.max(0, sumAccruals - sumDebtRepayments - sumSalaryPayouts);
-  const totalPayoutOnHand =
-    periodMode === 'valday'
-      ? userDebt > 0
-        ? parseFloat(user.payout || user.debt || '0')
-        : periodNetPayout
-      : periodNetPayout > 0
-        ? periodNetPayout
-        : parseFloat(user.payout || user.debt || '0');
+  // Чистый заработок за период за вычетом удержаний:
+  const periodNetEarned = Math.max(0, sumAccruals - sumDebtRepayments);
+  // Остаток к выдаче на руки деньгами (если выплата ещё не проводилась или проведена частично):
+  const periodRemainingOnHand = Math.max(0, periodNetEarned - sumSalaryPayouts);
 
   // Фактическая сумма к выдаче для печати на бандероли/в шапке:
-  // Если выплата уже проведена (sumSalaryPayouts > 0) и остаток обнулился,
-  // берем сумму проведенной выплаты, иначе текущий расчетный остаток.
+  // Если ЗП за период ещё не выплачена — к выдаче ровно periodNetEarned.
+  // Если ЗП уже была выплачена деньгами и остаток обнулился — сумма проведённой выплаты за период.
+  // Ни при каких условиях не подмешивает глобальный долг за все времена с будущими сменами!
   const payoutToPrint =
-    totalPayoutOnHand > 0
-      ? totalPayoutOnHand
+    periodRemainingOnHand > 0
+      ? periodRemainingOnHand
       : sumSalaryPayouts > 0
-        ? sumSalaryPayouts
-        : Math.max(0, sumAccruals - sumDebtRepayments);
+        ? Math.min(sumSalaryPayouts, periodNetEarned || sumSalaryPayouts)
+        : periodNetEarned;
 
-  // Период недели считается честно: от даты прошлой выплаты (или начала цикла) до сегодняшнего дня
-  const actualStart = cycleStartDate.toLocaleDateString('ru-RU');
-  const actualEnd = cycleEndDate.toLocaleDateString('ru-RU');
-  const dynamicCycleLabel = `${actualStart} — ${actualEnd}`;
+  // Формирование точного заголовка периода
+  let periodLabel = '';
+  if (periodMode === 'custom') {
+    periodLabel = `${new Date(customStart + 'T00:00:00').toLocaleDateString('ru-RU')} — ${new Date(customEnd + 'T23:59:59').toLocaleDateString('ru-RU')}`;
+  } else if (periodMode === 'month') {
+    periodLabel = `${monthName.toUpperCase()} ${year} Г.`;
+  } else if (periodMode === 'gazelle') {
+    // В режиме «Недельный расчёт» строго фиксированный четверговый срез (Пт-Чт)
+    periodLabel = `${weekCycle.start.toLocaleDateString('ru-RU')} — ${weekCycle.end.toLocaleDateString('ru-RU')}`;
+  } else {
+    // По факту (все смены)
+    if (accruals.length > 0) {
+      const dates = accruals.map((a) => new Date(a.transaction_date || a.created_at).getTime());
+      const minD = new Date(Math.min(...dates)).toLocaleDateString('ru-RU');
+      const maxD = new Date(Math.max(...dates)).toLocaleDateString('ru-RU');
+      periodLabel = minD === maxD ? minD : `${minD} — ${maxD}`;
+    } else {
+      periodLabel = `${weekCycle.start.toLocaleDateString('ru-RU')} — ${weekCycle.end.toLocaleDateString('ru-RU')}`;
+    }
+  }
 
-  const customLabel = `${new Date(customStart + 'T00:00:00').toLocaleDateString('ru-RU')} — ${new Date(customEnd + 'T23:59:59').toLocaleDateString('ru-RU')}`;
-  const periodLabel =
-    periodMode === 'custom'
-      ? customLabel
-      : periodMode === 'month'
-        ? `${monthName.toUpperCase()} ${year} Г.`
-        : dynamicCycleLabel;
+  // Расчёт подотчётных средств на руках сотрудника (включая зафиксированные переносы)
+  const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
+  const historyHolds = allHistory
+    .filter(
+      (t) =>
+        t.category_id === CASH_COLLECT_CAT &&
+        t.settlement_status === 'pending' &&
+        t.lifecycle_status !== 'cancelled',
+    )
+    .reduce((s, t) => s + parseFloat(t.amount || '0'), 0);
+  const accountableHoldAmount = Math.max(user.accountable_hold || 0, historyHolds);
+
+  const advanceBalanceCurrent = parseFloat(user.advance_balance || '0');
 
   const modeBadge =
     periodMode === 'gazelle'
@@ -731,14 +702,14 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
             </div>
           </div>
 
-          {Boolean(user.accountable_hold && user.accountable_hold > 0) && (
+          {Boolean(accountableHoldAmount > 0) && (
             <div className="bg-amber-50 print:bg-white p-1.5 rounded-lg border border-amber-300 print:border-slate-800 flex items-center justify-between text-[9.5px]">
               <span className="text-amber-950 print:text-slate-900 font-black flex items-center gap-1.5">
                 <span>💵</span>
                 <span>Подотчётные средства на руках (подлежат сдаче в кассу компании):</span>
               </span>
               <span className="font-mono font-black text-amber-950 print:text-slate-950 px-2 py-0.5 border border-amber-400 print:border-slate-800 rounded bg-white">
-                {user.accountable_hold!.toLocaleString('ru-RU')} ₽
+                {accountableHoldAmount.toLocaleString('ru-RU')} ₽
               </span>
             </div>
           )}
