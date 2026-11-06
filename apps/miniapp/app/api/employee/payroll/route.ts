@@ -32,6 +32,9 @@ export async function GET(request: Request) {
     { data: paidRows },
     { data: allAccruals },
     { data: payoutsRows },
+    { data: userTrips },
+    { data: userCollections },
+    { data: userCashExpenses },
   ] = await Promise.all([
     (supabase.from('transactions') as any)
       .select(
@@ -85,7 +88,48 @@ export async function GET(request: Request) {
       .not('from_wallet_id', 'is', null)
       .order('transaction_date', { ascending: false })
       .limit(200),
+
+    // Подсчет наличных на руках (подотчет сотрудника)
+    (supabase.from('trips') as any)
+      .select('id, trip_orders(id, amount, payment_method, lifecycle_status)')
+      .eq('driver_id', userId)
+      .neq('lifecycle_status', 'cancelled'),
+
+    (supabase.from('cash_collections') as any).select('amount').eq('driver_id', userId),
+
+    (supabase.from('trip_expenses') as any)
+      .select('amount, payment_method, trips!inner(driver_id, lifecycle_status)')
+      .eq('trips.driver_id', userId)
+      .neq('trips.lifecycle_status', 'cancelled')
+      .eq('payment_method', 'cash'),
   ]);
+
+  const cashReceived = ((userTrips as any[]) ?? [])
+    .flatMap((t: any) => t.trip_orders ?? [])
+    .filter((o: any) => o.payment_method === 'cash' && o.lifecycle_status !== 'cancelled')
+    .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+
+  const cashCollected = ((userCollections as any[]) ?? []).reduce(
+    (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
+    0,
+  );
+
+  const cashSpent = ((userCashExpenses as any[]) ?? []).reduce(
+    (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
+    0,
+  );
+
+  const cash_on_hands = Math.max(0, cashReceived - cashSpent - cashCollected);
+
+  const userTripIdsWithCash = new Set(
+    (userTrips ?? [])
+      .filter((t: any) =>
+        (t.trip_orders ?? []).some(
+          (o: any) => o.payment_method === 'cash' && o.lifecycle_status !== 'cancelled',
+        ),
+      )
+      .map((t: any) => t.id),
+  );
 
   const accumulated_total = (accumulatedRows ?? [])
     .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0)
@@ -143,6 +187,8 @@ export async function GET(request: Request) {
 
   const accrualItems = (allAccruals ?? []).map((t: any) => {
     const tripDate = t.trip?.started_at ?? t.transaction_date;
+    const hasUncollectedCash =
+      cash_on_hands > 0 && t.trip?.id && userTripIdsWithCash.has(t.trip.id);
     return {
       id: t.id,
       amount: t.amount,
@@ -156,6 +202,7 @@ export async function GET(request: Request) {
       driver_name: t.trip?.driver?.name ?? null,
       asset_name: t.trip?.asset?.short_name ?? null,
       description: t.description || null,
+      has_uncollected_cash: Boolean(hasUncollectedCash),
     };
   });
 
@@ -178,6 +225,7 @@ export async function GET(request: Request) {
     pending_count: pendingItems.length,
     accumulated_total,
     total_paid,
+    cash_on_hands,
     accruals: accrualItems,
     payouts: payoutItems,
   });

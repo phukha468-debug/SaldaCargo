@@ -64,11 +64,24 @@ export async function GET(request: Request) {
     .eq('category_id', ADVANCE_CATEGORY_ID)
     .eq('related_user_id', userId);
 
+  const queryTrips = (supabase.from('trips') as any)
+    .select(
+      'driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
+    )
+    .eq('driver_id', userId)
+    .neq('lifecycle_status', 'cancelled');
+
+  const queryCollections = (supabase.from('cash_collections') as any)
+    .select('amount')
+    .eq('driver_id', userId);
+
   const promises: Promise<any>[] = [
     queryPending,
     queryAdvanceGiven,
     queryAdvanceOffset,
     queryUnconfirmedCount,
+    queryTrips,
+    queryCollections,
   ];
 
   let historyPromise = Promise.resolve({ data: null });
@@ -97,7 +110,31 @@ export async function GET(request: Request) {
   const advanceGiven = results[1].data;
   const advanceOffset = results[2].data;
   const unconfirmedCount = results[3]?.count ?? 0;
-  const history = results[4]?.data ?? [];
+  const userTrips = results[4]?.data ?? [];
+  const userCollections = results[5]?.data ?? [];
+  const history = results[6]?.data ?? [];
+
+  const cashIn = ((userTrips as any[]) ?? [])
+    .flatMap((t: any) => t.trip_orders ?? [])
+    .filter(
+      (o: any) =>
+        o.payment_method === 'cash' &&
+        o.lifecycle_status !== 'cancelled' &&
+        o.settlement_status === 'completed',
+    )
+    .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+
+  const cashSpent = ((userTrips as any[]) ?? [])
+    .flatMap((t: any) => t.trip_expenses ?? [])
+    .filter((e: any) => e.payment_method === 'cash')
+    .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
+
+  const cashCollected = ((userCollections as any[]) ?? []).reduce(
+    (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
+    0,
+  );
+
+  const uncollectedCash = Math.max(0, Math.round((cashIn - cashSpent - cashCollected) * 100) / 100);
 
   const salaryTotal = ((pendingPayroll as any[]) ?? []).reduce(
     (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
@@ -121,6 +158,7 @@ export async function GET(request: Request) {
     advance_balance: advanceBalance.toFixed(2),
     offset: offset.toFixed(2),
     payout: payout.toFixed(2),
+    uncollected_cash: uncollectedCash.toFixed(2),
     unconfirmed_count: unconfirmedCount,
     pending_transactions: pendingPayroll ?? [],
     history: history.map((t: any) => {
@@ -200,6 +238,9 @@ export async function POST(request: Request) {
       partial_amount?: string;
       action?: string;
       idempotency_key?: string;
+      is_netting?: boolean;
+      allow_uncollected?: boolean;
+      collect_surplus?: boolean;
     };
 
     if (!body.user_id) {
@@ -272,6 +313,8 @@ export async function POST(request: Request) {
       { data: advanceGiven },
       { data: advanceOffset },
       { data: userRow },
+      { data: userTrips },
+      { data: userCollections },
     ] = await Promise.all([
       (supabase.from('transactions') as any)
         .select(
@@ -302,7 +345,51 @@ export async function POST(request: Request) {
         .eq('related_user_id', body.user_id),
 
       (supabase.from('users') as any).select('name, roles').eq('id', body.user_id).single(),
+
+      (supabase.from('trips') as any)
+        .select(
+          'id, driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
+        )
+        .eq('driver_id', body.user_id)
+        .neq('lifecycle_status', 'cancelled'),
+
+      (supabase.from('cash_collections') as any).select('amount').eq('driver_id', body.user_id),
     ]);
+
+    const cashIn = ((userTrips as any[]) ?? [])
+      .flatMap((t: any) => t.trip_orders ?? [])
+      .filter(
+        (o: any) =>
+          o.payment_method === 'cash' &&
+          o.lifecycle_status !== 'cancelled' &&
+          o.settlement_status === 'completed',
+      )
+      .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+
+    const cashSpent = ((userTrips as any[]) ?? [])
+      .flatMap((t: any) => t.trip_expenses ?? [])
+      .filter((e: any) => e.payment_method === 'cash')
+      .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
+
+    const cashCollected = ((userCollections as any[]) ?? []).reduce(
+      (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
+      0,
+    );
+
+    const uncollectedCash = Math.max(
+      0,
+      Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
+    );
+
+    if (uncollectedCash > 0 && !body.is_netting && !body.allow_uncollected) {
+      return NextResponse.json(
+        {
+          error: `У сотрудника числятся несданные наличные: ${uncollectedCash.toLocaleString('ru-RU')} ₽. Сначала примите деньги в кассу или проведите взаимозачёт.`,
+          uncollected_cash: uncollectedCash,
+        },
+        { status: 400 },
+      );
+    }
 
     const employeeName = userRow?.name ?? 'Сотрудник';
     const dateLabel = new Date().toLocaleDateString('ru-RU', {
@@ -445,6 +532,12 @@ export async function POST(request: Request) {
       actualPayout = salaryTotal - offset;
     }
 
+    let nettedAmount = 0;
+    if (body.is_netting && uncollectedCash > 0) {
+      nettedAmount = Math.min(actualPayout, uncollectedCash);
+      actualPayout = Math.max(0, Math.round((actualPayout - nettedAmount) * 100) / 100);
+    }
+
     const { splits, error: splitErr } = resolveSplits(body, actualPayout);
     if (splitErr) {
       return NextResponse.json({ error: splitErr }, { status: 400 });
@@ -543,6 +636,48 @@ export async function POST(request: Request) {
       }
     }
 
+    if (nettedAmount > 0) {
+      ops.push(
+        (supabase.from('cash_collections') as any).insert({
+          driver_id: body.user_id,
+          amount: nettedAmount.toFixed(2),
+          collected_by: adminId,
+          note: `Взаимозачёт ЗП: ${employeeName} (удержано из выручки)`,
+        }),
+      );
+    }
+
+    if (body.collect_surplus && uncollectedCash > nettedAmount) {
+      const surplus = Math.round((uncollectedCash - nettedAmount) * 100) / 100;
+      ops.push(
+        (supabase.from('cash_collections') as any).insert({
+          driver_id: body.user_id,
+          amount: surplus.toFixed(2),
+          collected_by: adminId,
+          note: `Сдача остатка выручки после взаимозачёта: ${employeeName}`,
+        }),
+      );
+      const CASH_ID = '10000000-0000-0000-0000-000000000002';
+      const { data: cashCollCat } = await (supabase.from('transaction_categories') as any)
+        .select('id')
+        .eq('code', 'CASH_COLLECT')
+        .maybeSingle();
+
+      ops.push(
+        (supabase.from('transactions') as any).insert({
+          direction: 'transfer',
+          amount: surplus.toFixed(2),
+          category_id: cashCollCat?.id || categoryId,
+          to_wallet_id: CASH_ID,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          description: `Инкассация остатка выручки: ${employeeName}`,
+          created_by: adminId,
+          idempotency_key: `${batchId}_surplus`,
+        }),
+      );
+    }
+
     if (actualOffset > 0) {
       // Запись о зачёте аванса (income = уменьшает остаток долга сотрудника, но НЕ пополняет кошелёк)
       ops.push(
@@ -568,6 +703,7 @@ export async function POST(request: Request) {
       ok: true,
       payout: actualPayout.toFixed(2),
       offset: actualOffset.toFixed(2),
+      netted: nettedAmount.toFixed(2),
       settled_count: idsToSettle.length,
       splits,
     });

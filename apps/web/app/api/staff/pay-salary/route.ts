@@ -96,6 +96,52 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ error: 'Сотрудник не найден' }, { status: 404 });
 
+    // Проверка несданных наличных на руках
+    const [{ data: userTrips }, { data: userCollections }] = await Promise.all([
+      (supabase.from('trips') as any)
+        .select(
+          'id, driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
+        )
+        .eq('driver_id', body.user_id)
+        .neq('lifecycle_status', 'cancelled'),
+      (supabase.from('cash_collections') as any).select('amount').eq('driver_id', body.user_id),
+    ]);
+
+    const cashIn = ((userTrips as any[]) ?? [])
+      .flatMap((t: any) => t.trip_orders ?? [])
+      .filter(
+        (o: any) =>
+          o.payment_method === 'cash' &&
+          o.lifecycle_status !== 'cancelled' &&
+          o.settlement_status === 'completed',
+      )
+      .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+
+    const cashSpent = ((userTrips as any[]) ?? [])
+      .flatMap((t: any) => t.trip_expenses ?? [])
+      .filter((e: any) => e.payment_method === 'cash')
+      .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
+
+    const cashCollected = ((userCollections as any[]) ?? []).reduce(
+      (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
+      0,
+    );
+
+    const uncollectedCash = Math.max(
+      0,
+      Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
+    );
+
+    if (uncollectedCash > 0 && !(body as any).allow_uncollected) {
+      return NextResponse.json(
+        {
+          error: `У сотрудника числятся несданные наличные: ${uncollectedCash.toLocaleString('ru-RU')} ₽. Сначала примите деньги в кассу или проведите взаимозачёт.`,
+          uncollected_cash: uncollectedCash,
+        },
+        { status: 400 },
+      );
+    }
+
     const operationalRole = (user.roles as string[]).find((r) => r in PAYROLL_CATEGORIES);
     const categoryId = operationalRole ? PAYROLL_CATEGORIES[operationalRole] : OTHER_EXPENSE;
 

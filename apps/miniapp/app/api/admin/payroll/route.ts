@@ -47,6 +47,10 @@ export async function GET(request: Request) {
       { data: advanceGiven },
       // Зачтённые/возвращённые авансы / долги (income)
       { data: advanceOffset },
+      // Все рейсы с заказами
+      { data: allTrips },
+      // Все инкассации
+      { data: allCollections },
     ] = await Promise.all([
       (supabase as any)
         .from('users')
@@ -102,6 +106,15 @@ export async function GET(request: Request) {
         .eq('lifecycle_status', 'approved')
         .eq('category_id', ADVANCE_CATEGORY_ID)
         .not('related_user_id', 'is', null),
+
+      (supabase as any)
+        .from('trips')
+        .select(
+          'driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
+        )
+        .neq('lifecycle_status', 'cancelled'),
+
+      (supabase as any).from('cash_collections').select('driver_id, amount'),
     ]);
 
     const sumByUser = (rows: any[] | null) => {
@@ -124,6 +137,23 @@ export async function GET(request: Request) {
     const advGiven = sumByUser(advanceGiven);
     const advOffset = sumByUser(advanceOffset);
 
+    const userTripsMap = new Map<string, any[]>();
+    for (const t of (allTrips as any[]) ?? []) {
+      if (!t.driver_id) continue;
+      const arr = userTripsMap.get(t.driver_id) ?? [];
+      arr.push(t);
+      userTripsMap.set(t.driver_id, arr);
+    }
+
+    const collectionsMap = new Map<string, number>();
+    for (const c of (allCollections as any[]) ?? []) {
+      if (!c.driver_id) continue;
+      collectionsMap.set(
+        c.driver_id,
+        (collectionsMap.get(c.driver_id) ?? 0) + parseFloat(c.amount ?? '0'),
+      );
+    }
+
     const result = ((users as any[]) ?? [])
       .map((u: any) => {
         const isManagement = (u.roles as string[]).some((r: string) =>
@@ -141,6 +171,28 @@ export async function GET(request: Request) {
         );
         const offsetNow = Math.min(debtAmt, advanceBalance);
         const payoutNow = Math.max(0, debtAmt - offsetNow);
+
+        const trips = userTripsMap.get(u.id) ?? [];
+        const cashIn = trips
+          .flatMap((t: any) => t.trip_orders ?? [])
+          .filter(
+            (o: any) =>
+              o.payment_method === 'cash' &&
+              o.lifecycle_status !== 'cancelled' &&
+              o.settlement_status === 'completed',
+          )
+          .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+
+        const cashSpent = trips
+          .flatMap((t: any) => t.trip_expenses ?? [])
+          .filter((e: any) => e.payment_method === 'cash')
+          .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
+
+        const cashCollected = collectionsMap.get(u.id) ?? 0;
+        const uncollectedCash = Math.max(
+          0,
+          Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
+        );
 
         let isOnline = false;
         let address = '';
@@ -175,6 +227,7 @@ export async function GET(request: Request) {
           advance_balance: advanceBalance.toFixed(2),
           advance_offset: offsetNow.toFixed(2),
           payout: payoutNow.toFixed(2),
+          uncollected_cash: uncollectedCash.toFixed(2),
           shifts: earnedCount,
         };
       })

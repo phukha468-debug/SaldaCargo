@@ -42,7 +42,7 @@ export async function GET() {
     ] = await Promise.all([
       (supabase.from('users') as any)
         .select('id, name, phone, current_asset_id')
-        .contains('roles', ['driver'])
+        .or('roles.cs.{"driver"},roles.cs.{"loader"}')
         .eq('is_active', true)
         .order('name'),
 

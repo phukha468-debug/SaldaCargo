@@ -20,6 +20,7 @@ type PayrollEntry = {
   advance_balance?: string;
   advance_offset?: string;
   payout?: string;
+  uncollected_cash?: string;
   is_management: boolean;
   shifts: number;
   is_online?: boolean;
@@ -144,6 +145,8 @@ function StaffContent() {
   const [settleIdempotencyKey, setSettleIdempotencyKey] = useState('');
   const [isSubmittingSettle, setIsSubmittingSettle] = useState(false);
   const [confirmOffsetOpen, setConfirmOffsetOpen] = useState(false);
+  const [uncollectedCash, setUncollectedCash] = useState(0);
+  const [isNetting, setIsNetting] = useState(false);
 
   // Adjust debt modal state
   const [adjustTarget, setAdjustTarget] = useState<PayrollEntry | null>(null);
@@ -183,6 +186,24 @@ function StaffContent() {
     staleTime: 60000,
   });
 
+  const collectCashMutation = useMutation({
+    mutationFn: (body: { driver_id: string; amount: string; note?: string }) =>
+      fetch('/api/admin/cash-collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Ошибка приёма денег');
+        return json;
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-payroll'] });
+      qc.invalidateQueries({ queryKey: ['wallets'] });
+      if (settleTarget) openSettle(settleTarget);
+    },
+  });
+
   const settleMutation = useMutation({
     mutationFn: (body: {
       user_id: string;
@@ -191,6 +212,9 @@ function StaffContent() {
       wallet_splits?: Array<{ wallet_id: string; amount: number }>;
       partial_offset: string;
       idempotency_key?: string;
+      is_netting?: boolean;
+      allow_uncollected?: boolean;
+      collect_surplus?: boolean;
     }) =>
       fetch('/api/admin/staff-settle', {
         method: 'POST',
@@ -211,6 +235,8 @@ function StaffContent() {
       setSettleWallet('');
       setSettleOffset('');
       setConfirmOffsetOpen(false);
+      setIsNetting(false);
+      setUncollectedCash(0);
     },
   });
 
@@ -301,6 +327,8 @@ function StaffContent() {
       setSettleBankSplit('');
       setPendingTransactions(data.pending_transactions ?? []);
       setUnconfirmedCount(data.unconfirmed_count ?? 0);
+      setUncollectedCash(parseFloat(data.uncollected_cash || '0'));
+      setIsNetting(false);
       setSettleIdempotencyKey(crypto.randomUUID());
     } catch (e) {
       console.error('Failed to load settle data', e);
@@ -335,7 +363,14 @@ function StaffContent() {
     const payoutAmt = parseFloat(settleAmount) || 0;
     const offsetAmt = parseFloat(settleOffset) || 0;
 
-    if (payoutAmt === 0 && offsetAmt === 0) return;
+    if (payoutAmt === 0 && offsetAmt === 0 && !isNetting) return;
+
+    if (uncollectedCash > 0 && !isNetting) {
+      alert(
+        `У сотрудника числятся несданные наличные: ${uncollectedCash} ₽. Сначала примите деньги в кассу или проведите взаимозачёт.`,
+      );
+      return;
+    }
 
     if (settleWalletMode === 'single' && !settleWallet && payoutAmt > 0) return;
 
@@ -378,6 +413,8 @@ function StaffContent() {
         from_wallet_id: settleWalletMode === 'single' ? settleWallet : undefined,
         wallet_splits: payoutAmt > 0 ? splitsPayload : undefined,
         idempotency_key: settleIdempotencyKey,
+        is_netting: isNetting,
+        collect_surplus: true,
       },
       {
         onSettled: () => setIsSubmittingSettle(false),
@@ -528,6 +565,11 @@ function StaffContent() {
                         </div>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <p className="text-xs text-zinc-400">{primaryRoleLabel(entry.roles)}</p>
+                          {parseFloat(entry.uncollected_cash || '0') > 0 && (
+                            <span className="text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                              ⚠️ На руках: <Money amount={entry.uncollected_cash!} />
+                            </span>
+                          )}
                           {isOnlineLoader && entry.address && (
                             <span className="text-[11px] font-bold text-emerald-700 truncate">
                               📍 {entry.address}
@@ -609,9 +651,15 @@ function StaffContent() {
                         e.stopPropagation();
                         openSettle(entry);
                       }}
-                      className="w-full bg-orange-500 text-white font-black text-xs py-3 hover:bg-orange-600 active:bg-orange-700 transition-colors"
+                      className={`w-full text-white font-black text-xs py-3 transition-colors ${
+                        parseFloat(entry.uncollected_cash || '0') > 0
+                          ? 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800'
+                          : 'bg-orange-500 hover:bg-orange-600 active:bg-orange-700'
+                      }`}
                     >
                       Рассчитаться (ЗП: <Money amount={entry.debt} />
+                      {parseFloat(entry.uncollected_cash || '0') > 0 &&
+                        ` · нал: ${entry.uncollected_cash} ₽`}
                       {parseFloat(entry.advance_balance || '0') > 0 &&
                         ` · аванс: ${entry.advance_balance} ₽`}
                       )
@@ -648,6 +696,70 @@ function StaffContent() {
                 ✕
               </button>
             </div>
+
+            {/* Uncollected Cash Warning & Actions */}
+            {uncollectedCash > 0 && (
+              <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-black text-rose-900">⚠️ Не сдано в кассу:</span>
+                  <span className="font-black text-rose-700 text-sm">
+                    <Money amount={uncollectedCash.toString()} />
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={collectCashMutation.isPending}
+                    onClick={() =>
+                      settleTarget &&
+                      collectCashMutation.mutate({
+                        driver_id: settleTarget.id,
+                        amount: uncollectedCash.toString(),
+                      })
+                    }
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs py-2.5 rounded-xl transition-all disabled:opacity-50"
+                  >
+                    {collectCashMutation.isPending ? '...' : `💵 Принять (${uncollectedCash} ₽)`}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !isNetting;
+                      setIsNetting(next);
+                      if (next) {
+                        const salary = parseFloat(settleAmount) || 0;
+                        const diff = salary - uncollectedCash;
+                        setSettleAmount(diff > 0 ? diff.toFixed(0) : '0');
+                      } else {
+                        const salaryTotal = parseFloat(settleTarget?.debt || '0');
+                        setSettleAmount(salaryTotal.toFixed(0));
+                      }
+                    }}
+                    className={`w-full font-black text-xs py-2.5 rounded-xl transition-all active:scale-95 border ${
+                      isNetting
+                        ? 'bg-amber-600 border-amber-700 text-white shadow-xs'
+                        : 'bg-white border-zinc-300 text-zinc-800 hover:bg-zinc-50'
+                    }`}
+                  >
+                    {isNetting ? '✓ Взаимозачёт активен' : '⚖️ Взаимозачёт'}
+                  </button>
+                </div>
+
+                {isNetting && uncollectedCash > (parseFloat(settleTarget?.debt || '0') || 0) && (
+                  <div className="flex items-center justify-between text-xs pt-1.5 border-t border-rose-200/60 text-rose-950 font-bold">
+                    <span>Сдать остаток в кассу:</span>
+                    <span className="font-black text-rose-700">
+                      {(
+                        uncollectedCash - (parseFloat(settleTarget?.debt || '0') || 0)
+                      ).toLocaleString('ru-RU')}{' '}
+                      ₽
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Amounts */}
             <div className="grid grid-cols-2 gap-4">
@@ -938,20 +1050,27 @@ function StaffContent() {
                   disabled={
                     settleMutation.isPending ||
                     isSubmittingSettle ||
+                    (uncollectedCash > 0 && !isNetting) ||
                     (settleWalletMode === 'single'
-                      ? !settleWallet
+                      ? !settleWallet && parseFloat(settleAmount || '0') > 0
                       : Math.abs(
                           (parseFloat(settleCashSplit) || 0) +
                             (parseFloat(settleBankSplit) || 0) -
                             (parseFloat(settleAmount) || 0),
                         ) > 0.05) ||
-                    (parseFloat(settleAmount || '0') <= 0 && parseFloat(settleOffset || '0') <= 0)
+                    (parseFloat(settleAmount || '0') <= 0 &&
+                      parseFloat(settleOffset || '0') <= 0 &&
+                      !isNetting)
                   }
                   className="w-full bg-zinc-900 text-white font-black text-base py-5 rounded-2xl disabled:opacity-20 active:scale-[0.98] transition-all shadow-xl shadow-zinc-200"
                 >
                   {settleMutation.isPending || isSubmittingSettle
                     ? 'Проводим выплату...'
-                    : 'Подтвердить и выплатить'}
+                    : uncollectedCash > 0 && !isNetting
+                      ? 'Сначала примите нал или взаимозачёт'
+                      : isNetting
+                        ? 'Провести взаимозачёт'
+                        : 'Подтвердить и выплатить'}
                 </button>
 
                 {settleMutation.isError && (

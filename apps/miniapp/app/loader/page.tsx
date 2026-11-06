@@ -127,6 +127,7 @@ export default function LoaderHomePage() {
   const accumulatedTotal = parseFloat(payrollData?.accumulated_total || '0');
   const pendingItems = payrollData?.pending_confirmation || [];
   const totalPaid = parseFloat(payrollData?.total_paid || '0');
+  const cashOnHands = parseFloat(payrollData?.cash_on_hands || '0');
 
   const accruals = useMemo(() => payrollData?.accruals || [], [payrollData]);
   const payouts = useMemo(() => payrollData?.payouts || [], [payrollData]);
@@ -484,6 +485,22 @@ export default function LoaderHomePage() {
             )}
           </div>
 
+          {/* Индикатор наличных на руках (к сдаче в кассу) - строго 1 строка */}
+          {cashOnHands > 0 && (
+            <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="text-xs">⚠️</span>
+                <span className="text-xs font-bold text-amber-900 truncate">На руках:</span>
+                <span className="text-xs font-mono font-black text-amber-700">
+                  {cashOnHands.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
+                Сдать в кассу
+              </span>
+            </div>
+          )}
+
           {/* Строка с ожидающими подтверждения (если есть) */}
           {pendingItems.length > 0 && (
             <div className="pt-2 border-t border-slate-100">
@@ -670,6 +687,11 @@ export default function LoaderHomePage() {
 
                         {/* Справа: Статус и сумма (строго в 1 строку) */}
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {acc.has_uncollected_cash && (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">
+                              ⚠️ Нал не сдан
+                            </span>
+                          )}
                           <span
                             className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
                               isPaid
