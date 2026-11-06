@@ -39,7 +39,7 @@ interface CreatePrrModalProps {
   onSuccess?: (data: any) => void;
   defaultCreatorId?: string;
   creatorName?: string;
-  role?: 'driver' | 'mechanic' | 'admin';
+  role?: 'driver' | 'mechanic' | 'admin' | 'loader';
 }
 
 const PAYMENT_METHODS = [
@@ -117,23 +117,40 @@ export function CreatePrrModal({
     if (defaultCreatorId && !list.some((l) => l.id === defaultCreatorId)) {
       list.unshift({
         id: defaultCreatorId,
-        name: creatorName ? `${creatorName} (Я)` : 'Я (водитель)',
+        name: creatorName
+          ? `${creatorName} (Я)`
+          : role === 'loader'
+            ? 'Я (грузчик)'
+            : 'Я (водитель)',
       });
     }
     return list;
-  }, [allLoaders, defaultCreatorId, creatorName]);
+  }, [allLoaders, defaultCreatorId, creatorName, role]);
 
-  // Если открывает водитель, по умолчанию выбираем его самого как исполнителя
+  // Если открывает водитель или грузчик, по умолчанию выбираем его самого как исполнителя
   useEffect(() => {
-    if (isOpen && role === 'driver' && defaultCreatorId && selectedLoaders.length === 0) {
+    if (
+      isOpen &&
+      (role === 'driver' || role === 'loader') &&
+      defaultCreatorId &&
+      selectedLoaders.length === 0
+    ) {
+      const selfInList = allLoaders.find((l) => l.id === defaultCreatorId);
+      const displayName = creatorName
+        ? `${creatorName} (Я)`
+        : selfInList?.name
+          ? `${selfInList.name} (Я)`
+          : role === 'loader'
+            ? 'Я (грузчик)'
+            : 'Я (водитель)';
       setSelectedLoaders([
         {
           id: defaultCreatorId,
-          name: creatorName ? `${creatorName} (Я)` : 'Я (водитель)',
+          name: displayName,
         },
       ]);
     }
-  }, [isOpen, role, defaultCreatorId, creatorName, selectedLoaders.length]);
+  }, [isOpen, role, defaultCreatorId, creatorName, allLoaders, selectedLoaders.length]);
 
   // По умолчанию выбираем "Частный клиент"
   useEffect(() => {
@@ -168,6 +185,20 @@ export function CreatePrrModal({
 
   const selectedCounterparty = counterparties.find((c) => c.id === selectedCounterpartyId);
   const isInternal = isInternalCounterparty(selectedCounterparty?.name);
+
+  const tk501Cp = useMemo(
+    () => counterparties.find((c) => isInternalCounterparty(c.name)),
+    [counterparties],
+  );
+  const privateCp = useMemo(
+    () =>
+      counterparties.find(
+        (c) =>
+          c.name.toLowerCase().includes('частный') ||
+          c.id === 'ba412028-ed45-4cf8-b365-ad76a93afd71',
+      ),
+    [counterparties],
+  );
 
   // Проверка запрета наличных
   const isNoCash = isNoCashCounterparty(selectedCounterparty?.name);
@@ -374,17 +405,19 @@ export function CreatePrrModal({
     <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
       <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-zinc-200 max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom duration-200 mb-0">
         {/* Шапка */}
-        <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50 shrink-0">
+        <div className="px-5 py-3.5 border-b border-zinc-100 flex items-center justify-between bg-zinc-50 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-orange-100 border border-orange-200 flex items-center justify-center text-xl shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-lg shrink-0">
               👷
             </div>
             <div>
-              <h2 className="text-base font-black text-zinc-900 leading-tight">
-                Погрузо-разгрузочные работы
+              <h2 className="text-sm font-black text-zinc-900 leading-tight">
+                {role === 'loader' ? 'Создать заказ (ПРР)' : 'Погрузо-разгрузочные работы'}
               </h2>
-              <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide">
-                Без автомобиля · 70% грузчикам, 30% компании
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">
+                {isInternal
+                  ? '🏢 ТК 501: 100% грузчикам (0% компании)'
+                  : 'Без авто · 70% грузчикам, 30% компании'}
               </p>
             </div>
           </div>
@@ -398,7 +431,7 @@ export function CreatePrrModal({
         </div>
 
         {/* Содержимое с прокруткой */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl p-3 flex items-center gap-2">
               <span>⚠️</span>
@@ -413,9 +446,29 @@ export function CreatePrrModal({
             </div>
           )}
 
+          {/* Тип заказа (для грузчиков только 1 вариант — ПРР без авто) */}
+          <div className="bg-amber-50/80 border border-amber-300/80 rounded-xl p-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">📦</span>
+              <div>
+                <div className="text-xs font-black text-amber-950">
+                  Тип заказа: Погрузо-разгрузочные работы (ПРР)
+                </div>
+                <div className="text-[10px] font-semibold text-amber-800">
+                  {role === 'loader'
+                    ? 'Только ПРР (без авто) · Для грузчиков доступен только этот вариант'
+                    : 'Без автомобиля · Назначение бригады грузчиков'}
+                </div>
+              </div>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md shrink-0">
+              Единственный вариант
+            </span>
+          </div>
+
           {/* 1. Клиент */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-1">
               <label className="text-[11px] font-black uppercase tracking-wider text-zinc-500">
                 Клиент
               </label>
@@ -423,6 +476,48 @@ export function CreatePrrModal({
                 <span className="text-[11px] font-bold text-orange-600 truncate max-w-[200px]">
                   {selectedCounterparty.name}
                 </span>
+              )}
+            </div>
+
+            {/* Быстрые кнопки ключевых клиентов */}
+            <div className="flex items-center gap-1.5 mb-2 overflow-x-auto pb-0.5">
+              {tk501Cp && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCounterpartyId(tk501Cp.id);
+                    setClientSearch('');
+                    setShowClientList(false);
+                  }}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg text-xs font-black transition-all border shrink-0 flex items-center gap-1 cursor-pointer',
+                    selectedCounterpartyId === tk501Cp.id
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100',
+                  )}
+                >
+                  <span>🏢</span>
+                  <span>ТК 501 (100% себе)</span>
+                </button>
+              )}
+              {privateCp && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCounterpartyId(privateCp.id);
+                    setClientSearch('');
+                    setShowClientList(false);
+                  }}
+                  className={cn(
+                    'px-2.5 py-1 rounded-lg text-xs font-bold transition-all border shrink-0 flex items-center gap-1 cursor-pointer',
+                    selectedCounterpartyId === privateCp.id
+                      ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
+                      : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200',
+                  )}
+                >
+                  <span>👤</span>
+                  <span>Частный клиент (70/30)</span>
+                </button>
               )}
             </div>
 

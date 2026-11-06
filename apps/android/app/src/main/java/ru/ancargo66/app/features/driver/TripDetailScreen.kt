@@ -45,7 +45,9 @@ fun TripDetailScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val isPrr = tripDetail?.asset?.regNumber == "БЕЗ АВТО" || tripDetail?.tripType == "loaders_only"
+    val isPrr = tripDetail?.asset?.regNumber == "БЕЗ АВТО" ||
+            (tripDetail?.asset?.shortName ?: "").contains("без авто", ignoreCase = true) ||
+            tripDetail?.tripType == "loaders_only"
 
     fun getVehicleFuelRate(shortName: String?, regNumber: String?): Double {
         val name = (shortName ?: "").lowercase()
@@ -96,7 +98,8 @@ fun TripDetailScreen(
             try {
                 val trip = SaldaApiClient.getTripDetail(tripId, userId)
                 tripDetail = trip
-                if (endOdometerInput.isBlank()) {
+                val isTripPrr = trip.asset?.regNumber == "БЕЗ АВТО" || (trip.asset?.shortName ?: "").contains("без авто", ignoreCase = true) || trip.tripType == "loaders_only"
+                if (endOdometerInput.isBlank() && !isTripPrr) {
                     val defaultOdo = if (trip.odometerEnd != null && trip.odometerEnd > 0) trip.odometerEnd else trip.odometerStart + 35
                     endOdometerInput = defaultOdo.toString()
                 }
@@ -567,12 +570,30 @@ fun TripDetailScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
+                                        val orderIsInternal = isInternalCounterparty(ord.counterparty?.name)
+                                        val loadersPaySum = if (ord.loadersData.isNotEmpty()) ord.loadersData.sumOf { it.pay.toDoubleOrNull() ?: 0.0 } else (ord.loaderPay + ord.loader2Pay)
+                                        val totalWorkersPay = ord.driverPay + loadersPaySum
+                                        val displayAmt = if (ord.amount > 0) ord.amount else if (orderIsInternal && totalWorkersPay > 0) totalWorkersPay else ord.amount
                                         Text(
-                                            text = "${ord.amount.toInt()} ₽",
+                                            text = "${displayAmt.toInt()} ₽",
                                             fontWeight = FontWeight.Black,
                                             fontSize = 14.sp,
                                             color = Zinc900
                                         )
+                                        if (orderIsInternal) {
+                                            Surface(
+                                                color = SaldaOrange50,
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "ТК501",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = SaldaOrangePrimary,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
 
                                         if (isActive) {
                                             IconButton(
@@ -791,10 +812,10 @@ fun TripDetailScreen(
     if (showAddExpenseDialog) {
         val fuelRate = getVehicleFuelRate(tripDetail?.asset?.shortName, tripDetail?.asset?.regNumber)
         val startOdo = (tripDetail?.odometerStart ?: 0).toLong()
-        val endOdo = endOdometerInput.toLongOrNull()
+        val endOdo: Long = if (isPrr) (startOdo + 100L) else (endOdometerInput.toLongOrNull()
             ?: (tripDetail?.odometerEnd ?: 0L).takeIf { it > 0L }
             ?: (tripDetail?.asset?.odometerCurrent ?: 0L).takeIf { it > startOdo }
-            ?: (startOdo + 100L)
+            ?: (startOdo + 100L))
         val deltaKm = if (endOdo > startOdo) endOdo - startOdo else 100L
         val autoCubeLiters = kotlin.math.round((deltaKm * fuelRate / 100.0) * 10.0) / 10.0
         val autoCubeAmount = kotlin.math.round(autoCubeLiters * 60.0).toInt()
@@ -1092,14 +1113,16 @@ fun TripDetailScreen(
                         }
                     }
 
-                    OutlinedTextField(
-                        value = endOdometerInput,
-                        onValueChange = { endOdometerInput = it },
-                        label = { Text("Конечный одометр (км)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (!isPrr) {
+                        OutlinedTextField(
+                            value = endOdometerInput,
+                            onValueChange = { endOdometerInput = it },
+                            label = { Text("Конечный одометр (км)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
                     if (!isPrr) {
                         Surface(

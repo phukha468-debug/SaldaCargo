@@ -11,6 +11,7 @@ import { v4 as uuid } from 'uuid';
 import { Button, cn } from '@saldacargo/ui';
 import {
   isNoCashCounterparty,
+  isInternalCounterparty,
   isTerritoryCounterparty,
   formatTerritoryDescription,
   isGeostroyCounterparty,
@@ -177,6 +178,7 @@ export default function AddOrderPage() {
   const selectedCounterpartyId = watch('counterparty_id');
   const selectedPaymentMethod = watch('payment_method');
   const selectedCounterparty = counterparties.find((c) => c.id === selectedCounterpartyId);
+  const isInternal = isInternalCounterparty(selectedCounterparty?.name);
 
   const amountRaw = watch('amount');
   const amount = amountRaw ? Number(amountRaw) : 0;
@@ -195,6 +197,7 @@ export default function AddOrderPage() {
     loadersCount: loaders.length,
     minMachineBase,
     loadingAmount: isLoadersOnly ? undefined : parsedLoadingAmount,
+    isInternal,
   });
 
   const isCity = payroll.isAutomatic;
@@ -814,11 +817,15 @@ export default function AddOrderPage() {
               )}
 
               <div className="bg-zinc-800/80 p-2.5 rounded-xl">
-                <div className="text-zinc-400 font-bold">🏢 Компании (30%)</div>
+                <div className="text-zinc-400 font-bold">
+                  {isInternal ? '🏢 ТК501 (0%)' : '🏢 Компании (30%)'}
+                </div>
                 <div className="text-base font-black text-emerald-400 mt-0.5">
                   {payroll.companyShare.toLocaleString('ru-RU')} ₽
                 </div>
-                <div className="text-[10px] text-zinc-400">доход компании</div>
+                <div className="text-[10px] text-zinc-400">
+                  {isInternal ? '100% рабочим' : 'доход компании'}
+                </div>
               </div>
             </div>
 

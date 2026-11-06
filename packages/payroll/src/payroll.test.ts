@@ -270,4 +270,62 @@ assert(t20.loaderPayEach === 1050, 'T20 loaderPayEach should be 1050');
 assert(t20.totalLoadersPay === 1050, 'T20 totalLoadersPay should be 1050');
 assert(t20.companyShare === 900, 'T20 companyShare should be 900 (30% of 3000)');
 
+// 21. ТК501 (isInternal = true): ПРР (без авто) 4 000 ₽, 1 грузчик -> 100% грузчику, 0% компании
+const t21 = calculateOrderPayroll({
+  direction: 'loaders_only',
+  amount: 4000,
+  isDriverLoader: false,
+  loadersCount: 1,
+  isInternal: true,
+});
+console.log('T21 (4000 TK501 PRR no vehicle, 1 loader):', t21);
+assert(t21.driverCarPay === 0, 'T21 driverCarPay should be 0');
+assert(t21.driverLoaderPay === 0, 'T21 driverLoaderPay should be 0');
+assert(t21.driverTotalPay === 0, 'T21 driverTotalPay should be 0');
+assert(t21.loaderPayEach === 4000, 'T21 loaderPayEach should be 4000 (100% of 4000)');
+assert(t21.totalLoadersPay === 4000, 'T21 totalLoadersPay should be 4000');
+assert(t21.companyShare === 0, 'T21 companyShare should be 0 (0% of 4000)');
+
+// 22. ТК501 (isInternal = true): ПРР (без авто) 4 000 ₽, 2 грузчика -> 2000 ₽ каждому, 0% компании
+const t22 = calculateOrderPayroll({
+  direction: 'loaders_only',
+  amount: 4000,
+  isDriverLoader: false,
+  loadersCount: 2,
+  isInternal: true,
+});
+console.log('T22 (4000 TK501 PRR no vehicle, 2 loaders):', t22);
+assert(t22.loaderPayEach === 2000, 'T22 loaderPayEach should be 2000 (50% of 4000)');
+assert(t22.totalLoadersPay === 4000, 'T22 totalLoadersPay should be 4000');
+assert(t22.companyShare === 0, 'T22 companyShare should be 0');
+
+// 23. ТК501 (isInternal = true): ПРР (без авто) 4 000 ₽, водитель один разгрузил -> 4000 ₽ водителю, 0% компании
+const t23 = calculateOrderPayroll({
+  direction: 'loaders_only',
+  amount: 4000,
+  isDriverLoader: true,
+  loadersCount: 0,
+  isInternal: true,
+});
+console.log('T23 (4000 TK501 PRR no vehicle, driver alone):', t23);
+assert(t23.driverLoaderPay === 4000, 'T23 driverLoaderPay should be 4000');
+assert(t23.driverTotalPay === 4000, 'T23 driverTotalPay should be 4000');
+assert(t23.totalLoadersPay === 0, 'T23 totalLoadersPay should be 0');
+assert(t23.companyShare === 0, 'T23 companyShare should be 0');
+
+// 24. ТК501 (isInternal = true): ПРР (без авто) 4 000 ₽, водитель + 1 грузчик -> по 2000 ₽ каждому, 0% компании
+const t24 = calculateOrderPayroll({
+  direction: 'loaders_only',
+  amount: 4000,
+  isDriverLoader: true,
+  loadersCount: 1,
+  isInternal: true,
+});
+console.log('T24 (4000 TK501 PRR no vehicle, driver + 1 loader):', t24);
+assert(t24.driverLoaderPay === 2000, 'T24 driverLoaderPay should be 2000');
+assert(t24.driverTotalPay === 2000, 'T24 driverTotalPay should be 2000');
+assert(t24.loaderPayEach === 2000, 'T24 loaderPayEach should be 2000');
+assert(t24.totalLoadersPay === 2000, 'T24 totalLoadersPay should be 2000');
+assert(t24.companyShare === 0, 'T24 companyShare should be 0');
+
 console.log('ALL PAYROLL TESTS PASSED SUCCESSFULLY! ✅');

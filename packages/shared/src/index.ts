@@ -852,6 +852,16 @@ export function checkOdometerRequirement(
     return { required: false, reason: null, message: '' };
   }
 
+  const reg = (asset.reg_number || '').toUpperCase().trim();
+  const name = (asset.short_name || '').toLowerCase().trim();
+  if (reg === 'БЕЗ АВТО' || name.includes('без авто') || name.includes('прр')) {
+    return {
+      required: false,
+      reason: null,
+      message: 'Для рейсов без авто ввод одометра не требуется.',
+    };
+  }
+
   return {
     required: true,
     reason: 'shift_end',
@@ -909,6 +919,12 @@ export function validateTripOdometer(
   startOdo: number | null | undefined,
   endOdo: number | null | undefined,
 ): OdometerValidationResult {
+  const reg = (asset?.reg_number || '').toUpperCase().trim();
+  const name = (asset?.short_name || '').toLowerCase().trim();
+  if (reg === 'БЕЗ АВТО' || name.includes('без авто') || name.includes('прр')) {
+    return { valid: true };
+  }
+
   if (endOdo == null || isNaN(Number(endOdo)) || Number(endOdo) <= 0) {
     return { valid: true };
   }

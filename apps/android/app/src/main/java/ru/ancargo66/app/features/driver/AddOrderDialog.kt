@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import ru.ancargo66.app.core.model.Counterparty
 import ru.ancargo66.app.core.model.LoaderPayItem
 import ru.ancargo66.app.core.model.User
+import ru.ancargo66.app.core.model.isInternalCounterparty
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.theme.*
 import java.text.SimpleDateFormat
@@ -86,7 +87,8 @@ fun calculateOrderPayroll(
     isDriverLoader: Boolean,
     loadersCount: Int,
     minMachineBase: Double = 1000.0,
-    loadingAmount: Double? = null
+    loadingAmount: Double? = null,
+    isInternal: Boolean = false
 ): OrderPayrollResult {
     val dirObj = ORDER_DIRECTIONS.find { it.id == direction }
     val isAutomatic = direction != "ekb"
@@ -100,10 +102,10 @@ fun calculateOrderPayroll(
     // Сценарий 1: ПРР без авто (Только грузчики)
     if (direction == "loaders_only") {
         val poolPerLoader = if (totalLoadersCount > 0) amount / totalLoadersCount else 0.0
-        val loaderPayEach = Math.round(poolPerLoader * 0.7).toInt()
+        val loaderPayEach = if (isInternal) Math.round(poolPerLoader).toInt() else Math.round(poolPerLoader * 0.7).toInt()
         val driverLoaderPay = if (isDriverLoader) loaderPayEach else 0
         val totalLoadersPay = loaderPayEach * loadersCount
-        val companyShare = (amount - driverLoaderPay - totalLoadersPay).toInt()
+        val companyShare = if (isInternal) 0 else maxOf(0, (amount - driverLoaderPay - totalLoadersPay).toInt())
 
         return OrderPayrollResult(
             driverCarPay = 0,
@@ -128,8 +130,8 @@ fun calculateOrderPayroll(
     }
 
     if (explicitLoading <= 0.0) {
-        val driverCarPay = Math.round(amount * 0.3).toInt()
-        val companyShare = (amount - driverCarPay).toInt()
+        val driverCarPay = if (isInternal) amount.toInt() else Math.round(amount * 0.3).toInt()
+        val companyShare = if (isInternal) 0 else maxOf(0, (amount - driverCarPay).toInt())
         return OrderPayrollResult(
             driverCarPay = driverCarPay,
             driverLoaderPay = 0,
@@ -149,11 +151,11 @@ fun calculateOrderPayroll(
 
     val driverCarPay = Math.round(machinePool * 0.3).toInt()
     val poolPerLoader = if (totalLoadersCount > 0) loadersPool / totalLoadersCount else 0.0
-    val loaderPayEach = Math.round(poolPerLoader * 0.7).toInt()
+    val loaderPayEach = if (isInternal) Math.round(poolPerLoader).toInt() else Math.round(poolPerLoader * 0.7).toInt()
     val driverLoaderPay = if (isDriverLoader) loaderPayEach else 0
     val driverTotalPay = driverCarPay + driverLoaderPay
     val totalLoadersPay = loaderPayEach * loadersCount
-    val companyShare = (amount - driverTotalPay - totalLoadersPay).toInt()
+    val companyShare = if (isInternal) 0 else maxOf(0, (amount - driverTotalPay - totalLoadersPay).toInt())
 
     return OrderPayrollResult(
         driverCarPay = driverCarPay,
@@ -241,6 +243,7 @@ fun AddOrderDialog(
     val amountDouble = amountInput.toDoubleOrNull() ?: 0.0
     val loadingAmountDouble = loadingAmountInput.toDoubleOrNull()
     val isClientNoCash = isNoCashClient(selectedClient)
+    val isInternal = isInternalCounterparty(selectedClient?.name)
 
     val isGeostroy = selectedClient?.name?.contains("Геострой", ignoreCase = true) == true
     val isTerritory = selectedClient?.name?.contains("Территория", ignoreCase = true) == true
@@ -253,7 +256,8 @@ fun AddOrderDialog(
         isDriverLoader = isDriverLoader,
         loadersCount = selectedLoaders.size,
         minMachineBase = minBase,
-        loadingAmount = if (isLoadersOnly) null else loadingAmountDouble
+        loadingAmount = if (isLoadersOnly) null else loadingAmountDouble,
+        isInternal = isInternal
     )
 
     // Если клиент безналичный — переключаем с наличных на долг
@@ -881,6 +885,26 @@ fun AddOrderDialog(
                                 }
 
                                 if (payroll.isAutomatic) {
+                                    if (isInternal) {
+                                        Surface(
+                                            color = Color(0xFF064E3B),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    "✨ Заказчик ТК501: 100% суммы идёт работникам (0% компании)",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFA7F3D0)
+                                                )
+                                            }
+                                        }
+                                    }
+
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -891,9 +915,9 @@ fun AddOrderDialog(
                                             shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Column(modifier = Modifier.padding(10.dp)) {
-                                                Text("🚗 За машину (30%)", fontSize = 10.sp, color = Zinc400, fontWeight = FontWeight.Bold)
-                                                Text("${payroll.driverCarPay} ₽", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
-                                                Text("из ${payroll.machinePool} ₽", fontSize = 9.sp, color = Zinc500)
+                                                Text(if (isInternal) "🏢 ТК501 (0%)" else "🚗 За машину (30%)", fontSize = 10.sp, color = Zinc400, fontWeight = FontWeight.Bold)
+                                                Text(if (isInternal) "0 ₽" else "${payroll.driverCarPay} ₽", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                                Text(if (isInternal) "без удержания" else "из ${payroll.machinePool} ₽", fontSize = 9.sp, color = Zinc500)
                                             }
                                         }
 
@@ -903,9 +927,9 @@ fun AddOrderDialog(
                                             shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Column(modifier = Modifier.padding(10.dp)) {
-                                                Text("📦 За погрузку (70%)", fontSize = 10.sp, color = Zinc400, fontWeight = FontWeight.Bold)
-                                                Text("${payroll.driverLoaderPay} ₽", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
-                                                Text(if (isDriverLoader) "из ${payroll.loadersPool} ₽" else "не отмечен", fontSize = 9.sp, color = Zinc500)
+                                                Text(if (isInternal) "📦 Рабочим (100%)" else "📦 За погрузку (70%)", fontSize = 10.sp, color = Zinc400, fontWeight = FontWeight.Bold)
+                                                Text("${if (isLoadersOnly && !isDriverLoader) payroll.loaderPayEach else payroll.driverLoaderPay} ₽", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                                Text(if (isInternal) "100% рабочим" else if (isDriverLoader) "из ${payroll.loadersPool} ₽" else "не отмечен", fontSize = 9.sp, color = Zinc500)
                                             }
                                         }
                                     }
@@ -918,8 +942,8 @@ fun AddOrderDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column {
-                                            Text("ИТОГО ВОДИТЕЛЮ ЗА ЗАКАЗ", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Zinc400)
-                                            Text("${payroll.driverTotalPay} ₽", fontSize = 24.sp, fontWeight = FontWeight.Black, color = SaldaOrangePrimary)
+                                            Text(if (isLoadersOnly && !isDriverLoader) "ВЫПЛАТА РАБОТНИКАМ" else "ИТОГО ВОДИТЕЛЮ ЗА ЗАКАЗ", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Zinc400)
+                                            Text(if (isLoadersOnly && !isDriverLoader) "${payroll.totalLoadersPay} ₽" else "${payroll.driverTotalPay} ₽", fontSize = 24.sp, fontWeight = FontWeight.Black, color = SaldaOrangePrimary)
                                         }
 
                                         if (selectedLoaders.isNotEmpty()) {

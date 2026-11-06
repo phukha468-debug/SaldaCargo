@@ -75,7 +75,7 @@ export async function GET(request: Request) {
       .in('category_id', ALL_PAYROLL_CATS)
       .is('from_wallet_id', null)
       .order('transaction_date', { ascending: false })
-      .limit(50),
+      .limit(300),
 
     // История выплат (списания из кассы или переводы ЗП)
     (supabase.from('transactions') as any)
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
       .eq('lifecycle_status', 'approved')
       .not('from_wallet_id', 'is', null)
       .order('transaction_date', { ascending: false })
-      .limit(30),
+      .limit(200),
   ]);
 
   const accumulated_total = (accumulatedRows ?? [])

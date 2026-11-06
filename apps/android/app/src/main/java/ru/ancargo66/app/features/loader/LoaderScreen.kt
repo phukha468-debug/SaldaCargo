@@ -29,6 +29,7 @@ import ru.ancargo66.app.ui.components.SaldaBottomNav
 import ru.ancargo66.app.ui.theme.swipeToBack
 import androidx.activity.compose.BackHandler
 import ru.ancargo66.app.ui.theme.*
+import ru.ancargo66.app.features.driver.CreatePrrDialog
 
 @Composable
 fun LoaderScreen(
@@ -46,6 +47,7 @@ fun LoaderScreen(
     var actionInProgressId by remember { mutableStateOf<String?>(null) }
     var activeTab by remember { mutableStateOf(0) } // 0: Начисления, 1: Выплаты
     var selectedAccrualForDetails by remember { mutableStateOf<ru.ancargo66.app.core.model.SalaryAccrualItem?>(null) }
+    var showCreatePrrDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val loadFinance = {
@@ -231,6 +233,31 @@ fun LoaderScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // Кнопка создания ПРР заявки без авто
+            item {
+                Button(
+                    onClick = { showCreatePrrDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text("👷", fontSize = 18.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "СОЗДАТЬ ЗАЯВКУ (БЕЗ АВТО)",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
             // Главный блок: Тумблер готовности к работе
             item {
                 Card(
@@ -833,6 +860,17 @@ fun LoaderScreen(
                 TextButton(onClick = { selectedAccrualForDetails = null }) {
                     Text("Понятно", fontWeight = FontWeight.Bold, color = SaldaOrangePrimary)
                 }
+            }
+        )
+    }
+
+    if (showCreatePrrDialog) {
+        CreatePrrDialog(
+            userId = user.id,
+            onDismiss = { showCreatePrrDialog = false },
+            onSuccess = {
+                showCreatePrrDialog = false
+                loadFinance()
             }
         )
     }

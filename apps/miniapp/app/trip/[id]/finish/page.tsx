@@ -430,60 +430,63 @@ export default function FinishTripPage() {
         </div>
 
         {/* Одометр */}
-        {trip?.trip_type !== 'loaders_only' && trip?.asset?.reg_number !== 'БЕЗ АВТО' && (
-          <div className="bg-white rounded-lg border-2 border-zinc-200 p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-black text-zinc-900 uppercase tracking-wider">
-                Одометр на конец смены, км{' '}
-                {odoReq.required && <span className="text-red-500">*</span>}
-              </label>
-              {odoReq.required ? (
-                <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
-                  Обязательно
+        {trip?.trip_type !== 'loaders_only' &&
+          trip?.asset?.reg_number !== 'БЕЗ АВТО' &&
+          !trip?.asset?.short_name?.toLowerCase().includes('без авто') &&
+          !trip?.asset?.short_name?.toLowerCase().includes('прр') && (
+            <div className="bg-white rounded-lg border-2 border-zinc-200 p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-black text-zinc-900 uppercase tracking-wider">
+                  Одометр на конец смены, км{' '}
+                  {odoReq.required && <span className="text-red-500">*</span>}
+                </label>
+                {odoReq.required ? (
+                  <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                    Обязательно
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded">
+                    Необязательно
+                  </span>
+                )}
+              </div>
+
+              <div className="text-xs text-zinc-500 font-medium">
+                {startOdo > 0 && (
+                  <span>
+                    Начальный одометр: <strong>{startOdo.toLocaleString('ru-RU')} км</strong>{' '}
+                    (лимит: не более +{maxDelta.toLocaleString('ru-RU')} км).{' '}
+                  </span>
+                )}
+                {odoReq.message}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  {...register('odometer_end')}
+                  placeholder={startOdo > 0 ? String(startOdo) : '0'}
+                  className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                  км
                 </span>
-              ) : (
-                <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded">
-                  Необязательно
-                </span>
+              </div>
+
+              {!odoValidation.valid && odoValidation.error && (
+                <div className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300 rounded-lg p-2.5 text-center">
+                  🛑 {odoValidation.error}
+                </div>
+              )}
+
+              {odoValidation.valid && tripMileage != null && tripMileage >= 0 && (
+                <div className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center">
+                  Пробег за смену: +{tripMileage.toLocaleString('ru-RU')} км
+                </div>
               )}
             </div>
-
-            <div className="text-xs text-zinc-500 font-medium">
-              {startOdo > 0 && (
-                <span>
-                  Начальный одометр: <strong>{startOdo.toLocaleString('ru-RU')} км</strong> (лимит:
-                  не более +{maxDelta.toLocaleString('ru-RU')} км).{' '}
-                </span>
-              )}
-              {odoReq.message}
-            </div>
-
-            <div className="relative">
-              <input
-                type="number"
-                inputMode="numeric"
-                {...register('odometer_end')}
-                placeholder={startOdo > 0 ? String(startOdo) : '0'}
-                className="w-full rounded-lg border-2 border-zinc-200 px-4 h-14 text-2xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none transition-colors"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400 uppercase tracking-widest">
-                км
-              </span>
-            </div>
-
-            {!odoValidation.valid && odoValidation.error && (
-              <div className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300 rounded-lg p-2.5 text-center">
-                🛑 {odoValidation.error}
-              </div>
-            )}
-
-            {odoValidation.valid && tripMileage != null && tripMileage >= 0 && (
-              <div className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-center">
-                Пробег за смену: +{tripMileage.toLocaleString('ru-RU')} км
-              </div>
-            )}
-          </div>
-        )}
+          )}
 
         {/* Заправка из кубика (База) */}
         {trip?.trip_type !== 'loaders_only' && (

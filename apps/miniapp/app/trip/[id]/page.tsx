@@ -7,6 +7,7 @@ import { Money, LifecycleBadge } from '@saldacargo/ui';
 import {
   formatDuration,
   formatDate,
+  isInternalCounterparty,
   isGeostroyCounterparty,
   isGeostroyOrderValid,
   checkOdometerRequirement,
@@ -517,10 +518,41 @@ export default function TripDetailPage() {
                           </div>
 
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <Money
-                              amount={order.amount}
-                              className="font-black text-lg text-zinc-900"
-                            />
+                            {(() => {
+                              const orderIsInternal = isInternalCounterparty(
+                                order.counterparty?.name,
+                              );
+                              const totalOrderPay =
+                                parseFloat(order.driver_pay || '0') +
+                                (orderLoaders.length > 0
+                                  ? orderLoaders.reduce(
+                                      (acc: number, l: { pay?: string | number }) =>
+                                        acc + (parseFloat(String(l.pay || '0')) || 0),
+                                      0,
+                                    )
+                                  : parseFloat(order.loader_pay || '0') +
+                                    parseFloat(order.loader2_pay || '0'));
+                              const displayAmount =
+                                parseFloat(order.amount || '0') > 0
+                                  ? order.amount
+                                  : orderIsInternal && totalOrderPay > 0
+                                    ? totalOrderPay.toString()
+                                    : order.amount;
+
+                              return (
+                                <div className="flex flex-col items-end">
+                                  <Money
+                                    amount={displayAmount}
+                                    className="font-black text-lg text-zinc-900"
+                                  />
+                                  {orderIsInternal && (
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-orange-600 bg-orange-50 px-1.5 py-0.2 rounded border border-orange-200">
+                                      ТК501 · 100%
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {canEdit && (
                               <div className="flex flex-col gap-1">
                                 <Link

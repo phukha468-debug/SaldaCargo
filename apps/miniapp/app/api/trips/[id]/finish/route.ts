@@ -55,7 +55,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ? Number(body.odometer_end)
       : null;
 
-  const odoRequirement = checkOdometerRequirement(trip.asset);
+  const isPrrTrip =
+    trip.trip_type === 'loaders_only' ||
+    trip.asset?.reg_number === 'БЕЗ АВТО' ||
+    Boolean(trip.asset?.short_name?.toLowerCase().includes('без авто'));
+
+  const odoRequirement = isPrrTrip
+    ? { required: false, reason: null, message: '' }
+    : checkOdometerRequirement(trip.asset);
 
   if (odoRequirement.required && !odoEnd) {
     return NextResponse.json(

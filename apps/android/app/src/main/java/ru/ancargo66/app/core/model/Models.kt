@@ -630,3 +630,20 @@ data class StaffSettleDetails(
     @SerialName("pending_transactions") val pendingTransactions: List<StaffPendingTx> = emptyList(),
     val history: List<StaffHistoryTx> = emptyList()
 )
+
+fun isInternalCounterparty(name: String?): Boolean {
+    if (name.isNullOrBlank()) return false
+    val trimmed = name.trim().lowercase()
+    return trimmed.startsWith("тк 501") ||
+           trimmed.startsWith("тк501") ||
+           trimmed.startsWith("тк 510") ||
+           trimmed.startsWith("тк510") ||
+           trimmed.startsWith("наша компания") ||
+           trimmed.startsWith("собственные нужды")
+}
+
+fun isNoCarAsset(regNumber: String?, shortName: String? = null): Boolean {
+    val reg = (regNumber ?: "").trim().uppercase()
+    val name = (shortName ?: "").trim().lowercase()
+    return reg == "БЕЗ АВТО" || name.contains("без авто") || name.contains("прр")
+}

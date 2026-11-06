@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import ru.ancargo66.app.core.model.Counterparty
 import ru.ancargo66.app.core.model.LoaderPayItem
 import ru.ancargo66.app.core.model.User
+import ru.ancargo66.app.core.model.isInternalCounterparty
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.theme.*
 
@@ -64,6 +65,10 @@ fun CreatePrrDialog(
                 if (generic != null) {
                     selectedCounterpartyId = generic.id
                 }
+                val meLoader = allLoaders.find { it.id == userId }
+                if (meLoader != null && selectedLoaders.isEmpty()) {
+                    selectedLoaders = listOf(LoaderPayItem(id = meLoader.id, name = meLoader.name, pay = ""))
+                }
             } catch (_: Exception) {}
         }
     }
@@ -71,6 +76,18 @@ fun CreatePrrDialog(
     val selectedClient = counterparties.find { it.id == selectedCounterpartyId }
     val isGeostroy = selectedClient?.name?.contains("Геострой", ignoreCase = true) == true
     val isTerritory = selectedClient?.name?.contains("Территория", ignoreCase = true) == true
+    val isInternal = isInternalCounterparty(selectedClient?.name)
+    val amt = amountInput.toDoubleOrNull() ?: 0.0
+    val factor = if (isInternal) 1.0 else 0.70
+
+    LaunchedEffect(amountInput, isInternal) {
+        val currentAmt = amountInput.toDoubleOrNull() ?: 0.0
+        val currentFactor = if (isInternal) 1.0 else 0.70
+        if (selectedLoaders.isNotEmpty()) {
+            val eachPay = Math.round((currentAmt * currentFactor) / selectedLoaders.size).toInt().toString()
+            selectedLoaders = selectedLoaders.map { it.copy(pay = eachPay) }
+        }
+    }
 
     BackHandler(enabled = !isSubmitting) { onDismiss() }
 
@@ -204,11 +221,58 @@ fun CreatePrrDialog(
                     OutlinedTextField(
                         value = amountInput,
                         onValueChange = { amountInput = it },
-                        placeholder = { Text("Например: 3000") },
+                        placeholder = { Text("Например: 4000") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+
+                // Информационная плашка распределения дохода
+                item {
+                    if (isInternal) {
+                        Surface(
+                            color = Color(0xFFECFDF5),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    "✨ Заказчик ТК501: 100% суммы делится между работниками (0% компании).",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF065F46)
+                                )
+                                if (selectedLoaders.isNotEmpty() && amt > 0.0) {
+                                    val each = Math.round(amt / selectedLoaders.size).toInt()
+                                    Text(
+                                        "Чистый доход: $each ₽ на каждого из ${selectedLoaders.size} работников.",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF047857)
+                                    )
+                                }
+                            }
+                        }
+                    } else if (selectedClient != null) {
+                        Surface(
+                            color = Zinc100,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "💼 Внешний клиент: 70% грузчикам, 30% компании (${(amt * 0.3).toInt()} ₽)",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Zinc700
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Способ оплаты (1. Наличные, 2. QR-код, 3. В долг)
@@ -241,13 +305,13 @@ fun CreatePrrDialog(
 
                     Surface(
                         onClick = {
-                            if (isSelected) {
-                                selectedLoaders = selectedLoaders.filter { it.id != loader.id }
+                            val nextLoaders = if (isSelected) {
+                                selectedLoaders.filter { it.id != loader.id }
                             } else {
-                                val amt = amountInput.toDoubleOrNull() ?: 0.0
-                                val defaultPay = if (selectedLoaders.isEmpty()) ((amt * 0.70)).toInt().toString() else ((amt * 0.70) / (selectedLoaders.size + 1)).toInt().toString()
-                                selectedLoaders = selectedLoaders + LoaderPayItem(id = loader.id, name = loader.name, pay = defaultPay)
+                                selectedLoaders + LoaderPayItem(id = loader.id, name = loader.name)
                             }
+                            val eachPay = if (nextLoaders.isNotEmpty()) Math.round((amt * factor) / nextLoaders.size).toInt().toString() else "0"
+                            selectedLoaders = nextLoaders.map { it.copy(pay = eachPay) }
                         },
                         color = if (isSelected) SaldaOrange50 else Color.White,
                         shape = RoundedCornerShape(8.dp),

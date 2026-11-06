@@ -637,6 +637,7 @@ fun DriverScreen(
                                         startTripError = "Выберите автомобиль перед началом рейса"
                                         return@Button
                                     }
+                                    val isNoCar = asset.regNumber == "БЕЗ АВТО" || asset.shortName.contains("без авто", ignoreCase = true)
                                     scope.launch {
                                         isStartingTrip = true
                                         startTripError = null
@@ -644,8 +645,8 @@ fun DriverScreen(
                                             val newTrip = SaldaApiClient.startTrip(
                                                 driverId = user.id,
                                                 assetId = asset.id,
-                                                odometerStart = asset.odometerCurrent,
-                                                isPrr = asset.regNumber == "БЕЗ АВТО"
+                                                odometerStart = if (isNoCar) 0L else asset.odometerCurrent,
+                                                isPrr = isNoCar
                                             )
                                             selectedTripIdForDetails = newTrip.id
                                             refreshData()
@@ -676,6 +677,29 @@ fun DriverScreen(
                                         text = if (isStartingTrip) "СОЗДАЁМ РЕЙС..." else if (currentAsset?.regNumber == "БЕЗ АВТО") "НАЧАТЬ РЕЙС (БЕЗ АВТО)" else "НАЧАТЬ РЕЙС",
                                         fontWeight = FontWeight.Black,
                                         fontSize = 16.sp
+                                    )
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = { showCreatePrrDialog = true },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SaldaOrangePrimary),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, SaldaOrangePrimary),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text("👷", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "СОЗДАТЬ ЗАЯВКУ БЕЗ АВТО (ПРР)",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
                                     )
                                 }
                             }

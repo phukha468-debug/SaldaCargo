@@ -191,6 +191,7 @@ export interface OrderPayrollParams {
   loadersCount: number; // количество сторонних грузчиков
   minMachineBase?: number; // по умолчанию 1000 ₽ (или 800 ₽ для спец. магазинов)
   loadingAmount?: number; // явно выделенная сумма за погрузку из общего чека
+  isInternal?: boolean; // ТК501 / собственная фирма (100% рабочим, 0% компании)
 }
 
 export interface OrderPayrollResult {
@@ -216,6 +217,7 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
     loadersCount = 0,
     minMachineBase = 1000,
     loadingAmount,
+    isInternal = false,
   } = params;
 
   // Автоматический расчет применяется ко всем местным направлениям
@@ -240,9 +242,9 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
 
   // Сценарий 1: Только водитель (без погрузки)
   if (totalLoadersCount === 0 && (loadingAmount === undefined || loadingAmount <= 0)) {
-    const driverCarPay = Math.round(amount * 0.3);
+    const driverCarPay = isInternal ? amount : Math.round(amount * 0.3);
     const driverTotalPay = driverCarPay;
-    const companyShare = amount - driverTotalPay;
+    const companyShare = isInternal ? 0 : amount - driverTotalPay;
     return {
       driverCarPay,
       driverLoaderPay: 0,
@@ -285,17 +287,19 @@ export function calculateOrderPayroll(params: OrderPayrollParams): OrderPayrollR
     }
   }
 
-  // Доля водителя за автомобиль: 30%
+  // Доля водителя за автомобиль: 30% (для ТК501 при наличии авто весь остаток или ЗП)
   const driverCarPay = Math.round(machinePool * 0.3);
 
-  // Доля одного грузчика: 70% от его доли в пуле грузчиков
+  // Доля одного грузчика:
+  // Для ТК501 (isInternal): 100% пула делится поровну между работниками (0% компании)
+  // Для внешних клиентов: 70% от доли в пуле грузчиков (30% компании)
   const poolPerLoader = totalLoadersCount > 0 ? loadersPool / totalLoadersCount : 0;
-  const loaderPayEach = Math.round(poolPerLoader * 0.7);
+  const loaderPayEach = isInternal ? Math.round(poolPerLoader) : Math.round(poolPerLoader * 0.7);
 
   const driverLoaderPay = isDriverLoader ? loaderPayEach : 0;
   const driverTotalPay = driverCarPay + driverLoaderPay;
   const totalLoadersPay = loaderPayEach * loadersCount;
-  const companyShare = amount - driverTotalPay - totalLoadersPay;
+  const companyShare = isInternal ? 0 : Math.max(0, amount - driverTotalPay - totalLoadersPay);
 
   return {
     driverCarPay,
