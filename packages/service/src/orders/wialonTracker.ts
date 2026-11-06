@@ -70,6 +70,51 @@ export async function getWialonSession(host: string, token: string): Promise<str
 }
 
 /**
+ * Поиск созданной пользователем геозоны базы Салды в Wialon
+ */
+export async function fetchWialonBaseGeofence(
+  host: string,
+  eid: string,
+): Promise<{ lat: number; lon: number; radiusMeters: number } | null> {
+  try {
+    const searchParams = {
+      spec: {
+        itemsType: 'avl_resource',
+        propName: 'sys_name',
+        propValueMask: '*',
+        sortType: 'sys_name',
+      },
+      force: 1,
+      flags: 0x1000 + 0x400 + 1,
+      from: 0,
+      to: 0,
+    };
+    const searchUrl = `${host}/wialon/ajax.html?svc=core/search_items&params=${encodeURIComponent(
+      JSON.stringify(searchParams),
+    )}&sid=${eid}`;
+    const res = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    for (const item of json.items || []) {
+      if (item.zl) {
+        for (const geo of Object.values<any>(item.zl)) {
+          if (geo.n && geo.n.toLowerCase().includes('салда') && geo.b?.cen_y && geo.b?.cen_x) {
+            return {
+              lat: Number(geo.b.cen_y),
+              lon: Number(geo.b.cen_x),
+              radiusMeters: Number(geo.w || geo.r || 3500),
+            };
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Wialon] Ошибка получения геозоны из Wialon:', e);
+  }
+  return null;
+}
+
+/**
  * 2. Опрос 4 Валдаев и получение их текущих координат и одометров
  */
 export async function fetchWialonValdaiPositions(
@@ -78,6 +123,12 @@ export async function fetchWialonValdaiPositions(
 ): Promise<WialonUnitPosition[]> {
   const cleanHost = host.replace(/\/+$/, '');
   const eid = await getWialonSession(cleanHost, token);
+
+  // Получаем динамические параметры геозоны Салды из Wialon
+  const remoteGeo = await fetchWialonBaseGeofence(cleanHost, eid);
+  const baseLat = remoteGeo?.lat ?? SALDA_BASE_LAT;
+  const baseLon = remoteGeo?.lon ?? SALDA_BASE_LON;
+  const baseRadius = remoteGeo?.radiusMeters ?? SALDA_BASE_RADIUS;
 
   // Флаги: 1 (base info) + 1024 (pos) + 4096 (counters)
   const flags = 1 + 1024 + 4096;
@@ -130,9 +181,9 @@ export async function fetchWialonValdaiPositions(
       odoKm = Math.round(Number(item.cnm));
     }
 
-    const distMeters = calculateDistanceMeters(lat, lon, SALDA_BASE_LAT, SALDA_BASE_LON);
+    const distMeters = calculateDistanceMeters(lat, lon, baseLat, baseLon);
     const distKm = Number((distMeters / 1000).toFixed(2));
-    const isInsideBase = distMeters <= SALDA_BASE_RADIUS;
+    const isInsideBase = distMeters <= baseRadius;
 
     results.push({
       id: item.id,
