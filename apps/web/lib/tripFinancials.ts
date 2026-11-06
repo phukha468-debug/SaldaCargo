@@ -241,13 +241,19 @@ export async function syncTripFinancials(
     }
   }
 
+  // Получаем все существующие транзакции грузчиков для рейса
+  const { data: existingLoaderTxs } = await (supabase.from('transactions') as any)
+    .select('id, related_user_id')
+    .eq('trip_id', tripId)
+    .eq('category_id', PAYROLL_LOADER_CAT);
+
+  const processedUserIds = new Set<string>();
+
   for (const [userId, { name, pay }] of loaderPayMap) {
-    const { data: existingLoaderTx } = await (supabase.from('transactions') as any)
-      .select('id')
-      .eq('trip_id', tripId)
-      .eq('category_id', PAYROLL_LOADER_CAT)
-      .eq('related_user_id', userId)
-      .maybeSingle();
+    processedUserIds.add(userId);
+    const existingLoaderTx = (existingLoaderTxs ?? []).find(
+      (t: any) => t.related_user_id === userId,
+    );
 
     if (pay > 0) {
       if (existingLoaderTx) {
@@ -270,6 +276,13 @@ export async function syncTripFinancials(
           idempotency_key: generateDeterministicUuid(`trip-payroll-loader-${tripId}-${userId}`),
         });
       }
+    }
+  }
+
+  // Удаляем транзакции грузчиков, которые были удалены из заказа
+  for (const tx of existingLoaderTxs ?? []) {
+    if (!processedUserIds.has(tx.related_user_id)) {
+      await (supabase.from('transactions') as any).delete().eq('id', tx.id);
     }
   }
 
