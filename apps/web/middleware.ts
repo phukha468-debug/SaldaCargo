@@ -5,10 +5,15 @@ export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('salda_auth_token')?.value;
 
-  // Публичные маршруты
-  const isAuthRoute = pathname === '/login' || pathname.startsWith('/api/auth');
+  // Публичные маршруты, внешние вебхуки и крон-задачи
+  const isPublicRoute =
+    pathname === '/login' ||
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/webhooks') ||
+    pathname.startsWith('/api/cron') ||
+    pathname.startsWith('/api/public');
 
-  if (isAuthRoute) {
+  if (isPublicRoute) {
     // Если уже авторизован и переходит на /login — перенаправляем на главную
     if (token && pathname === '/login') {
       return NextResponse.redirect(new URL('/', request.url));
