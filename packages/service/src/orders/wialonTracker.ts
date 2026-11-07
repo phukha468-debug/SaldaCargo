@@ -586,8 +586,10 @@ export async function fetchTripWialonMileage(options: {
   const FUEL_RATE_PER_100KM = 18;
   const FUEL_PRICE_TK = 82;
   const normLiters = Number(((wialonKm * FUEL_RATE_PER_100KM) / 100).toFixed(1));
-  const normCost = Math.round(normLiters * FUEL_PRICE_TK);
-  const driverPay = wialonKm * 10 + daysCount * 1000;
+  // Округление ГСМ до 100 ₽ (8 963 ₽ -> 9 000 ₽)
+  const normCost = Math.round((normLiters * FUEL_PRICE_TK) / 100) * 100;
+  // Округление ЗП до 100 ₽ в меньшую сторону (7 070 ₽ -> 7 000 ₽)
+  const driverPay = Math.floor((wialonKm * 10 + daysCount * 1000) / 100) * 100;
 
   return {
     unitId,

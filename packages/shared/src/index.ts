@@ -1222,7 +1222,19 @@ export function extractFuelLitersFromExpense(exp: {
 }
 
 /**
+ * Расчет зарплаты водителя за рейс с округлением в меньшую сторону до сотен рублей
+ * (например, 7 070 ₽ округляется до 7 000 ₽)
+ */
+export function calculateDriverTripPay(distanceKm: number, daysCount: number = 1): number {
+  const kmPay = distanceKm * DRIVER_RATE_PER_KM;
+  const perDiemPay = daysCount * DRIVER_PER_DIEM_PER_DAY;
+  const rawTotal = kmPay + perDiemPay;
+  return Math.floor(rawTotal / 100) * 100;
+}
+
+/**
  * Расчет расхода топлива по нормативу (по умолчанию Валдай: 18 л / 100 км по 82 ₽/л)
+ * с округлением суммы до сотен рублей (например, 8 963 ₽ округляется до 9 000 ₽)
  */
 export function calculateTripFuelNorm(
   distanceKm: number,
@@ -1231,7 +1243,8 @@ export function calculateTripFuelNorm(
 ) {
   const km = Math.max(0, distanceKm);
   const liters = Number(((km * ratePer100Km) / 100).toFixed(1));
-  const amount = Math.round(liters * pricePerLiter);
+  const rawCost = liters * pricePerLiter;
+  const amount = Math.round(rawCost / 100) * 100;
   return { km, ratePer100Km, liters, amount, pricePerLiter };
 }
 
@@ -1285,8 +1298,10 @@ export function auditTripWialon(trip: {
       const normLiters = Number(
         data.norm_liters || Math.round(((wialonKm * rate) / 100) * 10) / 10,
       );
-      const normCost = Number(data.norm_cost || Math.round(normLiters * price));
-      const driverPay = Number(data.driver_pay || wialonKm * DRIVER_RATE_PER_KM + 1000);
+      const normCost = Number(data.norm_cost || Math.round((normLiters * price) / 100) * 100);
+      const driverPay = Number(
+        data.driver_pay || Math.floor((wialonKm * DRIVER_RATE_PER_KM + 1000) / 100) * 100,
+      );
 
       const hasDiscrepancy = diffKm > 5;
       const sign = enteredKm > wialonKm ? '+' : '-';
@@ -1312,6 +1327,7 @@ export function auditTripWialon(trip: {
   }
 
   const defaultNorm = calculateTripFuelNorm(enteredKm);
+  const defaultPay = calculateDriverTripPay(enteredKm);
   return {
     hasDiscrepancy: false,
     isAudited: false,
@@ -1322,7 +1338,7 @@ export function auditTripWialon(trip: {
     odoEnd,
     normLiters: defaultNorm.liters,
     normCost: defaultNorm.amount,
-    driverPay: enteredKm * DRIVER_RATE_PER_KM + 1000,
+    driverPay: defaultPay,
     badgeText: '',
     shortBadgeText: '',
   };

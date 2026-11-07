@@ -323,14 +323,16 @@ export async function handleVehicleArrival(
   // Тариф водителя: 10 руб/км + 1000 руб/сутки
   const kmPay = distanceKm * 10;
   const perDiemPay = daysCount * 1000;
-  const totalDriverPay = kmPay + perDiemPay;
+  // Округление ЗП до 100 ₽ в меньшую сторону (например 7 070 ₽ -> 7 000 ₽)
+  const totalDriverPay = Math.floor((kmPay + perDiemPay) / 100) * 100;
 
   // Расчет расхода топлива по нормативу для Валдая: 18 л / 100 км
   // Актуализируемая базовая цена: 82 руб/л (ТК и нал), льготный Кубик: 60 руб/л
   const FUEL_RATE_PER_100KM = 18;
   const FUEL_PRICE_TK = 82;
   const fuelLiters = Number(((distanceKm * FUEL_RATE_PER_100KM) / 100).toFixed(1));
-  const defaultFuelCost = Math.round(fuelLiters * FUEL_PRICE_TK);
+  // Округление суммы топлива до 100 ₽ (например 8 963 ₽ -> 9 000 ₽)
+  const defaultFuelCost = Math.round((fuelLiters * FUEL_PRICE_TK) / 100) * 100;
 
   // 1. Обновляем рейс: статус completed, lifecycle_status = 'draft' (ждет одобрения на странице ревью)
   await supabase

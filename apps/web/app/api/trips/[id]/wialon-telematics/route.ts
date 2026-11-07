@@ -110,8 +110,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             endOdo: body.endOdo,
             normLiters: body.normLiters || Number(((body.wialonKm * 18) / 100).toFixed(1)),
             normCost:
-              body.normCost || Math.round(Number(((body.wialonKm * 18) / 100).toFixed(1)) * 82),
-            driverPay: body.driverPay || body.wialonKm * 10 + (body.daysCount || 1) * 1000,
+              body.normCost !== undefined
+                ? Math.round(body.normCost / 100) * 100
+                : Math.round((Number(((body.wialonKm * 18) / 100).toFixed(1)) * 82) / 100) * 100,
+            driverPay:
+              body.driverPay !== undefined
+                ? Math.floor(body.driverPay / 100) * 100
+                : Math.floor((body.wialonKm * 10 + (body.daysCount || 1) * 1000) / 100) * 100,
             daysCount: body.daysCount || 1,
           }
         : null;
