@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { cn, Money } from '@saldacargo/ui';
-import { isOilOrFilterWork } from '@saldacargo/shared';
+import { isOilOrFilterWork, GARAGE_WORK_CATEGORIES } from '@saldacargo/shared';
 import { WarehouseSection } from './warehouse-section';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -78,6 +78,8 @@ type DetailWork = {
   price_client: string | null;
   work_description: string | null;
   custom_work_name: string | null;
+  custom_work_description?: string | null;
+  created_at?: string | null;
   mechanic_id: string | null;
   second_mechanic_id: string | null;
   notes?: string | null;
@@ -261,15 +263,20 @@ function OrderDetailModal({
   const [showCloseDialog, setShowCloseDialog] = useState(false);
 
   const [showAddWork, setShowAddWork] = useState(false);
-  const [workSearch, setWorkSearch] = useState('');
-  const [workCatFilter, setWorkCatFilter] = useState<string | null>(null);
   const [confirmDeleteWorkId, setConfirmDeleteWorkId] = useState<string | null>(null);
   const [addWorkError, setAddWorkError] = useState<string | null>(null);
   const [addWorkQty, setAddWorkQty] = useState(1);
-  const [isCustomWork, setIsCustomWork] = useState(false);
+  const [addWorkDate, setAddWorkDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [addWorkCategory, setAddWorkCategory] = useState<string>(GARAGE_WORK_CATEGORIES[0]);
   const [customWorkName, setCustomWorkName] = useState('');
   const [customWorkPrice, setCustomWorkPrice] = useState('');
+  const [addWorkMinutes, setAddWorkMinutes] = useState('60');
+  const [addWorkMechanic, setAddWorkMechanic] = useState<string>('');
+  const [addWorkSecondMechanic, setAddWorkSecondMechanic] = useState<string>('');
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
+  const [editWorkName, setEditWorkName] = useState('');
+  const [editWorkDate, setEditWorkDate] = useState('');
+  const [editWorkCategory, setEditWorkCategory] = useState('');
   const [editWorkDesc, setEditWorkDesc] = useState('');
   const [editWorkQty, setEditWorkQty] = useState(1);
   const [editWorkPrice, setEditWorkPrice] = useState('');
@@ -378,38 +385,39 @@ function OrderDetailModal({
 
   const isClosed = order?.lifecycle_status === 'approved';
 
-  const { data: workCatalog = [] } = useQuery<
-    Array<{
-      id: string;
-      name: string;
-      category: string | null;
-      norm_minutes: number;
-      norm_minutes_valdai: number | null;
-      default_price_client: string | null;
-    }>
-  >({
-    queryKey: ['garage-work-catalog'],
-    queryFn: () => fetch('/api/garage/work-catalog').then((r) => r.json()),
-    staleTime: 300000,
-    enabled: showAddWork,
-  });
-
   const addWorkMutation = useMutation({
     mutationFn: ({
-      work_catalog_id,
       custom_work_name,
+      category,
+      work_date,
       price_client,
+      norm_minutes,
+      mechanic_id,
+      second_mechanic_id,
       quantity,
     }: {
-      work_catalog_id?: string;
-      custom_work_name?: string;
+      custom_work_name: string;
+      category?: string;
+      work_date?: string;
       price_client?: string;
+      norm_minutes?: number;
+      mechanic_id?: string | null;
+      second_mechanic_id?: string | null;
       quantity: number;
     }) =>
       fetch(`/api/garage/orders/${orderId}/works`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ work_catalog_id, custom_work_name, price_client, quantity }),
+        body: JSON.stringify({
+          custom_work_name,
+          category,
+          work_date,
+          price_client,
+          norm_minutes,
+          mechanic_id,
+          second_mechanic_id,
+          quantity,
+        }),
       }).then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw new Error(d.error ?? 'Ошибка');
@@ -417,11 +425,10 @@ function OrderDetailModal({
       }),
     onSuccess: () => {
       setAddWorkError(null);
-      setWorkSearch('');
       setAddWorkQty(1);
-      setIsCustomWork(false);
       setCustomWorkName('');
       setCustomWorkPrice('');
+      setAddWorkMinutes('60');
       setShowAddWork(false);
       queryClient.invalidateQueries({ queryKey: ['garage-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['garage-orders'] });
@@ -460,6 +467,9 @@ function OrderDetailModal({
         mechanic_id?: string | null;
         second_mechanic_id?: string | null;
         custom_salary_pct?: number | null;
+        custom_work_name?: string;
+        category?: string;
+        work_date?: string;
       };
     }) =>
       fetch(`/api/garage/orders/${orderId}/works/${workId}`, {
@@ -560,14 +570,6 @@ function OrderDetailModal({
     });
     setPartPricesDraft(draft);
   }, [order?.id]);
-
-  const filteredCatalog = workSearch.trim()
-    ? workCatalog.filter((w) => w.name.toLowerCase().includes(workSearch.toLowerCase().trim()))
-    : workCatFilter
-      ? workCatalog.filter((w) => (w.category ?? 'Прочее') === workCatFilter)
-      : workCatalog;
-
-  const catalogCategories = [...new Set(workCatalog.map((w) => w.category ?? 'Прочее'))].sort();
 
   const totalNormMin =
     order?.works
@@ -1023,157 +1025,199 @@ function OrderDetailModal({
                 </div>
 
                 {showAddWork && (
-                  <div className="mb-3 border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex gap-2 items-center flex-wrap">
-                      {!isCustomWork ? (
-                        <>
-                          <input
-                            autoFocus
-                            type="text"
-                            value={workSearch}
-                            onChange={(e) => {
-                              setWorkSearch(e.target.value);
-                              setAddWorkError(null);
-                            }}
-                            placeholder="Поиск по названию..."
-                            className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400 min-w-[150px]"
-                          />
+                  <div className="mb-3 border border-blue-200 bg-blue-50/50 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                      <span>➕ Добавить работу (ручной ввод)</span>
+                      <span className="text-[11px] text-slate-400 font-normal">
+                        Тариф: {hourlyRate.toLocaleString('ru-RU')} ₽/ч
+                      </span>
+                    </div>
+
+                    {/* Row 1: Date, Category, Work Name */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                      <div className="md:col-span-3">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          📅 Дата работы *
+                        </label>
+                        <input
+                          type="date"
+                          value={addWorkDate}
+                          onChange={(e) => setAddWorkDate(e.target.value)}
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 font-medium"
+                        />
+                      </div>
+
+                      <div className="md:col-span-4">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          ⚙️ Категория / Узел *
+                        </label>
+                        <select
+                          value={addWorkCategory}
+                          onChange={(e) => setAddWorkCategory(e.target.value)}
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 font-medium"
+                        >
+                          {GARAGE_WORK_CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-5">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          ✏️ Наименование работы *
+                        </label>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={customWorkName}
+                          onChange={(e) => {
+                            setCustomWorkName(e.target.value);
+                            setAddWorkError(null);
+                          }}
+                          placeholder="Например: Замена задних фонарей"
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Mechanic, 2nd Mechanic, Minutes, Price, Qty, Add button */}
+                    <div className="grid grid-cols-2 md:grid-cols-12 gap-2 items-end pt-1">
+                      <div className="col-span-2 md:col-span-3">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          👤 Исполнитель
+                        </label>
+                        <select
+                          value={addWorkMechanic}
+                          onChange={(e) => setAddWorkMechanic(e.target.value)}
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-blue-500"
+                        >
+                          <option value="">
+                            {order.mechanic
+                              ? `По наряду (${order.mechanic.name.split(' ')[0]})`
+                              : '— Не назначен —'}
+                          </option>
+                          {mechanics.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="col-span-2 md:col-span-3">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          👥 2-й исполнитель
+                        </label>
+                        <select
+                          value={addWorkSecondMechanic}
+                          onChange={(e) => setAddWorkSecondMechanic(e.target.value)}
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-blue-500"
+                        >
+                          <option value="">— Нет —</option>
+                          {mechanics.map((m) => (
+                            <option key={m.id} value={m.id} disabled={m.id === addWorkMechanic}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="col-span-1 md:col-span-2">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          ⏱ Время (мин)
+                        </label>
+                        <input
+                          type="number"
+                          step="15"
+                          min="5"
+                          value={addWorkMinutes}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAddWorkMinutes(val);
+                            if (val && !customWorkPrice) {
+                              const calc = Math.round((Number(val) / 60) * hourlyRate);
+                              setCustomWorkPrice(String(calc));
+                            }
+                          }}
+                          placeholder="60"
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 font-medium"
+                        />
+                      </div>
+
+                      <div className="col-span-1 md:col-span-2">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          💰 Цена (₽)
+                        </label>
+                        <input
+                          type="number"
+                          step="100"
+                          value={customWorkPrice}
+                          onChange={(e) => setCustomWorkPrice(e.target.value)}
+                          placeholder={String(
+                            Math.round(((Number(addWorkMinutes) || 60) / 60) * hourlyRate),
+                          )}
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 font-bold text-slate-800"
+                        />
+                      </div>
+
+                      <div className="col-span-1 md:col-span-1">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1 text-center">
+                          Кол-во
+                        </label>
+                        <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white h-[30px]">
                           <button
                             type="button"
-                            onClick={() => setIsCustomWork(true)}
-                            className="text-xs font-semibold text-blue-600 hover:underline shrink-0"
+                            onClick={() => setAddWorkQty((q) => Math.max(1, q - 1))}
+                            className="px-1.5 py-1 text-slate-500 hover:bg-slate-100 text-xs font-bold"
                           >
-                            Ввести вручную
+                            −
                           </button>
-                        </>
-                      ) : (
-                        <>
-                          <input
-                            autoFocus
-                            type="text"
-                            value={customWorkName}
-                            onChange={(e) => {
-                              setCustomWorkName(e.target.value);
-                              setAddWorkError(null);
-                            }}
-                            placeholder="Название работы..."
-                            className="flex-1 text-sm bg-white border border-slate-200 rounded px-2 py-1 outline-none min-w-[150px]"
-                          />
-                          <input
-                            type="number"
-                            value={customWorkPrice}
-                            onChange={(e) => {
-                              setCustomWorkPrice(e.target.value);
-                              setAddWorkError(null);
-                            }}
-                            placeholder="Цена (₽)"
-                            className="w-20 text-sm bg-white border border-slate-200 rounded px-2 py-1 outline-none shrink-0"
-                          />
+                          <span className="flex-1 text-center text-xs font-bold text-slate-800">
+                            {addWorkQty}
+                          </span>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (!customWorkName.trim()) {
-                                setAddWorkError('Введите название работы');
-                                return;
-                              }
-                              addWorkMutation.mutate({
-                                custom_work_name: customWorkName,
-                                price_client: customWorkPrice || undefined,
-                                quantity: addWorkQty,
-                              });
-                            }}
-                            disabled={addWorkMutation.isPending}
-                            className="text-xs bg-blue-600 text-white px-2 py-1.5 rounded font-semibold disabled:opacity-50 shrink-0"
+                            onClick={() => setAddWorkQty((q) => q + 1)}
+                            className="px-1.5 py-1 text-slate-500 hover:bg-slate-100 text-xs font-bold"
                           >
                             +
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsCustomWork(false)}
-                            className="text-xs text-slate-500 hover:text-slate-700 shrink-0"
-                          >
-                            Отмена
-                          </button>
-                        </>
-                      )}
-                      <div className="flex items-center gap-1 shrink-0 border border-slate-300 rounded-lg overflow-hidden bg-white">
+                        </div>
+                      </div>
+
+                      <div className="col-span-1 md:col-span-1 flex gap-1 items-center">
                         <button
                           type="button"
-                          onClick={() => setAddWorkQty((q) => Math.max(1, q - 1))}
-                          className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
+                          onClick={() => {
+                            if (!customWorkName.trim()) {
+                              setAddWorkError('Введите наименование работы');
+                              return;
+                            }
+                            addWorkMutation.mutate({
+                              custom_work_name: customWorkName.trim(),
+                              category: addWorkCategory,
+                              work_date: addWorkDate,
+                              price_client: customWorkPrice ? customWorkPrice : undefined,
+                              norm_minutes: Number(addWorkMinutes) || 60,
+                              mechanic_id: addWorkMechanic || null,
+                              second_mechanic_id: addWorkSecondMechanic || null,
+                              quantity: addWorkQty,
+                            });
+                          }}
+                          disabled={addWorkMutation.isPending}
+                          className="h-[30px] w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 transition-colors shadow-sm"
+                          title="Добавить работу"
                         >
-                          −
-                        </button>
-                        <span className="px-1 text-sm font-bold text-slate-800 min-w-[20px] text-center">
-                          {addWorkQty}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setAddWorkQty((q) => q + 1)}
-                          className="px-2 py-1 text-slate-500 hover:bg-slate-100 text-sm font-bold"
-                        >
-                          +
+                          {addWorkMutation.isPending ? '...' : '+'}
                         </button>
                       </div>
                     </div>
+
                     {addWorkError && (
-                      <div className="px-3 py-2 bg-red-50 border-b border-red-200">
-                        <p className="text-xs text-red-700 font-medium">{addWorkError}</p>
-                      </div>
-                    )}
-                    {!workSearch.trim() && (
-                      <div className="px-3 py-2 flex gap-1.5 flex-wrap border-b border-slate-100 bg-slate-50/70">
-                        {catalogCategories.map((cat) => (
-                          <button
-                            key={cat}
-                            onClick={() => setWorkCatFilter(workCatFilter === cat ? null : cat)}
-                            className={cn(
-                              'text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors',
-                              workCatFilter === cat
-                                ? 'bg-slate-900 text-white border-slate-900'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400',
-                            )}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {!isCustomWork && (
-                      <div className="max-h-60 overflow-y-auto">
-                        {!workSearch.trim() && !workCatFilter ? (
-                          <p className="text-xs text-slate-400 px-3 py-4 italic text-center">
-                            Выберите категорию или введите название для поиска
-                          </p>
-                        ) : filteredCatalog.length === 0 ? (
-                          <p className="text-xs text-slate-400 px-3 py-3 italic">
-                            Ничего не найдено
-                          </p>
-                        ) : (
-                          filteredCatalog.map((w) => (
-                            <button
-                              key={w.id}
-                              onClick={() =>
-                                addWorkMutation.mutate({
-                                  work_catalog_id: w.id,
-                                  quantity: addWorkQty,
-                                })
-                              }
-                              disabled={addWorkMutation.isPending}
-                              className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 flex justify-between items-center group disabled:opacity-50"
-                            >
-                              <span className="text-sm text-slate-800 group-hover:text-blue-700">
-                                {w.name}
-                              </span>
-                              <span className="text-xs text-slate-400 shrink-0 ml-2">
-                                {(w.norm_minutes / 60).toFixed(1)} нч
-                                {w.default_price_client
-                                  ? ` · ${parseInt(w.default_price_client).toLocaleString('ru-RU')} ₽`
-                                  : ''}
-                              </span>
-                            </button>
-                          ))
-                        )}
+                      <div className="p-2 bg-red-100 border border-red-300 rounded-lg text-xs text-red-700 font-semibold">
+                        {addWorkError}
                       </div>
                     )}
                   </div>
@@ -1184,7 +1228,12 @@ function OrderDetailModal({
                 ) : (
                   <div className="space-y-1">
                     {order.works.map((w) => {
-                      const name = w.work_catalog?.name ?? w.custom_work_name ?? 'Без названия';
+                      const name = w.custom_work_name ?? w.work_catalog?.name ?? 'Без названия';
+                      const category =
+                        w.custom_work_description ||
+                        w.notes?.match(/\[category:([^\]]+)\]/)?.[1] ||
+                        null;
+                      const dateFormatted = w.created_at ? fmtDate(w.created_at) : null;
                       const isEditing = editingWorkId === w.id;
                       const isDone = w.status === 'completed';
                       const workCode = (w.work_catalog as unknown as { code?: string } | null)
@@ -1208,18 +1257,37 @@ function OrderDetailModal({
                                 'w-2.5 h-2.5 rounded-full flex-shrink-0',
                                 isDone ? 'bg-emerald-500' : 'bg-red-400',
                               )}
+                              title={isDone ? 'Завершена' : 'В работе'}
                             />
 
-                            {/* Name + hours */}
+                            {/* Name + Date + Category + Performers */}
                             <div className="flex-1 min-w-0 flex flex-col justify-center">
-                              <p className="text-sm font-medium text-slate-800 leading-snug">
-                                {name}
-                                {(w.quantity ?? 1) > 1 && (
-                                  <span className="ml-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                                    ×{w.quantity}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {dateFormatted && (
+                                  <span
+                                    className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded leading-none shrink-0"
+                                    title="Дата выполнения"
+                                  >
+                                    📅 {dateFormatted}
                                   </span>
                                 )}
-                              </p>
+                                {category && (
+                                  <span
+                                    className="text-[10px] font-bold text-blue-700 bg-blue-100/90 px-1.5 py-0.5 rounded leading-none shrink-0"
+                                    title="Категория / Узел"
+                                  >
+                                    ⚙️ {category}
+                                  </span>
+                                )}
+                                <p className="text-sm font-semibold text-slate-800 leading-snug">
+                                  {name}
+                                  {(w.quantity ?? 1) > 1 && (
+                                    <span className="ml-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                      ×{w.quantity}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
                               <div className="flex items-center gap-2 flex-wrap mt-0.5">
                                 <p className="text-xs text-slate-400">
                                   {normHours.toFixed(1)} нч
@@ -1275,6 +1343,17 @@ function OrderDetailModal({
                                   return;
                                 }
                                 setEditingWorkId(w.id);
+                                setEditWorkName(w.custom_work_name ?? w.work_catalog?.name ?? '');
+                                setEditWorkCategory(
+                                  w.custom_work_description ||
+                                    w.notes?.match(/\[category:([^\]]+)\]/)?.[1] ||
+                                    GARAGE_WORK_CATEGORIES[0],
+                                );
+                                setEditWorkDate(
+                                  w.created_at
+                                    ? w.created_at.slice(0, 10)
+                                    : new Date().toISOString().slice(0, 10),
+                                );
                                 setEditWorkPrice(
                                   w.price_client ?? String(Math.round(normHours * hourlyRate)),
                                 );
@@ -1344,6 +1423,51 @@ function OrderDetailModal({
                                     <span className="text-xs text-blue-500">
                                       Тариф: {hourlyRate.toLocaleString('ru-RU')} ₽/ч
                                     </span>
+                                  </div>
+
+                                  {/* Name, Date, Category */}
+                                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                                    <div className="md:col-span-3">
+                                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                                        📅 Дата работы
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={editWorkDate}
+                                        onChange={(e) => setEditWorkDate(e.target.value)}
+                                        className="w-full text-xs bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 outline-none font-medium"
+                                      />
+                                    </div>
+
+                                    <div className="md:col-span-4">
+                                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                                        ⚙️ Категория / Узел
+                                      </label>
+                                      <select
+                                        value={editWorkCategory}
+                                        onChange={(e) => setEditWorkCategory(e.target.value)}
+                                        className="w-full text-xs bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 outline-none font-medium"
+                                      >
+                                        {GARAGE_WORK_CATEGORIES.map((cat) => (
+                                          <option key={cat} value={cat}>
+                                            {cat}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div className="md:col-span-5">
+                                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                                        ✏️ Наименование работы
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editWorkName}
+                                        onChange={(e) => setEditWorkName(e.target.value)}
+                                        placeholder="Название работы..."
+                                        className="w-full text-xs bg-white border border-blue-200 rounded-lg px-2.5 py-1.5 outline-none font-semibold text-slate-800"
+                                      />
+                                    </div>
                                   </div>
 
                                   {/* Price + computed hours */}
@@ -1478,6 +1602,9 @@ function OrderDetailModal({
                                         patchWorkMutation.mutate({
                                           workId: w.id,
                                           body: {
+                                            custom_work_name: editWorkName.trim() || undefined,
+                                            category: editWorkCategory,
+                                            work_date: editWorkDate,
                                             quantity: editWorkQty,
                                             actual_minutes: computedMinutes,
                                             price_client:
@@ -1501,6 +1628,9 @@ function OrderDetailModal({
                                         patchWorkMutation.mutate({
                                           workId: w.id,
                                           body: {
+                                            custom_work_name: editWorkName.trim() || undefined,
+                                            category: editWorkCategory,
+                                            work_date: editWorkDate,
                                             quantity: editWorkQty,
                                             actual_minutes: computedMinutes,
                                             price_client:

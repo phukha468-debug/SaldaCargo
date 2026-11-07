@@ -47,11 +47,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const priceClient = ((minutes / 60) * hourlyRate).toFixed(2);
   const markCompleted = body.completed !== false;
 
+  const cleanCategory = body.category?.trim() || null;
+  const cleanNotes = cleanCategory ? `[category:${cleanCategory}]` : null;
+  let workDateIso = new Date().toISOString();
+  if (body.work_date) {
+    const d = new Date(body.work_date);
+    if (!isNaN(d.getTime())) workDateIso = d.toISOString();
+  } else if (body.created_at) {
+    const d = new Date(body.created_at);
+    if (!isNaN(d.getTime())) workDateIso = d.toISOString();
+  }
+
   const { data, error } = await (supabase.from('service_order_works') as any)
     .insert({
       service_order_id: orderId,
       work_catalog_id: body.work_catalog_id ?? null,
       custom_work_name: body.custom_work_name?.trim() ?? null,
+      custom_work_description: cleanCategory,
+      notes: cleanNotes,
+      created_at: workDateIso,
       norm_minutes: minutes,
       actual_minutes: minutes,
       price_client: priceClient,
@@ -61,7 +75,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       second_mechanic_id: body.second_mechanic_id || null,
     })
     .select(
-      'id, custom_work_name, status, norm_minutes, actual_minutes, price_client, quantity, work_catalog:work_catalog(id, name, norm_minutes)',
+      'id, custom_work_name, custom_work_description, notes, created_at, status, norm_minutes, actual_minutes, price_client, quantity, work_catalog:work_catalog(id, name, norm_minutes)',
     )
     .single();
 

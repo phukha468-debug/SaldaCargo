@@ -12,18 +12,43 @@ export async function PATCH(
 
   const allowed = [
     'actual_minutes',
+    'norm_minutes',
     'price_client',
     'status',
     'salary_paid',
     'work_description',
+    'custom_work_name',
+    'custom_work_description',
     'quantity',
     'mechanic_id',
     'second_mechanic_id',
     'notes',
+    'created_at',
   ];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];
+  }
+
+  if (body.work_date) {
+    const d = new Date(body.work_date);
+    if (!isNaN(d.getTime())) {
+      updates.created_at = d.toISOString();
+    }
+  }
+
+  if (body.category !== undefined) {
+    const cleanCat = String(body.category || '').trim();
+    updates.custom_work_description = cleanCat || null;
+    const existingNotes = String(body.notes || updates.notes || '');
+    const cleanedNotes = existingNotes.replace(/\[category:[^\]]+\]/g, '').trim();
+    if (cleanCat) {
+      updates.notes = cleanedNotes
+        ? `${cleanedNotes} [category:${cleanCat}]`
+        : `[category:${cleanCat}]`;
+    } else {
+      updates.notes = cleanedNotes || null;
+    }
   }
   if ('custom_salary_pct' in body) {
     if (body.custom_salary_pct != null && body.custom_salary_pct !== '') {
@@ -92,7 +117,7 @@ export async function PATCH(
     .update(updates)
     .eq('id', workId)
     .select(
-      'id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description, custom_work_name, mechanic_id, second_mechanic_id, notes, work_catalog:work_catalog(id, name)',
+      'id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description, custom_work_name, custom_work_description, created_at, mechanic_id, second_mechanic_id, notes, work_catalog:work_catalog(id, name)',
     )
     .single();
 

@@ -34,7 +34,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           asset_id, asset:assets(id, short_name, reg_number, odometer_current),
           works:service_order_works(
             id, status, salary_paid, quantity, norm_minutes, actual_minutes, price_client, work_description,
-            custom_work_name, mechanic_id, second_mechanic_id,
+            custom_work_name, custom_work_description, notes, created_at, mechanic_id, second_mechanic_id,
             work_catalog:work_catalog(id, name, norm_minutes),
             time_logs:work_time_logs(id, started_at, stopped_at, status)
           ),

@@ -5,12 +5,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Money, cn } from '@saldacargo/ui';
-import { formatDate, isOilOrFilterWork } from '@saldacargo/shared';
+import { formatDate, isOilOrFilterWork, GARAGE_WORK_CATEGORIES } from '@saldacargo/shared';
 
 interface WorkItem {
   id: string;
   work_catalog?: { name: string; norm_minutes: number };
   custom_work_name?: string;
+  custom_work_description?: string;
+  notes?: string;
+  created_at?: string;
   status: string;
   norm_minutes: number;
   actual_minutes: number;
@@ -61,6 +64,10 @@ export default function OrderDetailPage() {
   const queryClient = useQueryClient();
 
   const [workNameInput, setWorkNameInput] = useState('');
+  const [workCategoryInput, setWorkCategoryInput] = useState<string>(GARAGE_WORK_CATEGORIES[0]);
+  const [workDateInput, setWorkDateInput] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [workMinutesInput, setWorkMinutesInput] = useState('');
   const [secondMechanicId, setSecondMechanicId] = useState<string>('');
   const [workPerformerInput, setWorkPerformerInput] = useState<'both' | 'primary' | 'second'>(
@@ -121,6 +128,8 @@ export default function OrderDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           custom_work_name: cleanName,
+          category: workCategoryInput,
+          work_date: workDateInput,
           minutes: mins,
           norm_minutes: mins,
           actual_minutes: mins,
@@ -387,6 +396,9 @@ export default function OrderDetailPage() {
           <div className="space-y-2">
             {safeWorks.map((w, idx) => {
               const name = w.custom_work_name || w.work_catalog?.name || 'Работа';
+              const category =
+                w.custom_work_description || w.notes?.match(/\[category:([^\]]+)\]/)?.[1] || null;
+              const dateFormatted = w.created_at ? formatDate(w.created_at) : null;
               const mins = w.actual_minutes || w.norm_minutes || 0;
               const workPay = calcWorkPay(mins);
               return (
@@ -395,6 +407,18 @@ export default function OrderDetailPage() {
                   className="bg-[#F8FAFC] border border-slate-200/80 rounded-2xl p-3.5 flex items-start justify-between gap-2"
                 >
                   <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                      {dateFormatted && (
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded leading-none">
+                          📅 {dateFormatted}
+                        </span>
+                      )}
+                      {category && (
+                        <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100/90 px-1.5 py-0.5 rounded leading-none">
+                          ⚙️ {category}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm font-extrabold text-slate-900">
                       {idx + 1}. {name}
                     </p>
@@ -428,12 +452,42 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* Форма добавления работы (1 строка - название, 2 строка - минуты) */}
+        {/* Форма добавления работы */}
         {isEditable && (
           <div className="bg-[#F2F4F7] rounded-2xl p-3.5 space-y-2.5 border border-slate-200/70">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  📅 Дата работы
+                </label>
+                <input
+                  type="date"
+                  value={workDateInput}
+                  onChange={(e) => setWorkDateInput(e.target.value)}
+                  className="w-full h-10 px-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  ⚙️ Узел / Категория
+                </label>
+                <select
+                  value={workCategoryInput}
+                  onChange={(e) => setWorkCategoryInput(e.target.value)}
+                  className="w-full h-10 px-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                >
+                  {GARAGE_WORK_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div>
               <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                Строка 1 — Наименование работы
+                Наименование работы (ручной ввод)
               </label>
               <input
                 type="text"

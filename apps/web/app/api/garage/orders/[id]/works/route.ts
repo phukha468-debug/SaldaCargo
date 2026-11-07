@@ -6,12 +6,30 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: orderId } = await params;
   const body = await request.json();
-  const { work_catalog_id, custom_work_name, actual_minutes, price_client, quantity } = body as {
+  const {
+    work_catalog_id,
+    custom_work_name,
+    actual_minutes,
+    norm_minutes: bodyNormMinutes,
+    price_client,
+    quantity,
+    work_date,
+    created_at,
+    category,
+    mechanic_id,
+    second_mechanic_id,
+  } = body as {
     work_catalog_id?: string;
     custom_work_name?: string;
     actual_minutes?: number;
+    norm_minutes?: number;
     price_client?: string;
     quantity?: number;
+    work_date?: string;
+    created_at?: string;
+    category?: string;
+    mechanic_id?: string;
+    second_mechanic_id?: string;
   };
 
   if (!work_catalog_id && !custom_work_name?.trim()) {
@@ -23,12 +41,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // Fetch order to determine status and machine_type
   const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
-    .select('id, lifecycle_status, machine_type')
+    .select('id, lifecycle_status, machine_type, assigned_mechanic_id')
     .eq('id', orderId)
     .single();
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
 
-  let normMinutes = 60;
+  let normMinutes = bodyNormMinutes ?? 60;
   const isOwn = order.machine_type === 'own';
 
   let catalogDescription: string | null = null;
@@ -59,21 +77,43 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     clientPrice = (((normMinutes * qty) / 60) * rate).toFixed(2);
   }
 
+  // Определяем дату выполнения работы
+  let workDateIso = new Date().toISOString();
+  if (work_date) {
+    const d = new Date(work_date);
+    if (!isNaN(d.getTime())) {
+      workDateIso = d.toISOString();
+    }
+  } else if (created_at) {
+    const d = new Date(created_at);
+    if (!isNaN(d.getTime())) {
+      workDateIso = d.toISOString();
+    }
+  }
+
+  const cleanCategory = category?.trim() || null;
+  const cleanNotes = cleanCategory ? `[category:${cleanCategory}]` : null;
+
   // Works always start as pending — mechanic or admin marks them done separately
   const { data, error } = await (supabase.from('service_order_works') as any)
     .insert({
       service_order_id: orderId,
       work_catalog_id: work_catalog_id ?? null,
       custom_work_name: custom_work_name?.trim() ?? null,
+      custom_work_description: cleanCategory,
+      notes: cleanNotes,
+      created_at: workDateIso,
       norm_minutes: normMinutes,
       actual_minutes: actual_minutes ?? null,
       price_client: clientPrice,
       quantity: qty,
       status: 'pending',
       work_description: catalogDescription,
+      mechanic_id: mechanic_id ?? order.assigned_mechanic_id ?? null,
+      second_mechanic_id: second_mechanic_id ?? null,
     })
     .select(
-      'id, status, quantity, norm_minutes, actual_minutes, price_client, custom_work_name, work_catalog:work_catalog(id, name)',
+      'id, status, quantity, norm_minutes, actual_minutes, price_client, custom_work_name, custom_work_description, notes, created_at, mechanic_id, second_mechanic_id, work_catalog:work_catalog(id, name)',
     )
     .single();
 
