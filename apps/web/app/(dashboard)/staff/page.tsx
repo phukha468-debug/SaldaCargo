@@ -682,32 +682,105 @@ function SettleModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const salaryTotal = parseFloat(user.debt);
+  const initialSalaryTotal = parseFloat(user.debt);
   const advanceBalance = parseFloat(user.advance_balance ?? '0');
+
+  // Загружаем актуальные начисления для ведомости (1C:ЗУП / SAP стандарт)
+  const { data: settleData, isLoading: isSettleLoading } = useQuery<{
+    salary_total: string;
+    advance_balance: string;
+    offset: string;
+    payout: string;
+    uncollected_cash: string;
+    pending_transactions: Array<{
+      id: string;
+      amount: string | number;
+      description: string;
+      created_at: string;
+      transaction_date?: string | null;
+      category_id: string;
+      trip?: { trip_number: number; started_at?: string; lifecycle_status?: string } | null;
+      service_order?: { order_number: number; created_at?: string } | null;
+    }>;
+  }>({
+    queryKey: ['staff-settle-data', user.id],
+    queryFn: () => fetch(`/api/staff/settle?user_id=${user.id}`).then((r) => r.json()),
+  });
+
+  const pendingList = settleData?.pending_transactions ?? [];
+  const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    if (settleData?.pending_transactions && !isInitialized) {
+      setSelectedTxIds(new Set(settleData.pending_transactions.map((t) => t.id)));
+      setIsInitialized(true);
+    }
+  }, [settleData, isInitialized]);
+
+  const selectedItems = pendingList.filter((t) => selectedTxIds.has(t.id));
+  const unselectedItems = pendingList.filter((t) => !selectedTxIds.has(t.id));
+
+  const salaryTotal =
+    pendingList.length > 0
+      ? selectedItems.reduce((s, t) => s + parseFloat(String(t.amount || '0')), 0)
+      : initialSalaryTotal;
+
   const maxOffset = Math.min(salaryTotal, advanceBalance);
 
   const [walletId, setWalletId] = useState(WALLETS[1]!.id);
   const [walletMode, setWalletMode] = useState<'single' | 'split'>('single');
   const [cashSplit, setCashSplit] = useState('');
   const [bankSplit, setBankSplit] = useState('');
-  // По умолчанию НЕ списываем аванс (0 ₽), чтобы исключить случайные удержания
   const [offsetInput, setOffsetInput] = useState('0');
-  const [partialInput, setPartialInput] = useState(salaryTotal.toFixed(2));
   const [error, setError] = useState('');
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showOffsetConfirm, setShowOffsetConfirm] = useState(false);
 
-  const isPartial = parseFloat(partialInput) < salaryTotal - 0.001;
-  const partialVal = Math.min(Math.max(0, parseFloat(partialInput) || 0), salaryTotal);
-
   const offsetVal = Math.min(Math.max(0, parseFloat(offsetInput) || 0), maxOffset);
-  // При частичной выплате зачёт аванса пропорционально
-  const effectiveOffset = isPartial ? Math.min(offsetVal, partialVal) : offsetVal;
-  const payout = Math.max(0, partialVal - effectiveOffset);
+  const effectiveOffset = offsetVal;
+  const payout = Math.max(0, salaryTotal - effectiveOffset);
   const remainingDebt = Math.max(0, advanceBalance - effectiveOffset);
-  const remainingSalary = Math.max(0, salaryTotal - partialVal);
+  const unselectedTotal = unselectedItems.reduce(
+    (s, t) => s + parseFloat(String(t.amount || '0')),
+    0,
+  );
   const needsWallet = payout > 0;
+
+  const selectAll = () => {
+    setSelectedTxIds(new Set(pendingList.map((t) => t.id)));
+  };
+
+  const selectThursday = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToThu = day >= 4 ? day - 4 : day + 3;
+    const endThu = new Date(now);
+    endThu.setDate(now.getDate() - diffToThu);
+    endThu.setHours(23, 59, 59, 999);
+
+    const thuIds = pendingList
+      .filter((t) => {
+        const d = new Date(t.transaction_date || t.created_at);
+        return d <= endThu;
+      })
+      .map((t) => t.id);
+    setSelectedTxIds(new Set(thuIds));
+  };
+
+  const deselectAll = () => {
+    setSelectedTxIds(new Set());
+  };
+
+  const toggleItem = (id: string) => {
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleCashChange = (val: string) => {
     setCashSplit(val);
@@ -757,11 +830,11 @@ function SettleModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: user.id,
+          selected_transaction_ids: pendingList.length > 0 ? Array.from(selectedTxIds) : undefined,
           from_wallet_id: needsWallet && walletMode === 'single' ? walletId : undefined,
           wallet_splits: needsWallet ? splits : undefined,
           partial_offset: effectiveOffset.toFixed(2),
           idempotency_key: idempotencyKey,
-          ...(isPartial ? { partial_amount: partialVal.toFixed(2) } : {}),
         }),
       }).then(async (r) => {
         const data = await r.json();
@@ -776,10 +849,10 @@ function SettleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h2 className="font-bold text-slate-900">Выплата ЗП</h2>
+            <h2 className="font-bold text-slate-900">Выплата ЗП (Ведомость)</h2>
             <p className="text-sm text-slate-500">{user.name}</p>
           </div>
           <button
@@ -857,7 +930,7 @@ function SettleModal({
             </div>
           </div>
         ) : (
-          /* Обычная форма выплаты */
+          /* Обычная форма выплаты: Защита 1С:ЗУП / SAP / МойСклад */
           <>
             <div className="p-6 space-y-3">
               {/* Предупреждение о подотчёте на руках */}
@@ -873,62 +946,155 @@ function SettleModal({
                 </div>
               )}
 
-              {/* Сумма к выплате */}
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1.5">
-                  Сумма к выплате сейчас
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max={salaryTotal}
-                    step="100"
-                    value={partialInput}
-                    onChange={(e) => setPartialInput(e.target.value)}
-                    className="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
-                  <span className="text-sm text-slate-500 shrink-0">₽</span>
-                  <button
-                    type="button"
-                    onClick={() => setPartialInput(salaryTotal.toFixed(2))}
-                    className={cn(
-                      'text-xs px-2.5 py-1.5 rounded-lg border font-semibold shrink-0 transition-colors',
-                      !isPartial
-                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200 text-slate-500 hover:bg-slate-50',
-                    )}
-                  >
-                    Всё
-                  </button>
+              {/* 1C/SAP: Построчная ведомость выбора начислений (Dense 1-Line Layout) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>
+                      📋 Начисления к выплате ({selectedItems.length}/{pendingList.length})
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={selectAll}
+                      className={cn(
+                        'text-[10px] px-2 py-0.5 rounded font-bold transition',
+                        selectedItems.length === pendingList.length && pendingList.length > 0
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700',
+                      )}
+                    >
+                      Все
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectThursday}
+                      title="Выбрать только начисления по четверг включительно"
+                      className="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 transition"
+                    >
+                      По Чт (срез)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deselectAll}
+                      className="text-[10px] px-1.5 py-0.5 rounded text-slate-400 hover:text-slate-700 transition"
+                    >
+                      Снять
+                    </button>
+                  </div>
                 </div>
-                {isPartial && (
-                  <p className="text-xs text-amber-600 mt-1.5 font-medium">
-                    Остаток долга {remainingSalary.toLocaleString('ru-RU')} ₽ останется к выплате
-                  </p>
+
+                {isSettleLoading ? (
+                  <div className="p-3 text-center text-xs text-slate-400">
+                    Загрузка начислений...
+                  </div>
+                ) : pendingList.length === 0 ? (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                    Нет ожидающих начислений
+                  </div>
+                ) : (
+                  <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl bg-slate-50/50">
+                    {pendingList.map((t) => {
+                      const isChecked = selectedTxIds.has(t.id);
+                      const rawDate = t.transaction_date || t.created_at;
+                      const dateStr = rawDate
+                        ? new Date(rawDate).toLocaleDateString('ru-RU', {
+                            day: '2-digit',
+                            month: '2-digit',
+                          })
+                        : '';
+                      const rawDesc = t.description ?? '';
+                      const title = t.trip
+                        ? `Рейс №${t.trip.trip_number}`
+                        : t.service_order
+                          ? `Наряд #${t.service_order.order_number}`
+                          : (
+                              rawDesc.replace(/^ЗП(?:\s+механика)?:\s*/i, '').split('—')[0] ?? ''
+                            ).trim();
+                      const sub = rawDesc
+                        .replace(/^ЗП(?:\s+механика)?:\s*/i, '')
+                        .replace(/^[^\wа-яА-ЯёЁ]+/, '');
+
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => toggleItem(t.id)}
+                          className={cn(
+                            'flex items-center justify-between px-2.5 py-1.5 text-xs cursor-pointer select-none transition-colors',
+                            isChecked
+                              ? 'bg-emerald-50/60 hover:bg-emerald-50'
+                              : 'hover:bg-slate-100 opacity-60',
+                          )}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}} // handled by parent div
+                              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0 cursor-pointer"
+                            />
+                            <span className="font-mono text-[10px] text-slate-400 shrink-0">
+                              {dateStr}
+                            </span>
+                            <span className="font-bold text-slate-800 truncate">{title}</span>
+                            {sub && sub !== title && (
+                              <span className="text-[10px] text-slate-500 truncate hidden sm:inline">
+                                ({sub})
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={cn(
+                              'font-black font-mono shrink-0',
+                              isChecked ? 'text-emerald-700' : 'text-slate-400',
+                            )}
+                          >
+                            {parseFloat(String(t.amount)).toLocaleString('ru-RU')} ₽
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Защита от потери долга: явное предупреждение о невыбранных позициях */}
+                {unselectedItems.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-xs space-y-0.5">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900 text-[11px]">
+                      <span>⚠️</span>
+                      <span>
+                        Не включено: {unselectedItems.length} поз. на{' '}
+                        {unselectedTotal.toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-amber-800 leading-tight">
+                      Останутся в долге сотрудника и перенесутся на следующий расчёт.
+                    </p>
+                  </div>
                 )}
               </div>
 
-              {/* Разбивка */}
+              {/* Финансовая сводка */}
               <div className="bg-slate-50 rounded-xl divide-y divide-slate-200 overflow-hidden">
-                <div className="flex justify-between items-center px-4 py-3">
-                  <span className="text-sm text-slate-600">Начислено ЗП</span>
+                <div className="flex justify-between items-center px-4 py-2.5">
+                  <span className="text-xs text-slate-600">Выбрано к выплате</span>
                   <span className="text-sm font-bold text-slate-900">
-                    <Money amount={user.debt} />
+                    <Money amount={salaryTotal.toFixed(2)} />
                   </span>
                 </div>
                 {advanceBalance > 0 && (
-                  <div className="flex justify-between items-center px-4 py-3">
-                    <span className="text-sm text-slate-600">Долг сотрудника (аванс)</span>
+                  <div className="flex justify-between items-center px-4 py-2.5">
+                    <span className="text-xs text-slate-600">Долг сотрудника (аванс)</span>
                     <span className="text-sm font-bold text-rose-600">
                       <Money amount={user.advance_balance} />
                     </span>
                   </div>
                 )}
                 {advanceBalance > 0 && (
-                  <div className="px-4 py-3 space-y-1.5">
+                  <div className="px-4 py-2.5 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-violet-700">Зачесть в счёт долга</span>
+                      <span className="text-xs text-violet-700">Зачесть в счёт аванса</span>
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
@@ -968,24 +1134,22 @@ function SettleModal({
                         step="100"
                         value={offsetInput}
                         onChange={(e) => setOffsetInput(e.target.value)}
-                        className="w-full border border-violet-200 rounded-lg px-3 py-2 text-sm font-bold text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-400 bg-violet-50"
+                        className="w-full border border-violet-200 rounded-lg px-3 py-1.5 text-xs font-bold text-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-400 bg-violet-50"
                       />
-                      <span className="text-sm text-slate-500 shrink-0">₽</span>
+                      <span className="text-xs text-slate-500 shrink-0">₽</span>
                     </div>
                   </div>
                 )}
-                <div className="flex justify-between items-center px-4 py-3 bg-emerald-50">
-                  <span className="text-sm font-bold text-emerald-800">
-                    {isPartial ? 'К выплате сейчас' : 'К выплате деньгами'}
-                  </span>
-                  <span className="text-lg font-black text-emerald-700">
+                <div className="flex justify-between items-center px-4 py-2.5 bg-emerald-50">
+                  <span className="text-xs font-bold text-emerald-800">К выплате на руки</span>
+                  <span className="text-base font-black text-emerald-700">
                     {payout > 0 ? <Money amount={payout.toFixed(2)} /> : '0 ₽'}
                   </span>
                 </div>
               </div>
 
               {advanceBalance > 0 && parseFloat(offsetInput) > 0 && (
-                <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-2.5 flex justify-between">
+                <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-2 flex justify-between">
                   <span className="text-xs text-violet-600">Остаток долга после зачёта</span>
                   <span className="text-xs font-bold text-violet-700">
                     <Money amount={remainingDebt.toFixed(2)} />
@@ -994,7 +1158,7 @@ function SettleModal({
               )}
 
               {needsWallet && (
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-medium text-slate-500">Списать с</label>
                     <div className="flex bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold">
@@ -1038,7 +1202,7 @@ function SettleModal({
                           type="button"
                           onClick={() => setWalletId(w.id)}
                           className={cn(
-                            'flex-1 py-2.5 rounded-xl border-2 text-xs font-black transition-all',
+                            'flex-1 py-2 rounded-xl border-2 text-xs font-black transition-all',
                             walletId === w.id
                               ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                               : 'border-slate-200 text-slate-500',
@@ -1049,7 +1213,7 @@ function SettleModal({
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
                           💵 Касса (наличные):
@@ -1086,7 +1250,7 @@ function SettleModal({
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1.5 border-t border-slate-200 text-[11px]">
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-[11px]">
                         <button
                           type="button"
                           onClick={setSplit5050}
@@ -1109,21 +1273,6 @@ function SettleModal({
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-
-              {parseFloat(user.unconfirmed_debt) > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-                  <span className="text-amber-500 material-symbols-outlined shrink-0">warning</span>
-                  <div>
-                    <p className="text-[11px] font-bold text-amber-900 leading-tight">
-                      Есть неподтверждённые начисления: <Money amount={user.unconfirmed_debt} />
-                    </p>
-                    <p className="text-[10px] text-amber-700 mt-0.5 leading-tight">
-                      Сотрудник ещё не подтвердил их в своём приложении. Рекомендуется выплачивать
-                      только подтверждённую ЗП.
-                    </p>
-                  </div>
                 </div>
               )}
 
@@ -1150,7 +1299,9 @@ function SettleModal({
                 disabled={mutation.isPending || isSubmitting || salaryTotal <= 0 || !isSplitValid}
                 className="flex-1 bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
               >
-                {mutation.isPending || isSubmitting ? 'Проводим...' : '✓ Подтвердить'}
+                {mutation.isPending || isSubmitting
+                  ? 'Проводим...'
+                  : `✓ Выплатить ${payout.toLocaleString('ru-RU')} ₽ (${selectedItems.length} поз.)`}
               </button>
               <button
                 onClick={onClose}

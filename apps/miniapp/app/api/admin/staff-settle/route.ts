@@ -218,6 +218,7 @@ export async function POST(request: Request) {
       wallet_splits?: Array<{ wallet_id: string; amount: number | string }>;
       partial_offset?: string;
       partial_amount?: string;
+      selected_transaction_ids?: string[]; // 1C / SAP / МойСклад: построчный выбор начислений
       action?: string;
       idempotency_key?: string;
       is_netting?: boolean;
@@ -300,8 +301,9 @@ export async function POST(request: Request) {
       (supabase.from('transactions') as any)
         .select(
           `
-          id, amount, description, created_at, category_id, service_order_id, trip_id, direction, lifecycle_status, related_user_id, created_by,
-          trip:trips(trip_number, started_at, lifecycle_status)
+          id, amount, description, created_at, transaction_date, category_id, service_order_id, trip_id, direction, lifecycle_status, related_user_id, created_by,
+          trip:trips(trip_number, started_at, lifecycle_status),
+          service_order:service_orders(order_number, created_at)
         `,
         )
         .eq('direction', 'expense')
@@ -473,7 +475,30 @@ export async function POST(request: Request) {
     let actualPayout: number;
     let actualOffset: number;
 
-    if (partialAmountRaw !== undefined) {
+    // 1C / SAP / МойСклад: построчный выбор начислений из ведомости
+    if (Array.isArray(body.selected_transaction_ids) && body.selected_transaction_ids.length > 0) {
+      const selectedSet = new Set(body.selected_transaction_ids.map(String));
+      idsToSettle = activePendingPayroll
+        .filter((t: any) => selectedSet.has(t.id))
+        .map((t: any) => t.id);
+
+      if (idsToSettle.length === 0) {
+        return NextResponse.json(
+          { error: 'Ни одно из выбранных начислений не найдено среди ожидающих выплаты' },
+          { status: 400 },
+        );
+      }
+
+      const selectedTotal = activePendingPayroll
+        .filter((t: any) => idsToSettle.includes(t.id))
+        .reduce((s: number, t: any) => s + parseFloat(t.amount ?? '0'), 0);
+
+      const maxOffsetForSelected = Math.min(selectedTotal, advanceBalance);
+      actualOffset = hasExplicitOffset
+        ? Math.min(Math.max(0, parseFloat(body.partial_offset!)), maxOffsetForSelected)
+        : maxOffsetForSelected;
+      actualPayout = Math.max(0, selectedTotal - actualOffset);
+    } else if (partialAmountRaw !== undefined) {
       const requestedAmount = Math.min(Math.max(0, parseFloat(partialAmountRaw) || 0), salaryTotal);
       let accumulated = 0;
       idsToSettle = [];
@@ -521,6 +546,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: splitErr }, { status: 400 });
     }
 
+    // Собираем детализацию по рейсам и нарядам для описания транзакции выплаты
     const settledTxns = activePendingPayroll.filter((t: any) => idsToSettle.includes(t.id)) ?? [];
     if (splitTxn) settledTxns.push(splitTxn);
 
@@ -528,7 +554,15 @@ export async function POST(request: Request) {
       .map((t: any) => {
         const tripNum = t.trip?.trip_number;
         const amt = parseFloat(t.amount ?? '0').toFixed(0);
-        return tripNum ? `Рейс №${tripNum} (${amt} ₽)` : null;
+        if (tripNum) return `Рейс №${tripNum} (${amt} ₽)`;
+        if (t.service_order?.order_number)
+          return `Наряд #${t.service_order.order_number} (${amt} ₽)`;
+        const cleanDesc = (t.description || '')
+          .replace(/^ЗП(?:\s+механика)?:\s*/i, '')
+          .replace(/^[^\wа-яА-ЯёЁ]+/, '')
+          .split('—')[0]
+          .trim();
+        return cleanDesc ? `${cleanDesc} (${amt} ₽)` : `${amt} ₽`;
       })
       .filter(Boolean);
 

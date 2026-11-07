@@ -141,6 +141,7 @@ function StaffContent() {
   const [settleOffset, setSettleOffset] = useState('');
   const [maxAdvance, setMaxAdvance] = useState(0);
   const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
+  const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
   const [unconfirmedCount, setUnconfirmedCount] = useState(0);
   const [settleIdempotencyKey, setSettleIdempotencyKey] = useState('');
   const [isSubmittingSettle, setIsSubmittingSettle] = useState(false);
@@ -215,6 +216,7 @@ function StaffContent() {
       is_netting?: boolean;
       allow_uncollected?: boolean;
       collect_surplus?: boolean;
+      selected_transaction_ids?: string[];
     }) =>
       fetch('/api/admin/staff-settle', {
         method: 'POST',
@@ -325,7 +327,9 @@ function StaffContent() {
       setSettleWalletMode('single');
       setSettleCashSplit('');
       setSettleBankSplit('');
-      setPendingTransactions(data.pending_transactions ?? []);
+      const pList = data.pending_transactions ?? [];
+      setPendingTransactions(pList);
+      setSelectedTxIds(new Set(pList.map((t: any) => t.id)));
       setUnconfirmedCount(data.unconfirmed_count ?? 0);
       setUncollectedCash(parseFloat(data.uncollected_cash || '0'));
       setIsNetting(false);
@@ -333,6 +337,68 @@ function StaffContent() {
     } catch (e) {
       console.error('Failed to load settle data', e);
     }
+  };
+
+  const toggleSettleItem = (id: string) => {
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+
+      const checkedTotal = pendingTransactions
+        .filter((t) => next.has(t.id))
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      setSettleAmount(checkedTotal.toFixed(0));
+
+      if (settleWalletMode === 'split') {
+        const half = Math.round((checkedTotal / 2) * 100) / 100;
+        setSettleCashSplit(half.toString());
+        setSettleBankSplit((Math.round((checkedTotal - half) * 100) / 100).toString());
+      }
+      return next;
+    });
+  };
+
+  const selectAllSettle = () => {
+    const allIds = new Set(pendingTransactions.map((t) => t.id));
+    setSelectedTxIds(allIds);
+    const total = pendingTransactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    setSettleAmount(total.toFixed(0));
+    if (settleWalletMode === 'split') {
+      const half = Math.round((total / 2) * 100) / 100;
+      setSettleCashSplit(half.toString());
+      setSettleBankSplit((Math.round((total - half) * 100) / 100).toString());
+    }
+  };
+
+  const selectThursdaySettle = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToThu = day >= 4 ? day - 4 : day + 3;
+    const endThu = new Date(now);
+    endThu.setDate(now.getDate() - diffToThu);
+    endThu.setHours(23, 59, 59, 999);
+
+    const thuItems = pendingTransactions.filter((t) => {
+      const rawDate = t.trip?.started_at || t.transaction_date || t.created_at;
+      return new Date(rawDate) <= endThu;
+    });
+    const thuIds = new Set(thuItems.map((t) => t.id));
+    setSelectedTxIds(thuIds);
+    const total = thuItems.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    setSettleAmount(total.toFixed(0));
+    if (settleWalletMode === 'split') {
+      const half = Math.round((total / 2) * 100) / 100;
+      setSettleCashSplit(half.toString());
+      setSettleBankSplit((Math.round((total - half) * 100) / 100).toString());
+    }
+  };
+
+  const deselectAllSettle = () => {
+    setSelectedTxIds(new Set());
+    setSettleAmount('0');
+    setSettleCashSplit('0');
+    setSettleBankSplit('0');
   };
 
   const handleMiniappCashChange = (val: string) => {
@@ -415,12 +481,20 @@ function StaffContent() {
         idempotency_key: settleIdempotencyKey,
         is_netting: isNetting,
         collect_surplus: true,
+        selected_transaction_ids:
+          pendingTransactions.length > 0 ? Array.from(selectedTxIds) : undefined,
       },
       {
         onSettled: () => setIsSubmittingSettle(false),
       },
     );
   };
+
+  const unselectedPendingItems = pendingTransactions.filter((t) => !selectedTxIds.has(t.id));
+  const unselectedPendingTotal = unselectedPendingItems.reduce(
+    (sum, t) => sum + (parseFloat(t.amount) || 0),
+    0,
+  );
 
   const activeList = grouped[activeGroup];
 
@@ -761,6 +835,122 @@ function StaffContent() {
               </div>
             )}
 
+            {/* 1C/SAP: Построчная ведомость начислений (Dense 1-Line Layout) */}
+            {pendingTransactions.length > 0 && (
+              <div className="space-y-2 bg-zinc-50 rounded-2xl p-3 border border-zinc-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                    📋 Начисления ({selectedTxIds.size}/{pendingTransactions.length})
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={selectAllSettle}
+                      className={`text-[10px] px-2 py-0.5 rounded-lg font-bold transition ${
+                        selectedTxIds.size === pendingTransactions.length
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'
+                      }`}
+                    >
+                      Все
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectThursdaySettle}
+                      title="Выбрать только начисления по четверг включительно"
+                      className="text-[10px] px-2 py-0.5 rounded-lg font-bold bg-amber-100 text-amber-900 hover:bg-amber-200 transition"
+                    >
+                      По Чт (срез)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deselectAllSettle}
+                      className="text-[10px] px-1.5 py-0.5 rounded-lg text-zinc-400 hover:text-zinc-700 transition"
+                    >
+                      Снять
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {pendingTransactions.map((t) => {
+                    const isChecked = selectedTxIds.has(t.id);
+                    const rawDate = t.trip?.started_at || t.transaction_date || t.created_at;
+                    const dateStr = rawDate
+                      ? new Date(rawDate).toLocaleDateString('ru-RU', {
+                          day: '2-digit',
+                          month: '2-digit',
+                        })
+                      : '';
+                    const title = t.trip
+                      ? `Рейс №${t.trip.trip_number}`
+                      : t.service_order
+                        ? `Наряд #${t.service_order.order_number}`
+                        : t.description
+                            .replace(/^ЗП(?:\s+механика)?:\s*/i, '')
+                            .split('—')[0]
+                            .trim();
+                    const sub = t.description
+                      .replace(/^ЗП(?:\s+механика)?:\s*/i, '')
+                      .replace(/^[^\wа-яА-ЯёЁ]+/, '');
+
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => toggleSettleItem(t.id)}
+                        className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none ${
+                          isChecked
+                            ? 'bg-emerald-50/70 border-emerald-200 text-zinc-900'
+                            : 'bg-white border-zinc-100 opacity-60 text-zinc-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}}
+                            className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 shrink-0 cursor-pointer"
+                          />
+                          <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+                            {dateStr}
+                          </span>
+                          <span className="font-bold truncate text-xs">{title}</span>
+                          {sub && sub !== title && (
+                            <span className="text-[10px] text-zinc-400 truncate hidden xs:inline">
+                              · {sub}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          className={`text-right font-black shrink-0 font-mono ${
+                            isChecked ? 'text-emerald-700' : 'text-zinc-400'
+                          }`}
+                        >
+                          <Money amount={t.amount} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Защита от потери долга: предупреждение о невыбранных начислениях */}
+                {unselectedPendingItems.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 text-xs flex items-center justify-between text-amber-900">
+                    <div className="flex items-center gap-1.5 font-bold text-[11px] truncate pr-2">
+                      <span>⚠️</span>
+                      <span className="truncate">
+                        Не выбрано: {unselectedPendingItems.length} поз. на{' '}
+                        {unselectedPendingTotal.toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-amber-700 shrink-0 font-medium">
+                      Останутся в долге
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Amounts */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -819,48 +1009,6 @@ function StaffContent() {
                 </p>
               </div>
             </div>
-
-            {/* Pending Details inside Settle Modal */}
-            {pendingTransactions.length > 0 && (
-              <div className="space-y-3 bg-zinc-50 rounded-[2rem] p-5">
-                <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">
-                  Что оплачиваем ({pendingTransactions.length})
-                </h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {pendingTransactions.map((t) => {
-                    const displayDate = t.trip?.started_at || t.transaction_date || t.created_at;
-                    return (
-                      <div
-                        key={t.id}
-                        className="flex justify-between items-start text-xs border-b border-zinc-100 pb-2 last:border-0"
-                      >
-                        <div className="flex-1 pr-2">
-                          <p className="font-bold text-zinc-900 leading-tight">
-                            {t.description.replace('ЗП: ', '').split(' — ')[0]}
-                          </p>
-                          <p className="text-[9px] font-bold text-zinc-400 uppercase mt-0.5">
-                            {new Date(displayDate).toLocaleDateString('ru-RU', {
-                              day: 'numeric',
-                              month: 'short',
-                            })}
-                            {t.trip && ` · Рейс №${t.trip.trip_number}`}
-                            {t.service_order && ` · Наряд №${t.service_order.order_number}`}
-                          </p>
-                          {t.trip?.driver?.name && t.trip.driver.name !== settleTarget.name && (
-                            <p className="text-[8px] font-black text-sky-600 uppercase mt-0.5">
-                              Водитель: {t.trip.driver.name}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right font-black text-zinc-800">
-                          <Money amount={t.amount} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Unconfirmed salary warning */}
             {unconfirmedCount > 0 && (
