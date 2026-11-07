@@ -685,12 +685,23 @@ export function isValidDateString(val: string | null | undefined): boolean {
  * «Маршрут: {маршрут} | Дата: {дата начала}»
  */
 export function formatGeostroyDescription(route: string, startDate: string): string {
-  const cleanRoute = route.trim();
+  // Убираем любые прилипшие хвосты "| Дата: ..." и префикс "Маршрут:"
+  const cleanRoute = route
+    .replace(/(?:\s*\|\s*(?:Дата начала|Дата):[^|]*)+/gi, '')
+    .replace(/^Маршрут:\s*/i, '')
+    .trim();
   const cleanDate = startDate.trim();
+
   if (cleanRoute && cleanDate) {
     return `Маршрут: ${cleanRoute} | Дата: ${cleanDate}`;
   }
-  return cleanRoute || cleanDate || '';
+  if (cleanRoute) {
+    return `Маршрут: ${cleanRoute}`;
+  }
+  if (cleanDate) {
+    return `Дата: ${cleanDate}`;
+  }
+  return '';
 }
 
 /**
@@ -703,30 +714,44 @@ export function parseGeostroyDescription(desc: string | null | undefined): {
   if (!desc) return { route: '', startDate: '' };
   const str = desc.trim();
 
+  // 1. Извлекаем дату начала:
+  // Проверяем явный разделитель "| Дата: <дата>" или "| Дата начала: <дата>"
   let startDate = '';
-  const dateMatch = str.match(/\b(\d{2}\.\d{2}\.\d{4})\b/);
-  if (dateMatch && dateMatch[1]) {
-    startDate = dateMatch[1];
+  const pipeDateMatch = str.match(/(?:\|\s*)?(?:Дата начала|Дата):\s*([0-9.]+)/i);
+  if (pipeDateMatch && pipeDateMatch[1]) {
+    startDate = pipeDateMatch[1].trim();
   } else {
-    const isoMatch = str.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    if (isoMatch && isoMatch[1] && isoMatch[2] && isoMatch[3]) {
-      startDate = `${isoMatch[3]}.${isoMatch[2]}.${isoMatch[1]}`;
+    // Ищем дату в формате ДД.ММ.ГГГГ
+    const dateMatch = str.match(/\b(\d{2}\.\d{2}\.\d{4})\b/);
+    if (dateMatch && dateMatch[1]) {
+      startDate = dateMatch[1];
+    } else {
+      const isoMatch = str.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+      if (isoMatch && isoMatch[1] && isoMatch[2] && isoMatch[3]) {
+        startDate = `${isoMatch[3]}.${isoMatch[2]}.${isoMatch[1]}`;
+      }
     }
   }
 
-  let route = str;
-  if (startDate) {
-    route = route
-      .replace(new RegExp(`\\b${startDate.replace(/\./g, '\\.')}\\b`, 'g'), '')
-      .replace(/Маршрут:\s*/gi, '')
-      .replace(/Дата начала:\s*/gi, '')
-      .replace(/Дата:\s*/gi, '')
-      .replace(/[|()\[\]]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  } else {
-    route = route.replace(/Маршрут:\s*/gi, '').trim();
+  // 2. Очищаем маршрут:
+  // - Удаляем все блоки "| Дата: ..." и "Дата: ..."
+  // - Удаляем префикс "Маршрут:"
+  // ВАЖНО: сохраняем скобки `()` и `[]`, чтобы не повреждать номер заявки и километраж!
+  let route = str
+    .replace(/(?:\s*\|\s*(?:Дата начала|Дата):[^|]*)+/gi, '')
+    .replace(/^Маршрут:\s*/gi, '')
+    .trim();
+
+  // Если дата была введена без префикса "Дата:", но распознана, удаляем её из маршрута
+  if (startDate && startDate.length === 10) {
+    route = route.replace(new RegExp(`\\b${startDate.replace(/\./g, '\\.')}\\b`, 'g'), '').trim();
   }
+
+  // Убираем висячие палки "|" на концах
+  route = route
+    .replace(/^\s*\|\s*/, '')
+    .replace(/\s*\|\s*$/, '')
+    .trim();
 
   return { route, startDate };
 }

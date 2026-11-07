@@ -688,6 +688,8 @@ type EditableOrder = {
   _selectedId: string | null;
   _inputValue: string;
   _deleted?: boolean;
+  _geostroyRoute?: string;
+  _geostroyDate?: string;
 };
 
 type EditableExpense = {
@@ -842,13 +844,23 @@ function EditModal({
 }) {
   const activeOrders = trip.trip_orders.filter((o) => o.lifecycle_status !== 'cancelled');
   const [orders, setOrders] = useState<EditableOrder[]>(() =>
-    activeOrders.map((o) => ({
-      ...o,
-      description: o.description ?? '',
-      _selectedId: o.counterparty_id,
-      _inputValue: o.counterparty?.name ?? '',
-      _deleted: false,
-    })),
+    activeOrders.map((o) => {
+      const geo = parseGeostroyDescription(o.description);
+      let defaultDate = geo.startDate;
+      if (!defaultDate && trip.started_at) {
+        const d = new Date(trip.started_at);
+        defaultDate = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+      }
+      return {
+        ...o,
+        description: o.description ?? '',
+        _selectedId: o.counterparty_id,
+        _inputValue: o.counterparty?.name ?? '',
+        _deleted: false,
+        _geostroyRoute: geo.route,
+        _geostroyDate: defaultDate,
+      };
+    }),
   );
   const [expenses, setExpenses] = useState<EditableExpense[]>(() =>
     (trip.trip_expenses ?? []).map((e) => ({
@@ -1039,6 +1051,9 @@ function EditModal({
         }
       }
       if (isGeostroyCounterparty(cp)) {
+        if (o._geostroyRoute !== undefined || o._geostroyDate !== undefined) {
+          o.description = formatGeostroyDescription(o._geostroyRoute ?? '', o._geostroyDate ?? '');
+        }
         if (!isGeostroyOrderValid(o.description)) {
           setError(
             `Для контрагента «ООО Геостройиндустрия» (заявка ${i + 1}) обязательно укажите Маршрут и корректную Дату начала маршрута по маске (ДД.ММ.ГГГГ)!`,
@@ -1409,6 +1424,27 @@ function EditModal({
                     }
                     if (isGeostroyCounterparty(currentCp)) {
                       const parsed = parseGeostroyDescription(order.description);
+                      const routeVal =
+                        order._geostroyRoute !== undefined ? order._geostroyRoute : parsed.route;
+                      const dateVal =
+                        order._geostroyDate !== undefined ? order._geostroyDate : parsed.startDate;
+
+                      const updateGeostroy = (newRoute: string, newDate: string) => {
+                        const newDesc = formatGeostroyDescription(newRoute, newDate);
+                        setOrders((prev) =>
+                          prev.map((o) =>
+                            o.id === order.id
+                              ? {
+                                  ...o,
+                                  _geostroyRoute: newRoute,
+                                  _geostroyDate: newDate,
+                                  description: newDesc,
+                                }
+                              : o,
+                          ),
+                        );
+                      };
+
                       return (
                         <div className="p-3 bg-amber-50/90 border-2 border-amber-300 rounded-xl space-y-2 mt-2 shadow-2xs">
                           <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-wide">
@@ -1422,42 +1458,41 @@ function EditModal({
                               </label>
                               <input
                                 type="text"
-                                placeholder="Например: Верхняя Салда — Екатеринбург"
+                                placeholder="Например: Шайтанка — Маминское"
                                 className={inputCls}
-                                value={parsed.route}
-                                onChange={(e) => {
-                                  const currentStartDate = parseGeostroyDescription(
-                                    order.description,
-                                  ).startDate;
-                                  update(
-                                    order.id,
-                                    'description',
-                                    formatGeostroyDescription(e.target.value, currentStartDate),
-                                  );
-                                }}
+                                value={routeVal}
+                                onChange={(e) => updateGeostroy(e.target.value, dateVal)}
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-black text-amber-950 uppercase block mb-1">
-                                📅 Дата начала (ДД.ММ.ГГГГ){' '}
-                                <span className="text-rose-600 font-black">*</span>
-                              </label>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[10px] font-black text-amber-950 uppercase">
+                                  📅 Дата начала (ДД.ММ.ГГГГ){' '}
+                                  <span className="text-rose-600 font-black">*</span>
+                                </label>
+                                {trip.started_at && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const d = new Date(trip.started_at);
+                                      const tripDate = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+                                      updateGeostroy(routeVal, tripDate);
+                                    }}
+                                    className="text-[9px] font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                                  >
+                                    Вставить дату рейса
+                                  </button>
+                                )}
+                              </div>
                               <input
                                 type="text"
                                 maxLength={10}
                                 placeholder="ДД.ММ.ГГГГ"
                                 className={`${inputCls} font-mono`}
-                                value={parsed.startDate}
+                                value={dateVal}
                                 onChange={(e) => {
                                   const masked = maskDateInput(e.target.value);
-                                  const currentRoute = parseGeostroyDescription(
-                                    order.description,
-                                  ).route;
-                                  update(
-                                    order.id,
-                                    'description',
-                                    formatGeostroyDescription(currentRoute, masked),
-                                  );
+                                  updateGeostroy(routeVal, masked);
                                 }}
                               />
                             </div>
