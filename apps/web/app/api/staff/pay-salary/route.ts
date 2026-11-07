@@ -96,40 +96,18 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ error: 'Сотрудник не найден' }, { status: 404 });
 
-    // Проверка несданных наличных на руках
-    const [{ data: userTrips }, { data: userCollections }] = await Promise.all([
-      (supabase.from('trips') as any)
-        .select(
-          'id, driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
-        )
-        .eq('driver_id', body.user_id)
-        .neq('lifecycle_status', 'cancelled'),
-      (supabase.from('cash_collections') as any).select('amount').eq('driver_id', body.user_id),
-    ]);
+    // Проверка зафиксированного остатка подотчёта (holds) на руках
+    const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
+    const { data: activeHolds } = await (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('category_id', CASH_COLLECT_CAT)
+      .eq('settlement_status', 'pending')
+      .neq('lifecycle_status', 'cancelled')
+      .eq('related_user_id', body.user_id);
 
-    const cashIn = ((userTrips as any[]) ?? [])
-      .flatMap((t: any) => t.trip_orders ?? [])
-      .filter(
-        (o: any) =>
-          o.payment_method === 'cash' &&
-          o.lifecycle_status !== 'cancelled' &&
-          o.settlement_status === 'completed',
-      )
-      .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
-
-    const cashSpent = ((userTrips as any[]) ?? [])
-      .flatMap((t: any) => t.trip_expenses ?? [])
-      .filter((e: any) => e.payment_method === 'cash')
-      .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
-
-    const cashCollected = ((userCollections as any[]) ?? []).reduce(
-      (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
+    const uncollectedCash = ((activeHolds as any[]) ?? []).reduce(
+      (s: number, h: any) => s + parseFloat(h.amount ?? '0'),
       0,
-    );
-
-    const uncollectedCash = Math.max(
-      0,
-      Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
     );
 
     if (uncollectedCash > 0 && !(body as any).allow_uncollected) {

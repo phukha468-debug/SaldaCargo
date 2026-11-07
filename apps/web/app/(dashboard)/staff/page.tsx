@@ -5350,6 +5350,25 @@ export default function StaffPage() {
     action?: 'add' | 'repay' | 'adjust';
   } | null>(null);
   const [driverFilter, setDriverFilter] = useState<'all' | 'official' | 'court'>('all');
+  const [isAccruingOfficial, setIsAccruingOfficial] = useState(false);
+
+  const handleRunOfficialPayroll = async () => {
+    setIsAccruingOfficial(true);
+    try {
+      const res = await fetch('/api/cron/official-payroll?force_accrual=true');
+      const data = await res.json();
+      qc.invalidateQueries({ queryKey: ['staff-payroll'] });
+      if (data.accruals_created > 0) {
+        alert(`Успешно начислено: ${data.accruals_created} платежей (ТК РФ / ФССП)`);
+      } else {
+        alert(`Все обязательные начисления за ${data.month || 'текущий месяц'} уже актуальны.`);
+      }
+    } catch (e: any) {
+      alert(`Ошибка начисления: ${e?.message ?? 'Неизвестная ошибка'}`);
+    } finally {
+      setIsAccruingOfficial(false);
+    }
+  };
 
   const shiftMonth = (delta: number) => {
     const d = new Date(year, month - 1 + delta, 1);
@@ -5614,15 +5633,14 @@ export default function StaffPage() {
 
       {/* Баннер ТК РФ и фильтр для группы водителей */}
       {activeGroup === 'drivers' && (
-        <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3 sm:px-4 sm:py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs shadow-sm">
-          <div className="flex items-center gap-2">
+        <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-2.5 sm:px-4 sm:py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="text-[11px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-lg shrink-0">
               ТК РФ
             </span>
-            <span className="text-emerald-950 font-medium">
-              1-го числа каждого месяца в долг сотрудников начисляется налог за официальное
-              трудоустройство (5 000 ₽) и удержания по исполнительным листам (алименты / ФССП),
-              вычитаемые из рейсов (вместо разделения по дням).
+            <span className="text-emerald-950 font-medium truncate">
+              Налог (5 000 ₽) и удержания ФССП/алименты начисляются 1-го числа в долг и вычитаются
+              из рейсов.
             </span>
           </div>
           <div className="flex items-center gap-1 bg-emerald-100/70 p-1 rounded-xl shrink-0 self-end sm:self-auto font-bold text-xs">
@@ -5667,6 +5685,14 @@ export default function StaffPage() {
                 </span>
               </button>
             )}
+            <button
+              onClick={handleRunOfficialPayroll}
+              disabled={isAccruingOfficial}
+              title="Проверить и начислить долги по ТК РФ и ФССП за текущий месяц"
+              className="px-2 py-1 rounded-lg transition-all flex items-center gap-1 bg-white text-emerald-800 hover:text-emerald-950 border border-emerald-300 shadow-sm disabled:opacity-50 font-semibold"
+            >
+              <span>{isAccruingOfficial ? '⏳' : '⚡'} Начислить</span>
+            </button>
           </div>
         </div>
       )}

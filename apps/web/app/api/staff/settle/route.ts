@@ -45,8 +45,6 @@ export async function GET(request: Request) {
     { data: pendingPayroll },
     { data: advanceGiven },
     { data: advanceOffset },
-    { data: userTrips },
-    { data: userCollections },
     { data: activeHolds },
   ] = await Promise.all([
     // Начисленная, но не выплаченная ЗП (отсутствует списание из кошелька)
@@ -79,17 +77,6 @@ export async function GET(request: Request) {
       .eq('category_id', ADVANCE_CATEGORY_ID)
       .eq('related_user_id', userId),
 
-    // Рейсы с наличными
-    (supabase.from('trips') as any)
-      .select(
-        'id, driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
-      )
-      .eq('driver_id', userId)
-      .neq('lifecycle_status', 'cancelled'),
-
-    // Инкассации
-    (supabase.from('cash_collections') as any).select('amount').eq('driver_id', userId),
-
     // Активные зафиксированные переносы подотчёта (holds)
     (supabase.from('transactions') as any)
       .select('amount')
@@ -99,35 +86,12 @@ export async function GET(request: Request) {
       .eq('related_user_id', userId),
   ]);
 
-  const cashIn = ((userTrips as any[]) ?? [])
-    .flatMap((t: any) => t.trip_orders ?? [])
-    .filter(
-      (o: any) =>
-        o.payment_method === 'cash' &&
-        o.lifecycle_status !== 'cancelled' &&
-        o.settlement_status === 'completed',
-    )
-    .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
-
-  const cashSpent = ((userTrips as any[]) ?? [])
-    .flatMap((t: any) => t.trip_expenses ?? [])
-    .filter((e: any) => e.payment_method === 'cash')
-    .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
-
-  const cashCollected = ((userCollections as any[]) ?? []).reduce(
-    (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
-    0,
-  );
-
   const holdsCash = ((activeHolds as any[]) ?? []).reduce(
     (s: number, h: any) => s + parseFloat(h.amount ?? '0'),
     0,
   );
 
-  const uncollectedCash = Math.max(
-    Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
-    holdsCash,
-  );
+  const uncollectedCash = holdsCash;
 
   const activePending = ((pendingPayroll as any[]) ?? []).filter(
     (t: any) => t.trip?.lifecycle_status !== 'cancelled',
@@ -291,8 +255,6 @@ export async function POST(request: Request) {
       { data: advanceGiven },
       { data: advanceOffset },
       { data: userRow },
-      { data: userTrips },
-      { data: userCollections },
       { data: activeHolds },
     ] = await Promise.all([
       (supabase.from('transactions') as any)
@@ -327,15 +289,6 @@ export async function POST(request: Request) {
 
       (supabase.from('users') as any).select('name, roles').eq('id', body.user_id).single(),
 
-      (supabase.from('trips') as any)
-        .select(
-          'id, driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
-        )
-        .eq('driver_id', body.user_id)
-        .neq('lifecycle_status', 'cancelled'),
-
-      (supabase.from('cash_collections') as any).select('amount').eq('driver_id', body.user_id),
-
       // Активные зафиксированные переносы подотчёта (holds)
       (supabase.from('transactions') as any)
         .select('id, amount')
@@ -345,35 +298,12 @@ export async function POST(request: Request) {
         .eq('related_user_id', body.user_id),
     ]);
 
-    const cashIn = ((userTrips as any[]) ?? [])
-      .flatMap((t: any) => t.trip_orders ?? [])
-      .filter(
-        (o: any) =>
-          o.payment_method === 'cash' &&
-          o.lifecycle_status !== 'cancelled' &&
-          o.settlement_status === 'completed',
-      )
-      .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
-
-    const cashSpent = ((userTrips as any[]) ?? [])
-      .flatMap((t: any) => t.trip_expenses ?? [])
-      .filter((e: any) => e.payment_method === 'cash')
-      .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
-
-    const cashCollected = ((userCollections as any[]) ?? []).reduce(
-      (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
-      0,
-    );
-
     const holdsCash = ((activeHolds as any[]) ?? []).reduce(
       (s: number, h: any) => s + parseFloat(h.amount ?? '0'),
       0,
     );
 
-    const uncollectedCash = Math.max(
-      Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
-      holdsCash,
-    );
+    const uncollectedCash = holdsCash;
 
     if (uncollectedCash > 0 && !body.is_netting && !body.allow_uncollected) {
       return NextResponse.json(
@@ -654,17 +584,30 @@ export async function POST(request: Request) {
       }
     }
 
+    const CASH_WALLET_ID = '10000000-0000-0000-0000-000000000002';
+
+    // Взаимозачёт: деньги ЗП фактически остаются у сотрудника из наличной выручки рейса.
+    // Записываем расход из кассы (CASH_WALLET_ID), чтобы уменьшить кассу и отразить ЗП в расходах дня,
+    // но НЕ создаём запись в cash_collections (т.к. физической сдачи денег в сейф не происходит).
     if (nettedAmount > 0) {
       ops.push(
-        (supabase.from('cash_collections') as any).insert({
-          driver_id: body.user_id,
+        (supabase.from('transactions') as any).insert({
+          direction: 'expense',
+          category_id: categoryId,
           amount: nettedAmount.toFixed(2),
-          collected_by: adminId,
-          note: `Взаимозачёт ЗП: ${employeeName} (удержано из выручки)`,
+          from_wallet_id: CASH_WALLET_ID,
+          description: `Выплата зарплаты (взаимозачёт из наличных): ${employeeName}${breakdownText}`,
+          transaction_date: new Date().toISOString(),
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          related_user_id: body.user_id,
+          created_by: adminId,
+          idempotency_key: `${baseBatchKey}_netting_cash`,
         }),
       );
     }
 
+    // Если запрошена инкассация остатка выручки сверх взаимозачёта — это физическая сдача наличных в сейф
     if (body.collect_surplus && uncollectedCash > nettedAmount) {
       const surplus = Math.round((uncollectedCash - nettedAmount) * 100) / 100;
       ops.push(
@@ -675,37 +618,41 @@ export async function POST(request: Request) {
           note: `Сдача остатка выручки после взаимозачёта: ${employeeName}`,
         }),
       );
-      const CASH_ID = '10000000-0000-0000-0000-000000000002';
-      const { data: cashCollCat } = await (supabase.from('transaction_categories') as any)
-        .select('id')
-        .eq('code', 'CASH_COLLECT')
-        .maybeSingle();
-
-      ops.push(
-        (supabase.from('transactions') as any).insert({
-          direction: 'transfer',
-          amount: surplus.toFixed(2),
-          category_id: cashCollCat?.id || categoryId,
-          to_wallet_id: CASH_ID,
-          lifecycle_status: 'approved',
-          settlement_status: 'completed',
-          description: `Инкассация остатка выручки: ${employeeName}`,
-          created_by: adminId,
-          idempotency_key: `${baseBatchKey}_surplus`,
-        }),
-      );
     }
 
+    // Корректируем активные переносы подотчёта (holds): списываем сумму взаимозачёта (и сданного остатка, если был)
     if ((nettedAmount > 0 || body.collect_surplus) && ((activeHolds as any[]) ?? []).length > 0) {
-      const holdIds = (activeHolds as any[]).map((h) => h.id);
-      ops.push(
-        (supabase.from('transactions') as any)
-          .update({
-            settlement_status: 'completed',
-            updated_at: new Date().toISOString(),
-          })
-          .in('id', holdIds),
-      );
+      const holdList = (activeHolds as any[]) ?? [];
+      let toDeduct =
+        nettedAmount + (body.collect_surplus ? Math.max(0, uncollectedCash - nettedAmount) : 0);
+
+      for (const h of holdList) {
+        if (toDeduct <= 0) break;
+        const hAmt = parseFloat(h.amount ?? '0');
+        if (toDeduct >= hAmt - 0.001) {
+          ops.push(
+            (supabase.from('transactions') as any)
+              .update({
+                settlement_status: 'completed',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', h.id),
+          );
+          toDeduct -= hAmt;
+        } else {
+          const rest = Math.round((hAmt - toDeduct) * 100) / 100;
+          ops.push(
+            (supabase.from('transactions') as any)
+              .update({
+                amount: rest.toFixed(2),
+                description: `${(h.description || '').replace(/\s*\(остаток.*\)$/, '')} (остаток ${rest} ₽)`,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', h.id),
+          );
+          toDeduct = 0;
+        }
+      }
     }
 
     if (actualOffset > 0) {

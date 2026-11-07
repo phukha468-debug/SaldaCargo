@@ -22,6 +22,7 @@ const OPERATIONAL_ROLES = [
 ];
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
+const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 
 export async function GET(request: Request) {
   try {
@@ -47,10 +48,8 @@ export async function GET(request: Request) {
       { data: advanceGiven },
       // Зачтённые/возвращённые авансы / долги (income)
       { data: advanceOffset },
-      // Все рейсы с заказами
-      { data: allTrips },
-      // Все инкассации
-      { data: allCollections },
+      // Активные зафиксированные переносы подотчёта (holds)
+      { data: activeHolds },
     ] = await Promise.all([
       (supabase as any)
         .from('users')
@@ -108,13 +107,12 @@ export async function GET(request: Request) {
         .not('related_user_id', 'is', null),
 
       (supabase as any)
-        .from('trips')
-        .select(
-          'driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
-        )
-        .neq('lifecycle_status', 'cancelled'),
-
-      (supabase as any).from('cash_collections').select('driver_id, amount'),
+        .from('transactions')
+        .select('related_user_id, amount')
+        .eq('category_id', CASH_COLLECT_CAT)
+        .eq('settlement_status', 'pending')
+        .neq('lifecycle_status', 'cancelled')
+        .not('related_user_id', 'is', null),
     ]);
 
     const sumByUser = (rows: any[] | null) => {
@@ -137,21 +135,12 @@ export async function GET(request: Request) {
     const advGiven = sumByUser(advanceGiven);
     const advOffset = sumByUser(advanceOffset);
 
-    const userTripsMap = new Map<string, any[]>();
-    for (const t of (allTrips as any[]) ?? []) {
-      if (!t.driver_id) continue;
-      const arr = userTripsMap.get(t.driver_id) ?? [];
-      arr.push(t);
-      userTripsMap.set(t.driver_id, arr);
-    }
-
-    const collectionsMap = new Map<string, number>();
-    for (const c of (allCollections as any[]) ?? []) {
-      if (!c.driver_id) continue;
-      collectionsMap.set(
-        c.driver_id,
-        (collectionsMap.get(c.driver_id) ?? 0) + parseFloat(c.amount ?? '0'),
-      );
+    const holdsMap = new Map<string, number>();
+    for (const h of (activeHolds as any[]) ?? []) {
+      const uid = h.related_user_id;
+      if (uid) {
+        holdsMap.set(uid, (holdsMap.get(uid) ?? 0) + parseFloat(h.amount ?? '0'));
+      }
     }
 
     const result = ((users as any[]) ?? [])
@@ -172,27 +161,7 @@ export async function GET(request: Request) {
         const offsetNow = Math.min(debtAmt, advanceBalance);
         const payoutNow = Math.max(0, debtAmt - offsetNow);
 
-        const trips = userTripsMap.get(u.id) ?? [];
-        const cashIn = trips
-          .flatMap((t: any) => t.trip_orders ?? [])
-          .filter(
-            (o: any) =>
-              o.payment_method === 'cash' &&
-              o.lifecycle_status !== 'cancelled' &&
-              o.settlement_status === 'completed',
-          )
-          .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
-
-        const cashSpent = trips
-          .flatMap((t: any) => t.trip_expenses ?? [])
-          .filter((e: any) => e.payment_method === 'cash')
-          .reduce((s: number, e: any) => s + parseFloat(e.amount ?? '0'), 0);
-
-        const cashCollected = collectionsMap.get(u.id) ?? 0;
-        const uncollectedCash = Math.max(
-          0,
-          Math.round((cashIn - cashSpent - cashCollected) * 100) / 100,
-        );
+        const uncollectedCash = holdsMap.get(u.id) ?? 0;
 
         let isOnline = false;
         let address = '';

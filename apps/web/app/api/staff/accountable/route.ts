@@ -52,7 +52,8 @@ export async function GET() {
         .select(
           'driver_id, trip_orders(amount, payment_method, lifecycle_status, settlement_status), trip_expenses(amount, payment_method)',
         )
-        .neq('lifecycle_status', 'cancelled'),
+        .neq('lifecycle_status', 'cancelled')
+        .neq('lifecycle_status', 'approved'),
 
       (supabase.from('cash_collections') as any).select('driver_id, amount'),
 
@@ -119,7 +120,7 @@ export async function GET() {
 
       const dHolds = holdsList.filter((h: any) => h.driver_id === d.id);
       const holdAmount = dHolds.reduce((s: number, h: any) => s + h.amount, 0);
-      const calcBalance = Math.max(0, cashIn - cashSpent - cashCollected);
+      const calcBalance = Math.max(0, cashIn - cashSpent);
 
       return {
         id: d.id,

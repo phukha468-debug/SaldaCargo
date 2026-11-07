@@ -32,8 +32,8 @@ export async function GET(request: Request) {
     { data: paidRows },
     { data: allAccruals },
     { data: payoutsRows },
+    { data: activeHoldsData },
     { data: userTrips },
-    { data: userCollections },
     { data: userCashExpenses },
   ] = await Promise.all([
     (supabase.from('transactions') as any)
@@ -89,37 +89,45 @@ export async function GET(request: Request) {
       .order('transaction_date', { ascending: false })
       .limit(200),
 
-    // Подсчет наличных на руках (подотчет сотрудника)
+    // Зафиксированные переносы подотчёта (holds)
+    (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('related_user_id', userId)
+      .eq('category_id', '72f677d4-84af-4d0d-a845-a1b63c7ae607')
+      .eq('settlement_status', 'pending')
+      .neq('lifecycle_status', 'cancelled'),
+
+    // Неутверждённые рейсы (в работе / на проверке)
     (supabase.from('trips') as any)
       .select('id, trip_orders(id, amount, payment_method, lifecycle_status)')
       .eq('driver_id', userId)
-      .neq('lifecycle_status', 'cancelled'),
-
-    (supabase.from('cash_collections') as any).select('amount').eq('driver_id', userId),
+      .neq('lifecycle_status', 'cancelled')
+      .neq('lifecycle_status', 'approved'),
 
     (supabase.from('trip_expenses') as any)
       .select('amount, payment_method, trips!inner(driver_id, lifecycle_status)')
       .eq('trips.driver_id', userId)
       .neq('trips.lifecycle_status', 'cancelled')
+      .neq('trips.lifecycle_status', 'approved')
       .eq('payment_method', 'cash'),
   ]);
+
+  const holdsCash = ((activeHoldsData as any[]) ?? []).reduce(
+    (s: number, h: any) => s + parseFloat(h.amount ?? '0'),
+    0,
+  );
 
   const cashReceived = ((userTrips as any[]) ?? [])
     .flatMap((t: any) => t.trip_orders ?? [])
     .filter((o: any) => o.payment_method === 'cash' && o.lifecycle_status !== 'cancelled')
     .reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
 
-  const cashCollected = ((userCollections as any[]) ?? []).reduce(
-    (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
-    0,
-  );
-
   const cashSpent = ((userCashExpenses as any[]) ?? []).reduce(
     (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
     0,
   );
 
-  const cash_on_hands = Math.max(0, cashReceived - cashSpent - cashCollected);
+  const cash_on_hands = holdsCash + Math.max(0, cashReceived - cashSpent);
 
   const userTripIdsWithCash = new Set(
     (userTrips ?? [])

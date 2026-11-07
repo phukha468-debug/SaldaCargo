@@ -249,7 +249,9 @@ export async function GET(request: Request) {
         .eq('lifecycle_status', 'approved')
         .lt('created_at', rangeStart),
 
-      (supabase.from('cash_collections') as any).select('amount').lt('created_at', rangeStart),
+      (supabase.from('cash_collections') as any)
+        .select('amount, note')
+        .lt('created_at', rangeStart),
 
       (supabase.from('transactions') as any)
         .select('amount, trip_order_id')
@@ -296,6 +298,14 @@ export async function GET(request: Request) {
 
     const sumArr = (arr: any[]) => (arr ?? []).reduce((s, r) => s + parseFloat(r.amount ?? '0'), 0);
 
+    // Исключаем взаимозачёты из инкассаций сейфа (деньги не сдавались в сейф, а оставались у сотрудников)
+    const cleanDayCollections = ((dayCollections ?? []) as any[]).filter(
+      (c: any) => !/взаимозач/i.test(c.note || ''),
+    );
+    const cleanPriorCollections = ((priorCollections ?? []) as any[]).filter(
+      (c: any) => !/взаимозач/i.test(c.note || ''),
+    );
+
     const priorBankInClean = (priorBankIn ?? [])
       .filter((r: any) => !r.trip_order_id)
       .reduce((s: number, r: any) => s + parseFloat(r.amount ?? '0'), 0);
@@ -303,7 +313,7 @@ export async function GET(request: Request) {
     const morningBank =
       sumArr(priorBankOrders ?? []) + priorBankInClean - sumArr(priorBankOut ?? []);
     const morningCash =
-      sumArr(priorCollections ?? []) + sumArr(priorCashIn ?? []) - sumArr(priorCashOut ?? []);
+      sumArr(cleanPriorCollections) + sumArr(priorCashIn ?? []) - sumArr(priorCashOut ?? []);
     const morningFuel = sumArr(priorFuelIn ?? []) - sumArr(priorFuelOut ?? []);
 
     // 4. Compute day's movements per wallet
@@ -342,7 +352,7 @@ export async function GET(request: Request) {
     );
     let bankDayOut = 0;
 
-    let cashDayIn = (dayCollections ?? []).reduce(
+    let cashDayIn = cleanDayCollections.reduce(
       (s: number, c: any) => s + parseFloat(c.amount ?? '0'),
       0,
     );
@@ -502,7 +512,7 @@ export async function GET(request: Request) {
         warehouse_parts: movementsListMap.get(t.id) || [],
       })),
       trip_orders: dayTripOrders ?? [],
-      cash_collections: dayCollections ?? [],
+      cash_collections: cleanDayCollections,
       bank_operations: bankStatementOps,
       categories: categoriesList ?? [],
       calendar_overrides: calendarOverrides ?? [],

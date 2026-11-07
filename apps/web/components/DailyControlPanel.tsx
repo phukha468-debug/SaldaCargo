@@ -1345,19 +1345,21 @@ export function DailyControlPanel() {
   // 2. Поступления в СЕЙФ (НАЛИЧНЫЕ):
   // Только факт сдачи наличных: инкассация водителей за смену либо погашение долга клиентом наличными
   if (activeWallet === 'all' || activeWallet === 'cash') {
-    (data?.cash_collections ?? []).forEach((col) => {
-      incomeItems.push({
-        id: `cash-${col.id}`,
-        title: `Инкассация с рейса${col.note ? ` (${col.note})` : ''}`,
-        category: 'Наличные со смены',
-        wallet: 'cash',
-        walletName: 'Сейф (нал)',
-        author: col.driver?.name || 'Водитель',
-        amount: parseFloat(col.amount) || 0,
-        time: formatTxTime(col.created_at),
-        dateSort: new Date(col.created_at).getTime(),
+    (data?.cash_collections ?? [])
+      .filter((col) => !/взаимозач/i.test(col.note || ''))
+      .forEach((col) => {
+        incomeItems.push({
+          id: `cash-${col.id}`,
+          title: `Инкассация с рейса${col.note ? ` (${col.note})` : ''}`,
+          category: 'Наличные со смены',
+          wallet: 'cash',
+          walletName: 'Сейф (нал)',
+          author: col.driver?.name || 'Водитель',
+          amount: parseFloat(col.amount) || 0,
+          time: formatTxTime(col.created_at),
+          dateSort: new Date(col.created_at).getTime(),
+        });
       });
-    });
   }
 
   // 3. Ручные транзакции поступлений (погашение дебиторки наличными в сейф)
