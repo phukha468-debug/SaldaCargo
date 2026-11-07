@@ -179,8 +179,8 @@ export async function fetchWialonValdaiPositions(
   const baseLon = remoteGeo?.lon ?? SALDA_BASE_LON;
   const baseRadius = remoteGeo?.radiusMeters ?? SALDA_BASE_RADIUS;
 
-  // Флаги: 1 (base info) + 1024 (pos) + 4096 (counters)
-  const flags = 1 + 1024 + 4096;
+  // Флаги: 1 (base info) + 1024 (pos) + 4096 (counters) + 256 (pos details) + 524288 (0x80000 - lmsg для одометра CAN/GPS)
+  const flags = 1 + 1024 + 4096 + 256 + 0x80000;
   const searchParams = {
     spec: {
       itemsType: 'avl_unit',
@@ -219,20 +219,27 @@ export async function fetchWialonValdaiPositions(
     else continue;
 
     const pos = item.pos || {};
-    const lat = pos.y || 0;
-    const lon = pos.x || 0;
-    const speed = pos.s || 0;
-    const time = pos.t || 0;
+    const lat = Number(pos.y || 0);
+    const lon = Number(pos.x || 0);
+    const speed = Number(pos.s || 0);
+    const time = Number(pos.t || 0);
 
-    // Одометр в Wialon (cnm — счетчик пробега)
+    // Одометр в Wialon (lmsg.p.mileage, lmsg.p.can_mileage или cnm)
     let odoKm = 0;
-    if (item.cnm) {
-      odoKm = Math.round(Number(item.cnm));
+    const rawMileage = item.lmsg?.p?.mileage ?? item.lmsg?.p?.can_mileage ?? item.cnm;
+    if (rawMileage !== undefined && rawMileage !== null) {
+      const num = Number(rawMileage);
+      if (!isNaN(num) && num > 0) {
+        odoKm = num > 2000000 ? Math.round(num / 1000) : Math.round(num);
+      }
     }
 
-    const distMeters = calculateDistanceMeters(lat, lon, baseLat, baseLon);
-    const distKm = Number((distMeters / 1000).toFixed(2));
-    const isInsideBase = distMeters <= baseRadius;
+    const hasValidCoords = lat !== 0 && lon !== 0;
+    const distMeters = hasValidCoords
+      ? calculateDistanceMeters(lat, lon, baseLat, baseLon)
+      : Infinity;
+    const distKm = hasValidCoords ? Number((distMeters / 1000).toFixed(2)) : 0;
+    const isInsideBase = hasValidCoords ? distMeters <= baseRadius : false;
 
     results.push({
       id: item.id,
@@ -324,6 +331,8 @@ export async function syncValdaiTelematics(
         vehicleId: asset.id,
         odometer: effectiveOdo,
         timestamp: new Date().toISOString(),
+        isInsideBase: true,
+        distanceFromBaseKm: pos.distanceFromBaseKm,
       });
       eventsTriggered.push({
         event: 'arrival',
@@ -333,50 +342,81 @@ export async function syncValdaiTelematics(
       });
     }
 
-    // СОБЫТИЕ 3: Ретроспективная проверка транзита (если машина сейчас снаружи, но за время рейса проезжала базу)
+    // СОБЫТИЕ 3: Машина сейчас СНАРУЖИ — проверка промежуточного транзита
+    // ВАЖНО: Если машина снаружи, рейс НИКОГДА не может быть завершён!
+    // Фиксируется только отметка о транзите в заметках рейса, без закрытия заявки.
     else if (!currentInside) {
       const { data: activeOrder } = await supabase
         .from('orders')
-        .select('id, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at)')
+        .select(
+          'id, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at, driver_note)',
+        )
         .eq('assigned_vehicle_id', asset.id)
         .eq('status', 'in_progress')
         .maybeSingle();
 
-      const isTransitAllowed = Boolean(activeOrder?.raw_parser_payload?.prevent_salda_auto_finish);
-
       const tripObj = (
         Array.isArray(activeOrder?.trip) ? activeOrder.trip[0] : activeOrder?.trip
-      ) as { id: string; started_at?: string } | undefined;
+      ) as { id: string; started_at?: string; driver_note?: string | null } | undefined;
 
-      if (isTransitAllowed && tripObj?.started_at) {
-        const fromSec = Math.floor(new Date(tripObj.started_at).getTime() / 1000);
-        const toSec = Math.floor(Date.now() / 1000);
-        const visit = await checkHistoricalBaseVisit(
-          cleanHost,
-          eid,
-          pos.id,
-          fromSec,
-          toSec,
-          baseLat,
-          baseLon,
-          baseRadius,
-        );
+      if (activeOrder && tripObj?.started_at) {
+        const saldaTransitCount = activeOrder.raw_parser_payload?.salda_transit_count || 0;
+        const lastTransitTs = activeOrder.raw_parser_payload?.last_transit_checked_at || 0;
+        const nowSec = Math.floor(Date.now() / 1000);
 
-        if (visit?.visited) {
-          console.log(
-            `[Wialon Tracker] 🔄 Ретроспективно обнаружен транзит через Салду для ${pos.regNumber} в ${new Date(visit.timeSec * 1000).toLocaleTimeString('ru-RU')} (${(visit.distanceMeters / 1000).toFixed(2)} км от базы)`,
+        if (nowSec - lastTransitTs > 3600) {
+          const fromSec = Math.max(
+            Math.floor(new Date(tripObj.started_at).getTime() / 1000),
+            lastTransitTs || 0,
           );
-          const res = await handleVehicleArrival(supabase, {
-            vehicleId: asset.id,
-            odometer: effectiveOdo,
-            timestamp: new Date(visit.timeSec * 1000).toISOString(),
-            forceFinish: false,
-          });
-          eventsTriggered.push({
-            event: 'transit_retrospective',
-            regNumber: pos.regNumber,
-            res,
-          });
+          if (nowSec - fromSec > 1800) {
+            const visit = await checkHistoricalBaseVisit(
+              cleanHost,
+              eid,
+              pos.id,
+              fromSec,
+              nowSec,
+              baseLat,
+              baseLon,
+              baseRadius,
+            );
+
+            if (visit?.visited) {
+              const transitTimeStr = new Date(visit.timeSec * 1000).toLocaleTimeString('ru-RU');
+              console.log(
+                `[Wialon Tracker] 🔄 Обнаружен промежуточный транзит через Салду для ${pos.regNumber} в ${transitTimeStr} (${(visit.distanceMeters / 1000).toFixed(2)} км от базы)`,
+              );
+              const prevNote = tripObj.driver_note || '';
+              const noteEntry = `[Промежуточный транзит Салда: ${transitTimeStr}, одометр: ${effectiveOdo} км]`;
+              if (!prevNote.includes(noteEntry)) {
+                await supabase
+                  .from('trips')
+                  .update({
+                    driver_note: `${prevNote}\n${noteEntry}`.trim(),
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', tripObj.id);
+
+                await supabase
+                  .from('orders')
+                  .update({
+                    raw_parser_payload: {
+                      ...(activeOrder.raw_parser_payload || {}),
+                      salda_transit_count: saldaTransitCount + 1,
+                      last_transit_checked_at: nowSec,
+                    },
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', activeOrder.id);
+
+                eventsTriggered.push({
+                  event: 'transit_logged',
+                  regNumber: pos.regNumber,
+                  transitTimeStr,
+                });
+              }
+            }
+          }
         }
       }
     }

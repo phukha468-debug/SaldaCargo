@@ -317,6 +317,15 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    // Отвязываем связанную заявку и возвращаем в лист ожидания
+    await (supabase.from('orders') as any)
+      .update({
+        status: 'waiting_vehicle',
+        active_trip_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('active_trip_id', id);
+
     const cookieStore = await cookies();
     const adminId = cookieStore.get('salda_auth_token')?.value ?? null;
     await syncTripFinancials(supabase, id, adminId);

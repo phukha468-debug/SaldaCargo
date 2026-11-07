@@ -48,5 +48,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .eq('trip_id', id)
     .neq('lifecycle_status', 'cancelled');
 
+  // Возвращаем связанную заявку в orders -> in_progress
+  await (supabase.from('orders') as any)
+    .update({ status: 'in_progress', updated_at: new Date().toISOString() })
+    .eq('active_trip_id', id);
+
   return NextResponse.json({ success: true });
 }

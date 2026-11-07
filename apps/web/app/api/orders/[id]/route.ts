@@ -114,6 +114,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    if (updatePayload.status === 'completed' && currentOrder?.active_trip_id) {
+      await (supabase.from('trips') as any)
+        .update({
+          status: 'completed',
+          lifecycle_status: 'approved',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentOrder.active_trip_id);
+      await (supabase.from('trip_orders') as any)
+        .update({ lifecycle_status: 'approved' })
+        .eq('trip_id', currentOrder.active_trip_id)
+        .neq('lifecycle_status', 'cancelled');
+    }
+
     const enriched = {
       ...updated,
       routes_json: updated.raw_parser_payload?.routes || [],

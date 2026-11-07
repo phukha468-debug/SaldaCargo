@@ -86,6 +86,11 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 });
 
+  // Синхронизируем статус связанной заявки в orders -> completed
+  await (supabase.from('orders') as any)
+    .update({ status: 'completed', updated_at: new Date().toISOString() })
+    .eq('active_trip_id', id);
+
   await syncTripFinancials(supabase, id, adminId);
   await updateAssetFuelAfterApproval(supabase, id);
 

@@ -186,14 +186,32 @@ export async function handleVehicleDeparture(
   };
 }
 
+export interface VehicleArrivalParams {
+  vehicleId: string;
+  timestamp?: string;
+  odometer: number;
+  forceFinish?: boolean;
+  isInsideBase?: boolean;
+  distanceFromBaseKm?: number;
+}
+
 /**
  * 3. Авто-закрытие по возврату в радиус города/гаража -> перевод в pending_review
  */
 export async function handleVehicleArrival(
   supabase: SupabaseClient<any, any, any>,
-  params: { vehicleId: string; timestamp?: string; odometer: number; forceFinish?: boolean },
+  params: VehicleArrivalParams,
 ) {
   const arrivalTime = params.timestamp || new Date().toISOString();
+
+  // Если машина физически снаружи базы — рейс не может быть автоматически закрыт
+  if (params.isInsideBase === false && !params.forceFinish) {
+    console.log(`[Wialon] ⚠️ ТС ${params.vehicleId} снаружи базы. Автозавершение рейса отменено.`);
+    return {
+      success: false,
+      message: 'Транспортное средство находится вне геозоны базы. Автозавершение отклонено.',
+    };
+  }
 
   // Ищем заказ со статусом in_progress для данного ТС
   const { data: order, error: orderErr } = await supabase
@@ -224,16 +242,33 @@ export async function handleVehicleArrival(
     throw new Error(`Связанный рейс не найден: ${tripFetchErr?.message}`);
   }
 
-  // Проверка: Составной / круговой маршрут с промежуточным заездом в Верхнюю Салду
-  const isTransitAllowed = Boolean(
+  const startDate = new Date(trip.started_at);
+  const arrivalDate = new Date(arrivalTime);
+  const diffMinutes = Math.max(1, (arrivalDate.getTime() - startDate.getTime()) / (1000 * 60));
+
+  // Проверка составного рейса или явного запрета завершения
+  const routes = (order.raw_parser_payload?.routes || []) as any[];
+  const hasMultipleLegs = routes.length > 1;
+  const isTransitExplicitlyAllowed = Boolean(
     order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
   );
 
-  if (isTransitAllowed && !params.forceFinish) {
+  // Проверка: выезд из внешнего пункта (например Шайтанка), когда межгород только начался
+  const isExternalOrigin =
+    order.loading_address_json?.raw &&
+    !order.loading_address_json.raw.toLowerCase().includes('салда');
+  const isExternalDestination =
+    order.unloading_address_json?.city &&
+    !order.unloading_address_json.city.toLowerCase().includes('салда');
+
+  // Если машина в пути менее 45 минут при межгороде или внешнем пункте погрузки — это транзитный проезд на старте!
+  const isEarlyTransit = diffMinutes < 45 && (isExternalOrigin || isExternalDestination);
+
+  if ((isTransitExplicitlyAllowed || hasMultipleLegs || isEarlyTransit) && !params.forceFinish) {
     const transitCount =
       ((order.raw_parser_payload?.salda_transit_count ?? order.salda_transit_count) || 0) + 1;
     console.log(
-      `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount}. Заявка НЕ закрывается!`,
+      `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount} (${Math.round(diffMinutes)} мин с начала). Рейс продолжается!`,
     );
 
     // Обновляем одометр актива и фиксируем промежуточную отметку в рейсе и заявке
@@ -254,15 +289,14 @@ export async function handleVehicleArrival(
       })
       .eq('id', trip.id);
 
-    // Однократный промежуточный заезд в зону: фиксируем транзит и автоматически СНИМАЕМ галочку prevent_salda_auto_finish в raw_parser_payload.
-    // Второй заезд в Салду уже штатно завершит заявку и переведет её на ревью.
+    // Сохраняем счетчик транзитов без стирания флага составного рейса
     await supabase
       .from('orders')
       .update({
         raw_parser_payload: {
           ...(order.raw_parser_payload || {}),
-          prevent_salda_auto_finish: false,
           salda_transit_count: transitCount,
+          last_transit_checked_at: Math.floor(Date.now() / 1000),
         },
         updated_at: new Date().toISOString(),
       })
@@ -271,11 +305,10 @@ export async function handleVehicleArrival(
     return {
       success: true,
       transit: true,
-      prevent_salda_auto_finish_cleared: true,
       salda_transit_count: transitCount,
       orderId: order.id,
       tripId: trip.id,
-      message: `Промежуточный заезд в Салду (заезд #${transitCount}). Флаг составного рейса автоматически снят — следующий заезд закроет заявку.`,
+      message: `Промежуточный заезд в Салду (заезд #${transitCount}). Заявка продолжается в пути.`,
     };
   }
 
@@ -284,9 +317,7 @@ export async function handleVehicleArrival(
   const distanceKm = Math.max(1, odoEnd - odoStart);
 
   // Расчет продолжительности в днях для суточных
-  const startDate = new Date(trip.started_at);
-  const endDate = new Date(arrivalTime);
-  const diffHours = Math.max(1, (endDate.getTime() - startDate.getTime()) / (1000 * 3600));
+  const diffHours = Math.max(1, (arrivalDate.getTime() - startDate.getTime()) / (1000 * 3600));
   const daysCount = Math.max(1, Math.ceil(diffHours / 24));
 
   // Тариф водителя: 10 руб/км + 1000 руб/сутки
