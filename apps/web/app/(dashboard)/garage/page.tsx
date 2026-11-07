@@ -7,7 +7,14 @@ import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { cn, Money } from '@saldacargo/ui';
-import { isOilOrFilterWork, GARAGE_WORK_CATEGORIES } from '@saldacargo/shared';
+import {
+  isOilOrFilterWork,
+  GARAGE_WORK_CATEGORIES,
+  GARAGE_WORK_ACTIONS,
+  GARAGE_WORK_POSITIONS,
+  POPULAR_GARAGE_COMPONENTS,
+  buildStandardWorkName,
+} from '@saldacargo/shared';
 import { WarehouseSection } from './warehouse-section';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -268,6 +275,9 @@ function OrderDetailModal({
   const [addWorkQty, setAddWorkQty] = useState(1);
   const [addWorkDate, setAddWorkDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [addWorkCategory, setAddWorkCategory] = useState<string>(GARAGE_WORK_CATEGORIES[0]);
+  const [addWorkAction, setAddWorkAction] = useState<string>(GARAGE_WORK_ACTIONS[0]);
+  const [addWorkComponent, setAddWorkComponent] = useState<string>('');
+  const [addWorkPosition, setAddWorkPosition] = useState<string>('');
   const [customWorkName, setCustomWorkName] = useState('');
   const [customWorkPrice, setCustomWorkPrice] = useState('');
   const [addWorkMinutes, setAddWorkMinutes] = useState('60');
@@ -427,6 +437,8 @@ function OrderDetailModal({
       setAddWorkError(null);
       setAddWorkQty(1);
       setCustomWorkName('');
+      setAddWorkComponent('');
+      setAddWorkPosition('');
       setCustomWorkPrice('');
       setAddWorkMinutes('60');
       setShowAddWork(false);
@@ -1033,9 +1045,9 @@ function OrderDetailModal({
                       </span>
                     </div>
 
-                    {/* Row 1: Date, Category, Work Name */}
+                    {/* Row 1: Date, Category, 3-Word Standard (Action, Component, Position) */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-2">
                         <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                           📅 Дата работы *
                         </label>
@@ -1047,9 +1059,9 @@ function OrderDetailModal({
                         />
                       </div>
 
-                      <div className="md:col-span-4">
+                      <div className="md:col-span-3">
                         <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                          ⚙️ Категория / Узел *
+                          ⚙️ Узел / Категория *
                         </label>
                         <select
                           value={addWorkCategory}
@@ -1064,22 +1076,95 @@ function OrderDetailModal({
                         </select>
                       </div>
 
-                      <div className="md:col-span-5">
+                      <div className="md:col-span-2">
                         <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                          ✏️ Наименование работы *
+                          1. Действие *
                         </label>
-                        <input
-                          autoFocus
-                          type="text"
-                          value={customWorkName}
+                        <select
+                          value={addWorkAction}
                           onChange={(e) => {
-                            setCustomWorkName(e.target.value);
+                            const val = e.target.value;
+                            setAddWorkAction(val);
+                            setCustomWorkName(
+                              buildStandardWorkName(val, addWorkComponent, addWorkPosition),
+                            );
                             setAddWorkError(null);
                           }}
-                          placeholder="Например: Замена задних фонарей"
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-blue-500 font-medium"
+                        >
+                          {GARAGE_WORK_ACTIONS.map((act) => (
+                            <option key={act} value={act}>
+                              {act}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-3">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          2. Деталь / Узел *
+                        </label>
+                        <input
+                          list="popular-components-list"
+                          type="text"
+                          value={addWorkComponent}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAddWorkComponent(val);
+                            setCustomWorkName(
+                              buildStandardWorkName(addWorkAction, val, addWorkPosition),
+                            );
+                            setAddWorkError(null);
+                          }}
+                          placeholder="например: тормозные колодки"
                           className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 font-medium"
                         />
+                        <datalist id="popular-components-list">
+                          {POPULAR_GARAGE_COMPONENTS.map((item) => (
+                            <option key={item} value={item} />
+                          ))}
+                        </datalist>
                       </div>
+
+                      <div className="md:col-span-2">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          3. Сторона / Положение
+                        </label>
+                        <select
+                          value={addWorkPosition}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAddWorkPosition(val);
+                            setCustomWorkName(
+                              buildStandardWorkName(addWorkAction, addWorkComponent, val),
+                            );
+                          }}
+                          className="w-full text-xs bg-white border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-blue-500 font-medium"
+                        >
+                          {GARAGE_WORK_POSITIONS.map((p) => (
+                            <option key={p.value} value={p.value}>
+                              {p.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Live Assembled Preview & Manual Override */}
+                    <div className="flex items-center gap-2 bg-white/90 border border-blue-200 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                      <span className="text-[11px] font-bold text-blue-900 shrink-0">
+                        🏷 Итоговое наименование:
+                      </span>
+                      <input
+                        type="text"
+                        value={customWorkName}
+                        onChange={(e) => {
+                          setCustomWorkName(e.target.value);
+                          setAddWorkError(null);
+                        }}
+                        placeholder="Заполните действие и деталь выше или введите вручную..."
+                        className="w-full text-xs font-semibold text-slate-800 bg-transparent outline-none placeholder:text-slate-400"
+                      />
                     </div>
 
                     {/* Row 2: Mechanic, 2nd Mechanic, Minutes, Price, Qty, Add button */}
@@ -1461,6 +1546,7 @@ function OrderDetailModal({
                                         ✏️ Наименование работы
                                       </label>
                                       <input
+                                        list="popular-components-list"
                                         type="text"
                                         value={editWorkName}
                                         onChange={(e) => setEditWorkName(e.target.value)}

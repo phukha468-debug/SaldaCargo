@@ -5,7 +5,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Money, cn } from '@saldacargo/ui';
-import { formatDate, isOilOrFilterWork, GARAGE_WORK_CATEGORIES } from '@saldacargo/shared';
+import {
+  formatDate,
+  isOilOrFilterWork,
+  GARAGE_WORK_CATEGORIES,
+  GARAGE_WORK_ACTIONS,
+  GARAGE_WORK_POSITIONS,
+  POPULAR_GARAGE_COMPONENTS,
+  buildStandardWorkName,
+} from '@saldacargo/shared';
 
 interface WorkItem {
   id: string;
@@ -65,6 +73,9 @@ export default function OrderDetailPage() {
 
   const [workNameInput, setWorkNameInput] = useState('');
   const [workCategoryInput, setWorkCategoryInput] = useState<string>(GARAGE_WORK_CATEGORIES[0]);
+  const [workActionInput, setWorkActionInput] = useState<string>(GARAGE_WORK_ACTIONS[0]);
+  const [workComponentInput, setWorkComponentInput] = useState<string>('');
+  const [workPositionInput, setWorkPositionInput] = useState<string>('');
   const [workDateInput, setWorkDateInput] = useState<string>(() =>
     new Date().toISOString().slice(0, 10),
   );
@@ -144,6 +155,8 @@ export default function OrderDetailPage() {
     },
     onSuccess: () => {
       setWorkNameInput('');
+      setWorkComponentInput('');
+      setWorkPositionInput('');
       setWorkMinutesInput('');
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
@@ -452,7 +465,7 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* Форма добавления работы */}
+        {/* Форма добавления работы (Правило 3-х слов) */}
         {isEditable && (
           <div className="bg-[#F2F4F7] rounded-2xl p-3.5 space-y-2.5 border border-slate-200/70">
             <div className="grid grid-cols-2 gap-2">
@@ -485,16 +498,90 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
+            {/* Конструктор 3-х слов: Действие + Сторона */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  1. Действие *
+                </label>
+                <select
+                  value={workActionInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setWorkActionInput(val);
+                    setWorkNameInput(
+                      buildStandardWorkName(val, workComponentInput, workPositionInput),
+                    );
+                  }}
+                  className="w-full h-10 px-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                >
+                  {GARAGE_WORK_ACTIONS.map((act) => (
+                    <option key={act} value={act}>
+                      {act}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  3. Сторона / Положение
+                </label>
+                <select
+                  value={workPositionInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setWorkPositionInput(val);
+                    setWorkNameInput(
+                      buildStandardWorkName(workActionInput, workComponentInput, val),
+                    );
+                  }}
+                  className="w-full h-10 px-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                >
+                  {GARAGE_WORK_POSITIONS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* 2. Деталь / Узел */}
             <div>
               <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                Наименование работы (ручной ввод)
+                2. Деталь / Узел автомобиля *
+              </label>
+              <input
+                list="miniapp-popular-components"
+                type="text"
+                value={workComponentInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWorkComponentInput(val);
+                  setWorkNameInput(buildStandardWorkName(workActionInput, val, workPositionInput));
+                }}
+                placeholder="Например: тормозные колодки"
+                className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+              />
+              <datalist id="miniapp-popular-components">
+                {POPULAR_GARAGE_COMPONENTS.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* Assembled Name Preview */}
+            <div className="bg-white rounded-xl p-2.5 border border-slate-200 space-y-1">
+              <label className="block text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                🏷 Итоговое наименование (по формуле 3-х слов):
               </label>
               <input
                 type="text"
                 value={workNameInput}
                 onChange={(e) => setWorkNameInput(e.target.value)}
-                placeholder="Например: Замена глушителя (бочка)"
-                className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                placeholder="Заполните действие и деталь выше или введите вручную..."
+                className="w-full text-xs font-extrabold text-slate-900 outline-none"
               />
             </div>
 
