@@ -446,3 +446,160 @@ export async function syncValdaiTelematics(
     eventsTriggered,
   };
 }
+
+export const WIALON_VALDAI_UNITS: Record<string, number> = {
+  А096МВ196: 11873,
+  О188ТА196: 11876,
+  У446ВН96: 11875,
+  У883АР96: 11874,
+};
+
+export interface TripWialonMileageResult {
+  unitId: number;
+  regNumber: string;
+  wialonKm: number;
+  startOdo: number;
+  endOdo: number;
+  startTime: string;
+  endTime: string;
+  normLiters: number;
+  normCost: number;
+  driverPay: number;
+  daysCount: number;
+}
+
+/**
+ * Получение точного пробега, одометров и нормативов из Wialon за интервал рейса
+ */
+export async function fetchTripWialonMileage(options: {
+  host?: string;
+  token?: string;
+  regNumber: string;
+  startedAt: string;
+  endedAt?: string | null;
+}): Promise<TripWialonMileageResult | null> {
+  const host = options.host || process.env.WIALON_HOST || 'https://host.local4.wialon.host';
+  const token =
+    options.token ||
+    process.env.WIALON_TOKEN ||
+    '561a6efcd9ed8d38d0ff3b80c29253f01653C6698177A6D92E360BBD0D70D0B6AF5240DE';
+
+  const cleanHost = host.replace(/\/+$/, '');
+  const cleanReg = options.regNumber.toUpperCase().replace(/\s+/g, '');
+
+  let unitId = WIALON_VALDAI_UNITS[cleanReg];
+  if (!unitId) {
+    for (const [key, id] of Object.entries(WIALON_VALDAI_UNITS)) {
+      if (cleanReg.includes(key.slice(1, 4))) {
+        unitId = id;
+        break;
+      }
+    }
+  }
+
+  const eid = await getWialonSession(cleanHost, token);
+
+  if (!unitId) {
+    try {
+      const searchParams = {
+        spec: {
+          itemsType: 'avl_unit',
+          propName: 'sys_name',
+          propValueMask: `*${cleanReg.replace(/[^0-9]/g, '')}*`,
+          sortType: 'sys_name',
+        },
+        force: 1,
+        flags: 1,
+        from: 0,
+        to: 0,
+      };
+      const searchUrl = `${cleanHost}/wialon/ajax.html?svc=core/search_items&params=${encodeURIComponent(
+        JSON.stringify(searchParams),
+      )}&sid=${eid}`;
+      const res = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) });
+      if (res.ok) {
+        const json = await res.json();
+        const items = json.items || [];
+        if (items.length > 0) {
+          unitId = items[0].id;
+        }
+      }
+    } catch {}
+  }
+
+  if (!unitId) return null;
+
+  // Буфер 45 минут до старта рейса и после финиша рейса
+  const fromSec = Math.floor(new Date(options.startedAt).getTime() / 1000) - 2700;
+  const toSec = options.endedAt
+    ? Math.floor(new Date(options.endedAt).getTime() / 1000) + 2700
+    : Math.floor(Date.now() / 1000);
+
+  const msgUrl = `${cleanHost}/wialon/ajax.html?svc=messages/load_interval&params=${encodeURIComponent(
+    JSON.stringify({
+      itemId: unitId,
+      timeFrom: fromSec,
+      timeTo: toSec,
+      flags: 0,
+      flagsMask: 0,
+      loadCount: 10000,
+    }),
+  )}&sid=${eid}`;
+
+  const res = await fetch(msgUrl, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const msgs = data.messages || [];
+
+  if (msgs.length === 0) return null;
+
+  let startOdo: number | null = null;
+  let endOdo: number | null = null;
+  let startTime = '';
+  let endTime = '';
+
+  for (const m of msgs) {
+    const rawMileage = m.p?.mileage ?? m.p?.can_mileage ?? m.cnm;
+    if (rawMileage !== undefined && rawMileage !== null) {
+      const num = Number(rawMileage);
+      if (!isNaN(num) && num > 0) {
+        const km = num > 2000000 ? Math.round(num / 1000) : Math.round(num);
+        if (startOdo === null) {
+          startOdo = km;
+          startTime = new Date(m.t * 1000).toISOString();
+        }
+        endOdo = km;
+        endTime = new Date(m.t * 1000).toISOString();
+      }
+    }
+  }
+
+  if (startOdo === null || endOdo === null) return null;
+
+  const wialonKm = Math.max(0, endOdo - startOdo);
+
+  const startMs = new Date(options.startedAt).getTime();
+  const endMs = options.endedAt ? new Date(options.endedAt).getTime() : Date.now();
+  const diffHours = Math.max(1, (endMs - startMs) / (1000 * 3600));
+  const daysCount = Math.max(1, Math.ceil(diffHours / 24));
+
+  const FUEL_RATE_PER_100KM = 18;
+  const FUEL_PRICE_TK = 82;
+  const normLiters = Number(((wialonKm * FUEL_RATE_PER_100KM) / 100).toFixed(1));
+  const normCost = Math.round(normLiters * FUEL_PRICE_TK);
+  const driverPay = wialonKm * 10 + daysCount * 1000;
+
+  return {
+    unitId,
+    regNumber: cleanReg,
+    wialonKm,
+    startOdo,
+    endOdo,
+    startTime,
+    endTime,
+    normLiters,
+    normCost,
+    driverPay,
+    daysCount,
+  };
+}

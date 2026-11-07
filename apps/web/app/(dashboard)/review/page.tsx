@@ -20,6 +20,8 @@ import {
   isInternalCounterparty,
   isTruckAsset,
   auditTripFuel,
+  auditTripWialon,
+  TripWialonAudit,
 } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 
@@ -63,6 +65,7 @@ interface TripForReview {
   odometer_start: number;
   odometer_end: number | null;
   driver_note: string | null;
+  admin_note?: string | null;
   asset: {
     id?: string;
     short_name: string;
@@ -1157,6 +1160,15 @@ function EditModal({
                   <span>Сигнал ГСМ</span>
                 </span>
               )}
+              {auditTripWialon(trip).hasDiscrepancy && (
+                <span
+                  className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 cursor-help"
+                  title={auditTripWialon(trip).badgeText}
+                >
+                  <span>📡</span>
+                  <span>{auditTripWialon(trip).shortBadgeText}</span>
+                </span>
+              )}
             </div>
             <h2 className="text-lg sm:text-xl font-black mt-1 text-white flex items-center gap-2">
               Редактирование рейса
@@ -1904,6 +1916,44 @@ function TripCard({
     (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
     (trip.driver_note ?? '').includes('[CARRYOVER]');
   const fuelAudit = auditTripFuel(trip);
+  const wialonAudit = auditTripWialon(trip);
+  const queryClient = useQueryClient();
+  const [showWialonModal, setShowWialonModal] = useState(false);
+  const [isApplyingWialon, setIsApplyingWialon] = useState(false);
+
+  const handleApplyWialon = async (tripId: string, auditData?: TripWialonAudit) => {
+    try {
+      setIsApplyingWialon(true);
+      const res = await fetch(`/api/trips/${tripId}/wialon-telematics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          auditData
+            ? {
+                wialonKm: auditData.wialonKm,
+                startOdo: auditData.odoStart,
+                endOdo: auditData.odoEnd,
+                normLiters: auditData.normLiters,
+                normCost: auditData.normCost,
+                driverPay: auditData.driverPay,
+              }
+            : {},
+        ),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        alert(`Ошибка применения Wialon: ${json.error || 'Неизвестная ошибка'}`);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['trips-review'] });
+        queryClient.invalidateQueries({ queryKey: ['trips-month'] });
+        queryClient.invalidateQueries({ queryKey: ['trips-week'] });
+      }
+    } catch (err: any) {
+      alert(`Ошибка связи: ${err?.message || 'Неизвестная ошибка'}`);
+    } finally {
+      setIsApplyingWialon(false);
+    }
+  };
 
   const loaderNames = [
     ...new Set(
@@ -2005,6 +2055,21 @@ function TripCard({
                   aria-label="Сигнал по ГСМ"
                 >
                   ⚠️
+                </button>
+              )}
+              {wialonAudit.hasDiscrepancy && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowWialonModal(true);
+                  }}
+                  className="px-1.5 py-0.5 rounded bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black text-[10px] leading-tight shrink-0 shadow-xs flex items-center gap-0.5 cursor-pointer transition-transform"
+                  title={`${wialonAudit.badgeText}\n(Нажмите для сверки одометра по Wialon)`}
+                  aria-label="Расхождение Wialon"
+                >
+                  <span>📡</span>
+                  <span className="hidden xl:inline">{wialonAudit.shortBadgeText}</span>
                 </button>
               )}
             </div>
@@ -2330,6 +2395,64 @@ function TripCard({
             </div>
           )}
 
+          {/* Предупреждение о расхождении одометра с Wialon */}
+          {wialonAudit.hasDiscrepancy && (
+            <div className="px-5 py-2.5 bg-amber-50/90 border-t border-amber-200 flex items-center justify-between text-xs">
+              <span className="font-bold text-amber-950 flex items-center gap-2 min-w-0">
+                <span className="text-base">⚠️</span>
+                <span className="truncate">{wialonAudit.badgeText}</span>
+                <span className="text-slate-500 font-normal hidden lg:inline truncate">
+                  · ГСМ (18л/100км @ 82₽): {wialonAudit.normLiters} л ({wialonAudit.normCost} ₽) ·
+                  ЗП вод: {wialonAudit.driverPay} ₽
+                </span>
+              </span>
+              <div className="flex items-center gap-2 shrink-0 ml-3">
+                <button
+                  type="button"
+                  onClick={() => setShowWialonModal(true)}
+                  className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer"
+                >
+                  Сверка
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleApplyWialon(trip.id, wialonAudit)}
+                  disabled={isApplyingWialon}
+                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-[11px] rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-xs">sync</span>
+                  <span>Применить {wialonAudit.wialonKm} км</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {wialonAudit.isAudited && !wialonAudit.hasDiscrepancy && (
+            <div className="px-5 py-1.5 bg-sky-50/60 border-t border-sky-100 flex items-center justify-between text-[11px] text-slate-600">
+              <div className="flex items-center gap-2 truncate">
+                <span className="text-sky-700 font-bold flex items-center gap-1">
+                  <span>📡</span>
+                  <span>Wialon телеметрия:</span>
+                </span>
+                <span>
+                  {wialonAudit.wialonKm} км (одометр {wialonAudit.odoStart} → {wialonAudit.odoEnd})
+                </span>
+                <span className="text-slate-300">·</span>
+                <span>
+                  ГСМ (18 л/100км @ 82 ₽): <strong>{wialonAudit.normLiters} л</strong> (
+                  {wialonAudit.normCost} ₽)
+                </span>
+                <span className="text-slate-300">·</span>
+                <span>
+                  ЗП: <strong>{wialonAudit.driverPay} ₽</strong>
+                </span>
+              </div>
+              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100/80 px-2 py-0.5 rounded shrink-0">
+                ✓ Одометр подтвержден Wialon
+              </span>
+            </div>
+          )}
+
           {/* Предупреждение о расхождении ГСМ */}
           {fuelAudit.hasDiscrepancy && (
             <div className="px-5 py-2.5 bg-rose-50/90 border-t border-rose-200 flex items-center justify-between text-xs">
@@ -2501,6 +2624,136 @@ function TripCard({
                 className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
               >
                 Понятно
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно с детальной телеметрией Wialon */}
+      {showWialonModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowWialonModal(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-5 border border-slate-200 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-base">
+                  📡
+                </span>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 leading-tight">
+                    Телеметрия Wialon (CAN / GPS)
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Рейс #{trip.trip_number} · {trip.asset?.short_name} ({trip.asset?.reg_number})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWialonModal(false)}
+                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Введено сотрудником
+                </span>
+                <span className="text-base font-black text-slate-800">
+                  {wialonAudit.enteredKm} км
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-0.5">
+                  одометр {trip.odometer_start || 0} → {trip.odometer_end || 0}
+                </span>
+              </div>
+              <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                <span className="text-[10px] text-amber-700 uppercase font-bold block">
+                  По данным Wialon
+                </span>
+                <span className="text-base font-black text-amber-900">
+                  {wialonAudit.wialonKm} км
+                </span>
+                <span className="text-[11px] text-amber-700 block mt-0.5">
+                  одометр {wialonAudit.odoStart} → {wialonAudit.odoEnd}
+                </span>
+              </div>
+            </div>
+
+            {wialonAudit.hasDiscrepancy ? (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-900 leading-relaxed flex items-start gap-2">
+                <span className="text-base shrink-0">⚠️</span>
+                <div>
+                  Обнаружено расхождение: {wialonAudit.diffKm} км!
+                  <div className="text-[11px] font-normal text-rose-800 mt-0.5">
+                    Сотрудник указал {wialonAudit.enteredKm} км, а бортовой трекер зафиксировал{' '}
+                    {wialonAudit.wialonKm} км.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-900 leading-relaxed flex items-center gap-2">
+                <span className="text-base shrink-0">✓</span>
+                <div>Одометр рейса полностью совпадает с Wialon ({wialonAudit.wialonKm} км).</div>
+              </div>
+            )}
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5 text-xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                Расчет нормативов по Wialon ({wialonAudit.wialonKm} км):
+              </div>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-600">Расход топлива (18 л / 100 км):</span>
+                <span className="font-bold text-slate-900">{wialonAudit.normLiters} л</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-600">Стоимость ГСМ (по тарифу 82 ₽/л):</span>
+                <span className="font-bold text-rose-600">
+                  {wialonAudit.normCost.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-0.5 border-t border-slate-200/60 pt-1">
+                <span className="text-slate-600">Зарплата водителя (10 ₽/км + суточные):</span>
+                <span className="font-bold text-emerald-600">
+                  {wialonAudit.driverPay.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowWialonModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Закрыть
+              </button>
+              <button
+                type="button"
+                disabled={isApplyingWialon}
+                onClick={() => {
+                  handleApplyWialon(trip.id, wialonAudit);
+                  setShowWialonModal(false);
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-sm">sync</span>
+                <span>
+                  {isApplyingWialon
+                    ? 'Применение...'
+                    : `Применить Wialon (${wialonAudit.wialonKm} км)`}
+                </span>
               </button>
             </div>
           </div>

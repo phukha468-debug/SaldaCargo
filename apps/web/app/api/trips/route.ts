@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     .select(
       `
       id, trip_number, status, lifecycle_status, started_at, ended_at,
-      trip_type, odometer_start, odometer_end, driver_note,
+      trip_type, odometer_start, odometer_end, driver_note, admin_note,
       asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code, name)),
       driver:users!trips_driver_id_fkey(id, name),
       loader:users!trips_loader_id_fkey(id, name),

@@ -22,7 +22,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     let query = supabase.from('trips').select(
       `
       id, trip_number, status, lifecycle_status, started_at, ended_at, created_at,
-      trip_type, odometer_start, odometer_end, driver_note,
+      trip_type, odometer_start, odometer_end, driver_note, admin_note,
       asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code, name)),
       driver:users!trips_driver_id_fkey(id, name),
       loader:users!trips_loader_id_fkey(id, name),
@@ -89,6 +89,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         category_id?: string;
       }>;
       deleted_expense_ids?: string[];
+      odometer_start?: number;
+      odometer_end?: number;
+      admin_note?: string;
+      driver_note?: string;
     };
 
     const supabase = createAdminClient();
@@ -101,6 +105,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     if (tripError || !trip) {
       return NextResponse.json({ error: tripError?.message ?? 'Рейс не найден' }, { status: 404 });
+    }
+
+    // 1.1 Обновление данных самого рейса (одометр, заметки)
+    const tripUpdates: Record<string, any> = {};
+    if (body.odometer_start !== undefined) tripUpdates.odometer_start = body.odometer_start;
+    if (body.odometer_end !== undefined) tripUpdates.odometer_end = body.odometer_end;
+    if (body.admin_note !== undefined) tripUpdates.admin_note = body.admin_note;
+    if (body.driver_note !== undefined) tripUpdates.driver_note = body.driver_note;
+
+    if (Object.keys(tripUpdates).length > 0) {
+      tripUpdates.updated_at = new Date().toISOString();
+      await (supabase.from('trips') as any).update(tripUpdates).eq('id', id);
     }
 
     // 2. Вспомогательная функция для резолвинга/создания контрагента

@@ -132,6 +132,10 @@ export const FINANCIAL_CATEGORIES = {
 
 // ─── Нормы расхода топлива (л / 100 км) и кубик (ДТ 1000л) ───────────────────
 export const CUBE_FUEL_PRICE_PER_LITER = 60;
+export const DIESEL_FUEL_PRICE_PER_LITER = 82; // Актуальная цена ДТ (ТК и наличные)
+export const VALDAI_FUEL_RATE_PER_100KM = 18; // Норма расхода топлива для Валдая (л / 100 км)
+export const DRIVER_RATE_PER_KM = 10; // Ставка водителя: 10 руб/км
+export const DRIVER_PER_DIEM_PER_DAY = 1000; // Суточные водителя: 1000 руб/сутки
 export const DEFAULT_FUEL_CONSUMPTION_RATE = 16;
 
 export const FUEL_CONSUMPTION_RATES: Record<string, number> = {
@@ -1206,15 +1210,122 @@ export function extractFuelLitersFromExpense(exp: {
 
   // 2. Если заправка из кубика (тариф 60 ₽/л)
   if (exp.payment_method === 'cube' || desc.includes('кубик') || desc.includes('база')) {
-    return Math.round((amt / 60) * 10) / 10;
+    return Math.round((amt / CUBE_FUEL_PRICE_PER_LITER) * 10) / 10;
   }
 
-  // 3. Если заправка по ТК или наличным (средний тариф ДТ ~65 ₽/л)
+  // 3. Если заправка по ТК или наличным (актуальный тариф ДТ 82 ₽/л)
   if (exp.payment_method === 'fuel_card' || exp.payment_method === 'cash') {
-    return Math.round((amt / 65) * 10) / 10;
+    return Math.round((amt / DIESEL_FUEL_PRICE_PER_LITER) * 10) / 10;
   }
 
   return 0;
+}
+
+/**
+ * Расчет расхода топлива по нормативу (по умолчанию Валдай: 18 л / 100 км по 82 ₽/л)
+ */
+export function calculateTripFuelNorm(
+  distanceKm: number,
+  ratePer100Km: number = VALDAI_FUEL_RATE_PER_100KM,
+  pricePerLiter: number = DIESEL_FUEL_PRICE_PER_LITER,
+) {
+  const km = Math.max(0, distanceKm);
+  const liters = Number(((km * ratePer100Km) / 100).toFixed(1));
+  const amount = Math.round(liters * pricePerLiter);
+  return { km, ratePer100Km, liters, amount, pricePerLiter };
+}
+
+export interface TripWialonAudit {
+  hasDiscrepancy: boolean;
+  isAudited: boolean;
+  diffKm: number;
+  enteredKm: number;
+  wialonKm: number;
+  odoStart: number;
+  odoEnd: number;
+  normLiters: number;
+  normCost: number;
+  driverPay: number;
+  badgeText: string;
+  shortBadgeText: string;
+}
+
+/**
+ * Аудит пробега и расхода топлива по данным телеметрии Wialon.
+ * Сверяет одометр рейса с фактической телеметрией Wialon.
+ * При расхождении > 5 км возвращает флаг hasDiscrepancy и компактный 1-строчный бейдж.
+ */
+export function auditTripWialon(trip: {
+  odometer_start?: number | null;
+  odometer_end?: number | null;
+  admin_note?: string | null;
+  driver_note?: string | null;
+  asset?: {
+    short_name?: string | null;
+    reg_number?: string | null;
+    asset_type?: { code?: string | null } | null;
+  } | null;
+}): TripWialonAudit {
+  const odoStart = trip.odometer_start || 0;
+  const odoEnd = trip.odometer_end || 0;
+  const enteredKm = odoEnd > odoStart ? odoEnd - odoStart : 0;
+
+  const note = `${trip.admin_note || ''} ${trip.driver_note || ''}`;
+  const match = note.match(/\[WIALON_AUDIT:(\{.*?\})\]/);
+
+  if (match && match[1]) {
+    try {
+      const data = JSON.parse(match[1]);
+      const wialonKm = Number(data.wialon_km || data.distance_km || 0);
+      const start = Number(data.odo_start || odoStart);
+      const end = Number(data.odo_end || odoEnd);
+      const diffKm = Math.abs(enteredKm - wialonKm);
+      const rate = Number(data.fuel_rate || VALDAI_FUEL_RATE_PER_100KM);
+      const price = Number(data.fuel_price || DIESEL_FUEL_PRICE_PER_LITER);
+      const normLiters = Number(
+        data.norm_liters || Math.round(((wialonKm * rate) / 100) * 10) / 10,
+      );
+      const normCost = Number(data.norm_cost || Math.round(normLiters * price));
+      const driverPay = Number(data.driver_pay || wialonKm * DRIVER_RATE_PER_KM + 1000);
+
+      const hasDiscrepancy = diffKm > 5;
+      const sign = enteredKm > wialonKm ? '+' : '-';
+      const badgeText = hasDiscrepancy
+        ? `⚠️ Одометр: введено ${enteredKm} км, Wialon ${wialonKm} км (${sign}${diffKm} км)`
+        : `📡 Wialon: ${wialonKm} км (${normLiters} л @ ${price}₽ = ${normCost} ₽)`;
+
+      return {
+        hasDiscrepancy,
+        isAudited: true,
+        diffKm,
+        enteredKm,
+        wialonKm,
+        odoStart: start,
+        odoEnd: end,
+        normLiters,
+        normCost,
+        driverPay,
+        badgeText,
+        shortBadgeText: hasDiscrepancy ? `⚠️ ${sign}${diffKm} км` : `📡 ${wialonKm} км`,
+      };
+    } catch {}
+  }
+
+  const defaultNorm = calculateTripFuelNorm(enteredKm);
+  return {
+    hasDiscrepancy: false,
+    isAudited: false,
+    diffKm: 0,
+    enteredKm,
+    wialonKm: enteredKm,
+    odoStart,
+    odoEnd,
+    normLiters: defaultNorm.liters,
+    normCost: defaultNorm.amount,
+    driverPay: enteredKm * DRIVER_RATE_PER_KM + 1000,
+    badgeText: '',
+    shortBadgeText: '',
+  };
 }
 
 export interface FuelAuditResult {
