@@ -217,7 +217,11 @@ export async function syncTripFinancials(
     if (driverPay > 0) {
       if (existingDriverTx) {
         await (supabase.from('transactions') as any)
-          .update({ amount: driverPay.toFixed(2) })
+          .update({
+            amount: driverPay.toFixed(2),
+            lifecycle_status: 'approved',
+            transaction_date: trip.started_at,
+          })
           .eq('id', existingDriverTx.id);
       } else {
         await (supabase.from('transactions') as any).insert({
@@ -282,7 +286,11 @@ export async function syncTripFinancials(
     if (pay > 0) {
       if (existingTx) {
         await (supabase.from('transactions') as any)
-          .update({ amount: pay.toFixed(2) })
+          .update({
+            amount: pay.toFixed(2),
+            lifecycle_status: 'approved',
+            transaction_date: trip.started_at,
+          })
           .eq('id', existingTx.id);
       } else {
         await (supabase.from('transactions') as any).insert({

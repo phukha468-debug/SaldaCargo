@@ -86,6 +86,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 });
 
+  // Переводим все связанные неаннулированные транзакции рейса в approved
+  await (supabase.from('transactions') as any)
+    .update({ lifecycle_status: 'approved', updated_at: new Date().toISOString() })
+    .eq('trip_id', id)
+    .neq('lifecycle_status', 'cancelled');
+
   // Синхронизируем статус связанной заявки в orders -> completed
   await (supabase.from('orders') as any)
     .update({ status: 'completed', updated_at: new Date().toISOString() })
