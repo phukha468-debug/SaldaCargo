@@ -79,7 +79,8 @@ export default function OrderDetailPage() {
   const [workDateInput, setWorkDateInput] = useState<string>(() =>
     new Date().toISOString().slice(0, 10),
   );
-  const [workMinutesInput, setWorkMinutesInput] = useState('');
+  const [workMinutesInput, setWorkMinutesInput] = useState('60');
+  const [workPriceInput, setWorkPriceInput] = useState('');
   const [secondMechanicId, setSecondMechanicId] = useState<string>('');
   const [workPerformerInput, setWorkPerformerInput] = useState<'both' | 'primary' | 'second'>(
     'both',
@@ -144,6 +145,7 @@ export default function OrderDetailPage() {
           minutes: mins,
           norm_minutes: mins,
           actual_minutes: mins,
+          price_client: workPriceInput || undefined,
           completed: true,
           mechanic_id: wMechId,
           second_mechanic_id: wSecondId,
@@ -157,7 +159,8 @@ export default function OrderDetailPage() {
       setWorkNameInput('');
       setWorkComponentInput('');
       setWorkPositionInput('');
-      setWorkMinutesInput('');
+      setWorkMinutesInput('60');
+      setWorkPriceInput('');
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
       queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
@@ -656,52 +659,98 @@ export default function OrderDetailPage() {
               )}
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                  Строка 2 — Время в минутах
+            {/* Время и Цена с автоматическим взаимным пересчетом */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  ⏱ Время (мин)
                 </label>
-                {Number(workMinutesInput) > 0 && (
-                  <span className="text-[11px] font-extrabold text-[#21A038]">
-                    +{calcWorkPay(Number(workMinutesInput)).toLocaleString('ru-RU')} ₽ в ЗП
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
                 <input
                   type="number"
                   inputMode="numeric"
                   value={workMinutesInput}
-                  onChange={(e) => setWorkMinutesInput(e.target.value)}
-                  placeholder="Минуты (напр. 60)"
-                  className="flex-1 h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-extrabold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setWorkMinutesInput(val);
+                    const num = Number(val);
+                    if (val !== '' && !isNaN(num) && num >= 0 && hourlyRate > 0) {
+                      setWorkPriceInput(String(Math.round((num / 60) * hourlyRate)));
+                    } else if (val === '') {
+                      setWorkPriceInput('');
+                    }
+                  }}
+                  placeholder="60"
+                  className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-extrabold text-slate-900 focus:outline-none focus:border-[#21A038]"
                 />
-                <button
-                  type="button"
-                  onClick={() => addWorkMutation.mutate()}
-                  disabled={addWorkMutation.isPending}
-                  className="px-4 h-11 rounded-xl bg-[#21A038] text-white font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform shrink-0"
-                >
-                  {addWorkMutation.isPending ? '...' : '+ Добавить'}
-                </button>
               </div>
-              <div className="flex flex-wrap gap-1.5 mt-2">
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  💰 Цена (₽)
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={workPriceInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setWorkPriceInput(val);
+                    const num = Number(val);
+                    if (val !== '' && !isNaN(num) && num >= 0 && hourlyRate > 0) {
+                      setWorkMinutesInput(String(Math.round((num / hourlyRate) * 60)));
+                    } else if (val === '') {
+                      setWorkMinutesInput('');
+                    }
+                  }}
+                  placeholder={String(
+                    Math.round(((Number(workMinutesInput) || 60) / 60) * hourlyRate),
+                  )}
+                  className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-extrabold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              {Number(workMinutesInput) > 0 ? (
+                <span className="text-[11px] font-extrabold text-[#21A038]">
+                  +{calcWorkPay(Number(workMinutesInput)).toLocaleString('ru-RU')} ₽ в ЗП
+                </span>
+              ) : (
+                <span />
+              )}
+              <span className="text-[10px] text-slate-400 font-bold">Тариф: {hourlyRate} ₽/ч</span>
+            </div>
+
+            <div className="flex gap-2 items-center">
+              <div className="flex flex-wrap gap-1 flex-1">
                 {[30, 45, 60, 90, 120, 180].map((m) => (
                   <button
                     key={m}
                     type="button"
-                    onClick={() => setWorkMinutesInput(String(m))}
+                    onClick={() => {
+                      setWorkMinutesInput(String(m));
+                      setWorkPriceInput(String(Math.round((m / 60) * hourlyRate)));
+                    }}
                     className={cn(
-                      'px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors',
+                      'px-2 py-1 rounded-lg text-[11px] font-bold transition-colors',
                       Number(workMinutesInput) === m
                         ? 'bg-[#21A038] text-white'
                         : 'bg-white text-slate-600 border border-slate-200',
                     )}
                   >
-                    {m} мин
+                    {m}м
                   </button>
                 ))}
               </div>
+
+              <button
+                type="button"
+                onClick={() => addWorkMutation.mutate()}
+                disabled={addWorkMutation.isPending}
+                className="px-4 h-10 rounded-xl bg-[#21A038] text-white font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform shrink-0"
+              >
+                {addWorkMutation.isPending ? '...' : '+ Добавить'}
+              </button>
             </div>
           </div>
         )}

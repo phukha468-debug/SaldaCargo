@@ -1028,7 +1028,16 @@ function OrderDetailModal({
                       </button>
                     )}
                     <button
-                      onClick={() => setShowAddWork((v) => !v)}
+                      onClick={() =>
+                        setShowAddWork((v) => {
+                          const next = !v;
+                          if (next) {
+                            setAddWorkMinutes('60');
+                            setCustomWorkPrice(String(Math.round(hourlyRate)));
+                          }
+                          return next;
+                        })
+                      }
                       className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
                     >
                       {showAddWork ? '✕ Закрыть' : '+ Добавить'}
@@ -1216,14 +1225,17 @@ function OrderDetailModal({
                         <input
                           type="number"
                           step="15"
-                          min="5"
+                          min="0"
                           value={addWorkMinutes}
                           onChange={(e) => {
                             const val = e.target.value;
                             setAddWorkMinutes(val);
-                            if (val && !customWorkPrice) {
-                              const calc = Math.round((Number(val) / 60) * hourlyRate);
-                              setCustomWorkPrice(String(calc));
+                            const num = Number(val);
+                            if (val !== '' && !isNaN(num) && num >= 0 && hourlyRate > 0) {
+                              const calcPrice = Math.round((num / 60) * hourlyRate);
+                              setCustomWorkPrice(String(calcPrice));
+                            } else if (val === '') {
+                              setCustomWorkPrice('');
                             }
                           }}
                           placeholder="60"
@@ -1238,8 +1250,19 @@ function OrderDetailModal({
                         <input
                           type="number"
                           step="100"
+                          min="0"
                           value={customWorkPrice}
-                          onChange={(e) => setCustomWorkPrice(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomWorkPrice(val);
+                            const num = Number(val);
+                            if (val !== '' && !isNaN(num) && num >= 0 && hourlyRate > 0) {
+                              const calcMins = Math.round((num / hourlyRate) * 60);
+                              setAddWorkMinutes(String(calcMins));
+                            } else if (val === '') {
+                              setAddWorkMinutes('');
+                            }
+                          }}
                           placeholder={String(
                             Math.round(((Number(addWorkMinutes) || 60) / 60) * hourlyRate),
                           )}
@@ -1556,11 +1579,39 @@ function OrderDetailModal({
                                     </div>
                                   </div>
 
-                                  {/* Price + computed hours */}
-                                  <div className="flex gap-3 items-end">
-                                    <div className="flex-1">
+                                  {/* Price + Minutes bidirectional */}
+                                  <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end">
+                                    <div className="col-span-1 md:col-span-4">
                                       <label className="text-xs text-slate-500 block mb-1">
-                                        Стоимость (₽)
+                                        ⏱ Время (мин)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="15"
+                                        value={computedMinutes}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          const num = Number(val);
+                                          if (
+                                            val !== '' &&
+                                            !isNaN(num) &&
+                                            num >= 0 &&
+                                            hourlyRate > 0
+                                          ) {
+                                            const calcPrice = Math.round((num / 60) * hourlyRate);
+                                            setEditWorkPrice(String(calcPrice));
+                                          } else if (val === '') {
+                                            setEditWorkPrice('0');
+                                          }
+                                        }}
+                                        className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                      />
+                                    </div>
+
+                                    <div className="col-span-1 md:col-span-4">
+                                      <label className="text-xs text-slate-500 block mb-1">
+                                        💰 Стоимость (₽)
                                       </label>
                                       <input
                                         type="number"
@@ -1572,13 +1623,15 @@ function OrderDetailModal({
                                         placeholder="0"
                                       />
                                     </div>
-                                    <div className="shrink-0 pb-1 text-right">
+
+                                    <div className="col-span-1 md:col-span-2 pb-1 text-right">
                                       <p className="text-xs text-slate-400">расчетное время</p>
                                       <p className="text-lg font-black text-blue-700">
                                         {computedHours.toFixed(1)} нч
                                       </p>
                                     </div>
-                                    <div style={{ width: '72px' }}>
+
+                                    <div className="col-span-1 md:col-span-2">
                                       <label className="text-xs text-slate-500 block mb-1 text-center">
                                         Кол-во
                                       </label>
