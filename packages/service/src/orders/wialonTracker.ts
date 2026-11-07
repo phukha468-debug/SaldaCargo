@@ -302,7 +302,19 @@ export async function syncValdaiTelematics(
 
     const prevInside = stateData.is_inside !== undefined ? stateData.is_inside : true;
     const currentInside = pos.isInsideBase;
-    const effectiveOdo = pos.odometerKm > 0 ? pos.odometerKm : asset.odometer_current || 120000;
+
+    // Защита от скручивания/занижения одометра:
+    // Если трекер Wialon выдает пробег существенно меньше, чем зафиксировано у машины в базе
+    // (например, трекер на Валдай 446 считает от момента установки: 63 тыс. км vs 247 тыс. км на приборке),
+    // то относительный счетчик трекера НЕЛЬЗЯ использовать напрямую как одометр машины.
+    const currentAssetOdo = Number(asset.odometer_current || 0);
+    const isWialonRelativeCounter = currentAssetOdo > 0 && pos.odometerKm < currentAssetOdo - 1000;
+
+    const effectiveOdo = isWialonRelativeCounter
+      ? currentAssetOdo
+      : pos.odometerKm > 0
+        ? Math.max(pos.odometerKm, currentAssetOdo)
+        : currentAssetOdo || 120000;
 
     // СОБЫТИЕ 1: Выезд за пределы Верхней Салды (СТАРТ РЕЙСА)
     if (prevInside && !currentInside) {
@@ -429,14 +441,17 @@ export async function syncValdaiTelematics(
     const cleanNotes = notes.replace(/\[WIALON_STATE:\{.*?\}\]/g, '').trim();
     const updatedNotes = `${cleanNotes ? cleanNotes + '\n' : ''}[WIALON_STATE:${JSON.stringify(stateData)}]`;
 
-    await supabase
-      .from('assets')
-      .update({
-        notes: updatedNotes,
-        odometer_current: effectiveOdo,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', asset.id);
+    const assetUpdatePayload: Record<string, any> = {
+      notes: updatedNotes,
+      updated_at: new Date().toISOString(),
+    };
+    // Обновляем одометр актива только если Wialon передает реальный абсолютный одометр
+    // и он превышает текущий (одометр никогда не скручивается назад)
+    if (!isWialonRelativeCounter && pos.odometerKm > currentAssetOdo) {
+      assetUpdatePayload.odometer_current = pos.odometerKm;
+    }
+
+    await supabase.from('assets').update(assetUpdatePayload).eq('id', asset.id);
   }
 
   return {

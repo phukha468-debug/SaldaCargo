@@ -167,11 +167,19 @@ export async function handleVehicleDeparture(
     })
     .eq('id', targetOrder.id);
 
-  // Обновляем одометр актива
-  await supabase
+  // Обновляем одометр актива (только если новый одометр больше текущего)
+  const { data: curAssetDep } = await supabase
     .from('assets')
-    .update({ odometer_current: params.odometer, updated_at: new Date().toISOString() })
-    .eq('id', params.vehicleId);
+    .select('odometer_current')
+    .eq('id', params.vehicleId)
+    .single();
+
+  if (params.odometer > (curAssetDep?.odometer_current || 0)) {
+    await supabase
+      .from('assets')
+      .update({ odometer_current: params.odometer, updated_at: new Date().toISOString() })
+      .eq('id', params.vehicleId);
+  }
 
   return {
     success: true,
@@ -389,11 +397,19 @@ export async function handleVehicleArrival(
     })
     .eq('id', order.id);
 
-  // 4. Обновляем одометр ТС
-  await supabase
+  // 4. Обновляем одометр ТС (только если новый одометр больше текущего)
+  const { data: curAssetArr } = await supabase
     .from('assets')
-    .update({ odometer_current: odoEnd, updated_at: new Date().toISOString() })
-    .eq('id', params.vehicleId);
+    .select('odometer_current')
+    .eq('id', params.vehicleId)
+    .single();
+
+  if (odoEnd > (curAssetArr?.odometer_current || 0)) {
+    await supabase
+      .from('assets')
+      .update({ odometer_current: odoEnd, updated_at: new Date().toISOString() })
+      .eq('id', params.vehicleId);
+  }
 
   return {
     success: true,

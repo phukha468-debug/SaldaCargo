@@ -190,8 +190,17 @@ async function processWialonEvent(req: Request) {
       return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
     }
 
-    // Если Wialon не прислал значение одометра, берем текущий одометр актива
-    const odoValue = odometer && odometer > 0 ? odometer : asset.odometer_current || 120000;
+    // Защита от скручивания/занижения одометра:
+    // Если трекер Wialon передает относительный пробег (например, 63 тыс. км вместо 247 тыс. км приборки),
+    // берем актуальный одометр актива из базы данных.
+    const currentAssetOdo = Number(asset.odometer_current || 0);
+    const isWialonRelative = currentAssetOdo > 0 && odometer && odometer < currentAssetOdo - 1000;
+
+    const odoValue = isWialonRelative
+      ? currentAssetOdo
+      : odometer && odometer > 0
+        ? Math.max(odometer, currentAssetOdo)
+        : currentAssetOdo || 120000;
 
     // Определяем событие: выезд (старт) или въезд (финиш)
     const isDeparture =

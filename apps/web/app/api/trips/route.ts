@@ -107,15 +107,34 @@ export async function POST(request: Request) {
   const loadersCount = (body.loader_id ? 1 : 0) + (body.loader2_id ? 1 : 0);
 
   // Валидация одометра
-  if (body.asset_id && body.odometer_end != null && Number(body.odometer_end) > 0) {
+  let finalOdoStart = body.odometer_start;
+  if (body.asset_id) {
     const { data: asset } = await (supabase.from('assets') as any)
       .select('id, short_name, reg_number, odometer_current, asset_type:asset_types(code)')
       .eq('id', body.asset_id)
       .maybeSingle();
-    const minOdo = body.odometer_start || asset?.odometer_current || 0;
-    const odoValidation = validateTripOdometer(asset, minOdo, body.odometer_end);
-    if (!odoValidation.valid) {
-      return NextResponse.json({ error: odoValidation.error }, { status: 400 });
+
+    const { data: lastTrip } = await (supabase.from('trips') as any)
+      .select('odometer_end')
+      .eq('asset_id', body.asset_id)
+      .neq('lifecycle_status', 'cancelled')
+      .not('odometer_end', 'is', null)
+      .order('trip_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    finalOdoStart = Math.max(
+      Number(body.odometer_start) || 0,
+      Number(asset?.odometer_current) || 0,
+      Number(lastTrip?.odometer_end) || 0,
+    );
+
+    if (body.odometer_end != null && Number(body.odometer_end) > 0) {
+      const minOdo = finalOdoStart || asset?.odometer_current || 0;
+      const odoValidation = validateTripOdometer(asset, minOdo, body.odometer_end);
+      if (!odoValidation.valid) {
+        return NextResponse.json({ error: odoValidation.error }, { status: 400 });
+      }
     }
   }
 
@@ -129,7 +148,7 @@ export async function POST(request: Request) {
       loader2_id: body.loader2_id || null,
       loaders_count: loadersCount,
       trip_type: body.trip_type,
-      odometer_start: body.odometer_start,
+      odometer_start: finalOdoStart,
       odometer_end: body.odometer_end,
       started_at: body.started_at,
       ended_at: body.ended_at,
