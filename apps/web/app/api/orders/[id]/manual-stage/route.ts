@@ -33,12 +33,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const now = new Date().toISOString();
 
-    // Парсим номер рейса из номера заявки
+    // Парсим номер рейса из номера заявки (если это не ЭПЭ с дробью вроде 793/2026)
     const rawOrderNum = order.base_doc_number || order.internal_order_number || order.order_number;
     const cleanNumStr = String(rawOrderNum || '')
       .replace(/^№\s*/, '')
       .replace(/^Заявка\s*№?\s*/i, '');
-    const parsedTripNum = parseInt((cleanNumStr.split('/')[0] || '').trim(), 10);
+    const isEpeWithSlash = cleanNumStr.includes('/') || cleanNumStr.includes('\\');
+    const parsedTripNum = !isEpeWithSlash
+      ? parseInt((cleanNumStr.split('/')[0] || '').trim(), 10)
+      : NaN;
     const validTripNum =
       !isNaN(parsedTripNum) && parsedTripNum > 0 && parsedTripNum < 100000 ? parsedTripNum : null;
 

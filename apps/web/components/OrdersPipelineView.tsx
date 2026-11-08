@@ -638,6 +638,17 @@ export function OrdersPipelineView() {
       o.billing_docs?.client_accepted_edo || o.billing_docs?.status === 'accepted',
     );
     if (!showArchivedDocs && isAccepted) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const match =
+        String(o.trip?.trip_number || '').includes(q) ||
+        o.base_doc_number?.toLowerCase().includes(q) ||
+        String(o.order_number).includes(q) ||
+        o.client?.name?.toLowerCase().includes(q) ||
+        o.vehicle?.reg_number?.toLowerCase().includes(q) ||
+        o.driver?.name?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
     return true;
   });
 
@@ -646,7 +657,9 @@ export function OrdersPipelineView() {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
+      String(o.trip?.trip_number || '').includes(q) ||
       o.base_doc_number?.toLowerCase().includes(q) ||
+      String(o.order_number).includes(q) ||
       o.client?.name?.toLowerCase().includes(q) ||
       o.cargo_name?.toLowerCase().includes(q) ||
       o.vehicle?.reg_number?.toLowerCase().includes(q) ||
@@ -873,9 +886,29 @@ export function OrdersPipelineView() {
                           {/* СТРОКА 1: Номер, Клиент, Бейджи, Ставка (Dense layout) */}
                           <div className="flex items-center justify-between gap-1 text-[11px]">
                             <div className="flex items-center gap-1.5 truncate">
-                              <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition">
-                                № {order.base_doc_number || order.order_number}
+                              <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition shrink-0">
+                                {order.trip?.trip_number
+                                  ? `Рейс № ${order.trip.trip_number}`
+                                  : `№ ${order.base_doc_number || order.order_number}`}
                               </span>
+                              {order.base_doc_number &&
+                                (order.base_doc_number.includes('/') ||
+                                order.base_doc_number.includes('\\') ? (
+                                  <span
+                                    className="px-1 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold shrink-0"
+                                    title="Номер Электронного поручения экспедитору (ЭПЭ)"
+                                  >
+                                    ЭПЭ {order.base_doc_number}
+                                  </span>
+                                ) : order.trip?.trip_number &&
+                                  order.base_doc_number !== String(order.trip.trip_number) ? (
+                                  <span
+                                    className="text-[9.5px] text-slate-400 font-mono shrink-0"
+                                    title="Входящий номер заявки"
+                                  >
+                                    (№{order.base_doc_number})
+                                  </span>
+                                ) : null)}
                               <span className="text-[10px] text-slate-500 font-semibold truncate max-w-[85px]">
                                 {clientShort}
                               </span>
@@ -1081,9 +1114,29 @@ export function OrdersPipelineView() {
                       {/* Статус и номер */}
                       <div className="flex items-center gap-2 min-w-[210px] shrink-0">
                         {getStatusBadge(order.status)}
-                        <span className="font-bold text-slate-900 truncate">
-                          № {order.base_doc_number || order.order_number}
+                        <span className="font-bold text-slate-900 truncate shrink-0">
+                          {order.trip?.trip_number
+                            ? `Рейс № ${order.trip.trip_number}`
+                            : `№ ${order.base_doc_number || order.order_number}`}
                         </span>
+                        {order.base_doc_number &&
+                          (order.base_doc_number.includes('/') ||
+                          order.base_doc_number.includes('\\') ? (
+                            <span
+                              className="px-1 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold shrink-0"
+                              title="Номер Электронного поручения (ЭПЭ)"
+                            >
+                              ЭПЭ {order.base_doc_number}
+                            </span>
+                          ) : order.trip?.trip_number &&
+                            order.base_doc_number !== String(order.trip.trip_number) ? (
+                            <span
+                              className="text-[9.5px] text-slate-400 font-mono shrink-0"
+                              title="Входящий номер заявки"
+                            >
+                              (№{order.base_doc_number})
+                            </span>
+                          ) : null)}
                         {isTransit && (
                           <span
                             className="px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[9.5px] font-bold"
@@ -1353,7 +1406,7 @@ export function OrdersPipelineView() {
             <div className="divide-y divide-slate-100 text-[11px] whitespace-nowrap overflow-x-auto">
               {/* Шапка таблицы */}
               <div className="px-3 py-1.5 bg-slate-50 font-bold text-slate-500 text-[10px] uppercase tracking-wider flex items-center justify-between gap-2 border-b border-slate-200">
-                <div className="w-[180px] shrink-0">Рейс / Дата</div>
+                <div className="w-[195px] shrink-0">Рейс / ЭПЭ / Дата</div>
                 <div className="w-[160px] shrink-0">Транспорт / Водитель</div>
                 <div className="w-[150px] shrink-0">Контрагент</div>
                 <div className="w-[85px] text-right shrink-0">Ставка</div>
@@ -1385,10 +1438,30 @@ export function OrdersPipelineView() {
                     }`}
                   >
                     {/* Рейс / Номер / Дата */}
-                    <div className="w-[180px] flex items-center gap-1.5 shrink-0">
+                    <div className="w-[195px] flex items-center gap-1.5 shrink-0">
                       <span className="font-bold text-slate-900 truncate">
-                        № {order.base_doc_number || order.order_number}
+                        {order.trip?.trip_number
+                          ? `Рейс № ${order.trip.trip_number}`
+                          : `Заявка № ${order.base_doc_number || order.order_number}`}
                       </span>
+                      {order.base_doc_number &&
+                        (order.base_doc_number.includes('/') ||
+                        order.base_doc_number.includes('\\') ? (
+                          <span
+                            className="px-1 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold shrink-0"
+                            title="Номер Электронного поручения экспедитору (ЭПЭ)"
+                          >
+                            ЭПЭ {order.base_doc_number}
+                          </span>
+                        ) : order.trip?.trip_number &&
+                          order.base_doc_number !== String(order.trip.trip_number) ? (
+                          <span
+                            className="text-[9.5px] text-slate-400 font-mono shrink-0"
+                            title="Номер входящей заявки"
+                          >
+                            (№{order.base_doc_number})
+                          </span>
+                        ) : null)}
                       <span className="text-[10px] text-slate-400 font-mono">({tripDate})</span>
                       {order.status === 'in_progress' ? (
                         <span className="px-1 py-0.2 bg-purple-100 text-purple-900 font-bold rounded text-[9px] animate-pulse">
@@ -1598,12 +1671,20 @@ export function OrdersPipelineView() {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 rounded-xl max-w-sm w-full p-4 shadow-xl space-y-3 text-xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                <span>🧾 Счёт на рейс</span>
-                <span className="text-indigo-600">
-                  №{' '}
-                  {invoiceModalOrder.order.base_doc_number || invoiceModalOrder.order.order_number}
+              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 truncate">
+                <span>🧾 Счёт:</span>
+                <span className="text-indigo-600 font-black">
+                  {invoiceModalOrder.order.trip?.trip_number
+                    ? `Рейс № ${invoiceModalOrder.order.trip.trip_number}`
+                    : `Заявка № ${invoiceModalOrder.order.base_doc_number || invoiceModalOrder.order.order_number}`}
                 </span>
+                {invoiceModalOrder.order.base_doc_number &&
+                  (invoiceModalOrder.order.base_doc_number.includes('/') ||
+                  invoiceModalOrder.order.base_doc_number.includes('\\') ? (
+                    <span className="px-1 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9.5px] font-bold">
+                      ЭПЭ {invoiceModalOrder.order.base_doc_number}
+                    </span>
+                  ) : null)}
               </div>
               <button
                 onClick={() => setInvoiceModalOrder(null)}
@@ -1890,8 +1971,23 @@ function OrderDetailsModal({
             <span className="text-xl">📋</span>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-base">
-                  Заявка № {order.base_doc_number || order.order_number}
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <span>
+                    {order.trip?.trip_number
+                      ? `Рейс № ${order.trip.trip_number}`
+                      : `Заявка № ${order.base_doc_number || order.order_number}`}
+                  </span>
+                  {order.base_doc_number &&
+                    (order.base_doc_number.includes('/') || order.base_doc_number.includes('\\') ? (
+                      <span className="px-1.5 py-0.5 bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 rounded text-[11px] font-bold">
+                        ЭПЭ {order.base_doc_number}
+                      </span>
+                    ) : order.trip?.trip_number &&
+                      order.base_doc_number !== String(order.trip.trip_number) ? (
+                      <span className="text-xs text-slate-300 font-mono font-normal">
+                        (№{order.base_doc_number})
+                      </span>
+                    ) : null)}
                 </h3>
                 <span className="text-xs text-slate-300">
                   от {order.base_doc_date ? order.base_doc_date : order.created_at?.slice(0, 10)}
@@ -2890,25 +2986,55 @@ function CreateSmartOrderModal({
             <div>
               <div className="flex items-center justify-between mb-0.5">
                 <label className="font-bold text-slate-700">№ Заявки / Рейса</label>
-                {nextTripNumber && (
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() =>
-                      setForm((prev: any) => ({ ...prev, base_doc_number: String(nextTripNumber) }))
-                    }
-                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer transition hover:underline"
-                    title="Привязать номер заявки к следующему рейсу по очереди"
+                    onClick={() => {
+                      const cur = form.base_doc_number || '';
+                      const year = new Date().getFullYear();
+                      if (!cur.includes(String(year))) {
+                        setForm((prev: any) => ({
+                          ...prev,
+                          base_doc_number: cur
+                            ? `${cur.replace(/[\/\\]\d+/, '')}/${year}`
+                            : `/${year}`,
+                        }));
+                      }
+                    }}
+                    className="text-[10px] text-purple-700 hover:text-purple-900 font-bold cursor-pointer transition hover:underline"
+                    title="Формат Электронного поручения (ЭПЭ) для ВСМПО-АВИСМА"
                   >
-                    След. рейс #{nextTripNumber}
+                    +ЭПЭ \{new Date().getFullYear()}
                   </button>
-                )}
+                  {nextTripNumber && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm((prev: any) => ({
+                          ...prev,
+                          base_doc_number: String(nextTripNumber),
+                        }))
+                      }
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer transition hover:underline"
+                      title="Привязать номер заявки к следующему рейсу по очереди"
+                    >
+                      #{nextTripNumber}
+                    </button>
+                  )}
+                </div>
               </div>
               <input
                 type="text"
                 required
                 value={form.base_doc_number}
                 onChange={(e) => setForm({ ...form, base_doc_number: e.target.value })}
-                placeholder={nextTripNumber ? String(nextTripNumber) : 'Напр. 987'}
+                placeholder={
+                  selectedClientType === 'vsmpo'
+                    ? `794/${new Date().getFullYear()}`
+                    : nextTripNumber
+                      ? String(nextTripNumber)
+                      : 'Напр. 987'
+                }
                 className="w-full p-1.5 border border-slate-300 rounded bg-slate-50 font-bold"
               />
             </div>

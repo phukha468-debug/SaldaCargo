@@ -220,7 +220,10 @@ export async function handleVehicleDeparture(
   const cleanNumStr = String(rawOrderNum || '')
     .replace(/^№\s*/, '')
     .replace(/^Заявка\s*№?\s*/i, '');
-  const parsedTripNum = parseInt((cleanNumStr.split('/')[0] || '').trim(), 10);
+  const isEpeWithSlash = cleanNumStr.includes('/') || cleanNumStr.includes('\\');
+  const parsedTripNum = !isEpeWithSlash
+    ? parseInt((cleanNumStr.split('/')[0] || '').trim(), 10)
+    : NaN;
 
   const tripInsertPayload: Record<string, any> = {
     asset_id: params.vehicleId,
