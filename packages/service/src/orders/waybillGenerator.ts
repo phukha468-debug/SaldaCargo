@@ -1463,125 +1463,8 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     const initialValues = ${defaultDataJson};
     const currentVehReg = '${v('vehReg')}';
 
-    // Встроенные стандартные шаблоны автопарка
-    let vehicleTemplates = {
-      'О 188 ТА 196': {
-        vehBrand: 'ГАЗ 2834-LM (Валдай 6м)',
-        vehReg: 'О 188 ТА 196',
-        vehGarage: '096',
-        driverTab: '096',
-        driverFio: 'Никифоров Д.В.',
-        driverLic: '99 45 273350',
-        driverClass: 'B, C, CE',
-        licRegNum: 'СТ-66/096',
-        licSeries: 'АА',
-        licNumber: '014829',
-        code_workMode: '1',
-        code_col: '1',
-        code_brig: '1',
-        t2_fuelBrand: 'ДТ',
-        t2_fuelCode: '03',
-        t2_fuelGiven: '150',
-        t2_fuelStart: '45',
-        dispFio: 'Шахмаев А.О.',
-        dispSig: 'Шахмаев',
-        mechOutFio: 'Нигомедьянов Р.Р.',
-        mechOutSig: 'Нигомедьянов',
-        driverAcceptFio: 'Никифоров Д.В.',
-        driverAcceptSig: 'Никифоров',
-        medRole: 'Медсестра',
-        medSig: 'Шахмаева',
-        medFio: 'Шахмаева О.В.',
-        note1: 'Замечаний к ТС и водителю нет.'
-      },
-      'А 096 МВ 196': {
-        vehBrand: 'ГАЗ 3010 FD (Валдай 6м)',
-        vehReg: 'А 096 МВ 196',
-        vehGarage: '095',
-        driverTab: '095',
-        driverFio: 'Насртдинов В.А.',
-        driverLic: '66 12 841920',
-        driverClass: 'B, C',
-        licRegNum: 'СТ-66/095',
-        licSeries: 'АА',
-        licNumber: '014830',
-        code_workMode: '1',
-        code_col: '1',
-        code_brig: '1',
-        t2_fuelBrand: 'ДТ',
-        t2_fuelCode: '03',
-        t2_fuelGiven: '150',
-        t2_fuelStart: '50',
-        dispFio: 'Шахмаев А.О.',
-        dispSig: 'Шахмаев',
-        mechOutFio: 'Нигомедьянов Р.Р.',
-        mechOutSig: 'Нигомедьянов',
-        driverAcceptFio: 'Насртдинов В.А.',
-        driverAcceptSig: 'Насртдинов',
-        medRole: 'Медсестра',
-        medSig: 'Шахмаева',
-        medFio: 'Шахмаева О.В.',
-        note1: 'Замечаний к ТС и водителю нет.'
-      },
-      'А 661 ТМ 196': {
-        vehBrand: 'FUSO CANTER FE85DJ (5т)',
-        vehReg: 'А 661 ТМ 196',
-        vehGarage: '085',
-        driverTab: '085',
-        driverFio: 'Никифоров Д.В.',
-        driverLic: '99 45 273350',
-        driverClass: 'B, C, CE',
-        licRegNum: 'СТ-66/085',
-        licSeries: 'АА',
-        licNumber: '014831',
-        code_workMode: '1',
-        code_col: '1',
-        code_brig: '1',
-        t2_fuelBrand: 'ДТ',
-        t2_fuelCode: '03',
-        t2_fuelGiven: '180',
-        t2_fuelStart: '60',
-        dispFio: 'Шахмаев А.О.',
-        dispSig: 'Шахмаев',
-        mechOutFio: 'Нигомедьянов Р.Р.',
-        mechOutSig: 'Нигомедьянов',
-        driverAcceptFio: 'Никифоров Д.В.',
-        driverAcceptSig: 'Никифоров',
-        medRole: 'Медсестра',
-        medSig: 'Шахмаева',
-        medFio: 'Шахмаева О.В.',
-        note1: 'Замечаний к ТС и водителю нет.'
-      },
-      'У 883 АР 96': {
-        vehBrand: 'ГАЗ 331061 (Валдай 5м)',
-        vehReg: 'У 883 АР 96',
-        vehGarage: '083',
-        driverTab: '083',
-        driverFio: 'Насртдинов В.А.',
-        driverLic: '66 12 841920',
-        driverClass: 'B, C',
-        licRegNum: 'СТ-66/083',
-        licSeries: 'АА',
-        licNumber: '014832',
-        code_workMode: '1',
-        code_col: '1',
-        code_brig: '1',
-        t2_fuelBrand: 'ДТ',
-        t2_fuelCode: '03',
-        t2_fuelGiven: '140',
-        t2_fuelStart: '40',
-        dispFio: 'Шахмаев А.О.',
-        dispSig: 'Шахмаев',
-        mechOutFio: 'Нигомедьянов Р.Р.',
-        mechOutSig: 'Нигомедьянов',
-        driverAcceptFio: 'Насртдинов В.А.',
-        driverAcceptSig: 'Насртдинов',
-        medRole: 'Медсестра',
-        medSig: 'Шахмаева',
-        medFio: 'Шахмаева О.В.',
-        note1: 'Замечаний к ТС и водителю нет.'
-      }
-    };
+    // Шаблоны путевых листов (загружаются исключительно из базы данных созданные пользователем)
+    let vehicleTemplates = {};
 
     function showToast(msg, isSuccess = true) {
       const box = document.getElementById('toastBox');
@@ -1593,47 +1476,59 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
     function normalizeReg(str) {
       if (!str) return '';
-      return str.trim().toUpperCase().replace(/\s+/g, ' ');
+      return str.trim().toUpperCase().replace(/[\s\-]/g, '');
     }
 
     function initTemplates() {
-      try {
-        const local = localStorage.getItem('salda_waybill_templates');
-        if (local) {
-          const parsed = JSON.parse(local);
-          Object.keys(parsed).forEach(k => {
-            vehicleTemplates[normalizeReg(k)] = parsed[k];
-          });
-        }
-      } catch (e) {
-        console.warn('LocalStorage templates error:', e);
-      }
-
+      // Загружаем шаблоны строго из БД через API (только созданные пользователем)
       fetch('/api/waybill-templates')
         .then(r => r.json())
         .then(data => {
+          vehicleTemplates = {};
           if (data?.templates) {
             Object.keys(data.templates).forEach(k => {
               vehicleTemplates[normalizeReg(k)] = data.templates[k];
             });
+            try {
+              // Синхронизируем LocalStorage, полностью перезаписывая устаревшие дефолтные шаблоны
+              localStorage.setItem('salda_waybill_templates', JSON.stringify(vehicleTemplates));
+            } catch (e) {}
           }
           renderTemplateSelector();
         })
-        .catch(() => renderTemplateSelector());
+        .catch(() => {
+          try {
+            const local = localStorage.getItem('salda_waybill_templates');
+            if (local) {
+              vehicleTemplates = JSON.parse(local) || {};
+            }
+          } catch (e) {
+            console.warn('LocalStorage templates error:', e);
+          }
+          renderTemplateSelector();
+        });
     }
 
     function renderTemplateSelector() {
       const sel = document.getElementById('templateSelector');
       if (!sel) return;
-      sel.innerHTML = '<option value="">📋 Шаблоны авто...</option>';
       const keys = Object.keys(vehicleTemplates).sort();
-      keys.forEach(k => {
-        const opt = document.createElement('option');
-        opt.value = k;
-        const brand = vehicleTemplates[k].vehBrand ? ' (' + vehicleTemplates[k].vehBrand.split('(')[0].trim() + ')' : '';
-        opt.textContent = '🚚 ' + k + brand;
-        sel.appendChild(opt);
-      });
+      if (keys.length === 0) {
+        sel.innerHTML = '<option value="">📋 Нет шаблонов (нажмите «+ Шаблон»)</option>';
+      } else {
+        sel.innerHTML = '<option value="">📋 Шаблоны авто (' + keys.length + ')...</option>';
+        keys.forEach(k => {
+          const opt = document.createElement('option');
+          opt.value = k;
+          const brand = vehicleTemplates[k].vehBrand ? ' (' + vehicleTemplates[k].vehBrand.split('(')[0].trim() + ')' : '';
+          opt.textContent = '🚚 ' + k + brand;
+          sel.appendChild(opt);
+        });
+        const optDel = document.createElement('option');
+        optDel.value = '__delete__';
+        optDel.textContent = '🗑️ Удалить шаблон...';
+        sel.appendChild(optDel);
+      }
 
       // Если есть шаблон под текущий номер машины в бланке — показываем кнопку 1-клик
       const curVeh = normalizeReg(document.querySelector('[data-field="vehReg"]')?.innerText || currentVehReg);
@@ -1642,6 +1537,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         if (curVeh && vehicleTemplates[curVeh]) {
           quickBtn.style.display = 'inline-flex';
           quickBtn.innerHTML = '⚡ Шаблон [' + curVeh + ']';
+          quickBtn.title = 'Загрузить сохраненный шаблон для ' + curVeh + ' в 1 клик';
         } else {
           quickBtn.style.display = 'none';
         }
@@ -1650,8 +1546,40 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
     function handleSelectTemplate(val) {
       if (!val) return;
+      if (val === '__delete__') {
+        const keys = Object.keys(vehicleTemplates);
+        if (keys.length === 0) {
+          alert('Нет сохраненных шаблонов для удаления');
+          return;
+        }
+        const toDelete = prompt('Введите гос. номер шаблона для удаления:\n' + keys.join(', '));
+        if (toDelete) {
+          deleteTemplate(toDelete);
+        }
+        document.getElementById('templateSelector').value = '';
+        return;
+      }
       applyTemplate(val);
       document.getElementById('templateSelector').value = '';
+    }
+
+    function deleteTemplate(vehicleReg) {
+      const norm = normalizeReg(vehicleReg);
+      if (!vehicleTemplates[norm]) {
+        alert('Шаблон "' + vehicleReg + '" не найден!');
+        return;
+      }
+      if (!confirm('Вы действительно хотите удалить шаблон для автомобиля "' + norm + '"?')) return;
+      delete vehicleTemplates[norm];
+      try {
+        localStorage.setItem('salda_waybill_templates', JSON.stringify(vehicleTemplates));
+      } catch (e) {}
+      fetch('/api/waybill-templates?reg=' + encodeURIComponent(norm), { method: 'DELETE' })
+        .then(() => {
+          showToast('🗑️ Шаблон "' + norm + '" удален');
+          renderTemplateSelector();
+        })
+        .catch(() => renderTemplateSelector());
     }
 
     function quickApplyCurrentVehicleTemplate() {
@@ -1688,11 +1616,15 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
     function saveCurrentAsTemplate() {
       const curVehEl = document.querySelector('[data-field="vehReg"]');
-      const suggestedReg = normalizeReg(curVehEl?.innerText || currentVehReg || 'О 188 ТА 196');
+      const suggestedReg = normalizeReg(curVehEl?.innerText || currentVehReg || '');
 
       const vehicleRegInput = prompt('Название шаблона (гос. номер автомобиля):', suggestedReg);
       if (!vehicleRegInput) return;
       const vehicleReg = normalizeReg(vehicleRegInput);
+      if (!vehicleReg) {
+        alert('Укажите корректный гос. номер');
+        return;
+      }
 
       const templateFields = {};
       document.querySelectorAll('.editable-field').forEach(el => {
@@ -1721,10 +1653,18 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vehicle_reg: vehicleReg, fields: templateFields })
-      }).catch(err => console.warn('Sync server error:', err));
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.error) showToast('Ошибка сохранения: ' + res.error, false);
+        else showToast('✅ Шаблон для автомобиля "' + vehicleReg + '" сохранен!');
+      })
+      .catch(err => {
+        console.warn('Sync server error:', err);
+        showToast('⚠️ Шаблон сохранен локально (ошибка сети)', false);
+      });
 
       renderTemplateSelector();
-      showToast('✅ Шаблон для автомобиля "' + vehicleReg + '" сохранен!');
     }
 
     function clearAllFields() {
