@@ -70,7 +70,14 @@ export interface OrderItem {
   id: string;
   order_number: number;
   source_type: string;
-  status: 'draft' | 'waiting_vehicle' | 'assigned' | 'in_progress' | 'pending_review' | 'completed';
+  status:
+    | 'draft'
+    | 'waiting_vehicle'
+    | 'assigned'
+    | 'in_progress'
+    | 'pending_review'
+    | 'docs_collection'
+    | 'completed';
   base_doc_name: string;
   base_doc_number: string | null;
   base_doc_date: string | null;
@@ -186,6 +193,15 @@ const KANBAN_STAGES: Array<{
     badgeText: 'text-orange-900',
     borderCol: 'border-orange-300',
     headerBg: 'bg-orange-50/80',
+  },
+  {
+    status: 'docs_collection',
+    title: 'Сбор документов',
+    icon: '📑',
+    badgeBg: 'bg-indigo-100',
+    badgeText: 'text-indigo-900',
+    borderCol: 'border-indigo-300',
+    headerBg: 'bg-indigo-50/80',
   },
   {
     status: 'completed',
@@ -614,10 +630,10 @@ export function OrdersPipelineView() {
     }
   };
 
-  // Все рейсы 3-х контрагентов (ВСМПО, Ависма, Геострой), которые в пути, на ревью или завершены
+  // Все рейсы 3-х контрагентов (ВСМПО, Ависма, Геострой), которые в пути, на ревью, сборе документов или завершены
   const strictCounterpartyOrders = orders.filter((o) => {
     if (!isStrictDocCounterparty(o.client?.name)) return false;
-    return ['in_progress', 'pending_review', 'completed'].includes(o.status);
+    return ['in_progress', 'pending_review', 'docs_collection', 'completed'].includes(o.status);
   });
 
   const pendingDocsCount = strictCounterpartyOrders.filter((o) => {
@@ -691,6 +707,12 @@ export function OrdersPipelineView() {
         return (
           <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-800 border border-orange-300">
             🔍 На ревью
+          </span>
+        );
+      case 'docs_collection':
+        return (
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-800 border border-indigo-300">
+            📑 Сбор документов
           </span>
         );
       case 'completed':
@@ -816,7 +838,7 @@ export function OrdersPipelineView() {
 
       {/* ── РЕЖИМ 1: КАНБАН-ДОСКА (ПО АНАЛОГИИ С ЭКСПЕДИЦИЕЙ, УЛЬТРА-КОМПАКТНЫЕ КАРТОЧКИ) ── */}
       {viewMode === 'kanban' && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2.5 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 items-start">
           {KANBAN_STAGES.map((col) => {
             const colOrders = filteredOrders.filter((o) => {
               if (col.status === 'waiting_vehicle') {
@@ -964,6 +986,55 @@ export function OrdersPipelineView() {
                             </div>
                           </div>
 
+                          {/* Индикатор сбора документов для этапа «Сбор документов» */}
+                          {order.status === 'docs_collection' && (
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInvoiceModalOrder({ order });
+                              }}
+                              className="mt-1 px-1.5 py-0.5 bg-indigo-50/70 border border-indigo-100 rounded flex items-center justify-between text-[9px] cursor-pointer hover:bg-indigo-100/70 transition"
+                              title="Кликните для открытия чек-листа документов"
+                            >
+                              <span className="font-bold text-indigo-900">Документы:</span>
+                              <div className="flex items-center gap-1 font-mono text-[8.5px]">
+                                <span
+                                  className={
+                                    order.billing_docs?.invoice_issued
+                                      ? 'text-emerald-700 font-bold'
+                                      : 'text-slate-400'
+                                  }
+                                >
+                                  {order.billing_docs?.invoice_issued ? '✓ Счёт' : '⏳ Счёт'}
+                                </span>
+                                <span>•</span>
+                                <span
+                                  className={
+                                    order.billing_docs?.tn_driver_delivered ||
+                                    order.billing_docs?.etrn_signed_edo
+                                      ? 'text-emerald-700 font-bold'
+                                      : 'text-slate-400'
+                                  }
+                                >
+                                  {order.billing_docs?.tn_driver_delivered ||
+                                  order.billing_docs?.etrn_signed_edo
+                                    ? '✓ ТН'
+                                    : '⏳ ТН'}
+                                </span>
+                                <span>•</span>
+                                <span
+                                  className={
+                                    order.billing_docs?.client_accepted_edo
+                                      ? 'text-emerald-700 font-bold'
+                                      : 'text-slate-400'
+                                  }
+                                >
+                                  {order.billing_docs?.client_accepted_edo ? '✓ ЭДО' : '⏳ ЭДО'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
                           {/* СТРОКА 3: Ручное перемещение этапа (для машин без Wialon) */}
                           <div
                             className="pt-1 mt-1 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px]"
@@ -1017,14 +1088,37 @@ export function OrdersPipelineView() {
                                   onClick={() =>
                                     manualStageMutation.mutate({
                                       orderId: order.id,
-                                      stage: 'completed',
+                                      stage: 'docs_collection',
                                     })
                                   }
-                                  title="Одобрить и закрыть рейс в дебиторку"
-                                  className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-2xs cursor-pointer"
+                                  title="Одобрить рейс (ЗП выплачена) и перейти к сбору документов"
+                                  className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded shadow-2xs cursor-pointer text-[9.5px]"
                                 >
-                                  ✓ В дебиторку
+                                  📑 В документы
                                 </button>
+                              )}
+                              {order.status === 'docs_collection' && (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setInvoiceModalOrder({ order })}
+                                    title="Открыть чек-лист сбора документов"
+                                    className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded border border-indigo-200 cursor-pointer text-[9px]"
+                                  >
+                                    📑 Документы
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      manualStageMutation.mutate({
+                                        orderId: order.id,
+                                        stage: 'completed',
+                                      })
+                                    }
+                                    title="Завершить сделку"
+                                    className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-2xs cursor-pointer text-[9px]"
+                                  >
+                                    ✓ Завершить
+                                  </button>
+                                </div>
                               )}
                               {order.status === 'waiting_vehicle' && (
                                 <button
@@ -1051,6 +1145,7 @@ export function OrdersPipelineView() {
                               <option value="assigned">Назначен</option>
                               <option value="in_progress">В пути</option>
                               <option value="pending_review">На ревью</option>
+                              <option value="docs_collection">Сбор документов</option>
                               <option value="completed">Завершён</option>
                             </select>
                           </div>
@@ -1251,14 +1346,37 @@ export function OrdersPipelineView() {
                             onClick={() =>
                               manualStageMutation.mutate({
                                 orderId: order.id,
-                                stage: 'completed',
+                                stage: 'docs_collection',
                               })
                             }
-                            title="Завершить рейс в дебиторку"
-                            className="px-2 py-0.8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] shadow-2xs cursor-pointer"
+                            title="Одобрить рейс (ЗП выплачена) и перевести в сбор документов"
+                            className="px-2 py-0.8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded text-[10px] shadow-2xs cursor-pointer"
                           >
-                            ✓ В дебиторку
+                            📑 В документы
                           </button>
+                        )}
+                        {order.status === 'docs_collection' && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setInvoiceModalOrder({ order })}
+                              title="Открыть чек-лист сбора документов"
+                              className="px-2 py-0.8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded text-[10px] border border-indigo-200 cursor-pointer shadow-2xs"
+                            >
+                              📑 Документы
+                            </button>
+                            <button
+                              onClick={() =>
+                                manualStageMutation.mutate({
+                                  orderId: order.id,
+                                  stage: 'completed',
+                                })
+                              }
+                              title="Завершить сделку"
+                              className="px-2 py-0.8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] shadow-2xs cursor-pointer"
+                            >
+                              ✓ Завершить
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -2004,6 +2122,10 @@ function OrderDetailsModal({
                   <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-orange-500 text-white">
                     🔍 На ревью
                   </span>
+                ) : order.status === 'docs_collection' ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-600 text-white">
+                    📑 Сбор документов
+                  </span>
                 ) : order.status === 'completed' ? (
                   <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-500 text-white">
                     ✅ Завершен
@@ -2099,6 +2221,11 @@ function OrderDetailsModal({
                       Грузовик вернулся / разгрузился. Ожидает одобрения ЗП и ГСМ, документы в
                       обработке.
                     </span>
+                  ) : order.status === 'docs_collection' ? (
+                    <span className="text-indigo-700 font-bold">
+                      Рейс успешно проверен, зарплаты рассчитаны. Идёт сбор и подписание документов
+                      (Счёт, ТН, ЭПЭ, ЭДО).
+                    </span>
                   ) : order.status === 'completed' ? (
                     <span className="text-emerald-700 font-bold">
                       Рейс успешно закрыт, дебиторка зафиксирована.
@@ -2153,10 +2280,18 @@ function OrderDetailsModal({
               )}
               {order.status === 'pending_review' && (
                 <button
+                  onClick={() => onManualStage && onManualStage('docs_collection')}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
+                >
+                  📑 Одобрить рейс (В сбор документов)
+                </button>
+              )}
+              {order.status === 'docs_collection' && (
+                <button
                   onClick={onComplete}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
                 >
-                  ✓ Закрыть рейс в дебиторку
+                  ✓ Завершить сделку
                 </button>
               )}
               {!order.assigned_vehicle_id && (

@@ -119,11 +119,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       billing_docs: mergedDocs,
     };
 
+    const updateFields: Record<string, any> = {
+      raw_parser_payload: updatedPayload,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (body.client_accepted_edo === true) {
+      updateFields.status = 'completed';
+    } else if (body.client_accepted_edo === false && currentOrder.status === 'completed') {
+      updateFields.status = 'docs_collection';
+    }
+
     const { error: updateErr } = await (supabase.from('orders') as any)
-      .update({
-        raw_parser_payload: updatedPayload,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateFields)
       .eq('id', id);
 
     if (updateErr) {

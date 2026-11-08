@@ -6,13 +6,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params;
     const body = await req.json();
-    const stage = body.stage; // 'waiting_vehicle' | 'assigned' | 'in_progress' | 'pending_review' | 'completed'
+    const stage = body.stage; // 'waiting_vehicle' | 'assigned' | 'in_progress' | 'pending_review' | 'docs_collection' | 'completed'
 
     const VALID_STAGES = [
       'waiting_vehicle',
       'assigned',
       'in_progress',
       'pending_review',
+      'docs_collection',
       'completed',
     ];
     if (!VALID_STAGES.includes(stage)) {
@@ -47,17 +48,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     let activeTripId = order.active_trip_id;
 
-    // 2. Если перемещаем в «В пути», «На ревью» или «Завершён», проверяем наличие связанного рейса
-    if (['in_progress', 'pending_review', 'completed'].includes(stage)) {
+    // 2. Если перемещаем в «В пути», «На ревью», «Сбор документов» или «Завершён», проверяем наличие связанного рейса
+    if (['in_progress', 'pending_review', 'docs_collection', 'completed'].includes(stage)) {
       if (!activeTripId) {
         // Создаем рейс trips вручную (для машин без Wialon)
         const currentOdo = order.vehicle?.odometer_current || 120500;
+        const isApprovedStage = ['docs_collection', 'completed'].includes(stage);
         const tripInsertPayload: Record<string, any> = {
           asset_id: order.assigned_vehicle_id || null,
           driver_id: order.assigned_driver_id || null,
           trip_type: 'intercity',
           status: stage === 'in_progress' ? 'in_progress' : 'completed',
-          lifecycle_status: stage === 'completed' ? 'approved' : 'draft',
+          lifecycle_status: isApprovedStage ? 'approved' : 'draft',
           odometer_start: stage === 'in_progress' ? currentOdo : Math.max(0, currentOdo - 350),
           odometer_end: currentOdo,
           started_at: order.planned_loading_at || now,
@@ -89,7 +91,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         } else {
           tripUpdatePayload.status = 'completed';
           tripUpdatePayload.ended_at = now;
-          if (stage === 'completed') {
+          if (['docs_collection', 'completed'].includes(stage)) {
             tripUpdatePayload.lifecycle_status = 'approved';
           }
         }
@@ -115,7 +117,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             settlement_status: 'pending',
             invoice_status: 'unbilled',
           });
-        } else if (stage === 'completed') {
+        } else if (['docs_collection', 'completed'].includes(stage)) {
           await (supabase.from('trip_orders') as any)
             .update({ lifecycle_status: 'approved', updated_at: now })
             .eq('trip_id', activeTripId);
@@ -133,7 +135,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (stage === 'in_progress' && !order.actual_loading_arrival_at) {
       updateOrderPayload.actual_loading_arrival_at = now;
     }
-    if (['pending_review', 'completed'].includes(stage) && !order.actual_delivery_arrival_at) {
+    if (
+      ['pending_review', 'docs_collection', 'completed'].includes(stage) &&
+      !order.actual_delivery_arrival_at
+    ) {
       updateOrderPayload.actual_delivery_arrival_at = now;
     }
 

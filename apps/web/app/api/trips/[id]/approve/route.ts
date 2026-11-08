@@ -92,9 +92,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .eq('trip_id', id)
     .neq('lifecycle_status', 'cancelled');
 
-  // Синхронизируем статус связанной заявки в orders -> completed
+  // Синхронизируем статус связанной заявки в orders -> перевод в docs_collection (Сбор документов)
   await (supabase.from('orders') as any)
-    .update({ status: 'completed', updated_at: new Date().toISOString() })
+    .update({ status: 'docs_collection', updated_at: new Date().toISOString() })
     .eq('active_trip_id', id);
 
   await syncTripFinancials(supabase, id, adminId);

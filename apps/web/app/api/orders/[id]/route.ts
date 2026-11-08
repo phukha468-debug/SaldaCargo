@@ -115,7 +115,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    if (updatePayload.status === 'completed' && currentOrder?.active_trip_id) {
+    if (
+      ['docs_collection', 'completed'].includes(updatePayload.status) &&
+      currentOrder?.active_trip_id
+    ) {
       await (supabase.from('trips') as any)
         .update({
           status: 'completed',
