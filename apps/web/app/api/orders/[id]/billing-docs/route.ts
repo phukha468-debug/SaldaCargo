@@ -73,7 +73,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
       const finalInvoiceDate = mergedDocs.invoice_date || new Date().toISOString().slice(0, 10);
 
-      // Ищем заказ в trip_orders: сначала по active_trip_id
+      // Ищем заказ в trip_orders: сначала по точному trip_order_id, затем по active_trip_id
       let tripOrderQuery = (supabase.from('trip_orders') as any).update({
         invoice_number: finalInvoiceNumber,
         invoice_date: finalInvoiceDate,
@@ -81,7 +81,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         updated_at: new Date().toISOString(),
       });
 
-      if (currentOrder.active_trip_id) {
+      if (currentPayload.trip_order_id) {
+        tripOrderQuery = tripOrderQuery.eq('id', currentPayload.trip_order_id);
+      } else if (currentOrder.active_trip_id) {
         tripOrderQuery = tripOrderQuery.eq('trip_id', currentOrder.active_trip_id);
       } else if (currentOrder.client_id) {
         tripOrderQuery = tripOrderQuery.eq('counterparty_id', currentOrder.client_id);
@@ -100,7 +102,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         updated_at: new Date().toISOString(),
       });
 
-      if (currentOrder.active_trip_id) {
+      if (currentPayload.trip_order_id) {
+        rollbackQuery = rollbackQuery.eq('id', currentPayload.trip_order_id);
+      } else if (currentOrder.active_trip_id) {
         rollbackQuery = rollbackQuery.eq('trip_id', currentOrder.active_trip_id);
       } else if (currentOrder.client_id) {
         rollbackQuery = rollbackQuery.eq('counterparty_id', currentOrder.client_id);
