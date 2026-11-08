@@ -17,6 +17,53 @@ export interface RouteStop {
   weight_kg?: number;
 }
 
+export interface BillingDocsWorkflow {
+  invoice_issued?: boolean;
+  invoice_number?: string | null;
+  invoice_date?: string | null;
+  tn_driver_delivered?: boolean;
+  epe_received_edo?: boolean;
+  epe_number?: string | null;
+  docs_sent_edo?: boolean;
+  docs_sent_at?: string | null;
+  client_accepted_edo?: boolean;
+  client_accepted_at?: string | null;
+  status?: 'in_progress' | 'accepted';
+}
+
+export function isStrictDocCounterparty(name?: string | null): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
+}
+
+export function getDocCounterpartyBadge(name?: string | null): {
+  label: string;
+  badgeClass: string;
+} {
+  if (!name) return { label: 'Контрагент', badgeClass: 'bg-slate-100 text-slate-700' };
+  const n = name.toLowerCase();
+  if (n.includes('всмпо')) {
+    return {
+      label: '🏢 ВСМПО-АВИСМА',
+      badgeClass: 'bg-indigo-100 text-indigo-900 border border-indigo-200',
+    };
+  }
+  if (n.includes('ависма')) {
+    return {
+      label: '🏢 ООО Ависма',
+      badgeClass: 'bg-blue-100 text-blue-900 border border-blue-200',
+    };
+  }
+  if (n.includes('геострой')) {
+    return {
+      label: '🏗️ Геостройиндустрия',
+      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300',
+    };
+  }
+  return { label: name, badgeClass: 'bg-slate-100 text-slate-700' };
+}
+
 export interface OrderItem {
   id: string;
   order_number: number;
@@ -89,6 +136,7 @@ export interface OrderItem {
   routes_json?: RouteStop[];
   prevent_salda_auto_finish?: boolean;
   salda_transit_count?: number;
+  billing_docs?: BillingDocsWorkflow | null;
   raw_parser_payload?: any;
 }
 
@@ -151,10 +199,22 @@ const KANBAN_STAGES: Array<{
 export function OrdersPipelineView() {
   const queryClient = useQueryClient();
 
-  // Вид: 'kanban' (по умолчанию по аналогии с экспедицией) | 'list' (1 строка)
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  // Вид: 'kanban' (по умолчанию) | 'list' (1 строка) | 'documents' (Документооборот ВСМПО/Ависма/Геострой)
+  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'documents'>('kanban');
   const [activeStatusTab, setActiveStatusTab] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
+
+  // Состояние раздела «Документы» (ВСМПО, ООО Ависма, Геостройиндустрия)
+  const [docClientFilter, setDocClientFilter] = useState<'all' | 'vsmpo' | 'avisma' | 'geostroy'>(
+    'all',
+  );
+  const [showArchivedDocs, setShowArchivedDocs] = useState<boolean>(false);
+  const [invoiceModalOrder, setInvoiceModalOrder] = useState<{
+    order: OrderItem;
+    initialStep5?: boolean;
+  } | null>(null);
+  const [invoiceNumberInput, setInvoiceNumberInput] = useState<string>('');
+  const [invoiceDateInput, setInvoiceDateInput] = useState<string>('');
 
   // Модальные окна
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -369,6 +429,174 @@ export function OrdersPipelineView() {
     }
   };
 
+  // ── РАБОТА С ДОКУМЕНТАМИ И СЧЕТАМИ (ВСМПО, АВИСМА, ГЕОСТРОЙ) ──
+  const billingDocsMutation = useMutation({
+    mutationFn: async ({
+      orderId,
+      docs,
+    }: {
+      orderId: string;
+      docs: Partial<BillingDocsWorkflow>;
+    }) => {
+      const res = await fetch(`/api/orders/${orderId}/billing-docs`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(docs),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Ошибка сохранения документов');
+      }
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      if (variables.docs.client_accepted_edo) {
+        alert(
+          '✅ Документы подписаны контрагентом в ЭДО (поставлены В ОПЛАТУ)!\nСчёт передан в Дебиторку, рейс скрыт из списка активных документов.',
+        );
+      }
+    },
+    onError: (err: any) => {
+      alert(`Ошибка: ${err.message}`);
+    },
+  });
+
+  const handleToggleTn = (order: OrderItem) => {
+    const cur = order.billing_docs || {};
+    billingDocsMutation.mutate({
+      orderId: order.id,
+      docs: { ...cur, tn_driver_delivered: !cur.tn_driver_delivered },
+    });
+  };
+
+  const handleToggleEpe = (order: OrderItem) => {
+    const cur = order.billing_docs || {};
+    billingDocsMutation.mutate({
+      orderId: order.id,
+      docs: { ...cur, epe_received_edo: !cur.epe_received_edo },
+    });
+  };
+
+  const handleToggleDocsSent = (order: OrderItem) => {
+    const cur = order.billing_docs || {};
+    billingDocsMutation.mutate({
+      orderId: order.id,
+      docs: {
+        ...cur,
+        docs_sent_edo: !cur.docs_sent_edo,
+        docs_sent_at: !cur.docs_sent_edo ? new Date().toISOString() : null,
+      },
+    });
+  };
+
+  const handleOpenInvoiceModal = (order: OrderItem, initialStep5: boolean = false) => {
+    const cur = order.billing_docs || {};
+    setInvoiceNumberInput(
+      cur.invoice_number || order.base_doc_number || `СЧ-${order.order_number}`,
+    );
+    setInvoiceDateInput(cur.invoice_date || new Date().toISOString().slice(0, 10));
+    setInvoiceModalOrder({ order, initialStep5 });
+  };
+
+  const handleSaveInvoice = (isIssued: boolean) => {
+    if (!invoiceModalOrder) return;
+    const { order, initialStep5 } = invoiceModalOrder;
+    const trimmed = invoiceNumberInput.trim();
+    if (isIssued && !trimmed) {
+      alert('Пожалуйста, укажите номер счёта');
+      return;
+    }
+
+    const cur = order.billing_docs || {};
+    const updatedDocs: Partial<BillingDocsWorkflow> = {
+      ...cur,
+      invoice_issued: isIssued,
+      invoice_number: isIssued ? trimmed : null,
+      invoice_date: isIssued ? invoiceDateInput : null,
+    };
+
+    if (initialStep5 && isIssued) {
+      updatedDocs.client_accepted_edo = true;
+      updatedDocs.status = 'accepted';
+    }
+
+    billingDocsMutation.mutate({
+      orderId: order.id,
+      docs: updatedDocs,
+    });
+
+    setInvoiceModalOrder(null);
+  };
+
+  const handleStep5Click = (order: OrderItem) => {
+    const cur = order.billing_docs || {};
+    if (cur.client_accepted_edo) {
+      if (
+        confirm(
+          `Вернуть рейс № ${order.base_doc_number || order.order_number} из архива в работу над документами?`,
+        )
+      ) {
+        billingDocsMutation.mutate({
+          orderId: order.id,
+          docs: { ...cur, client_accepted_edo: false, status: 'in_progress' },
+        });
+      }
+      return;
+    }
+
+    // Если номер счета еще не введен — открываем модалку для ввода
+    if (!cur.invoice_number) {
+      handleOpenInvoiceModal(order, true);
+      return;
+    }
+
+    if (
+      confirm(
+        `Подтвердить: Контрагент подписал документы в ЭДО и поставил в ОПЛАТУ?\n\n` +
+          `• Счёт № ${cur.invoice_number} появится в Дебиторке (статус "Выставить счёт" снимется)\n` +
+          `• Рейс исчезнет из раздела "Документы"`,
+      )
+    ) {
+      billingDocsMutation.mutate({
+        orderId: order.id,
+        docs: {
+          ...cur,
+          client_accepted_edo: true,
+          status: 'accepted',
+        },
+      });
+    }
+  };
+
+  // Все рейсы 3-х контрагентов (ВСМПО, Ависма, Геострой), которые в пути, на ревью или завершены
+  const strictCounterpartyOrders = orders.filter((o) => {
+    if (!isStrictDocCounterparty(o.client?.name)) return false;
+    return ['in_progress', 'pending_review', 'completed'].includes(o.status);
+  });
+
+  const pendingDocsCount = strictCounterpartyOrders.filter((o) => {
+    const isAccepted = Boolean(
+      o.billing_docs?.client_accepted_edo || o.billing_docs?.status === 'accepted',
+    );
+    return !isAccepted;
+  }).length;
+
+  const filteredDocOrders = strictCounterpartyOrders.filter((o) => {
+    if (docClientFilter !== 'all') {
+      const name = o.client?.name?.toLowerCase() || '';
+      if (docClientFilter === 'vsmpo' && !name.includes('всмпо')) return false;
+      if (docClientFilter === 'avisma' && !name.includes('ависма')) return false;
+      if (docClientFilter === 'geostroy' && !name.includes('геострой')) return false;
+    }
+    const isAccepted = Boolean(
+      o.billing_docs?.client_accepted_edo || o.billing_docs?.status === 'accepted',
+    );
+    if (!showArchivedDocs && isAccepted) return false;
+    return true;
+  });
+
   // Фильтрация
   const filteredOrders = orders.filter((o) => {
     if (!search) return true;
@@ -463,6 +691,26 @@ export function OrdersPipelineView() {
               }`}
             >
               <span>📑 Компактный список (1 строка)</span>
+            </button>
+            <button
+              onClick={() => setViewMode('documents')}
+              title="Документооборот и выставление счетов: ВСМПО-Ависма, ООО Ависма, Геостройиндустрия"
+              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
+                viewMode === 'documents'
+                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>📑 Документы</span>
+              {pendingDocsCount > 0 ? (
+                <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9.5px] rounded-full font-bold">
+                  {pendingDocsCount}
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.2 bg-slate-200 text-slate-600 text-[9.5px] rounded-full font-bold">
+                  0
+                </span>
+              )}
             </button>
           </div>
 
@@ -820,7 +1068,396 @@ export function OrdersPipelineView() {
         </div>
       )}
 
-      {/* ── МОДАЛЬНОЕ ОКНО ДЕТАЛЬНОГО ПРОСМОТРА ЗАЯВКИ (ПО КЛИКУ НА КАРТОЧКУ) ── */}
+      {/* ── РЕЖИМ 3: ДОКУМЕНТООБОРОТ И СЧЕТА (ВСМПО, АВИСМА, ГЕОСТРОЙИНДУСТРИЯ) ── */}
+      {viewMode === 'documents' && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden space-y-0">
+          {/* Панель фильтров по контрагентам и архив */}
+          <div className="p-2.5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-slate-700 mr-1">Контрагент:</span>
+              <button
+                onClick={() => setDocClientFilter('all')}
+                className={`px-2.5 py-1 rounded-md transition font-bold text-[11px] ${
+                  docClientFilter === 'all'
+                    ? 'bg-white text-indigo-700 shadow-2xs border border-indigo-200'
+                    : 'text-slate-600 hover:bg-slate-200/60'
+                }`}
+              >
+                Все 3 контрагента ({strictCounterpartyOrders.length})
+              </button>
+              <button
+                onClick={() => setDocClientFilter('vsmpo')}
+                className={`px-2.5 py-1 rounded-md transition font-bold text-[11px] ${
+                  docClientFilter === 'vsmpo'
+                    ? 'bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-200/60'
+                }`}
+              >
+                🏢 ВСМПО-АВИСМА (
+                {
+                  strictCounterpartyOrders.filter((o) =>
+                    o.client?.name?.toLowerCase().includes('всмпо'),
+                  ).length
+                }
+                )
+              </button>
+              <button
+                onClick={() => setDocClientFilter('avisma')}
+                className={`px-2.5 py-1 rounded-md transition font-bold text-[11px] ${
+                  docClientFilter === 'avisma'
+                    ? 'bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-200/60'
+                }`}
+              >
+                🏢 ООО Ависма (
+                {
+                  strictCounterpartyOrders.filter((o) =>
+                    o.client?.name?.toLowerCase().includes('ависма'),
+                  ).length
+                }
+                )
+              </button>
+              <button
+                onClick={() => setDocClientFilter('geostroy')}
+                className={`px-2.5 py-1 rounded-md transition font-bold text-[11px] ${
+                  docClientFilter === 'geostroy'
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-200/60'
+                }`}
+              >
+                🏗️ Геостройиндустрия (
+                {
+                  strictCounterpartyOrders.filter((o) =>
+                    o.client?.name?.toLowerCase().includes('геострой'),
+                  ).length
+                }
+                )
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 font-semibold select-none">
+                <input
+                  type="checkbox"
+                  checked={showArchivedDocs}
+                  onChange={(e) => setShowArchivedDocs(e.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span>Показать завершённые в ЭДО (архив)</span>
+              </label>
+
+              <span className="text-[11px] text-slate-500 font-bold">
+                В сборе: <b className="text-amber-600 font-mono">{pendingDocsCount}</b>
+              </span>
+            </div>
+          </div>
+
+          {/* Таблица строго в 1 строчку на рейс */}
+          {isLoading ? (
+            <div className="p-8 text-center text-xs text-slate-500">Загрузка документов...</div>
+          ) : filteredDocOrders.length === 0 ? (
+            <div className="p-8 text-center text-xs text-slate-500 space-y-1">
+              <div className="text-base">🎉</div>
+              <div className="font-bold text-slate-700">
+                Все документы собраны и выставлены в оплату!
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Нет активных рейсов, ожидающих сбора документов для выбранного контрагента.
+              </div>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 text-[11px] whitespace-nowrap overflow-x-auto">
+              {/* Шапка таблицы */}
+              <div className="px-3 py-1.5 bg-slate-50 font-bold text-slate-500 text-[10px] uppercase tracking-wider flex items-center justify-between gap-2 border-b border-slate-200">
+                <div className="w-[180px] shrink-0">Рейс / Дата</div>
+                <div className="w-[160px] shrink-0">Транспорт / Водитель</div>
+                <div className="w-[150px] shrink-0">Контрагент</div>
+                <div className="w-[85px] text-right shrink-0">Ставка</div>
+                <div className="w-[130px] text-center shrink-0">1. Счёт</div>
+                <div className="w-[105px] text-center shrink-0">2. Оригинал ТН</div>
+                <div className="w-[105px] text-center shrink-0">3. ЭПЭ в ЭДО</div>
+                <div className="w-[115px] text-center shrink-0">4. Пакет в ЭДО</div>
+                <div className="w-[155px] text-center shrink-0">5. В оплату (ЭДО)</div>
+                <div className="w-[100px] text-right shrink-0">Печать</div>
+              </div>
+
+              {/* Строки рейсов (строго 1 строка на рейс) */}
+              {filteredDocOrders.map((order) => {
+                const docs = order.billing_docs || {};
+                const isAccepted = Boolean(docs.client_accepted_edo || docs.status === 'accepted');
+                const badge = getDocCounterpartyBadge(order.client?.name);
+                const isAssigned = Boolean(order.assigned_vehicle_id && order.assigned_driver_id);
+                const tripDate = order.base_doc_date
+                  ? order.base_doc_date.slice(5)
+                  : order.planned_loading_at?.slice(5, 10) || order.created_at?.slice(5, 10) || '—';
+
+                return (
+                  <div
+                    key={order.id}
+                    className={`px-3 py-1.5 flex items-center justify-between gap-2 transition select-none ${
+                      isAccepted
+                        ? 'bg-slate-50/50 opacity-70 hover:opacity-100'
+                        : 'hover:bg-slate-50/80 bg-white'
+                    }`}
+                  >
+                    {/* Рейс / Номер / Дата */}
+                    <div className="w-[180px] flex items-center gap-1.5 shrink-0">
+                      <span className="font-bold text-slate-900 truncate">
+                        № {order.base_doc_number || order.order_number}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">({tripDate})</span>
+                      {order.status === 'in_progress' ? (
+                        <span className="px-1 py-0.2 bg-purple-100 text-purple-900 font-bold rounded text-[9px] animate-pulse">
+                          В пути
+                        </span>
+                      ) : order.status === 'pending_review' ? (
+                        <span className="px-1 py-0.2 bg-orange-100 text-orange-900 font-bold rounded text-[9px]">
+                          Ревью
+                        </span>
+                      ) : (
+                        <span className="px-1 py-0.2 bg-emerald-100 text-emerald-900 font-bold rounded text-[9px]">
+                          Завершён
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Авто и Водитель */}
+                    <div className="w-[160px] truncate text-slate-700 shrink-0 flex items-center gap-1">
+                      {isAssigned ? (
+                        <>
+                          <span className="px-1.5 py-0.2 bg-slate-200 text-slate-800 rounded font-mono text-[10px] font-bold shrink-0">
+                            {order.vehicle?.reg_number || 'Авто'}
+                          </span>
+                          <span className="truncate text-slate-700">
+                            {order.driver?.name?.split(' ')[0] || 'Водитель'}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-slate-400 italic text-[10px]">ТС не назначено</span>
+                      )}
+                    </div>
+
+                    {/* Контрагент */}
+                    <div className="w-[150px] shrink-0 truncate">
+                      <span
+                        className={`px-2 py-0.5 rounded font-bold text-[10.5px] truncate inline-block max-w-[145px] ${badge.badgeClass}`}
+                        title={order.client?.name || ''}
+                      >
+                        {badge.label}
+                      </span>
+                    </div>
+
+                    {/* Ставка */}
+                    <div className="w-[85px] text-right shrink-0 font-black text-slate-900 font-mono">
+                      {order.price_without_vat
+                        ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                        : '—'}
+                    </div>
+
+                    {/* 1. Счёт выставлен */}
+                    <div className="w-[130px] flex items-center justify-center shrink-0">
+                      {docs.invoice_issued && docs.invoice_number ? (
+                        <button
+                          onClick={() => handleOpenInvoiceModal(order)}
+                          title="Счёт выставлен. Клик — изменить номер или дату"
+                          className="px-2 py-0.8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition truncate max-w-[125px]"
+                        >
+                          <span>🧾 № {docs.invoice_number}</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenInvoiceModal(order)}
+                          title="Выставить счёт на этот рейс"
+                          className="px-2 py-0.8 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded font-semibold text-[10px] flex items-center gap-1 cursor-pointer transition"
+                        >
+                          <span>+ 🧾 Счёт</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 2. Водитель отдал ТН */}
+                    <div className="w-[105px] flex items-center justify-center shrink-0">
+                      <button
+                        onClick={() => handleToggleTn(order)}
+                        title="Клик — переключить сдачу оригинала ТН водителем"
+                        className={`px-2 py-0.8 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition ${
+                          docs.tn_driver_delivered
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                            : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                        }`}
+                      >
+                        <span>{docs.tn_driver_delivered ? '✔ ТН сдана' : '❌ Ждём ТН'}</span>
+                      </button>
+                    </div>
+
+                    {/* 3. ЭПЭ пришло в ЭДО */}
+                    <div className="w-[105px] flex items-center justify-center shrink-0">
+                      <button
+                        onClick={() => handleToggleEpe(order)}
+                        title="Клик — переключить статус поступления Электронного поручения (ЭПЭ) в ЭДО"
+                        className={`px-2 py-0.8 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition ${
+                          docs.epe_received_edo
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
+                        }`}
+                      >
+                        <span>{docs.epe_received_edo ? '✔ ЭПЭ в ЭДО' : '⏳ Ждём ЭПЭ'}</span>
+                      </button>
+                    </div>
+
+                    {/* 4. Отправлены все документы по ЭДО */}
+                    <div className="w-[115px] flex items-center justify-center shrink-0">
+                      <button
+                        onClick={() => handleToggleDocsSent(order)}
+                        title="Клик — отметить отправку полного пакета документов заказчику в ЭДО"
+                        className={`px-2 py-0.8 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition ${
+                          docs.docs_sent_edo
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
+                        }`}
+                      >
+                        <span>{docs.docs_sent_edo ? '✔ Пакет в ЭДО' : '✉️ Не отправлен'}</span>
+                      </button>
+                    </div>
+
+                    {/* 5. В ЭДО контрагент поставил В ОПЛАТУ (подписал) */}
+                    <div className="w-[155px] flex items-center justify-center shrink-0">
+                      {isAccepted ? (
+                        <button
+                          onClick={() => handleStep5Click(order)}
+                          title="Контрагент подписал документы и поставил в оплату. Счёт передан в Дебиторку. Клик — вернуть в работу"
+                          className="px-2.5 py-0.8 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition"
+                        >
+                          <span>🟢 В оплате (ЭДО)</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStep5Click(order)}
+                          title="Контрагент подписал документы в ЭДО: зафиксировать счёт в Дебиторке и завершить документооборот"
+                          className="px-2.5 py-0.8 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-[10.5px] shadow-2xs flex items-center gap-1 cursor-pointer transition active:scale-95"
+                        >
+                          <span>⏳ Поставить В ОПЛАТУ</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Кнопки печати и детали */}
+                    <div className="w-[100px] flex items-center gap-1 shrink-0 justify-end">
+                      <a
+                        href={`/api/orders/${order.id}/docs/tn-pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Печать Транспортной накладной"
+                        className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-[10px]"
+                      >
+                        📄 ТН
+                      </a>
+                      <a
+                        href={`/api/orders/${order.id}/docs/waybill-4c`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Печать Путевого листа № 4-С"
+                        className="px-1.5 py-0.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-[10px]"
+                      >
+                        📋 ПЛ
+                      </a>
+                      <button
+                        onClick={() => setSelectedDetailsOrder(order)}
+                        title="Детали заявки"
+                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px]"
+                      >
+                        🔍
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── МОДАЛЬНОЕ ОКНО БЫСТРОГО ВВОДА СЧЁТА ── */}
+      {invoiceModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-sm w-full p-4 shadow-xl space-y-3 text-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                <span>🧾 Счёт на рейс</span>
+                <span className="text-indigo-600">
+                  №{' '}
+                  {invoiceModalOrder.order.base_doc_number || invoiceModalOrder.order.order_number}
+                </span>
+              </div>
+              <button
+                onClick={() => setInvoiceModalOrder(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-base cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-500 font-medium">
+              {invoiceModalOrder.order.client?.name} • Ставка:{' '}
+              {invoiceModalOrder.order.price_without_vat
+                ? `${Number(invoiceModalOrder.order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                : '—'}
+            </div>
+
+            <div className="space-y-2.5">
+              <div>
+                <label className="text-[10.5px] font-bold text-slate-700 block mb-1">
+                  Номер счёта на оплату
+                </label>
+                <input
+                  type="text"
+                  value={invoiceNumberInput}
+                  onChange={(e) => setInvoiceNumberInput(e.target.value)}
+                  placeholder="Например, 104 или СЧ-793"
+                  className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10.5px] font-bold text-slate-700 block mb-1">
+                  Дата счёта
+                </label>
+                <input
+                  type="date"
+                  value={invoiceDateInput}
+                  onChange={(e) => setInvoiceDateInput(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => handleSaveInvoice(false)}
+                className="px-2 py-1 text-rose-600 hover:bg-rose-50 rounded text-xs font-bold cursor-pointer"
+              >
+                Снять счёт
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInvoiceModalOrder(null)}
+                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold cursor-pointer"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveInvoice(true)}
+                  className="px-3.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {selectedDetailsOrder && (
         <OrderDetailsModal
           order={selectedDetailsOrder}

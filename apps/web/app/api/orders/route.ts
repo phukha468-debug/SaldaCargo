@@ -42,6 +42,7 @@ export async function GET(req: Request) {
       salda_transit_count: Number(
         o.salda_transit_count || o.raw_parser_payload?.salda_transit_count || 0,
       ),
+      billing_docs: o.raw_parser_payload?.billing_docs || null,
     }));
 
     return NextResponse.json({ orders: enriched });

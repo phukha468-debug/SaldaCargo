@@ -38,6 +38,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       salda_transit_count: Number(
         order.salda_transit_count || order.raw_parser_payload?.salda_transit_count || 0,
       ),
+      billing_docs: order.raw_parser_payload?.billing_docs || null,
     };
 
     return NextResponse.json({ order: enriched });
@@ -133,6 +134,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       routes_json: updated.raw_parser_payload?.routes || [],
       prevent_salda_auto_finish: Boolean(updated.raw_parser_payload?.prevent_salda_auto_finish),
       salda_transit_count: Number(updated.raw_parser_payload?.salda_transit_count || 0),
+      billing_docs: updated.raw_parser_payload?.billing_docs || null,
     };
 
     return NextResponse.json({ order: enriched });
