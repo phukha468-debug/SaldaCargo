@@ -32,6 +32,16 @@ function normalizeRegNumber(raw: string): string {
 }
 
 /**
+ * Явная карта соответствия ID объектов Wialon и госномеров
+ */
+const WIALON_ID_TO_PLATE: Record<string, string> = {
+  '11873': 'А096МВ196',
+  '11876': 'О188ТА196',
+  '11875': 'У446ВН96',
+  '11874': 'У883АР96',
+};
+
+/**
  * Явная карта соответствия имен объектов Wialon и госномеров Валдаев
  */
 const WIALON_VALDAI_MAP: Record<string, string> = {
@@ -45,8 +55,10 @@ const WIALON_VALDAI_MAP: Record<string, string> = {
  * Поиск автомобиля в базе assets по имени или номеру из Wialon
  */
 async function findAssetByWialonUnit(supabase: any, unitStr: string, unitIdStr?: string) {
+  // 0. Поиск по прямому маппингу ID Wialon (11873, 11876 и т.д.)
+  const targetFromId = unitIdStr ? WIALON_ID_TO_PLATE[unitIdStr] : undefined;
   const clean = normalizeRegNumber(unitStr);
-  const targetReg = WIALON_VALDAI_MAP[clean] || clean;
+  const targetReg = targetFromId || WIALON_VALDAI_MAP[clean] || clean;
 
   const { data: assets, error } = await supabase
     .from('assets')
@@ -57,7 +69,7 @@ async function findAssetByWialonUnit(supabase: any, unitStr: string, unitIdStr?:
     return null;
   }
 
-  // 1. Поиск по явной карте или полному совпадению
+  // 1. Поиск по целевому номеру (из ID Wialon или карты имен)
   for (const asset of assets) {
     const assetNorm = normalizeRegNumber(asset.reg_number || '');
     const shortNorm = normalizeRegNumber(asset.short_name || '');
@@ -78,7 +90,7 @@ async function findAssetByWialonUnit(supabase: any, unitStr: string, unitIdStr?:
     }
   }
 
-  // Поиск по заметкам (где может быть сохранен wialon_unit_id)
+  // 3. Поиск по заметкам (где может быть сохранен wialon_unit_id)
   if (unitIdStr) {
     for (const asset of assets) {
       if (asset.notes && asset.notes.includes(unitIdStr)) {
@@ -202,36 +214,54 @@ async function processWialonEvent(req: Request) {
         ? Math.max(odometer, currentAssetOdo)
         : currentAssetOdo || 120000;
 
+    // Проверяем текст уведомления (например "%UNIT% вышел из %ZONE%." или "Выход из геозоны")
+    const fullTextCandidate =
+      `${payload.text || ''} ${payload.notification || ''} ${payload.name || ''}`.toLowerCase();
+    const isExplicitTextExit =
+      fullTextCandidate.includes('вышел') ||
+      fullTextCandidate.includes('выход') ||
+      fullTextCandidate.includes('покинул') ||
+      fullTextCandidate.includes('выезд');
+    const isExplicitTextEnter =
+      fullTextCandidate.includes('вошел') ||
+      fullTextCandidate.includes('вход') ||
+      fullTextCandidate.includes('въезд') ||
+      fullTextCandidate.includes('прибыл');
+
     // Определяем событие: выезд (старт) или въезд (финиш)
     const isDeparture =
-      eventCandidate === '2' ||
-      eventCandidate.includes('выход') ||
-      eventCandidate.includes('выезд') ||
-      eventCandidate.includes('покинул') ||
-      eventCandidate.includes('уехал') ||
-      eventCandidate.includes('depart') ||
-      eventCandidate.includes('departure') ||
-      eventCandidate.includes('exit') ||
-      eventCandidate.includes('exited') ||
-      eventCandidate.includes('leave') ||
-      eventCandidate.includes('left') ||
-      eventCandidate.includes('outside') ||
-      eventCandidate === 'out';
+      isExplicitTextExit ||
+      (!isExplicitTextEnter &&
+        (eventCandidate === '2' ||
+          eventCandidate.includes('выход') ||
+          eventCandidate.includes('выезд') ||
+          eventCandidate.includes('покинул') ||
+          eventCandidate.includes('уехал') ||
+          eventCandidate.includes('depart') ||
+          eventCandidate.includes('departure') ||
+          eventCandidate.includes('exit') ||
+          eventCandidate.includes('exited') ||
+          eventCandidate.includes('leave') ||
+          eventCandidate.includes('left') ||
+          eventCandidate.includes('outside') ||
+          eventCandidate === 'out'));
 
     const isArrival =
-      eventCandidate === '1' ||
-      eventCandidate.includes('вход') ||
-      eventCandidate.includes('въезд') ||
-      eventCandidate.includes('приезд') ||
-      eventCandidate.includes('заезд') ||
-      eventCandidate.includes('вошел') ||
-      eventCandidate.includes('прибыл') ||
-      eventCandidate.includes('arrive') ||
-      eventCandidate.includes('arrival') ||
-      eventCandidate.includes('enter') ||
-      eventCandidate.includes('entered') ||
-      eventCandidate.includes('inside') ||
-      eventCandidate === 'in';
+      isExplicitTextEnter ||
+      (!isExplicitTextExit &&
+        (eventCandidate === '1' ||
+          eventCandidate.includes('вход') ||
+          eventCandidate.includes('въезд') ||
+          eventCandidate.includes('приезд') ||
+          eventCandidate.includes('заезд') ||
+          eventCandidate.includes('вошел') ||
+          eventCandidate.includes('прибыл') ||
+          eventCandidate.includes('arrive') ||
+          eventCandidate.includes('arrival') ||
+          eventCandidate.includes('enter') ||
+          eventCandidate.includes('entered') ||
+          eventCandidate.includes('inside') ||
+          eventCandidate === 'in'));
 
     console.log(
       `[Wialon Webhook] Event: "${eventCandidate}" -> ${isDeparture ? 'DEPARTURE' : isArrival ? 'ARRIVAL' : 'UNKNOWN'} | Unit: ${unitStr} (Asset: ${asset.reg_number}, Odo: ${odoValue} km)`,
