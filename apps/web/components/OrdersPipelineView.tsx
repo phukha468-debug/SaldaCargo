@@ -18,10 +18,12 @@ export interface RouteStop {
 }
 
 export interface BillingDocsWorkflow {
+  waybill_type?: 'paper' | 'etrn'; // Строго один из двух: либо бумага (ТрН), либо ЭТрН!
   invoice_issued?: boolean;
   invoice_number?: string | null;
   invoice_date?: string | null;
   tn_driver_delivered?: boolean;
+  etrn_signed_edo?: boolean;
   epe_received_edo?: boolean;
   epe_number?: string | null;
   docs_sent_edo?: boolean;
@@ -463,11 +465,53 @@ export function OrdersPipelineView() {
     },
   });
 
+  // Ручной перевод этапа заказа (для машин без Wialon или ручной корректировки)
+  const manualStageMutation = useMutation({
+    mutationFn: async ({ orderId, stage }: { orderId: string; stage: OrderItem['status'] }) => {
+      const res = await fetch(`/api/orders/${orderId}/manual-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Ошибка смены этапа');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      if (selectedDetailsOrder && selectedDetailsOrder.id === data.order?.id) {
+        setSelectedDetailsOrder(data.order);
+      }
+    },
+    onError: (err: any) => {
+      alert(`Ошибка: ${err.message}`);
+    },
+  });
+
+  const handleToggleWaybillType = (order: OrderItem, newType: 'paper' | 'etrn') => {
+    const cur = order.billing_docs || {};
+    billingDocsMutation.mutate({
+      orderId: order.id,
+      docs: { ...cur, waybill_type: newType },
+    });
+  };
+
   const handleToggleTn = (order: OrderItem) => {
     const cur = order.billing_docs || {};
     billingDocsMutation.mutate({
       orderId: order.id,
-      docs: { ...cur, tn_driver_delivered: !cur.tn_driver_delivered },
+      docs: { ...cur, waybill_type: 'paper', tn_driver_delivered: !cur.tn_driver_delivered },
+    });
+  };
+
+  const handleToggleEtrn = (order: OrderItem) => {
+    const cur = order.billing_docs || {};
+    billingDocsMutation.mutate({
+      orderId: order.id,
+      docs: { ...cur, waybill_type: 'etrn', etrn_signed_edo: !cur.etrn_signed_edo },
     });
   };
 
@@ -886,6 +930,97 @@ export function OrdersPipelineView() {
                               <span className="text-[9.5px]">{isCash ? '💵' : '🏦'}</span>
                             </div>
                           </div>
+
+                          {/* СТРОКА 3: Ручное перемещение этапа (для машин без Wialon) */}
+                          <div
+                            className="pt-1 mt-1 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px]"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center gap-1">
+                              {order.status === 'assigned' && (
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      manualStageMutation.mutate({
+                                        orderId: order.id,
+                                        stage: 'in_progress',
+                                      })
+                                    }
+                                    title="Отправить в рейс (В пути)"
+                                    className="px-1.5 py-0.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded border border-purple-200 cursor-pointer"
+                                  >
+                                    🚀 В рейс
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      manualStageMutation.mutate({
+                                        orderId: order.id,
+                                        stage: 'pending_review',
+                                      })
+                                    }
+                                    title="Машина уже разгрузилась — сразу перевести на ревью и сбор документов"
+                                    className="px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded border border-orange-300 cursor-pointer"
+                                  >
+                                    ⏩ Разгружен (Ревью)
+                                  </button>
+                                </>
+                              )}
+                              {order.status === 'in_progress' && (
+                                <button
+                                  onClick={() =>
+                                    manualStageMutation.mutate({
+                                      orderId: order.id,
+                                      stage: 'pending_review',
+                                    })
+                                  }
+                                  title="Завершить рейс и отправить на ревью"
+                                  className="px-2 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded border border-orange-300 cursor-pointer"
+                                >
+                                  🏁 Разгружен (Ревью)
+                                </button>
+                              )}
+                              {order.status === 'pending_review' && (
+                                <button
+                                  onClick={() =>
+                                    manualStageMutation.mutate({
+                                      orderId: order.id,
+                                      stage: 'completed',
+                                    })
+                                  }
+                                  title="Одобрить и закрыть рейс в дебиторку"
+                                  className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-2xs cursor-pointer"
+                                >
+                                  ✓ В дебиторку
+                                </button>
+                              )}
+                              {order.status === 'waiting_vehicle' && (
+                                <button
+                                  onClick={() => setAssignModalOrder(order)}
+                                  className="px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded shadow-2xs cursor-pointer"
+                                >
+                                  + Назначить ТС
+                                </button>
+                              )}
+                            </div>
+
+                            <select
+                              value={order.status}
+                              onChange={(e) =>
+                                manualStageMutation.mutate({
+                                  orderId: order.id,
+                                  stage: e.target.value as any,
+                                })
+                              }
+                              className="bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[9.5px] font-bold text-slate-700 cursor-pointer focus:outline-none"
+                              title="Переместить заявку на любой этап вручную"
+                            >
+                              <option value="waiting_vehicle">Лист ожидания</option>
+                              <option value="assigned">Назначен</option>
+                              <option value="in_progress">В пути</option>
+                              <option value="pending_review">На ревью</option>
+                              <option value="completed">Завершён</option>
+                            </select>
+                          </div>
                         </div>
                       );
                     })
@@ -1021,6 +1156,55 @@ export function OrdersPipelineView() {
                             className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded font-bold text-[10px] cursor-pointer shadow-2xs"
                           >
                             + Назначить ТС
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Быстрое перемещение этапа (для машин без Wialon) */}
+                      <div
+                        className="flex items-center gap-1 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {order.status === 'assigned' && (
+                          <button
+                            onClick={() =>
+                              manualStageMutation.mutate({
+                                orderId: order.id,
+                                stage: 'pending_review',
+                              })
+                            }
+                            title="Машина уже разгрузилась — сразу перевести на ревью и сбор документов"
+                            className="px-2 py-0.8 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded text-[10px] border border-orange-300 cursor-pointer shadow-2xs"
+                          >
+                            ⏩ На ревью
+                          </button>
+                        )}
+                        {order.status === 'in_progress' && (
+                          <button
+                            onClick={() =>
+                              manualStageMutation.mutate({
+                                orderId: order.id,
+                                stage: 'pending_review',
+                              })
+                            }
+                            title="Машина разгрузилась — перевести на ревью"
+                            className="px-2 py-0.8 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded text-[10px] border border-orange-300 cursor-pointer shadow-2xs"
+                          >
+                            🏁 На ревью
+                          </button>
+                        )}
+                        {order.status === 'pending_review' && (
+                          <button
+                            onClick={() =>
+                              manualStageMutation.mutate({
+                                orderId: order.id,
+                                stage: 'completed',
+                              })
+                            }
+                            title="Завершить рейс в дебиторку"
+                            className="px-2 py-0.8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] shadow-2xs cursor-pointer"
+                          >
+                            ✓ В дебиторку
                           </button>
                         )}
                       </div>
@@ -1174,7 +1358,7 @@ export function OrdersPipelineView() {
                 <div className="w-[150px] shrink-0">Контрагент</div>
                 <div className="w-[85px] text-right shrink-0">Ставка</div>
                 <div className="w-[130px] text-center shrink-0">1. Счёт</div>
-                <div className="w-[105px] text-center shrink-0">2. Оригинал ТН</div>
+                <div className="w-[135px] text-center shrink-0">2. ТрН / ЭТрН (строго 1)</div>
                 <div className="w-[105px] text-center shrink-0">3. ЭПЭ в ЭДО</div>
                 <div className="w-[115px] text-center shrink-0">4. Пакет в ЭДО</div>
                 <div className="w-[155px] text-center shrink-0">5. В оплату (ЭДО)</div>
@@ -1275,19 +1459,51 @@ export function OrdersPipelineView() {
                       )}
                     </div>
 
-                    {/* 2. Водитель отдал ТН */}
-                    <div className="w-[105px] flex items-center justify-center shrink-0">
-                      <button
-                        onClick={() => handleToggleTn(order)}
-                        title="Клик — переключить сдачу оригинала ТН водителем"
-                        className={`px-2 py-0.8 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition ${
-                          docs.tn_driver_delivered
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                            : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
-                        }`}
-                      >
-                        <span>{docs.tn_driver_delivered ? '✔ ТН сдана' : '❌ Ждём ТН'}</span>
-                      </button>
+                    {/* 2. Либо ТрН (бумага), либо ЭТрН (электронная) — строго один из двух вариантов! */}
+                    <div className="w-[135px] flex items-center justify-center shrink-0">
+                      {docs.waybill_type === 'etrn' ? (
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => handleToggleWaybillType(order, 'paper')}
+                            title="Сейчас: ЭТрН. Клик — переключить на бумажную ТрН"
+                            className="px-1.5 py-0.8 bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-l text-[10px] font-bold border-y border-l border-purple-300 cursor-pointer"
+                          >
+                            ⚡ ЭТрН
+                          </button>
+                          <button
+                            onClick={() => handleToggleEtrn(order)}
+                            title="Клик — переключить статус подписания ЭТрН в ЭДО"
+                            className={`px-1.5 py-0.8 rounded-r text-[10px] font-bold border transition cursor-pointer ${
+                              docs.etrn_signed_edo
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                            }`}
+                          >
+                            {docs.etrn_signed_edo ? '✔ Подписана' : '⏳ Ждём'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => handleToggleWaybillType(order, 'etrn')}
+                            title="Сейчас: Бумажная ТрН. Клик — переключить на электронную ЭТрН"
+                            className="px-1.5 py-0.8 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-l text-[10px] font-bold border-y border-l border-slate-300 cursor-pointer"
+                          >
+                            📄 ТрН
+                          </button>
+                          <button
+                            onClick={() => handleToggleTn(order)}
+                            title="Клик — отметить сдачу оригинала ТрН водителем"
+                            className={`px-1.5 py-0.8 rounded-r text-[10px] font-bold border transition cursor-pointer ${
+                              docs.tn_driver_delivered
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                            }`}
+                          >
+                            {docs.tn_driver_delivered ? '✔ Сдана' : '❌ Ждём'}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* 3. ЭПЭ пришло в ЭДО */}
@@ -1482,6 +1698,9 @@ export function OrdersPipelineView() {
             })
           }
           onComplete={() => completeOrderMutation.mutate(selectedDetailsOrder.id)}
+          onManualStage={(stage) =>
+            manualStageMutation.mutate({ orderId: selectedDetailsOrder.id, stage })
+          }
           onDelete={() =>
             handleDeleteOrder(
               selectedDetailsOrder.id,
@@ -1642,6 +1861,7 @@ function OrderDetailsModal({
   onDepart,
   onArrive,
   onComplete,
+  onManualStage,
   onDelete,
 }: {
   order: OrderItem;
@@ -1651,6 +1871,7 @@ function OrderDetailsModal({
   onDepart: () => void;
   onArrive: () => void;
   onComplete: () => void;
+  onManualStage?: (stage: OrderItem['status']) => void;
   onDelete: () => void;
 }) {
   const routes: RouteStop[] = order.routes_json || order.raw_parser_payload?.routes || [];
@@ -1725,6 +1946,35 @@ function OrderDetailsModal({
 
         {/* Тело модального окна */}
         <div className="p-5 overflow-y-auto space-y-4 text-xs font-sans">
+          {/* ПАНЕЛЬ РУЧНОГО УПРАВЛЕНИЯ ЭТАПАМИ (ДЛЯ МАШИН БЕЗ WIALON) */}
+          <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+                <span>🔄</span>
+                <span>Текущий этап заявки (ручное перемещение для машин без Wialon):</span>
+              </div>
+              <span className="text-[10.5px] text-indigo-700 font-semibold">
+                Кликните этап для мгновенного перевода
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {KANBAN_STAGES.map((st) => (
+                <button
+                  key={st.status}
+                  onClick={() => onManualStage && onManualStage(st.status)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    order.status === st.status
+                      ? `${st.badgeBg} ${st.badgeText} ring-2 ring-indigo-600 shadow-xs font-black scale-105`
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{st.icon}</span>
+                  <span>{st.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Блок 1: Телематика Wialon и управление рейсом */}
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
@@ -1745,11 +1995,13 @@ function OrderDetailsModal({
                     </span>
                   ) : order.status === 'assigned' ? (
                     <span className="text-sky-700 font-bold">
-                      Машина назначена. При выезде за радиус 8 км Салды рейс стартует автоматически.
+                      Машина назначена. При выезде за радиус 8 км Салды рейс стартует автоматически
+                      (или используйте кнопки справа).
                     </span>
                   ) : order.status === 'pending_review' ? (
                     <span className="text-orange-700 font-bold">
-                      Грузовик вернулся в Салду. Ожидает одобрения ЗП и ГСМ.
+                      Грузовик вернулся / разгрузился. Ожидает одобрения ЗП и ГСМ, документы в
+                      обработке.
                     </span>
                   ) : order.status === 'completed' ? (
                     <span className="text-emerald-700 font-bold">
@@ -1764,27 +2016,44 @@ function OrderDetailsModal({
               </div>
             </div>
 
-            {/* Кнопки Wialon */}
-            <div className="flex items-center gap-1.5">
+            {/* Кнопки Wialon и быстрых действий */}
+            <div className="flex items-center gap-1.5 flex-wrap">
               {order.status === 'assigned' && (
-                <button
-                  onClick={onDepart}
-                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
-                >
-                  🚀 Выезд (Wialon)
-                </button>
+                <>
+                  <button
+                    onClick={onDepart}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
+                  >
+                    🚀 Выезд (Wialon)
+                  </button>
+                  <button
+                    onClick={() => onManualStage && onManualStage('pending_review')}
+                    className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
+                    title="Машина уже разгрузилась — сразу перевести в ревью и открыть сбор документов"
+                  >
+                    ⏩ Разгрузился (На ревью)
+                  </button>
+                </>
               )}
               {order.status === 'in_progress' && (
-                <button
-                  onClick={onArrive}
-                  className={`px-3 py-1.5 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px] ${
-                    isTransit
-                      ? 'bg-amber-600 hover:bg-amber-700'
-                      : 'bg-emerald-600 hover:bg-emerald-700'
-                  }`}
-                >
-                  {isTransit ? '🔄 Заезд (транзит, снять флаг)' : '🏁 Возврат в Салду (Ревью)'}
-                </button>
+                <>
+                  <button
+                    onClick={onArrive}
+                    className={`px-3 py-1.5 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px] ${
+                      isTransit
+                        ? 'bg-amber-600 hover:bg-amber-700'
+                        : 'bg-emerald-600 hover:bg-emerald-700'
+                    }`}
+                  >
+                    {isTransit ? '🔄 Заезд (транзит, снять флаг)' : '🏁 Возврат в Салду (Ревью)'}
+                  </button>
+                  <button
+                    onClick={() => onManualStage && onManualStage('pending_review')}
+                    className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
+                  >
+                    ⏩ Разгрузился (На ревью)
+                  </button>
+                </>
               )}
               {order.status === 'pending_review' && (
                 <button

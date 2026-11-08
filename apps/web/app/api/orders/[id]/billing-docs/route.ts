@@ -3,10 +3,12 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export interface BillingDocsPayload {
+  waybill_type?: 'paper' | 'etrn'; // Либо бумага (ТрН), либо ЭТрН (строго одно из двух!)
   invoice_issued?: boolean;
   invoice_number?: string | null;
   invoice_date?: string | null;
   tn_driver_delivered?: boolean;
+  etrn_signed_edo?: boolean;
   epe_received_edo?: boolean;
   epe_number?: string | null;
   docs_sent_edo?: boolean;
@@ -36,10 +38,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const currentPayload = currentOrder.raw_parser_payload || {};
     const existingDocs: BillingDocsPayload = currentPayload.billing_docs || {
+      waybill_type: 'paper',
       invoice_issued: false,
       invoice_number: null,
       invoice_date: null,
       tn_driver_delivered: false,
+      etrn_signed_edo: false,
       epe_received_edo: false,
       epe_number: null,
       docs_sent_edo: false,
