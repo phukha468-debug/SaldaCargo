@@ -392,12 +392,15 @@ export async function handleVehicleArrival(
       })
       .eq('id', trip.id);
 
-    // Сохраняем счетчик транзитов без стирания флага составного рейса
+    // При промежуточном заезде в Салду: снимаем флаг транзита (prevent_salda_auto_finish: false),
+    // чтобы при следующем окончательном возврате рейс штатно перешел на ревью,
+    // и инкрементируем счетчик заездов salda_transit_count
     await supabase
       .from('orders')
       .update({
         raw_parser_payload: {
           ...(order.raw_parser_payload || {}),
+          prevent_salda_auto_finish: false,
           salda_transit_count: transitCount,
           last_transit_checked_at: Math.floor(Date.now() / 1000),
         },
