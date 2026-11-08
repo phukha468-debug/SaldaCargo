@@ -19,6 +19,7 @@ export interface RouteStop {
 
 export interface BillingDocsWorkflow {
   waybill_type?: 'paper' | 'etrn'; // Строго один из двух: либо бумага (ТрН), либо ЭТрН!
+  waybill_number?: string | null;
   invoice_issued?: boolean;
   invoice_number?: string | null;
   invoice_date?: string | null;
@@ -233,6 +234,20 @@ export function OrdersPipelineView() {
   } | null>(null);
   const [invoiceNumberInput, setInvoiceNumberInput] = useState<string>('');
   const [invoiceDateInput, setInvoiceDateInput] = useState<string>('');
+
+  // Модальные окна ввода ТрН / ЭТрН и ЭПЭ в ЭДО
+  const [waybillModalOrder, setWaybillModalOrder] = useState<{
+    order: OrderItem;
+  } | null>(null);
+  const [waybillTypeInput, setWaybillTypeInput] = useState<'paper' | 'etrn'>('paper');
+  const [waybillNumberInput, setWaybillNumberInput] = useState<string>('');
+  const [waybillDeliveredInput, setWaybillDeliveredInput] = useState<boolean>(true);
+
+  const [epeModalOrder, setEpeModalOrder] = useState<{
+    order: OrderItem;
+  } | null>(null);
+  const [epeNumberInput, setEpeNumberInput] = useState<string>('');
+  const [epeReceivedInput, setEpeReceivedInput] = useState<boolean>(true);
 
   // Модальные окна
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -511,32 +526,81 @@ export function OrdersPipelineView() {
     const cur = order.billing_docs || {};
     billingDocsMutation.mutate({
       orderId: order.id,
-      docs: { ...cur, waybill_type: newType },
+      docs: {
+        ...cur,
+        waybill_type: newType,
+        tn_driver_delivered: newType === 'paper' ? cur.tn_driver_delivered : false,
+        etrn_signed_edo: newType === 'etrn' ? cur.etrn_signed_edo : false,
+      },
     });
   };
 
-  const handleToggleTn = (order: OrderItem) => {
+  const handleOpenWaybillModal = (order: OrderItem) => {
     const cur = order.billing_docs || {};
-    billingDocsMutation.mutate({
-      orderId: order.id,
-      docs: { ...cur, waybill_type: 'paper', tn_driver_delivered: !cur.tn_driver_delivered },
-    });
+    const type = cur.waybill_type || 'paper';
+    setWaybillTypeInput(type);
+    setWaybillNumberInput(cur.waybill_number || order.waybill_number || '');
+    setWaybillDeliveredInput(
+      type === 'etrn' ? Boolean(cur.etrn_signed_edo) : Boolean(cur.tn_driver_delivered ?? true),
+    );
+    setWaybillModalOrder({ order });
   };
 
-  const handleToggleEtrn = (order: OrderItem) => {
+  const handleSaveWaybill = (isReset: boolean = false) => {
+    if (!waybillModalOrder) return;
+    const { order } = waybillModalOrder;
     const cur = order.billing_docs || {};
+    const trimmedNum = waybillNumberInput.trim();
+
+    const updatedDocs: Partial<BillingDocsWorkflow> = {
+      ...cur,
+      waybill_type: waybillTypeInput,
+      waybill_number: isReset ? null : trimmedNum || null,
+      tn_driver_delivered: isReset
+        ? false
+        : waybillTypeInput === 'paper'
+          ? waybillDeliveredInput
+          : false,
+      etrn_signed_edo: isReset
+        ? false
+        : waybillTypeInput === 'etrn'
+          ? waybillDeliveredInput
+          : false,
+    };
+
     billingDocsMutation.mutate({
       orderId: order.id,
-      docs: { ...cur, waybill_type: 'etrn', etrn_signed_edo: !cur.etrn_signed_edo },
+      docs: updatedDocs,
     });
+
+    setWaybillModalOrder(null);
   };
 
-  const handleToggleEpe = (order: OrderItem) => {
+  const handleOpenEpeModal = (order: OrderItem) => {
     const cur = order.billing_docs || {};
+    setEpeNumberInput(cur.epe_number || order.base_doc_number || '');
+    setEpeReceivedInput(cur.epe_received_edo ?? true);
+    setEpeModalOrder({ order });
+  };
+
+  const handleSaveEpe = (isReset: boolean = false) => {
+    if (!epeModalOrder) return;
+    const { order } = epeModalOrder;
+    const cur = order.billing_docs || {};
+    const trimmedNum = epeNumberInput.trim();
+
+    const updatedDocs: Partial<BillingDocsWorkflow> = {
+      ...cur,
+      epe_received_edo: isReset ? false : epeReceivedInput,
+      epe_number: isReset ? null : trimmedNum || null,
+    };
+
     billingDocsMutation.mutate({
       orderId: order.id,
-      docs: { ...cur, epe_received_edo: !cur.epe_received_edo },
+      docs: updatedDocs,
     });
+
+    setEpeModalOrder(null);
   };
 
   const handleToggleDocsSent = (order: OrderItem) => {
@@ -1528,9 +1592,9 @@ export function OrdersPipelineView() {
                 <div className="w-[160px] shrink-0">Транспорт / Водитель</div>
                 <div className="w-[150px] shrink-0">Контрагент</div>
                 <div className="w-[85px] text-right shrink-0">Ставка</div>
-                <div className="w-[130px] text-center shrink-0">1. Счёт</div>
-                <div className="w-[135px] text-center shrink-0">2. ТрН / ЭТрН (строго 1)</div>
-                <div className="w-[105px] text-center shrink-0">3. ЭПЭ в ЭДО</div>
+                <div className="w-[135px] text-center shrink-0">1. Счёт</div>
+                <div className="w-[165px] text-center shrink-0">2. ТрН / ЭТрН (строго 1)</div>
+                <div className="w-[140px] text-center shrink-0">3. ЭПЭ в ЭДО</div>
                 <div className="w-[115px] text-center shrink-0">4. Пакет в ЭДО</div>
                 <div className="w-[155px] text-center shrink-0">5. В оплату (ЭДО)</div>
                 <div className="w-[100px] text-right shrink-0">Печать</div>
@@ -1630,19 +1694,24 @@ export function OrdersPipelineView() {
                     </div>
 
                     {/* 1. Счёт выставлен */}
-                    <div className="w-[130px] flex items-center justify-center shrink-0">
+                    <div className="w-[135px] flex items-center justify-center shrink-0">
                       {docs.invoice_issued && docs.invoice_number ? (
                         <button
                           onClick={() => handleOpenInvoiceModal(order)}
-                          title="Счёт выставлен. Клик — изменить номер или дату"
-                          className="px-2 py-0.8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition truncate max-w-[125px]"
+                          title={`Счёт № ${docs.invoice_number} от ${docs.invoice_date || '—'}. Клик — изменить номер или дату`}
+                          className="px-2 py-0.8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition truncate max-w-[130px]"
                         >
-                          <span>🧾 № {docs.invoice_number}</span>
+                          <span className="truncate">🧾 № {docs.invoice_number}</span>
+                          {docs.invoice_date && (
+                            <span className="text-[9px] text-indigo-400 font-mono">
+                              ({docs.invoice_date.slice(5)})
+                            </span>
+                          )}
                         </button>
                       ) : (
                         <button
                           onClick={() => handleOpenInvoiceModal(order)}
-                          title="Выставить счёт на этот рейс"
+                          title="Выставить счёт на этот рейс (ввести номер и дату)"
                           className="px-2 py-0.8 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded font-semibold text-[10px] flex items-center gap-1 cursor-pointer transition"
                         >
                           <span>+ 🧾 Счёт</span>
@@ -1651,7 +1720,7 @@ export function OrdersPipelineView() {
                     </div>
 
                     {/* 2. Либо ТрН (бумага), либо ЭТрН (электронная) — строго один из двух вариантов! */}
-                    <div className="w-[135px] flex items-center justify-center shrink-0">
+                    <div className="w-[165px] flex items-center justify-center shrink-0">
                       {docs.waybill_type === 'etrn' ? (
                         <div className="flex items-center">
                           <button
@@ -1662,15 +1731,24 @@ export function OrdersPipelineView() {
                             ⚡ ЭТрН
                           </button>
                           <button
-                            onClick={() => handleToggleEtrn(order)}
-                            title="Клик — переключить статус подписания ЭТрН в ЭДО"
-                            className={`px-1.5 py-0.8 rounded-r text-[10px] font-bold border transition cursor-pointer ${
+                            onClick={() => handleOpenWaybillModal(order)}
+                            title="Клик — ввести номер ЭТрН и статус подписания в ЭДО"
+                            className={`px-1.5 py-0.8 rounded-r text-[10px] font-bold border transition cursor-pointer truncate max-w-[115px] ${
                               docs.etrn_signed_edo
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
                                 : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
                             }`}
                           >
-                            {docs.etrn_signed_edo ? '✔ Подписана' : '⏳ Ждём'}
+                            {docs.etrn_signed_edo ? (
+                              <span className="truncate">
+                                ✔{' '}
+                                {docs.waybill_number || order.waybill_number
+                                  ? `№ ${docs.waybill_number || order.waybill_number}`
+                                  : 'Подписана'}
+                              </span>
+                            ) : (
+                              <span>⏳ Ждём (+№)</span>
+                            )}
                           </button>
                         </div>
                       ) : (
@@ -1683,33 +1761,53 @@ export function OrdersPipelineView() {
                             📄 ТрН
                           </button>
                           <button
-                            onClick={() => handleToggleTn(order)}
-                            title="Клик — отметить сдачу оригинала ТрН водителем"
-                            className={`px-1.5 py-0.8 rounded-r text-[10px] font-bold border transition cursor-pointer ${
+                            onClick={() => handleOpenWaybillModal(order)}
+                            title="Клик — ввести номер ТрН и подтвердить сдачу водителем"
+                            className={`px-1.5 py-0.8 rounded-r text-[10px] font-bold border transition cursor-pointer truncate max-w-[115px] ${
                               docs.tn_driver_delivered
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
                                 : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
                             }`}
                           >
-                            {docs.tn_driver_delivered ? '✔ Сдана' : '❌ Ждём'}
+                            {docs.tn_driver_delivered ? (
+                              <span className="truncate">
+                                ✔{' '}
+                                {docs.waybill_number || order.waybill_number
+                                  ? `№ ${docs.waybill_number || order.waybill_number}`
+                                  : 'Сдана'}
+                              </span>
+                            ) : (
+                              <span>❌ Ждём (+№)</span>
+                            )}
                           </button>
                         </div>
                       )}
                     </div>
 
                     {/* 3. ЭПЭ пришло в ЭДО */}
-                    <div className="w-[105px] flex items-center justify-center shrink-0">
-                      <button
-                        onClick={() => handleToggleEpe(order)}
-                        title="Клик — переключить статус поступления Электронного поручения (ЭПЭ) в ЭДО"
-                        className={`px-2 py-0.8 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition ${
-                          docs.epe_received_edo
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
-                        }`}
-                      >
-                        <span>{docs.epe_received_edo ? '✔ ЭПЭ в ЭДО' : '⏳ Ждём ЭПЭ'}</span>
-                      </button>
+                    <div className="w-[140px] flex items-center justify-center shrink-0">
+                      {docs.epe_received_edo ? (
+                        <button
+                          onClick={() => handleOpenEpeModal(order)}
+                          title={`ЭПЭ поступило в ЭДО (${docs.epe_number || order.base_doc_number || ''}). Клик — изменить`}
+                          className="px-2 py-0.8 rounded font-bold text-[10.5px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 cursor-pointer transition truncate max-w-[135px]"
+                        >
+                          <span className="truncate">
+                            ✔{' '}
+                            {docs.epe_number || order.base_doc_number
+                              ? `ЭПЭ ${docs.epe_number || order.base_doc_number}`
+                              : 'ЭПЭ в ЭДО'}
+                          </span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenEpeModal(order)}
+                          title="Клик — вписать входящий номер ЭПЭ и зафиксировать поступление в ЭДО"
+                          className="px-2 py-0.8 rounded font-semibold text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 flex items-center gap-1 cursor-pointer transition"
+                        >
+                          <span>+ 📥 ЭПЭ в ЭДО</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* 4. Отправлены все документы по ЭДО */}
@@ -1864,6 +1962,219 @@ export function OrdersPipelineView() {
                 <button
                   type="button"
                   onClick={() => handleSaveInvoice(true)}
+                  className="px-3.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── МОДАЛЬНОЕ ОКНО ВВОДА ТрН / ЭТрН ── */}
+      {waybillModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-sm w-full p-4 shadow-xl space-y-3 text-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 truncate">
+                <span>📄 Транспортная накладная:</span>
+                <span className="text-indigo-600 font-black">
+                  {waybillModalOrder.order.trip?.trip_number
+                    ? `Рейс № ${waybillModalOrder.order.trip.trip_number}`
+                    : `Заявка № ${waybillModalOrder.order.base_doc_number || waybillModalOrder.order.order_number}`}
+                </span>
+              </div>
+              <button
+                onClick={() => setWaybillModalOrder(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-base cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-500 font-medium">
+              {waybillModalOrder.order.client?.name} • Авто:{' '}
+              {waybillModalOrder.order.vehicle?.reg_number || '—'}
+            </div>
+
+            <div className="space-y-2.5">
+              {/* Переключатель формата накладной: Бумажная ТрН vs ЭТрН */}
+              <div>
+                <label className="text-[10.5px] font-bold text-slate-700 block mb-1">
+                  Формат накладной (строго один)
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setWaybillTypeInput('paper')}
+                    className={`py-1 rounded text-xs font-bold transition cursor-pointer ${
+                      waybillTypeInput === 'paper'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📄 Бумажная ТрН
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWaybillTypeInput('etrn')}
+                    className={`py-1 rounded text-xs font-bold transition cursor-pointer ${
+                      waybillTypeInput === 'etrn'
+                        ? 'bg-purple-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    ⚡ Электронная (ЭТрН)
+                  </button>
+                </div>
+              </div>
+
+              {/* Номер накладной */}
+              <div>
+                <label className="text-[10.5px] font-bold text-slate-700 block mb-1">
+                  Номер накладной (ТрН / ЭТрН)
+                </label>
+                <input
+                  type="text"
+                  value={waybillNumberInput}
+                  onChange={(e) => setWaybillNumberInput(e.target.value)}
+                  placeholder="Например, 1664 или ТрН-26/1664"
+                  className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Статус сдачи / подписания */}
+              <label className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={waybillDeliveredInput}
+                  onChange={(e) => setWaybillDeliveredInput(e.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span className="text-[11px] font-bold text-slate-800">
+                  {waybillTypeInput === 'paper'
+                    ? 'Оригинал ТрН сдан водителем'
+                    : 'ЭТрН подписана в ЭДО'}
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => handleSaveWaybill(true)}
+                className="px-2 py-1 text-rose-600 hover:bg-rose-50 rounded text-xs font-bold cursor-pointer"
+              >
+                Снять отметку
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWaybillModalOrder(null)}
+                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold cursor-pointer"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveWaybill(false)}
+                  className="px-3.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── МОДАЛЬНОЕ ОКНО ВВОДА ЭПЭ В ЭДО ── */}
+      {epeModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-sm w-full p-4 shadow-xl space-y-3 text-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 truncate">
+                <span>📥 ЭПЭ в ЭДО:</span>
+                <span className="text-indigo-600 font-black">
+                  {epeModalOrder.order.trip?.trip_number
+                    ? `Рейс № ${epeModalOrder.order.trip.trip_number}`
+                    : `Заявка № ${epeModalOrder.order.order_number}`}
+                </span>
+              </div>
+              <button
+                onClick={() => setEpeModalOrder(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-base cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-500 font-medium">
+              {epeModalOrder.order.client?.name} • Электронное поручение экспедитору
+            </div>
+
+            <div className="space-y-2.5">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10.5px] font-bold text-slate-700">Номер ЭПЭ</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!epeNumberInput.includes('/2026') && !epeNumberInput.includes('\\2026')) {
+                        setEpeNumberInput((prev) => (prev ? `${prev}/2026` : '793/2026'));
+                      }
+                    }}
+                    className="text-[9.5px] text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
+                  >
+                    + /2026
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={epeNumberInput}
+                  onChange={(e) => setEpeNumberInput(e.target.value)}
+                  placeholder="Например, 793/2026"
+                  className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Номер зафиксируется в заявке и отобразится во всех разделах.
+                </span>
+              </div>
+
+              {/* Чекбокс: ЭПЭ пришло в ЭДО */}
+              <label className="flex items-center gap-2 p-2 bg-emerald-50/70 border border-emerald-200 rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={epeReceivedInput}
+                  onChange={(e) => setEpeReceivedInput(e.target.checked)}
+                  className="rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                />
+                <span className="text-[11px] font-bold text-emerald-900">
+                  ЭПЭ поступило и доступно в ЭДО
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => handleSaveEpe(true)}
+                className="px-2 py-1 text-rose-600 hover:bg-rose-50 rounded text-xs font-bold cursor-pointer"
+              >
+                Снять ЭПЭ
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEpeModalOrder(null)}
+                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold cursor-pointer"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveEpe(false)}
                   className="px-3.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold shadow-xs cursor-pointer"
                 >
                   Сохранить

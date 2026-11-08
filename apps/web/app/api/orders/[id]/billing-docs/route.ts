@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export interface BillingDocsPayload {
   waybill_type?: 'paper' | 'etrn'; // Либо бумага (ТрН), либо ЭТрН (строго одно из двух!)
+  waybill_number?: string | null;
   invoice_issued?: boolean;
   invoice_number?: string | null;
   invoice_date?: string | null;
@@ -39,13 +40,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const currentPayload = currentOrder.raw_parser_payload || {};
     const existingDocs: BillingDocsPayload = currentPayload.billing_docs || {
       waybill_type: 'paper',
+      waybill_number: currentOrder.waybill_number || null,
       invoice_issued: false,
       invoice_number: null,
       invoice_date: null,
       tn_driver_delivered: false,
       etrn_signed_edo: false,
       epe_received_edo: false,
-      epe_number: null,
+      epe_number: currentOrder.base_doc_number || null,
       docs_sent_edo: false,
       docs_sent_at: null,
       client_accepted_edo: false,
@@ -123,6 +125,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       raw_parser_payload: updatedPayload,
       updated_at: new Date().toISOString(),
     };
+
+    if (mergedDocs.epe_number && mergedDocs.epe_number.trim()) {
+      updateFields.base_doc_number = mergedDocs.epe_number.trim();
+      updateFields.internal_order_number = mergedDocs.epe_number.trim();
+    }
+
+    if (mergedDocs.waybill_number && mergedDocs.waybill_number.trim()) {
+      updateFields.waybill_number = mergedDocs.waybill_number.trim();
+    }
 
     if (body.client_accepted_edo === true) {
       updateFields.status = 'completed';
