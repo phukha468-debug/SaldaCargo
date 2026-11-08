@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export interface RouteStop {
@@ -1553,10 +1553,11 @@ function CreateSmartOrderModal({
     // По умолчанию для новой заявки (по скриншоту пользователя: Геостройиндустрия, Шайтанка -> Маминское)
     const valdaiCar = vehicles.find((v: any) => v.reg_number?.includes('188')) || vehicles[0];
     const nasrtdinov = drivers.find((d: any) => d.name?.includes('Насртдинов')) || drivers[0];
+    const today = new Date().toISOString().slice(0, 10);
 
     return {
-      base_doc_number: '1',
-      base_doc_date: '2026-11-06',
+      base_doc_number: '',
+      base_doc_date: today,
       client_id: '',
       client_name: 'ООО "Геостройиндустрия"',
       client_inn: '6623101234',
@@ -1581,13 +1582,35 @@ function CreateSmartOrderModal({
       payment_method: 'bank_invoice',
       payment_terms: 'Безналичный расчет (Дебиторская задолженность)',
 
-      planned_loading_at: '2026-11-06T08:00',
-      planned_delivery_at: '2026-11-06T18:00',
+      planned_loading_at: `${today}T08:00`,
+      planned_delivery_at: `${today}T18:00`,
 
       assigned_vehicle_id: valdaiCar?.id || '',
       assigned_driver_id: nasrtdinov?.id || '',
     };
   });
+
+  // Загружаем следующий порядковый номер рейса
+  const [nextTripNumber, setNextTripNumber] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isEditing) {
+      fetch('/api/orders/next-number')
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.nextNumber) {
+            setNextTripNumber(data.nextNumber);
+            setForm((prev: any) => {
+              if (!prev.base_doc_number || prev.base_doc_number === '1') {
+                return { ...prev, base_doc_number: String(data.nextNumber) };
+              }
+              return prev;
+            });
+          }
+        })
+        .catch((err) => console.warn('Ошибка загрузки следующего номера рейса:', err));
+    }
+  }, [isEditing]);
 
   // Быстрое переключение пресетов
   const selectClientPreset = (type: 'vsmpo' | 'geostroy' | 'manual') => {
@@ -1972,12 +1995,27 @@ function CreateSmartOrderModal({
           {/* Секция 1: Реквизиты и участники */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             <div>
-              <label className="font-bold text-slate-700 block mb-0.5">№ Поручения / Заявки</label>
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="font-bold text-slate-700">№ Заявки / Рейса</label>
+                {nextTripNumber && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((prev: any) => ({ ...prev, base_doc_number: String(nextTripNumber) }))
+                    }
+                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer transition hover:underline"
+                    title="Привязать номер заявки к следующему рейсу по очереди"
+                  >
+                    След. рейс #{nextTripNumber}
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 required
                 value={form.base_doc_number}
                 onChange={(e) => setForm({ ...form, base_doc_number: e.target.value })}
+                placeholder={nextTripNumber ? String(nextTripNumber) : 'Напр. 987'}
                 className="w-full p-1.5 border border-slate-300 rounded bg-slate-50 font-bold"
               />
             </div>

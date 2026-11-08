@@ -136,19 +136,33 @@ export async function handleVehicleDeparture(
     ? `⚠️ Внимание: Автомашина выехала без заявки по геозоне Wialon! Заявка № ${targetOrder.base_doc_number}. Необходимо заполнить все данные.`
     : `Авто-старт по геозоне Wialon. Заявка № ${targetOrder.base_doc_number || targetOrder.order_number}`;
 
+  // Парсим номер рейса из номера заявки, чтобы связать их строго 1:1
+  const rawOrderNum =
+    targetOrder.base_doc_number || targetOrder.internal_order_number || targetOrder.order_number;
+  const cleanNumStr = String(rawOrderNum || '')
+    .replace(/^№\s*/, '')
+    .replace(/^Заявка\s*№?\s*/i, '');
+  const parsedTripNum = parseInt((cleanNumStr.split('/')[0] || '').trim(), 10);
+
+  const tripInsertPayload: Record<string, any> = {
+    asset_id: params.vehicleId,
+    driver_id: driverId,
+    trip_type: 'intercity',
+    status: 'in_progress',
+    lifecycle_status: 'draft',
+    odometer_start: params.odometer,
+    started_at: departureTime,
+    driver_note: tripNote,
+  };
+
+  if (!isNaN(parsedTripNum) && parsedTripNum > 0 && parsedTripNum < 100000) {
+    tripInsertPayload.trip_number = parsedTripNum;
+  }
+
   // Создаем связанный рейс в таблице trips
   const { data: newTrip, error: tripErr } = await supabase
     .from('trips')
-    .insert({
-      asset_id: params.vehicleId,
-      driver_id: driverId,
-      trip_type: 'intercity',
-      status: 'in_progress',
-      lifecycle_status: 'draft',
-      odometer_start: params.odometer,
-      started_at: departureTime,
-      driver_note: tripNote,
-    })
+    .insert(tripInsertPayload)
     .select()
     .single();
 

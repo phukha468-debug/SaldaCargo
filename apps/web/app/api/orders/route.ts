@@ -55,6 +55,37 @@ export async function POST(req: Request) {
     const body = await req.json();
     const supabase = createAdminClient();
 
+    let finalDocNumber = body.base_doc_number;
+    if (!finalDocNumber || finalDocNumber === '1') {
+      const { data: maxTrip } = await (supabase.from('trips') as any)
+        .select('trip_number')
+        .order('trip_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const { data: recentOrders } = await (supabase.from('orders') as any)
+        .select('base_doc_number, internal_order_number')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      let maxOrderNum = 0;
+      for (const o of recentOrders || []) {
+        const clean1 = String(o.base_doc_number || '')
+          .replace(/^№\s*/, '')
+          .replace(/^Заявка\s*№?\s*/i, '');
+        const num1 = parseInt((clean1.split('/')[0] || '').trim(), 10);
+        if (!isNaN(num1) && num1 > maxOrderNum && num1 < 100000) maxOrderNum = num1;
+
+        const clean2 = String(o.internal_order_number || '')
+          .replace(/^№\s*/, '')
+          .replace(/^Заявка\s*№?\s*/i, '');
+        const num2 = parseInt((clean2.split('/')[0] || '').trim(), 10);
+        if (!isNaN(num2) && num2 > maxOrderNum && num2 < 100000) maxOrderNum = num2;
+      }
+      const nextNum = Math.max(maxTrip?.trip_number || 0, maxOrderNum) + 1;
+      finalDocNumber = String(nextNum);
+    }
+
     const insertPayload: any = {
       source_type: body.source_type || 'direct_ad',
       status:
@@ -62,9 +93,9 @@ export async function POST(req: Request) {
           ? 'assigned'
           : body.status || 'waiting_vehicle',
       base_doc_name: body.base_doc_name || 'Поручение экспедитору',
-      base_doc_number: body.base_doc_number || null,
-      base_doc_date: body.base_doc_date || null,
-      internal_order_number: body.internal_order_number || body.base_doc_number || null,
+      base_doc_number: finalDocNumber,
+      base_doc_date: body.base_doc_date || new Date().toISOString().slice(0, 10),
+      internal_order_number: body.internal_order_number || finalDocNumber,
 
       client_id: body.client_id || null,
       forwarder_id: body.forwarder_id || null,
@@ -112,7 +143,7 @@ export async function POST(req: Request) {
 
     if (insertPayload.assigned_vehicle_id && !insertPayload.waybill_number) {
       const year = String(new Date().getFullYear()).slice(-2);
-      insertPayload.waybill_number = `ПЛ-${year}/${Math.floor(1000 + Math.random() * 9000)}`;
+      insertPayload.waybill_number = `ПЛ-${year}/${finalDocNumber}`;
     }
 
     const { data: created, error } = await (supabase.from('orders') as any)

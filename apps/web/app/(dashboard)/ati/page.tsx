@@ -166,8 +166,25 @@ export default function AtiPage() {
 
   // Форма новой заявки
   const [newOrderNumber, setNewOrderNumber] = useState(
-    `№ 002 от ${new Date().toLocaleDateString('ru-RU')}`,
+    `№ ... от ${new Date().toLocaleDateString('ru-RU')}`,
   );
+
+  useEffect(() => {
+    fetch('/api/orders/next-number')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.nextNumber) {
+          const dateStr = new Date().toLocaleDateString('ru-RU');
+          setNewOrderNumber((prev) => {
+            if (prev.includes('№ ...')) {
+              return `№ ${data.nextNumber} от ${dateStr}`;
+            }
+            return prev;
+          });
+        }
+      })
+      .catch((err) => console.warn('Ошибка получения след. номера рейса:', err));
+  }, []);
   const [newCounterpartyMode, setNewCounterpartyMode] = useState<'select' | 'create'>('select');
   const [selectedCpId, setSelectedCpId] = useState('');
   const [newCpName, setNewCpName] = useState('');
