@@ -225,7 +225,8 @@ export function OrdersPipelineView() {
     },
   });
 
-  // Фоновая и ручная синхронизация Wialon
+  // Ручная синхронизация Wialon по кнопке администратора (автоматический опрос Wialon из браузера отключен:
+  // синхронизация происходит строго через Вебхук Wialon либо серверный крон GitHub Actions)
   const wialonSyncMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch('/api/cron/wialon-sync', { method: 'POST' });
@@ -239,20 +240,6 @@ export function OrdersPipelineView() {
       queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['vehicles-list'] });
     },
-  });
-
-  useQuery({
-    queryKey: ['wialon-telematics-sync'],
-    queryFn: async () => {
-      const res = await fetch('/api/cron/wialon-sync');
-      if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
-        queryClient.invalidateQueries({ queryKey: ['vehicles-list'] });
-      }
-      return res.ok ? res.json() : null;
-    },
-    refetchInterval: 45000,
-    refetchOnWindowFocus: true,
   });
 
   // Мутация Wialon (выезд / приезд)

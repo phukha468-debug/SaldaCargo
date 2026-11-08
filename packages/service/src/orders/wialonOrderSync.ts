@@ -55,6 +55,84 @@ export async function handleVehicleDeparture(
 ) {
   const departureTime = params.timestamp || new Date().toISOString();
 
+  // 0. Проверяем, есть ли уже активная заявка в статусе in_progress (выезд после промежуточного транзита через Салду)
+  const { data: inProgressOrder } = await supabase
+    .from('orders')
+    .select('*, trip:trips!orders_active_trip_id_fkey(*)')
+    .eq('assigned_vehicle_id', params.vehicleId)
+    .eq('status', 'in_progress')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (inProgressOrder) {
+    console.log(
+      `[Wialon] 🚚 Автомобиль ${params.vehicleId} выехал из Салды, продолжая текущий рейс (заявка ${inProgressOrder.base_doc_number || inProgressOrder.order_number}). Новая заявка НЕ создается.`,
+    );
+
+    // Обновляем одометр актива (только если новый одометр больше текущего)
+    const { data: curAsset } = await supabase
+      .from('assets')
+      .select('odometer_current')
+      .eq('id', params.vehicleId)
+      .single();
+
+    if (params.odometer > (curAsset?.odometer_current || 0)) {
+      await supabase
+        .from('assets')
+        .update({ odometer_current: params.odometer, updated_at: new Date().toISOString() })
+        .eq('id', params.vehicleId);
+    }
+
+    // Снимаем флаг запрета автозавершения (если он был взведен для первого заезда)
+    if (
+      inProgressOrder.prevent_salda_auto_finish ||
+      inProgressOrder.raw_parser_payload?.prevent_salda_auto_finish
+    ) {
+      await supabase
+        .from('orders')
+        .update({
+          prevent_salda_auto_finish: false,
+          raw_parser_payload: {
+            ...(inProgressOrder.raw_parser_payload || {}),
+            prevent_salda_auto_finish: false,
+            departed_after_transit_at: departureTime,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', inProgressOrder.id);
+    }
+
+    // Фиксируем выезд после транзита в заметке рейса
+    const tripObj = Array.isArray(inProgressOrder.trip)
+      ? inProgressOrder.trip[0]
+      : inProgressOrder.trip;
+    if (tripObj?.id) {
+      const prevNote = tripObj.driver_note || '';
+      const departNote = `[Выезд из Салды (продолжение рейса): ${departureTime.slice(11, 16)}, одометр: ${params.odometer} км]`;
+      if (!prevNote.includes(departNote)) {
+        await supabase
+          .from('trips')
+          .update({
+            driver_note: `${prevNote}\n${departNote}`.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', tripObj.id);
+      }
+    }
+
+    return {
+      success: true,
+      isEmergency: false,
+      isTransitContinuation: true,
+      orderId: inProgressOrder.id,
+      tripId: inProgressOrder.active_trip_id,
+      departureTime,
+      status: 'in_progress',
+      message: 'Продолжение активного рейса после выезда из Салды (транзит)',
+    };
+  }
+
   // Ищем активную назначенную заявку на этот автомобиль
   const { data: order, error: orderErr } = await supabase
     .from('orders')
