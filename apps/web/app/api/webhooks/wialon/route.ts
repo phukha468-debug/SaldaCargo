@@ -108,7 +108,13 @@ async function findAssetByWialonUnit(supabase: any, unitStr: string, unitIdStr?:
  */
 async function processWialonEvent(req: Request) {
   try {
-    const url = new URL(req.url);
+    const rawUrl = req.url;
+    const firstQ = rawUrl.indexOf('?');
+    const cleanUrlString =
+      firstQ !== -1
+        ? rawUrl.slice(0, firstQ + 1) + rawUrl.slice(firstQ + 1).replace(/\?/g, '&')
+        : rawUrl;
+    const url = new URL(cleanUrlString);
     let payload: Record<string, any> = {};
 
     if (req.method === 'POST') {
