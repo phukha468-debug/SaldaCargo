@@ -92,7 +92,6 @@ export async function handleVehicleDeparture(
       await supabase
         .from('orders')
         .update({
-          prevent_salda_auto_finish: false,
           raw_parser_payload: {
             ...(inProgressOrder.raw_parser_payload || {}),
             prevent_salda_auto_finish: false,

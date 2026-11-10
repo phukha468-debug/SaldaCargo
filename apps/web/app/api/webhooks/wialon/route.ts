@@ -226,17 +226,11 @@ async function processWialonEvent(req: Request) {
       return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
     }
 
-    // Защита от скручивания/занижения одометра:
-    // Если трекер Wialon передает относительный пробег (например, 63 тыс. км вместо 247 тыс. км приборки),
-    // берем актуальный одометр актива из базы данных.
+    // Приоритет одометра:
+    // Если Wialon передает реальный одометр трекера (например 139xxx км), используем его напрямую.
+    // Это гарантирует, что разница (odoEnd - odoStart) считается в единой шкале трекера Wialon.
     const currentAssetOdo = Number(asset.odometer_current || 0);
-    const isWialonRelative = currentAssetOdo > 0 && odometer && odometer < currentAssetOdo - 1000;
-
-    const odoValue = isWialonRelative
-      ? currentAssetOdo
-      : odometer && odometer > 0
-        ? Math.max(odometer, currentAssetOdo)
-        : currentAssetOdo || 120000;
+    const odoValue = odometer && odometer > 0 ? Math.round(odometer) : currentAssetOdo || 120000;
 
     // Проверяем текст уведомления (например "%UNIT% вышел из %ZONE%." или "Выход из геозоны")
     const fullTextCandidate =
