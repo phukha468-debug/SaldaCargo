@@ -112,24 +112,39 @@ async function processWialonEvent(req: Request) {
     let payload: Record<string, any> = {};
 
     if (req.method === 'POST') {
-      const contentType = req.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        try {
-          payload = await req.json();
-        } catch {
-          payload = {};
+      try {
+        const rawBody = await req.text();
+        if (rawBody) {
+          try {
+            const parsed = JSON.parse(rawBody);
+            if (parsed && typeof parsed === 'object') {
+              payload = { ...parsed };
+            }
+          } catch {
+            if (rawBody.includes('=')) {
+              const sp = new URLSearchParams(rawBody);
+              sp.forEach((val, key) => {
+                payload[key] = val;
+              });
+            }
+            payload.raw_body = rawBody;
+            if (!payload.text) {
+              payload.text = rawBody;
+            }
+          }
         }
-      } else if (contentType.includes('application/x-www-form-urlencoded')) {
-        const formData = await req.formData();
-        formData.forEach((val, key) => {
-          payload[key] = val.toString();
-        });
+      } catch (e) {
+        console.warn('[Wialon Webhook] Ошибка чтения POST body:', e);
       }
     }
 
-    // Параметры из query string перекрывают или дополняют body
+    // Параметры из query string перекрывают или дополняют body (если они не нераскрытые макросы вроде %UNIT%)
     url.searchParams.forEach((val, key) => {
-      payload[key] = val;
+      if (!val.startsWith('%') || !val.endsWith('%')) {
+        payload[key] = val;
+      } else if (!payload[key]) {
+        payload[key] = val;
+      }
     });
 
     // Извлечение ключевых параметров Wialon
@@ -141,6 +156,7 @@ async function processWialonEvent(req: Request) {
         payload.status ||
         payload.notification ||
         payload.text ||
+        payload.raw_body ||
         '',
     )
       .trim()
@@ -150,9 +166,14 @@ async function processWialonEvent(req: Request) {
       payload.unit || payload.unit_name || payload.unitName || payload.name || '',
     ).trim();
 
+    // Если передан нераскрытый тег Wialon "%UNIT%", сбрасываем его
+    if (unitStr.startsWith('%') && unitStr.endsWith('%')) {
+      unitStr = '';
+    }
+
     // Если имя объекта не передано отдельным полем, но есть текст уведомления
-    if (!unitStr && payload.text) {
-      unitStr = String(payload.text);
+    if (!unitStr && (payload.text || payload.raw_body)) {
+      unitStr = String(payload.text || payload.raw_body);
     }
 
     const unitIdStr = payload.unit_id ? String(payload.unit_id) : undefined;
@@ -165,6 +186,9 @@ async function processWialonEvent(req: Request) {
 
     let rawOdo =
       payload.odometer ?? payload.odo ?? payload.mileage ?? payload.mileage_km ?? payload.km;
+    if (typeof rawOdo === 'string' && rawOdo.startsWith('%') && rawOdo.endsWith('%')) {
+      rawOdo = undefined;
+    }
     let odometer: number | undefined = undefined;
     if (rawOdo !== undefined && rawOdo !== null) {
       if (typeof rawOdo === 'string') {
