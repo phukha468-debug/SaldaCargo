@@ -135,12 +135,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (stage === 'in_progress' && !order.actual_loading_arrival_at) {
       updateOrderPayload.actual_loading_arrival_at = now;
     }
-    if (
-      ['pending_review', 'docs_collection', 'completed'].includes(stage) &&
-      !order.actual_delivery_arrival_at
-    ) {
-      updateOrderPayload.actual_delivery_arrival_at = now;
-    }
 
     const { data: updatedOrder, error: updateErr } = await (supabase.from('orders') as any)
       .update(updateOrderPayload)

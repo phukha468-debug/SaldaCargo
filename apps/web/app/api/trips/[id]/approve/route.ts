@@ -64,7 +64,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const supabase = createAdminClient();
 
   const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
-    .select('id, lifecycle_status')
+    .select('id, lifecycle_status, trip_number, asset_id')
     .eq('id', id)
     .single();
 
@@ -92,10 +92,41 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .eq('trip_id', id)
     .neq('lifecycle_status', 'cancelled');
 
-  // Синхронизируем статус связанной заявки в orders -> перевод в docs_collection (Сбор документов)
-  await (supabase.from('orders') as any)
-    .update({ status: 'docs_collection', updated_at: new Date().toISOString() })
-    .eq('active_trip_id', id);
+  // Синхронизируем статус связанных заявок в orders:
+  // Если это одна из 3-х фирм (ВСМПО, Ависма, Геострой) -> docs_collection (Сбор документов)
+  // Иначе -> completed (Завершен)
+  const isStrictDocCounterparty = (name?: string | null) => {
+    if (!name) return false;
+    const n = name.toLowerCase();
+    return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
+  };
+
+  const orConditions = [`active_trip_id.eq.${id}`];
+  if (trip.trip_number) orConditions.push(`order_number.eq.${trip.trip_number}`);
+  if (trip.asset_id) orConditions.push(`assigned_vehicle_id.eq.${trip.asset_id}`);
+
+  const { data: linkedOrders } = await (supabase.from('orders') as any)
+    .select('id, status, client:counterparties!orders_client_id_fkey(name)')
+    .or(orConditions.join(','))
+    .neq('status', 'cancelled');
+
+  if (linkedOrders && linkedOrders.length > 0) {
+    for (const ord of linkedOrders) {
+      const is3Firms = isStrictDocCounterparty(ord.client?.name);
+      const targetStatus = is3Firms ? 'docs_collection' : 'completed';
+      await (supabase.from('orders') as any)
+        .update({
+          status: targetStatus,
+          active_trip_id: id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', ord.id);
+    }
+  } else {
+    await (supabase.from('orders') as any)
+      .update({ status: 'docs_collection', updated_at: new Date().toISOString() })
+      .eq('active_trip_id', id);
+  }
 
   await syncTripFinancials(supabase, id, adminId);
   await updateAssetFuelAfterApproval(supabase, id);

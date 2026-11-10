@@ -33,17 +33,50 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const enriched = (data || []).map((o: any) => ({
-      ...o,
-      routes_json: o.routes_json || o.raw_parser_payload?.routes || [],
-      prevent_salda_auto_finish: Boolean(
-        o.prevent_salda_auto_finish || o.raw_parser_payload?.prevent_salda_auto_finish,
-      ),
-      salda_transit_count: Number(
-        o.salda_transit_count || o.raw_parser_payload?.salda_transit_count || 0,
-      ),
-      billing_docs: o.raw_parser_payload?.billing_docs || null,
-    }));
+    const isStrictDocCounterparty = (name?: string | null) => {
+      if (!name) return false;
+      const n = name.toLowerCase();
+      return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
+    };
+
+    const enriched = (data || []).map((o: any) => {
+      let currentStatus = o.status;
+
+      // Автоматическая фоновая синхронизация со связанным рейсом (trips)
+      if (o.trip) {
+        if (o.trip.lifecycle_status === 'approved') {
+          const targetStatus = isStrictDocCounterparty(o.client?.name)
+            ? 'docs_collection'
+            : 'completed';
+          if (currentStatus === 'in_progress' || currentStatus === 'pending_review') {
+            currentStatus = targetStatus;
+            (supabase.from('orders') as any)
+              .update({ status: targetStatus, updated_at: new Date().toISOString() })
+              .eq('id', o.id)
+              .then();
+          }
+        } else if (o.trip.status === 'completed' && currentStatus === 'in_progress') {
+          currentStatus = 'pending_review';
+          (supabase.from('orders') as any)
+            .update({ status: 'pending_review', updated_at: new Date().toISOString() })
+            .eq('id', o.id)
+            .then();
+        }
+      }
+
+      return {
+        ...o,
+        status: currentStatus,
+        routes_json: o.routes_json || o.raw_parser_payload?.routes || [],
+        prevent_salda_auto_finish: Boolean(
+          o.prevent_salda_auto_finish || o.raw_parser_payload?.prevent_salda_auto_finish,
+        ),
+        salda_transit_count: Number(
+          o.salda_transit_count || o.raw_parser_payload?.salda_transit_count || 0,
+        ),
+        billing_docs: o.raw_parser_payload?.billing_docs || null,
+      };
+    });
 
     return NextResponse.json({ orders: enriched });
   } catch (err: any) {

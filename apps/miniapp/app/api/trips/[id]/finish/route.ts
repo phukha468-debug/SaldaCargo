@@ -238,5 +238,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
+  // 7. Автоматически переводим связанную заявку в orders в статус 'pending_review' («На ревью»)
+  try {
+    const orConds = [`active_trip_id.eq.${id}`];
+    if (trip.trip_number) orConds.push(`order_number.eq.${trip.trip_number}`);
+    if (trip.asset_id) orConds.push(`assigned_vehicle_id.eq.${trip.asset_id}`);
+
+    const { data: linkedOrders } = await (supabase.from('orders') as any)
+      .select('id, status')
+      .or(orConds.join(','))
+      .in('status', ['waiting_vehicle', 'assigned', 'in_progress']);
+
+    if (linkedOrders && linkedOrders.length > 0) {
+      for (const ord of linkedOrders) {
+        await (supabase.from('orders') as any)
+          .update({
+            status: 'pending_review',
+            active_trip_id: id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', ord.id);
+      }
+    }
+  } catch (syncErr) {
+    console.error('Ошибка синхронизации заказа при завершении рейса водителем:', syncErr);
+  }
+
   return NextResponse.json(data);
 }
