@@ -84,10 +84,13 @@ export async function handleVehicleDeparture(
         .eq('id', params.vehicleId);
     }
 
-    // Снимаем флаг запрета автозавершения (если он был взведен для первого заезда)
+    // При выезде из геозоны Салды после транзита:
+    // фиксируем время выезда и снимаем in_salda_transit / prevent_salda_auto_finish,
+    // чтобы при следующем окончательном возвращении на базу рейс смог штатно перейти на ревью.
     if (
       inProgressOrder.prevent_salda_auto_finish ||
-      inProgressOrder.raw_parser_payload?.prevent_salda_auto_finish
+      inProgressOrder.raw_parser_payload?.prevent_salda_auto_finish ||
+      inProgressOrder.raw_parser_payload?.in_salda_transit
     ) {
       await supabase
         .from('orders')
@@ -95,6 +98,7 @@ export async function handleVehicleDeparture(
           raw_parser_payload: {
             ...(inProgressOrder.raw_parser_payload || {}),
             prevent_salda_auto_finish: false,
+            in_salda_transit: false,
             departed_after_transit_at: departureTime,
           },
           updated_at: new Date().toISOString(),
@@ -348,58 +352,76 @@ export async function handleVehicleArrival(
   const arrivalDate = new Date(arrivalTime);
   const diffMinutes = Math.max(1, (arrivalDate.getTime() - startDate.getTime()) / (1000 * 60));
 
-  // Проверка составного рейса или явного запрета завершения
-  const routes = (order.raw_parser_payload?.routes || []) as any[];
-  const hasMultipleLegs = routes.length > 1;
+  // Явный запрет автозавершения (выставляется вручную или при первом транзитном заезде)
   const isTransitExplicitlyAllowed = Boolean(
     order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
   );
 
-  // Проверка: выезд из внешнего пункта (например Шайтанка), когда межгород только начался
+  // Проверка: погрузка НЕ в Салде (например, Шайтанка) — машина могла заехать в Салду транзитом
+  // в начале рейса, не завершив его. Только с этим условием блокируем автофиниш.
+  // isExternalDestination (разгрузка не в Салде) — НАМЕРЕННО исключено: это норма для 100% рейсов
+  // и не должно блокировать завершение.
   const isExternalOrigin =
     order.loading_address_json?.raw &&
     !order.loading_address_json.raw.toLowerCase().includes('салда');
-  const isExternalDestination =
-    order.unloading_address_json?.city &&
-    !order.unloading_address_json.city.toLowerCase().includes('салда');
 
-  // Если машина в пути менее 45 минут при межгороде или внешнем пункте погрузки — это транзитный проезд на старте!
-  const isEarlyTransit = diffMinutes < 45 && (isExternalOrigin || isExternalDestination);
+  // Если машина в пути менее 45 минут И погрузка была НЕ из Салды — транзитный проезд на старте
+  const isEarlyTransit = diffMinutes < 45 && Boolean(isExternalOrigin);
 
-  if ((isTransitExplicitlyAllowed || hasMultipleLegs || isEarlyTransit) && !params.forceFinish) {
+  // hasMultipleLegs убран: наличие нескольких точек в заявке не означает незавершённость рейса
+  // и приводило к тому, что рейс застревал навсегда без ревью.
+
+  if ((isTransitExplicitlyAllowed || isEarlyTransit) && !params.forceFinish) {
     const transitCount =
       ((order.raw_parser_payload?.salda_transit_count ?? order.salda_transit_count) || 0) + 1;
+    const transitReason = isTransitExplicitlyAllowed
+      ? 'явный запрет (prevent_salda_auto_finish)'
+      : `ранний заезд (${Math.round(diffMinutes)} мин, погрузка вне Салды)`;
     console.log(
-      `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount} (${Math.round(diffMinutes)} мин с начала). Рейс продолжается!`,
+      `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount} (${Math.round(diffMinutes)} мин с начала). Причина: ${transitReason}. Рейс продолжается!`,
     );
 
-    // Обновляем одометр актива и фиксируем промежуточную отметку в рейсе и заявке
-    await supabase
+    // Обновляем одометр актива (только если новый одометр больше текущего) и фиксируем отметку в рейсе
+    const { data: curAssetTransit } = await supabase
       .from('assets')
-      .update({ odometer_current: params.odometer, updated_at: new Date().toISOString() })
-      .eq('id', params.vehicleId);
+      .select('odometer_current')
+      .eq('id', params.vehicleId)
+      .single();
+
+    if (params.odometer > (curAssetTransit?.odometer_current || 0)) {
+      await supabase
+        .from('assets')
+        .update({ odometer_current: params.odometer, updated_at: new Date().toISOString() })
+        .eq('id', params.vehicleId);
+    }
 
     const prevNote = trip.driver_note || '';
-    const newNote =
-      `${prevNote}\n[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`.trim();
+    const noteMarker = `[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}`;
+    const newNote = prevNote.includes(noteMarker)
+      ? prevNote
+      : `${prevNote}\n[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`.trim();
 
-    await supabase
-      .from('trips')
-      .update({
-        driver_note: newNote,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', trip.id);
+    if (newNote !== prevNote) {
+      await supabase
+        .from('trips')
+        .update({
+          driver_note: newNote,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', trip.id);
+    }
 
-    // При промежуточном заезде в Салду: снимаем флаг транзита (prevent_salda_auto_finish: false),
-    // чтобы при следующем окончательном возврате рейс штатно перешел на ревью,
-    // и инкрементируем счетчик заездов salda_transit_count
+    // При промежуточном заезде в Салду: сохраняем флаг транзита (prevent_salda_auto_finish: true)
+    // и помечаем in_salda_transit: true, чтобы повторные опросы телематики, пока машина находится внутри Салды,
+    // ни в коем случае НЕ закрывали рейс!
+    // Флаг снимется только при фактическом ВЫЕЗДЕ из геозоны Салды (handleVehicleDeparture).
     await supabase
       .from('orders')
       .update({
         raw_parser_payload: {
           ...(order.raw_parser_payload || {}),
-          prevent_salda_auto_finish: false,
+          prevent_salda_auto_finish: true,
+          in_salda_transit: true,
           salda_transit_count: transitCount,
           last_transit_checked_at: Math.floor(Date.now() / 1000),
         },
@@ -467,16 +489,49 @@ export async function handleVehicleArrival(
     console.error('Ошибка создания записи ГСМ trip_expenses:', fuelExpErr);
   }
 
-  // 2. Добавляем заказ в trip_orders для связки с финансовой системой
+  // 2. Определяем контрагента и добавляем заказ в trip_orders для связки с финансовой системой
+  let resolvedClientId = order.client_id;
+  if (!resolvedClientId && order.loading_org_name) {
+    const cleanOrg = order.loading_org_name
+      .replace(/\(ЛОП\)|\(ПРР\)|\(ООО\)|\(ИП\)/gi, '')
+      .replace(/["'«»]/g, '')
+      .trim();
+    if (cleanOrg.length > 2) {
+      const { data: matchedCp } = await supabase
+        .from('counterparties')
+        .select('id')
+        .eq('is_active', true)
+        .ilike('name', `%${cleanOrg}%`)
+        .order('is_legal_entity', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (matchedCp) {
+        resolvedClientId = matchedCp.id;
+        await supabase
+          .from('orders')
+          .update({ client_id: matchedCp.id, updated_at: new Date().toISOString() })
+          .eq('id', order.id);
+      }
+    }
+  }
+
+  const billingDocs = order.raw_parser_payload?.billing_docs;
+  const invNumber = billingDocs?.invoice_number?.trim() || null;
+  const invDate = invNumber ? billingDocs?.invoice_date || arrivalTime.slice(0, 10) : null;
+
   const { error: tripOrderErr } = await supabase.from('trip_orders').insert({
     trip_id: trip.id,
-    counterparty_id: order.client_id,
-    description: `Заявка ${order.base_doc_number || order.order_number}: ${order.cargo_name} (${distanceKm} км)`,
+    counterparty_id: resolvedClientId,
+    description: `Заявка ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Груз'} (${distanceKm} км)`,
     amount: order.price_without_vat || 0,
     driver_pay: totalDriverPay,
     payment_method: 'bank_invoice',
     settlement_status: 'pending',
     lifecycle_status: 'draft',
+    invoice_number: invNumber,
+    invoice_date: invDate,
+    invoice_status: invNumber ? 'issued' : 'unbilled',
     idempotency_key: crypto.randomUUID(),
   });
 

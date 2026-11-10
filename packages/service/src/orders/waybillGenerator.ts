@@ -681,8 +681,13 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       </select>
 
       <!-- Кнопка + Шаблон: сохранить текущую заполненность -->
-      <button class="btn btn-success" onclick="saveCurrentAsTemplate()" title="Сохранить текущую заполненность путевого листа в шаблон по номеру автомобиля">
+      <button class="btn btn-success" onclick="openSaveTemplateModal()" title="Сохранить текущую заполненность путевого листа в шаблон">
         💾 + Шаблон
+      </button>
+
+      <!-- Кнопка Управление всеми шаблонами -->
+      <button class="btn btn-secondary" onclick="openManageTemplatesModal()" title="Управление шаблонами: выбор, обновление, удаление">
+        ⚙️ Шаблоны
       </button>
 
       <button class="btn btn-secondary" onclick="resetDefaultData()" title="Восстановить исходные данные из заявки">
@@ -696,7 +701,61 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       </button>
     </div>
   </div>
-  <div id="toastBox" style="position: fixed; top: 12px; right: 16px; z-index: 9999; display: none;"></div>
+  <div id="toastBox" style="position: fixed; top: 12px; right: 16px; z-index: 99999; display: none;"></div>
+
+  <!-- Модальное окно управления шаблонами (скрыто при печати) -->
+  <div id="templateModalBackdrop" class="print-hide" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(3px); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #ffffff; color: #0f172a; width: 100%; max-width: 600px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      
+      <!-- Шапка модалки -->
+      <div style="background: #0f172a; color: #f8fafc; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16px;">⚙️</span>
+          <span style="font-weight: 700; font-size: 14px;">Управление шаблонами путевых листов (4-С)</span>
+        </div>
+        <button type="button" onclick="closeTemplateModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height: 1; padding: 0 4px;" title="Закрыть (Esc)">✕</button>
+      </div>
+
+      <!-- Тело модалки -->
+      <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; max-height: 75vh; overflow-y: auto;">
+        
+        <!-- Блок 1: Сохранить текущий бланк -->
+        <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px 14px;">
+          <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px;">
+            💾 Сохранить текущие поля бланка в шаблон:
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input id="modalTemplateNameInput" type="text" placeholder="Госномер или название (напр. А096МВ196)" style="flex: 1; padding: 7px 10px; border: 1.5px solid #94a3b8; border-radius: 8px; font-size: 13px; font-weight: 600; text-transform: uppercase; outline: none;" onkeydown="if(event.key==='Enter') saveFromModalInput()">
+            <button type="button" class="btn btn-success" style="padding: 8px 14px;" onclick="saveFromModalInput()">
+              ✓ Сохранить
+            </button>
+          </div>
+          <div style="font-size: 10.5px; color: #64748b; margin-top: 5px;">
+            Все заполненные поля (автомобиль, водитель, гараж, нормы ГСМ, штамп, маршруты) сохранятся навсегда.
+          </div>
+        </div>
+
+        <!-- Блок 2: Список сохраненных шаблонов -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 12.5px; font-weight: 700; color: #0f172a;">📋 Сохраненные шаблоны в базе:</span>
+            <span id="modalTemplatesCount" style="font-size: 11px; color: #64748b; font-weight: 600;">0 шаблонов</span>
+          </div>
+
+          <div id="modalTemplatesList" style="display: flex; flex-direction: column; gap: 6px;">
+            <!-- Список генерируется через JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Подвал модалки -->
+      <div style="background: #f8fafc; padding: 10px 18px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeTemplateModal()">Закрыть</button>
+      </div>
+
+    </div>
+  </div>
 
   <!-- ======================== БЛАНК ФОРМЫ 4-С ======================== -->
   <div class="pl-page" id="waybillPage">
@@ -1476,7 +1535,15 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
     function normalizeReg(str) {
       if (!str) return '';
-      return str.trim().toUpperCase().replace(/[\s\-]/g, '');
+      const latToCyr = {
+        'A': 'А', 'B': 'В', 'E': 'Е', 'K': 'К', 'M': 'М', 'H': 'Н',
+        'O': 'О', 'P': 'Р', 'C': 'С', 'T': 'Т', 'Y': 'У', 'X': 'Х'
+      };
+      return str
+        .trim()
+        .toUpperCase()
+        .replace(/[\s\-]/g, '')
+        .replace(/[ABEKMHOPCTYX]/g, m => latToCyr[m] || m);
     }
 
     function initTemplates() {
@@ -1514,9 +1581,9 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       if (!sel) return;
       const keys = Object.keys(vehicleTemplates).sort();
       if (keys.length === 0) {
-        sel.innerHTML = '<option value="">📋 Нет шаблонов (нажмите «+ Шаблон»)</option>';
+        sel.innerHTML = '<option value=\"\">📋 Нет шаблонов (нажмите «+ Шаблон»)</option>';
       } else {
-        sel.innerHTML = '<option value="">📋 Шаблоны авто (' + keys.length + ')...</option>';
+        sel.innerHTML = '<option value=\"\">📋 Шаблоны авто (' + keys.length + ')...</option>';
         keys.forEach(k => {
           const opt = document.createElement('option');
           opt.value = k;
@@ -1524,14 +1591,19 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
           opt.textContent = '🚚 ' + k + brand;
           sel.appendChild(opt);
         });
-        const optDel = document.createElement('option');
-        optDel.value = '__delete__';
-        optDel.textContent = '🗑️ Удалить шаблон...';
-        sel.appendChild(optDel);
+        const optSaveAs = document.createElement('option');
+        optSaveAs.value = '__save_custom__';
+        optSaveAs.textContent = '💾 Сохранить под другим номером...';
+        sel.appendChild(optSaveAs);
+
+        const optManage = document.createElement('option');
+        optManage.value = '__manage__';
+        optManage.textContent = '⚙️ Управление шаблонами...';
+        sel.appendChild(optManage);
       }
 
       // Если есть шаблон под текущий номер машины в бланке — показываем кнопку 1-клик
-      const curVeh = normalizeReg(document.querySelector('[data-field="vehReg"]')?.innerText || currentVehReg);
+      const curVeh = normalizeReg(document.querySelector('[data-field=\"vehReg\"]')?.innerText || currentVehReg);
       const quickBtn = document.getElementById('quickApplyBtn');
       if (quickBtn) {
         if (curVeh && vehicleTemplates[curVeh]) {
@@ -1544,18 +1616,91 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       }
     }
 
+    function openManageTemplatesModal() {
+      const modal = document.getElementById('templateModalBackdrop');
+      if (!modal) return;
+      const curVeh = normalizeReg(document.querySelector('[data-field=\"vehReg\"]')?.innerText || currentVehReg || '');
+      const inp = document.getElementById('modalTemplateNameInput');
+      if (inp) inp.value = curVeh;
+      renderModalTemplatesList();
+      modal.style.display = 'flex';
+    }
+
+    function openSaveTemplateModal() {
+      openManageTemplatesModal();
+      const inp = document.getElementById('modalTemplateNameInput');
+      if (inp) {
+        inp.focus();
+        inp.select();
+      }
+    }
+
+    function closeTemplateModal() {
+      const modal = document.getElementById('templateModalBackdrop');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function renderModalTemplatesList() {
+      const listEl = document.getElementById('modalTemplatesList');
+      const countEl = document.getElementById('modalTemplatesCount');
+      if (!listEl) return;
+      const keys = Object.keys(vehicleTemplates).sort();
+      if (countEl) countEl.innerText = keys.length + ' ' + (keys.length === 1 ? 'шаблон' : keys.length < 5 ? 'шаблона' : 'шаблонов');
+
+      if (keys.length === 0) {
+        listEl.innerHTML = '<div style=\"text-align: center; color: #64748b; font-size: 12px; padding: 18px;\">Шаблонов пока нет. Введите номер выше и нажмите «✓ Сохранить».</div>';
+        return;
+      }
+
+      let html = '';
+      keys.forEach(k => {
+        const item = vehicleTemplates[k] || {};
+        const brand = item.vehBrand ? item.vehBrand.split('(')[0].trim() : '';
+        const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('ru-RU') : '';
+        html += '<div style=\"display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px;\">';
+        html += '  <div style=\"display: flex; align-items: center; gap: 8px; min-width: 0;\">';
+        html += '    <span style=\"font-size: 14px;\">🚚</span>';
+        html += '    <div style=\"min-width: 0;\">';
+        html += '      <div style=\"font-weight: 800; font-size: 13px; color: #0f172a;\">' + k + (brand ? ' <span style=\"font-weight: 500; font-size: 11px; color: #64748b;\">(' + brand + ')</span>' : '') + '</div>';
+        if (updated) html += '      <div style=\"font-size: 10px; color: #94a3b8;\">Обновлен: ' + updated + '</div>';
+        html += '    </div>';
+        html += '  </div>';
+        html += '  <div style=\"display: flex; align-items: center; gap: 6px; flex-shrink: 0;\">';
+        html += '    <button type=\"button\" class=\"btn btn-primary\" style=\"padding: 5px 10px; font-size: 11px;\" onclick=\"applyTemplate(\'' + k + '\'); closeTemplateModal();\">⚡ Применить</button>';
+        html += '    <button type=\"button\" class=\"btn btn-amber\" style=\"padding: 5px 10px; font-size: 11px;\" onclick=\"overwriteTemplate(\'' + k + '\')\" title=\"Перезаписать этот шаблон текущими полями бланка\">💾 Обновить</button>';
+        html += '    <button type=\"button\" class=\"btn btn-danger\" style=\"padding: 5px 8px; font-size: 11px;\" onclick=\"deleteTemplate(\'' + k + '\')\" title=\"Удалить шаблон\">🗑️</button>';
+        html += '  </div>';
+        html += '</div>';
+      });
+      listEl.innerHTML = html;
+    }
+
+    function saveFromModalInput() {
+      const inp = document.getElementById('modalTemplateNameInput');
+      const val = inp?.value?.trim();
+      if (!val) {
+        showToast('⚠️ Введите госномер или название шаблона', false);
+        return;
+      }
+      saveCurrentAsTemplate(val);
+      renderModalTemplatesList();
+    }
+
+    function overwriteTemplate(vehicleReg) {
+      if (!confirm('Перезаписать шаблон для \"' + vehicleReg + '\" текущими данными с экрана?')) return;
+      saveCurrentAsTemplate(vehicleReg);
+      renderModalTemplatesList();
+    }
+
     function handleSelectTemplate(val) {
       if (!val) return;
-      if (val === '__delete__') {
-        const keys = Object.keys(vehicleTemplates);
-        if (keys.length === 0) {
-          alert('Нет сохраненных шаблонов для удаления');
-          return;
-        }
-        const toDelete = prompt('Введите гос. номер шаблона для удаления:\n' + keys.join(', '));
-        if (toDelete) {
-          deleteTemplate(toDelete);
-        }
+      if (val === '__save_custom__') {
+        openSaveTemplateModal();
+        document.getElementById('templateSelector').value = '';
+        return;
+      }
+      if (val === '__manage__' || val === '__delete__') {
+        openManageTemplatesModal();
         document.getElementById('templateSelector').value = '';
         return;
       }
@@ -1566,28 +1711,32 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
     function deleteTemplate(vehicleReg) {
       const norm = normalizeReg(vehicleReg);
       if (!vehicleTemplates[norm]) {
-        alert('Шаблон "' + vehicleReg + '" не найден!');
+        showToast('Шаблон \"' + vehicleReg + '\" не найден', false);
         return;
       }
-      if (!confirm('Вы действительно хотите удалить шаблон для автомобиля "' + norm + '"?')) return;
+      if (!confirm('Вы действительно хотите удалить шаблон для автомобиля \"' + norm + '\"?')) return;
       delete vehicleTemplates[norm];
       try {
         localStorage.setItem('salda_waybill_templates', JSON.stringify(vehicleTemplates));
       } catch (e) {}
       fetch('/api/waybill-templates?reg=' + encodeURIComponent(norm), { method: 'DELETE' })
         .then(() => {
-          showToast('🗑️ Шаблон "' + norm + '" удален');
+          showToast('🗑️ Шаблон \"' + norm + '\" удален');
           renderTemplateSelector();
+          renderModalTemplatesList();
         })
-        .catch(() => renderTemplateSelector());
+        .catch(() => {
+          renderTemplateSelector();
+          renderModalTemplatesList();
+        });
     }
 
     function quickApplyCurrentVehicleTemplate() {
-      const curVeh = normalizeReg(document.querySelector('[data-field="vehReg"]')?.innerText || currentVehReg);
+      const curVeh = normalizeReg(document.querySelector('[data-field=\"vehReg\"]')?.innerText || currentVehReg);
       if (curVeh && vehicleTemplates[curVeh]) {
         applyTemplate(curVeh);
       } else {
-        alert('Шаблон для автомобиля ' + curVeh + ' еще не сохранен. Нажмите «💾 + Шаблон», чтобы сохранить текущие данные!');
+        openSaveTemplateModal();
       }
     }
 
@@ -1595,7 +1744,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       const norm = normalizeReg(vehicleReg);
       const tpl = vehicleTemplates[norm];
       if (!tpl) {
-        alert('Шаблон для ' + vehicleReg + ' не найден!');
+        showToast('Шаблон для ' + vehicleReg + ' не найден', false);
         return;
       }
 
@@ -1604,25 +1753,23 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       // Применяем все поля шаблона, кроме уникальных реквизитов документа (№ и дата)
       Object.keys(fields).forEach(field => {
         if (field === 'docNumber' || field === 'docDay' || field === 'docMonth' || field === 'docYear') return;
-        const el = document.querySelector('[data-field="' + field + '"]');
+        const el = document.querySelector('[data-field=\"' + field + '\"]');
         if (el) {
           el.innerText = fields[field] || '';
         }
       });
 
       renderTemplateSelector();
-      showToast('✅ Шаблон авто "' + norm + '" успешно применен в 1 клик!');
+      showToast('✅ Шаблон авто \"' + norm + '\" успешно применен в 1 клик!');
     }
 
-    function saveCurrentAsTemplate() {
-      const curVehEl = document.querySelector('[data-field="vehReg"]');
+    function saveCurrentAsTemplate(customName = null) {
+      const curVehEl = document.querySelector('[data-field=\"vehReg\"]');
       const suggestedReg = normalizeReg(curVehEl?.innerText || currentVehReg || '');
 
-      const vehicleRegInput = prompt('Название шаблона (гос. номер автомобиля):', suggestedReg);
-      if (!vehicleRegInput) return;
-      const vehicleReg = normalizeReg(vehicleRegInput);
+      let vehicleReg = customName ? normalizeReg(customName) : suggestedReg;
       if (!vehicleReg) {
-        alert('Укажите корректный гос. номер');
+        openSaveTemplateModal();
         return;
       }
 
@@ -1648,7 +1795,9 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         console.warn('LocalStorage save error:', e);
       }
 
-      // Сохраняем в Supabase базу через API
+      showToast('⏳ Сохранение шаблона \"' + vehicleReg + '\"...');
+
+      // Сохраняем в базу через API
       fetch('/api/waybill-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1657,11 +1806,15 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       .then(r => r.json())
       .then(res => {
         if (res.error) showToast('Ошибка сохранения: ' + res.error, false);
-        else showToast('✅ Шаблон для автомобиля "' + vehicleReg + '" сохранен!');
+        else showToast('✅ Шаблон для автомобиля \"' + vehicleReg + '\" успешно сохранен!');
+        renderTemplateSelector();
+        renderModalTemplatesList();
       })
       .catch(err => {
         console.warn('Sync server error:', err);
-        showToast('⚠️ Шаблон сохранен локально (ошибка сети)', false);
+        showToast('✅ Шаблон \"' + vehicleReg + '\" сохранен локально', true);
+        renderTemplateSelector();
+        renderModalTemplatesList();
       });
 
       renderTemplateSelector();
@@ -1684,6 +1837,13 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       renderTemplateSelector();
       showToast('🔄 Исходные данные из заявки восстановлены');
     }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeTemplateModal();
+    });
+    document.getElementById('templateModalBackdrop')?.addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeTemplateModal();
+    });
 
     // Инициализация при открытии страницы
     initTemplates();

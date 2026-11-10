@@ -71,7 +71,8 @@ export async function syncTripFinancials(
     } else if (
       o.payment_method === 'debt_cash' ||
       o.payment_method === 'debt' ||
-      o.payment_method === 'debt_bank'
+      o.payment_method === 'debt_bank' ||
+      o.payment_method === 'bank_invoice'
     ) {
       expectedSettlement = 'pending';
     } else if (
@@ -231,7 +232,7 @@ export async function syncTripFinancials(
           description: `ЗП: ${(trip.driver as any)?.name ?? 'Водитель'} — рейс №${trip.trip_number}`,
           lifecycle_status: 'approved',
           settlement_status: 'pending',
-          employee_confirmed: false,
+          employee_confirmed: true,
           related_user_id: trip.driver_id,
           trip_id: tripId,
           transaction_date: trip.started_at,

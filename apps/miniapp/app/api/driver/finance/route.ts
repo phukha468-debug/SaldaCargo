@@ -26,7 +26,6 @@ export async function GET(request: Request) {
   const [
     { data: cashTrips },
     { data: collections },
-    { data: pendingConfirmation },
     { data: accumulatedRows },
     { data: monthlyAccruals },
     { data: holds },
@@ -48,26 +47,12 @@ export async function GET(request: Request) {
 
     supabase.from('cash_collections').select('amount, created_at').eq('driver_id', driverId) as any,
 
-    // Ожидают подтверждения
-    (supabase.from('transactions') as any)
-      .select(
-        `id, amount, description, category_id, transaction_date,
-       trip:trips(id, trip_number, started_at, asset:assets(short_name), driver:users!trips_driver_id_fkey(name))`,
-      )
-      .eq('related_user_id', driverId)
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'pending')
-      .eq('employee_confirmed', false)
-      .in('category_id', DRIVER_PAYROLL_CATS)
-      .order('transaction_date', { ascending: true }),
-
-    // Подтверждено, к выплате (all-time)
+    // К выплате (all-time)
     (supabase.from('transactions') as any)
       .select('amount')
       .eq('related_user_id', driverId)
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'pending')
-      .or('employee_confirmed.is.null,employee_confirmed.eq.true')
       .in('category_id', DRIVER_PAYROLL_CATS),
 
     // История начислений (все последние начисления: к выплате и выплаченные)
@@ -78,7 +63,6 @@ export async function GET(request: Request) {
       )
       .eq('related_user_id', driverId)
       .eq('lifecycle_status', 'approved')
-      .or('employee_confirmed.is.null,employee_confirmed.eq.true')
       .in('category_id', DRIVER_PAYROLL_CATS)
       .is('from_wallet_id', null)
       .order('transaction_date', { ascending: false })
@@ -169,25 +153,7 @@ export async function GET(request: Request) {
       })),
     },
     salary: {
-      pending_confirmation: (pendingConfirmation ?? []).map((t: any) => {
-        const d = t.trip?.started_at ?? t.transaction_date;
-        const dateStr = d
-          ? new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
-          : null;
-        return {
-          id: t.id,
-          amount: t.amount,
-          category_id: t.category_id,
-          label: PAYROLL_LABELS[t.category_id] ?? 'ЗП',
-          context: [
-            t.trip ? `Рейс №${t.trip.trip_number}` : null,
-            t.trip?.asset?.short_name ?? null,
-            dateStr,
-          ]
-            .filter(Boolean)
-            .join(' · '),
-        };
-      }),
+      pending_confirmation: [],
       accumulated_total,
       accruals: (monthlyAccruals ?? []).map((t: any) => ({
         id: t.id,

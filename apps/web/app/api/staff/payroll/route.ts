@@ -85,16 +85,8 @@ export async function GET(request: Request) {
         .not('related_user_id', 'is', null)
         .is('from_wallet_id', null),
 
-      (supabase as any)
-        .from('transactions')
-        .select('related_user_id, amount, description, from_wallet_id')
-        .eq('direction', 'expense')
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'pending')
-        .in('category_id', SALARY_CATEGORY_IDS)
-        .eq('employee_confirmed', false)
-        .not('related_user_id', 'is', null)
-        .is('from_wallet_id', null),
+      // Ожидающие подтверждения (отключено — подтверждения больше не требуются)
+      Promise.resolve({ data: [] }),
 
       (supabase as any)
         .from('transactions')

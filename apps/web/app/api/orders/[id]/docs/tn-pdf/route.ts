@@ -10,24 +10,41 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const isEmpty = searchParams.get('empty') === '1' || searchParams.get('empty') === 'true';
     const supabase = createAdminClient();
 
-    const { data: order, error } = await (supabase.from('orders') as any)
-      .select(
-        `
-        *,
-        client:counterparties!orders_client_id_fkey(*),
-        forwarder:counterparties!orders_forwarder_id_fkey(*),
-        shipper:counterparties!orders_shipper_id_fkey(*),
-        consignee:counterparties!orders_consignee_id_fkey(*),
-        vehicle:assets(*),
-        driver:users!orders_assigned_driver_id_fkey(*),
-        loading_point:loading_points_directory(*)
-      `,
-      )
-      .eq('id', id)
-      .single();
+    let order: any = null;
 
-    if (error || !order) {
-      return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 });
+    if (id === 'blank' || id === 'new') {
+      order = {
+        id: 'blank',
+        order_number: '______',
+        base_doc_number: '______',
+        created_at: new Date().toISOString(),
+        client: {
+          name: 'ПАО «Корпорация ВСМПО-АВИСМА»',
+          inn: '6607000556',
+          legal_address: '624760, Свердловская область, г. Верхняя Салда, ул. Парковая, д 1',
+        },
+      };
+    } else {
+      const { data: dbOrder, error } = await (supabase.from('orders') as any)
+        .select(
+          `
+          *,
+          client:counterparties!orders_client_id_fkey(*),
+          forwarder:counterparties!orders_forwarder_id_fkey(*),
+          shipper:counterparties!orders_shipper_id_fkey(*),
+          consignee:counterparties!orders_consignee_id_fkey(*),
+          vehicle:assets(*),
+          driver:users!orders_assigned_driver_id_fkey(*),
+          loading_point:loading_points_directory(*)
+        `,
+        )
+        .eq('id', id)
+        .single();
+
+      if (error || !dbOrder) {
+        return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 });
+      }
+      order = dbOrder;
     }
 
     const html = generateTransportWaybillHtml(

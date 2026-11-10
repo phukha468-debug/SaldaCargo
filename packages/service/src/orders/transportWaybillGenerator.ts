@@ -370,6 +370,22 @@ export function generateTransportWaybillHtml(
     .btn-secondary:hover { background: #64748b; }
     .btn-danger { background: #dc2626; }
     .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #16a34a; }
+    .btn-success:hover { background: #15803d; }
+    .btn-amber { background: #d97706; }
+    .btn-amber:hover { background: #b45309; }
+    .tpl-select {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+    .tpl-select:hover { border-color: #94a3b8; }
     
     .tn-page {
       width: 210mm;
@@ -555,14 +571,103 @@ export function generateTransportWaybillHtml(
 </head>
 <body>
 
-  <div class="print-hide">
-    <div>
-      <strong>Форма ТН (ПП РФ № 2116)</strong> | Заявка № 
+  <div class="print-hide" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+      <span style="font-size: 16px;">📄</span>
+      <div>
+        <div style="font-weight: 700; font-size: 12.5px; white-space: nowrap;">
+          Транспортная накладная (ТН) ${data.waybillNumber || (data.orderNumber ? '№ ' + data.orderNumber : '')}
+        </div>
+        <div style="font-size: 10px; color: #94a3b8;">
+          Типовая форма (ПП РФ № 2116) • Интерактивный бланк
+        </div>
+      </div>
     </div>
-    <div class="btn-group">
-      <button class="btn btn-secondary" onclick="resetDefaultData()">🔄 Загрузить из заявки</button>
-      <button class="btn btn-danger" onclick="clearAllFields()">🧹 Чистый бланк</button>
-      <button class="btn btn-primary" onclick="window.print()">🖨️ Печать PDF</button>
+    <div class="btn-group" style="display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;">
+      <!-- Кнопка 1-клик шаблона -->
+      <button id="quickApplyTnBtn" class="btn btn-amber" style="display: none;" onclick="quickApplyCurrentTnTemplate()">
+        ⚡ Шаблон
+      </button>
+
+      <!-- Выбор шаблона ТН -->
+      <select id="tnTemplateSelector" class="tpl-select" onchange="handleSelectTnTemplate(this.value)">
+        <option value="">📋 Шаблоны ТН...</option>
+      </select>
+
+      <!-- Сохранить в шаблон -->
+      <button class="btn btn-success" onclick="openSaveTnTemplateModal()" title="Сохранить текущие поля накладной в шаблон">
+        💾 + Шаблон
+      </button>
+
+      <!-- Управление шаблонами -->
+      <button class="btn btn-secondary" onclick="openManageTnTemplatesModal()" title="Управление шаблонами: выбор, обновление, удаление">
+        ⚙️ Шаблоны
+      </button>
+
+      <button class="btn btn-secondary" onclick="resetDefaultData()" title="Восстановить исходные данные из заявки">
+        🔄 Из заявки
+      </button>
+      <button class="btn btn-danger" onclick="clearAllFields()" title="Очистить все поля бланка">
+        🧹 Очистить
+      </button>
+      <button class="btn btn-primary" onclick="window.print()" title="Распечатать или сохранить в PDF">
+        🖨️ Печать PDF
+      </button>
+    </div>
+  </div>
+  <div id="toastBox" style="position: fixed; top: 12px; right: 16px; z-index: 99999; display: none;"></div>
+
+  <!-- Модальное окно управления шаблонами ТН (скрыто при печати) -->
+  <div id="tnTemplateModalBackdrop" class="print-hide" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(3px); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #ffffff; color: #0f172a; width: 100%; max-width: 620px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      
+      <!-- Шапка модалки -->
+      <div style="background: #0f172a; color: #f8fafc; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16px;">⚙️</span>
+          <span style="font-weight: 700; font-size: 14px;">Управление шаблонами транспортных накладных (ТН)</span>
+        </div>
+        <button type="button" onclick="closeTnTemplateModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height: 1; padding: 0 4px;" title="Закрыть (Esc)">✕</button>
+      </div>
+
+      <!-- Тело модалки -->
+      <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; max-height: 75vh; overflow-y: auto;">
+        
+        <!-- Блок 1: Сохранить текущий бланк -->
+        <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px 14px;">
+          <div style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px;">
+            💾 Сохранить текущие поля накладной в шаблон:
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input id="modalTnTemplateNameInput" type="text" placeholder="Название шаблона (напр. ВСМПО Салда или Геострой)" style="flex: 1; padding: 7px 10px; border: 1.5px solid #94a3b8; border-radius: 8px; font-size: 13px; font-weight: 600; outline: none;" onkeydown="if(event.key==='Enter') saveFromTnModalInput()">
+            <button type="button" class="btn btn-success" style="padding: 8px 14px;" onclick="saveFromTnModalInput()">
+              ✓ Сохранить
+            </button>
+          </div>
+          <div style="font-size: 10.5px; color: #64748b; margin-top: 5px;">
+            Все заполненные поля (грузоотправитель, заказчик, грузополучатель, перевозчик, водитель, погрузка/выгрузка, МЧД) сохранятся.
+          </div>
+        </div>
+
+        <!-- Блок 2: Список сохраненных шаблонов -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 12.5px; font-weight: 700; color: #0f172a;">📋 Сохраненные шаблоны ТН в базе:</span>
+            <span id="modalTnTemplatesCount" style="font-size: 11px; color: #64748b; font-weight: 600;">0 шаблонов</span>
+          </div>
+
+          <div id="modalTnTemplatesList" style="display: flex; flex-direction: column; gap: 6px;">
+            <!-- Список генерируется через JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Подвал модалки -->
+      <div style="background: #f8fafc; padding: 10px 18px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="closeTnTemplateModal()">Закрыть</button>
+      </div>
+
     </div>
   </div>
 
@@ -1286,8 +1391,244 @@ export function generateTransportWaybillHtml(
 
   <script>
     const defaultData = ${defaultDataJson};
+    let tnTemplates = {};
 
-        function clearAllFields() {
+    function showToast(msg, isSuccess = true) {
+      const box = document.getElementById('toastBox');
+      if (!box) return;
+      box.style.display = 'block';
+      box.innerHTML = '<div style=\"background: ' + (isSuccess ? '#059669' : '#dc2626') + '; color: #fff; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.25);\">' + msg + '</div>';
+      setTimeout(() => { box.style.display = 'none'; }, 3000);
+    }
+
+    function initTnTemplates() {
+      fetch('/api/document-templates?type=tn')
+        .then(r => r.json())
+        .then(data => {
+          tnTemplates = {};
+          if (data?.templates) {
+            Object.keys(data.templates).forEach(k => {
+              tnTemplates[k] = data.templates[k];
+            });
+            try {
+              localStorage.setItem('salda_tn_templates', JSON.stringify(tnTemplates));
+            } catch (e) {}
+          }
+          renderTnTemplateSelector();
+        })
+        .catch(() => {
+          try {
+            const local = localStorage.getItem('salda_tn_templates');
+            if (local) tnTemplates = JSON.parse(local) || {};
+          } catch (e) {}
+          renderTnTemplateSelector();
+        });
+    }
+
+    function renderTnTemplateSelector() {
+      const sel = document.getElementById('tnTemplateSelector');
+      if (!sel) return;
+      const keys = Object.keys(tnTemplates).sort();
+      if (keys.length === 0) {
+        sel.innerHTML = '<option value=\"\">📋 Нет шаблонов ТН (нажмите «+ Шаблон»)</option>';
+      } else {
+        sel.innerHTML = '<option value=\"\">📋 Шаблоны ТН (' + keys.length + ')...</option>';
+        keys.forEach(k => {
+          const opt = document.createElement('option');
+          opt.value = k;
+          opt.textContent = '📄 ' + k;
+          sel.appendChild(opt);
+        });
+        const optSaveAs = document.createElement('option');
+        optSaveAs.value = '__save_custom__';
+        optSaveAs.textContent = '💾 Сохранить под другим именем...';
+        sel.appendChild(optSaveAs);
+
+        const optManage = document.createElement('option');
+        optManage.value = '__manage__';
+        optManage.textContent = '⚙️ Управление шаблонами...';
+        sel.appendChild(optManage);
+      }
+    }
+
+    function openManageTnTemplatesModal() {
+      const modal = document.getElementById('tnTemplateModalBackdrop');
+      if (!modal) return;
+      const shipperEl = document.querySelector('[data-field=\"shipperName\"]');
+      const clientEl = document.querySelector('[data-field=\"clientName\"]');
+      const suggested = (clientEl?.innerText || shipperEl?.innerText || '').trim().replace(/^[\"«]|[\"»]$/g, '').split(' ')[0] || '';
+      const inp = document.getElementById('modalTnTemplateNameInput');
+      if (inp && !inp.value) inp.value = suggested;
+      renderModalTnTemplatesList();
+      modal.style.display = 'flex';
+    }
+
+    function openSaveTnTemplateModal() {
+      openManageTnTemplatesModal();
+      const inp = document.getElementById('modalTnTemplateNameInput');
+      if (inp) {
+        inp.focus();
+        inp.select();
+      }
+    }
+
+    function closeTnTemplateModal() {
+      const modal = document.getElementById('tnTemplateModalBackdrop');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function renderModalTnTemplatesList() {
+      const listEl = document.getElementById('modalTnTemplatesList');
+      const countEl = document.getElementById('modalTnTemplatesCount');
+      if (!listEl) return;
+      const keys = Object.keys(tnTemplates).sort();
+      if (countEl) countEl.innerText = keys.length + ' ' + (keys.length === 1 ? 'шаблон' : keys.length < 5 ? 'шаблона' : 'шаблонов');
+
+      if (keys.length === 0) {
+        listEl.innerHTML = '<div style=\"text-align: center; color: #64748b; font-size: 12px; padding: 18px;\">Шаблонов ТН пока нет. Введите название выше и нажмите «✓ Сохранить».</div>';
+        return;
+      }
+
+      let html = '';
+      keys.forEach(k => {
+        const item = tnTemplates[k] || {};
+        const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('ru-RU') : '';
+        html += '<div style=\"display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px;\">';
+        html += '  <div style=\"display: flex; align-items: center; gap: 8px; min-width: 0;\">';
+        html += '    <span style=\"font-size: 14px;\">📄</span>';
+        html += '    <div style=\"min-width: 0;\">';
+        html += '      <div style=\"font-weight: 800; font-size: 13px; color: #0f172a;\">' + k + '</div>';
+        if (updated) html += '      <div style=\"font-size: 10px; color: #94a3b8;\">Обновлен: ' + updated + '</div>';
+        html += '    </div>';
+        html += '  </div>';
+        html += '  <div style=\"display: flex; align-items: center; gap: 6px; flex-shrink: 0;\">';
+        html += '    <button type=\"button\" class=\"btn btn-primary\" style=\"padding: 5px 10px; font-size: 11px;\" onclick=\"applyTnTemplate(\'' + k + '\'); closeTnTemplateModal();\">⚡ Применить</button>';
+        html += '    <button type=\"button\" class=\"btn btn-amber\" style=\"padding: 5px 10px; font-size: 11px;\" onclick=\"overwriteTnTemplate(\'' + k + '\')\" title=\"Перезаписать этот шаблон текущими полями бланка\">💾 Обновить</button>';
+        html += '    <button type=\"button\" class=\"btn btn-danger\" style=\"padding: 5px 8px; font-size: 11px;\" onclick=\"deleteTnTemplate(\'' + k + '\')\" title=\"Удалить шаблон\">🗑️</button>';
+        html += '  </div>';
+        html += '</div>';
+      });
+      listEl.innerHTML = html;
+    }
+
+    function saveFromTnModalInput() {
+      const inp = document.getElementById('modalTnTemplateNameInput');
+      const val = inp?.value?.trim();
+      if (!val) {
+        showToast('⚠️ Введите название шаблона ТН', false);
+        return;
+      }
+      saveCurrentAsTnTemplate(val);
+      renderModalTnTemplatesList();
+    }
+
+    function overwriteTnTemplate(name) {
+      if (!confirm('Перезаписать шаблон ТН \"' + name + '\" текущими данными с экрана?')) return;
+      saveCurrentAsTnTemplate(name);
+      renderModalTnTemplatesList();
+    }
+
+    function handleSelectTnTemplate(val) {
+      if (!val) return;
+      if (val === '__save_custom__') {
+        openSaveTnTemplateModal();
+        document.getElementById('tnTemplateSelector').value = '';
+        return;
+      }
+      if (val === '__manage__') {
+        openManageTnTemplatesModal();
+        document.getElementById('tnTemplateSelector').value = '';
+        return;
+      }
+      applyTnTemplate(val);
+      document.getElementById('tnTemplateSelector').value = '';
+    }
+
+    function deleteTnTemplate(name) {
+      if (!confirm('Вы действительно хотите удалить шаблон ТН \"' + name + '\"?')) return;
+      delete tnTemplates[name];
+      try {
+        localStorage.setItem('salda_tn_templates', JSON.stringify(tnTemplates));
+      } catch (e) {}
+      fetch('/api/document-templates?name=' + encodeURIComponent(name) + '&type=tn', { method: 'DELETE' })
+        .then(() => {
+          showToast('🗑️ Шаблон ТН \"' + name + '\" удален');
+          renderTnTemplateSelector();
+          renderModalTnTemplatesList();
+        })
+        .catch(() => {
+          renderTnTemplateSelector();
+          renderModalTnTemplatesList();
+        });
+    }
+
+    function applyTnTemplate(name) {
+      const tpl = tnTemplates[name];
+      if (!tpl) {
+        showToast('Шаблон ТН \"' + name + '\" не найден', false);
+        return;
+      }
+      const fields = tpl.fields || tpl;
+      Object.keys(fields).forEach(field => {
+        if (field === 'orderNumber' || field === 'orderDate' || field === 'copyNumber') return;
+        const el = document.querySelector('[data-field=\"' + field + '\"]');
+        if (el) {
+          el.innerText = fields[field] || '';
+        }
+      });
+      renderTnTemplateSelector();
+      showToast('✅ Шаблон ТН \"' + name + '\" успешно применен!');
+    }
+
+    function saveCurrentAsTnTemplate(name) {
+      if (!name) {
+        openSaveTnTemplateModal();
+        return;
+      }
+      const templateFields = {};
+      document.querySelectorAll('.editable-field').forEach(el => {
+        const field = el.getAttribute('data-field');
+        if (field) {
+          templateFields[field] = el.innerText.trim();
+        }
+      });
+
+      tnTemplates[name] = {
+        name,
+        type: 'tn',
+        updatedAt: new Date().toISOString(),
+        fields: templateFields
+      };
+
+      try {
+        localStorage.setItem('salda_tn_templates', JSON.stringify(tnTemplates));
+      } catch (e) {}
+
+      showToast('⏳ Сохранение шаблона ТН \"' + name + '\"...');
+
+      fetch('/api/document-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type: 'tn', fields: templateFields })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.error) showToast('Ошибка сохранения: ' + res.error, false);
+        else showToast('✅ Шаблон ТН \"' + name + '\" успешно сохранен!');
+        renderTnTemplateSelector();
+        renderModalTnTemplatesList();
+      })
+      .catch(err => {
+        console.warn('Sync server error:', err);
+        showToast('✅ Шаблон ТН \"' + name + '\" сохранен локально', true);
+        renderTnTemplateSelector();
+        renderModalTnTemplatesList();
+      });
+
+      renderTnTemplateSelector();
+    }
+
+    function clearAllFields() {
       if (!confirm('Очистить все заполняемые поля и сделать бланк полностью пустым?')) return;
       document.querySelectorAll('.editable-field').forEach(el => {
         el.innerHTML = '&nbsp;';
@@ -1301,7 +1642,17 @@ export function generateTransportWaybillHtml(
           el.innerHTML = defaultData[field];
         }
       });
+      showToast('🔄 Исходные данные из заявки восстановлены');
     }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeTnTemplateModal();
+    });
+    document.getElementById('tnTemplateModalBackdrop')?.addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeTnTemplateModal();
+    });
+
+    initTnTemplates();
   </script>
 </body>
 </html>`;

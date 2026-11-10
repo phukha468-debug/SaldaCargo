@@ -325,14 +325,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     if (!tripInfo) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
 
-    // Отменяем только неподтверждённые pending ЗП-транзакции
+    // Отменяем pending ЗП-транзакции
     await (supabase.from('transactions') as any)
       .update({ lifecycle_status: 'cancelled', cancelled_reason: 'Переназначено администратором' })
       .eq('trip_id', id)
       .in('category_id', PAYROLL_CATS)
       .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'pending')
-      .eq('employee_confirmed', false);
+      .eq('settlement_status', 'pending');
 
     const newTxns: any[] = [];
 
@@ -345,7 +344,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         description: `ЗП: ${(tripInfo.driver as any)?.name ?? 'Водитель'} — рейс №${tripInfo.trip_number}`,
         lifecycle_status: 'approved',
         settlement_status: 'pending',
-        employee_confirmed: false,
+        employee_confirmed: true,
         related_user_id: tripInfo.driver_id,
         trip_id: id,
         transaction_date: tripInfo.started_at,
@@ -391,8 +390,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .eq('trip_id', id)
       .in('category_id', PAYROLL_CATS)
       .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'pending')
-      .eq('employee_confirmed', false);
+      .eq('settlement_status', 'pending');
     return NextResponse.json({ ok: true, action: 'payroll_confirmed' });
   }
 

@@ -345,34 +345,18 @@ export default function AdminTripDetailPage() {
                   </button>
                 </div>
               </div>
-            ) : hasActivePayroll ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
-                <p className="text-xs font-bold text-amber-700">
-                  ⏳ ЗП ожидает подтверждения сотрудника
+            ) : hasConfirmedPayroll || hasActivePayroll ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                <p className="text-xs font-bold text-emerald-700">
+                  ✓ ЗП начислена (рейс утверждён)
                 </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setActionError('');
-                      action.mutate({ action: 'confirm_payroll' });
-                    }}
-                    disabled={action.isPending}
-                    className="flex-1 bg-amber-600 text-white font-black text-[10px] px-3 py-2.5 rounded-xl uppercase tracking-wide active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    Подтвердить за сотрудника
-                  </button>
-                  <button
-                    onClick={() => setShowReissueForm(true)}
-                    disabled={action.isPending}
-                    className="text-[10px] font-black text-amber-700 border border-amber-300 rounded-xl px-3 py-2.5 disabled:opacity-50"
-                  >
-                    Изменить
-                  </button>
-                </div>
-              </div>
-            ) : hasConfirmedPayroll ? (
-              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
-                <p className="text-xs font-bold text-green-700">✓ ЗП подтверждена сотрудником</p>
+                <button
+                  onClick={() => setShowReissueForm(true)}
+                  disabled={action.isPending}
+                  className="text-[10px] font-black text-emerald-800 border border-emerald-300 rounded-lg px-2.5 py-1 hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  Изменить
+                </button>
               </div>
             ) : driverPay === 0 ? null : (
               <div className="bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 flex items-center justify-between">

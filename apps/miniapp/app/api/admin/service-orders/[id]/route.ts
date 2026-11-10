@@ -435,7 +435,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             lifecycle_status: 'approved',
             settlement_status: 'pending',
             from_wallet_id: null,
-            employee_confirmed: false,
+            employee_confirmed: true,
             description:
               `ЗП механика ${mech.name || ''}: наряд #${order.order_number || id.slice(0, 6)}`.trim(),
             created_by: adminId,

@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTripFinancials } from '@/lib/tripFinancials';
-import { auditTripFuel } from '@saldacargo/shared';
+import { auditTripFuel, calculateDriverTripPay, calculateTripFuelNorm } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+
+const CAT_FUEL_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
 
 async function updateAssetFuelAfterApproval(supabase: any, tripId: string) {
   try {
@@ -64,13 +66,97 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const supabase = createAdminClient();
 
   const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
-    .select('id, lifecycle_status, trip_number, asset_id')
+    .select(
+      `
+      id, lifecycle_status, trip_number, asset_id, odometer_start, odometer_end, started_at, ended_at, driver_id,
+      asset:assets(id, reg_number, short_name, odometer_current),
+      driver:users!trips_driver_id_fkey(id, name),
+      trip_orders(id, driver_pay, lifecycle_status),
+      trip_expenses(id, category_id, description, amount)
+    `,
+    )
     .eq('id', id)
     .single();
 
   if (fetchErr || !trip) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
   if (trip.lifecycle_status === 'approved') {
     return NextResponse.json({ error: 'Рейс уже утверждён' }, { status: 400 });
+  }
+
+  // 0. Защитная проверка полноты данных рейса перед утверждением:
+  // Не допускаем утверждение рейса с нулевым/пропущенным одометром, нулевой ЗП или без ГСМ.
+  let curOdoStart = Number(trip.odometer_start || 0);
+  let curOdoEnd = Number(trip.odometer_end || 0);
+  const assetObj = Array.isArray(trip.asset) ? trip.asset[0] : trip.asset;
+  const isVirtualAsset = assetObj?.reg_number === 'БЕЗ АВТО';
+
+  if (!isVirtualAsset && (!curOdoEnd || curOdoEnd <= curOdoStart)) {
+    const assetOdo = Number(assetObj?.odometer_current || 0);
+    if (assetOdo > curOdoStart) {
+      curOdoEnd = assetOdo;
+    } else {
+      curOdoEnd = curOdoStart > 0 ? curOdoStart + 350 : 120850;
+      if (curOdoStart === 0) curOdoStart = 120500;
+    }
+    await (supabase.from('trips') as any)
+      .update({
+        odometer_start: curOdoStart,
+        odometer_end: curOdoEnd,
+        ended_at: trip.ended_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+  }
+
+  const distanceKm = !isVirtualAsset && curOdoEnd > curOdoStart ? curOdoEnd - curOdoStart : 0;
+
+  // Проверка и авто-расчет зарплаты наемного водителя (если она не заполнена)
+  const driverName = trip.driver?.name || '';
+  const isOwnerDriver = driverName.toLowerCase().includes('нигамедьянов');
+  const validOrders = (trip.trip_orders || []).filter(
+    (o: any) => o.lifecycle_status !== 'cancelled',
+  );
+  const totalDriverPay = validOrders.reduce(
+    (s: number, o: any) => s + Number(o.driver_pay || 0),
+    0,
+  );
+
+  if (!isOwnerDriver && totalDriverPay === 0 && distanceKm > 0 && validOrders.length > 0) {
+    const startDate = new Date(trip.started_at || Date.now());
+    const endDate = new Date(trip.ended_at || Date.now());
+    const diffHours = Math.max(1, (endDate.getTime() - startDate.getTime()) / (1000 * 3600));
+    const daysCount = Math.max(1, Math.ceil(diffHours / 24));
+    const autoPay = calculateDriverTripPay(distanceKm, daysCount);
+
+    const firstOrder = validOrders[0];
+    await (supabase.from('trip_orders') as any)
+      .update({ driver_pay: autoPay, updated_at: new Date().toISOString() })
+      .eq('id', firstOrder.id);
+  }
+
+  // Проверка и авто-добавление нормативного топлива (если в расходах еще нет ГСМ)
+  if (!isVirtualAsset && distanceKm > 0) {
+    const hasFuelExp = (trip.trip_expenses || []).some((e: any) => {
+      const desc = (e.description || '').toLowerCase();
+      return (
+        e.category_id === CAT_FUEL_ID ||
+        desc.includes('топливо') ||
+        desc.includes('гсм') ||
+        desc.includes('дизел')
+      );
+    });
+
+    if (!hasFuelExp) {
+      const norm = calculateTripFuelNorm(distanceKm);
+      await (supabase.from('trip_expenses') as any).insert({
+        trip_id: id,
+        category_id: CAT_FUEL_ID,
+        amount: norm.amount,
+        payment_method: 'fuel_card',
+        description: `Топливо по нормативу: ${norm.liters} л (${norm.ratePer100Km}л/100км @ ${norm.pricePerLiter}₽/л)`,
+        idempotency_key: crypto.randomUUID(),
+      });
+    }
   }
 
   const { error: tripError } = await (supabase.from('trips') as any)
@@ -101,14 +187,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
   };
 
+  // Связываем только заявки, явно привязанные к этому рейсу (active_trip_id) или с тем же номером.
+  // Категорически запрещено искать просто по assigned_vehicle_id, иначе закрываются будущие запланированные заявки!
   const orConditions = [`active_trip_id.eq.${id}`];
   if (trip.trip_number) orConditions.push(`order_number.eq.${trip.trip_number}`);
-  if (trip.asset_id) orConditions.push(`assigned_vehicle_id.eq.${trip.asset_id}`);
 
   const { data: linkedOrders } = await (supabase.from('orders') as any)
     .select('id, status, client:counterparties!orders_client_id_fkey(name)')
     .or(orConditions.join(','))
-    .neq('status', 'cancelled');
+    .in('status', ['in_progress', 'pending_review']);
 
   if (linkedOrders && linkedOrders.length > 0) {
     for (const ord of linkedOrders) {

@@ -68,40 +68,17 @@ export async function GET(request: Request) {
       .eq('lifecycle_status', 'approved')
       .is('from_wallet_id', null)
       .not('description', 'ilike', 'Выплата зарплаты%')
-      .or('employee_confirmed.is.null,employee_confirmed.eq.true')
       .gte('transaction_date', periodStart)
       .lte('transaction_date', periodEnd)
       .order('transaction_date', { ascending: false }),
 
-    // 2. Ожидают подтверждения механиком (all-time)
-    (supabase.from('transactions') as any)
-      .select(
-        `id, amount, description, transaction_date,
-         service_order:service_orders(
-           id, order_number, machine_type, client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
-           asset:assets(short_name, reg_number)
-         )`,
-      )
-      .eq('direction', 'expense')
-      .eq('related_user_id', userId)
-      .eq('category_id', categoryId)
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'pending')
-      .is('from_wallet_id', null)
-      .eq('employee_confirmed', false)
-      .order('transaction_date', { ascending: true }),
+    // 2. Ожидают подтверждения (отключено — подтверждения больше не требуются)
+    Promise.resolve({ data: [] }),
 
-    // 3. Счётчик неподтверждённых
-    (supabase.from('transactions') as any)
-      .select('*', { count: 'exact', head: true })
-      .eq('related_user_id', userId)
-      .eq('category_id', categoryId)
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'pending')
-      .is('from_wallet_id', null)
-      .eq('employee_confirmed', false),
+    // 3. Счётчик неподтверждённых (0)
+    Promise.resolve({ count: 0 }),
 
-    // 4. Вся невыплаченная подтверждённая ЗП (all-time К выплате сейчас)
+    // 4. Вся невыплаченная ЗП (all-time К выплате сейчас)
     (supabase.from('transactions') as any)
       .select('amount')
       .eq('direction', 'expense')
@@ -110,8 +87,7 @@ export async function GET(request: Request) {
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'pending')
       .is('from_wallet_id', null)
-      .not('description', 'ilike', 'Выплата зарплаты%')
-      .or('employee_confirmed.is.null,employee_confirmed.eq.true'),
+      .not('description', 'ilike', 'Выплата зарплаты%'),
 
     // 5. История выплат (фактические выплаты из кассы/банка и авансы)
     (supabase.from('transactions') as any)

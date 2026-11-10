@@ -64,10 +64,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         : null,
     };
 
-    // 2. Если поставлена 5-я галочка «Контрагент в ЭДО поставил В ОПЛАТУ (подписал)»
+    // 2. Если выставлен счёт или клиент в ЭДО принял его в оплату
     // — обновляем запись в trip_orders (Дебиторка):
-    // снимается «выставить счёт» и появляется номер счёта со статусом 'issued'
-    if (mergedDocs.client_accepted_edo) {
+    // снимается «выставить счёт» и появляется номер счёта со статусом 'issued' / 'accepted'
+    const hasInvoiceNumber = Boolean(mergedDocs.invoice_number?.trim());
+    if (mergedDocs.client_accepted_edo || mergedDocs.invoice_issued || hasInvoiceNumber) {
       const finalInvoiceNumber =
         mergedDocs.invoice_number?.trim() ||
         currentOrder.base_doc_number ||
@@ -76,12 +77,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       const finalInvoiceDate = mergedDocs.invoice_date || new Date().toISOString().slice(0, 10);
 
       // Ищем заказ в trip_orders: сначала по точному trip_order_id, затем по active_trip_id
-      let tripOrderQuery = (supabase.from('trip_orders') as any).update({
+      const updateData: Record<string, any> = {
         invoice_number: finalInvoiceNumber,
         invoice_date: finalInvoiceDate,
-        invoice_status: 'issued',
+        invoice_status: mergedDocs.client_accepted_edo ? 'accepted' : 'issued',
         updated_at: new Date().toISOString(),
-      });
+      };
+      if (currentOrder.client_id) {
+        updateData.counterparty_id = currentOrder.client_id;
+      }
+
+      let tripOrderQuery = (supabase.from('trip_orders') as any).update(updateData);
 
       if (currentPayload.trip_order_id) {
         tripOrderQuery = tripOrderQuery.eq('id', currentPayload.trip_order_id);

@@ -7,6 +7,39 @@ const SALDA_BASE_LAT = parseFloat(process.env.WIALON_BASE_LAT || '58.053');
 const SALDA_BASE_LON = parseFloat(process.env.WIALON_BASE_LON || '60.552');
 const SALDA_BASE_RADIUS = parseFloat(process.env.WIALON_BASE_RADIUS_METERS || '8000'); // 8 км
 
+/**
+ * Смещение одометра Wialon для калибровки к реальному спидометру на приборной панели.
+ * Для А096МВ196 (Unit 11873): Wialon 195 181 км соответствует реальным 461 685 км на приборке (+266 504 км).
+ */
+export const WIALON_ODOMETER_OFFSETS: Record<string, number> = {
+  А096МВ196: 266504,
+  '11873': 266504,
+};
+
+export function calibrateWialonOdometer(regOrUnit: string, rawKm: number): number {
+  if (!rawKm || rawKm <= 0) return rawKm;
+  const clean = String(regOrUnit)
+    .replace(/[\s\-_]/g, '')
+    .toUpperCase()
+    .replace(/A/g, 'А')
+    .replace(/B/g, 'В')
+    .replace(/E/g, 'Е')
+    .replace(/K/g, 'К')
+    .replace(/M/g, 'М')
+    .replace(/H/g, 'Н')
+    .replace(/O/g, 'О')
+    .replace(/P/g, 'Р')
+    .replace(/C/g, 'С')
+    .replace(/T/g, 'Т')
+    .replace(/Y/g, 'У')
+    .replace(/X/g, 'Х');
+  const offset = WIALON_ODOMETER_OFFSETS[clean] || WIALON_ODOMETER_OFFSETS[regOrUnit] || 0;
+  if (offset > 0 && rawKm < 300000) {
+    return rawKm + offset;
+  }
+  return rawKm;
+}
+
 export interface WialonUnitPosition {
   id: number;
   name: string;
@@ -231,6 +264,7 @@ export async function fetchWialonValdaiPositions(
       const num = Number(rawMileage);
       if (!isNaN(num) && num > 0) {
         odoKm = num > 2000000 ? Math.round(num / 1000) : Math.round(num);
+        odoKm = calibrateWialonOdometer(regNumber, odoKm);
       }
     }
 
@@ -579,11 +613,12 @@ export async function fetchTripWialonMileage(options: {
       const num = Number(rawMileage);
       if (!isNaN(num) && num > 0) {
         const km = num > 2000000 ? Math.round(num / 1000) : Math.round(num);
+        const calibratedKm = calibrateWialonOdometer(cleanReg, km);
         if (startOdo === null) {
-          startOdo = km;
+          startOdo = calibratedKm;
           startTime = new Date(m.t * 1000).toISOString();
         }
-        endOdo = km;
+        endOdo = calibratedKm;
         endTime = new Date(m.t * 1000).toISOString();
       }
     }

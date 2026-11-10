@@ -11,25 +11,38 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const supabase = createAdminClient();
 
-    const { data: order, error } = await (supabase.from('orders') as any)
-      .select(
-        `
-        *,
-        client:counterparties!orders_client_id_fkey(*),
-        vehicle:assets(*),
-        driver:users!orders_assigned_driver_id_fkey(*),
-        loading_point:loading_points_directory(*),
-        trip:trips(*)
-      `,
-      )
-      .eq('id', id)
-      .single();
+    let order: any = null;
+    let trip: any = null;
 
-    if (error || !order) {
-      return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 });
+    if (id === 'blank' || id === 'new') {
+      order = {
+        id: 'blank',
+        order_number: '______',
+        created_at: new Date().toISOString(),
+        status: 'planned',
+        cargo_name: '',
+      };
+    } else {
+      const { data: dbOrder, error } = await (supabase.from('orders') as any)
+        .select(
+          `
+          *,
+          client:counterparties!orders_client_id_fkey(*),
+          vehicle:assets(*),
+          driver:users!orders_assigned_driver_id_fkey(*),
+          loading_point:loading_points_directory(*),
+          trip:trips(*)
+        `,
+        )
+        .eq('id', id)
+        .single();
+
+      if (error || !dbOrder) {
+        return NextResponse.json({ error: 'Заявка не найдена' }, { status: 404 });
+      }
+      order = dbOrder;
+      trip = order.trip;
     }
-
-    const trip = order.trip;
     let phase: 'planned' | 'departed' | 'completed' = 'planned';
     if (order.status === 'in_progress') phase = 'departed';
     else if (

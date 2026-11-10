@@ -1,24 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-
-function normalizePlate(reg?: string | null): string {
-  if (!reg) return '';
-  return reg
-    .trim()
-    .toUpperCase()
-    .replace(/[\s\-]/g, '');
-}
+import { normalizePlate } from '../document-templates/route';
 
 export async function GET() {
   try {
     const supabase = createAdminClient();
 
-    // Загружаем исключительно сохраненные пользователем шаблоны из базы данных (order_presets)
-    // Никаких жестко закодированных или фиктивных шаблонов по умолчанию!
     const { data: dbPresets, error } = await (supabase.from('order_presets') as any)
       .select('id, title, carrier_settings, updated_at')
-      .ilike('title', '[ПЛ]%');
+      .ilike('title', '[ПЛ]%')
+      .order('updated_at', { ascending: false });
 
     if (error) {
       console.warn('Ошибка выборки шаблонов ПЛ из БД:', error.message);
@@ -72,20 +64,27 @@ export async function POST(req: Request) {
       carrier_settings: {
         type: 'waybill_template',
         vehicle_reg: vehicleReg,
+        name: vehicleReg,
         fields,
       },
       is_active: true,
       updated_at: new Date().toISOString(),
     };
 
+    let savedId = existing?.id;
     if (existing?.id) {
       await (supabase.from('order_presets') as any).update(payload).eq('id', existing.id);
     } else {
-      await (supabase.from('order_presets') as any).insert(payload);
+      const { data: ins } = await (supabase.from('order_presets') as any)
+        .insert(payload)
+        .select('id')
+        .single();
+      savedId = ins?.id;
     }
 
     return NextResponse.json({
       success: true,
+      id: savedId,
       name: vehicleReg,
       message: `Шаблон для автомобиля "${vehicleReg}" сохранен`,
     });
@@ -97,14 +96,20 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const rawReg = searchParams.get('reg');
-    const vehicleReg = normalizePlate(rawReg);
+    const id = searchParams.get('id');
+    const rawReg = searchParams.get('reg') || searchParams.get('name');
 
+    const supabase = createAdminClient();
+    if (id) {
+      await (supabase.from('order_presets') as any).delete().eq('id', id);
+      return NextResponse.json({ success: true, message: 'Шаблон удален' });
+    }
+
+    const vehicleReg = normalizePlate(rawReg);
     if (!vehicleReg) {
       return NextResponse.json({ error: 'Не указан номер авто' }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
     await (supabase.from('order_presets') as any)
       .delete()
       .or(`title.eq.[ПЛ] ${vehicleReg},title.eq.[ПЛ] ${rawReg}`);

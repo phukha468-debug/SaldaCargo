@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DocumentTemplatesModal } from './DocumentTemplatesModal';
 
 export interface RouteStop {
   id: string;
@@ -260,6 +261,7 @@ export function OrdersPipelineView() {
   const [isDriverModalOpen, setIsDriverModalOpen] = useState<boolean>(false);
   const [driverModalInitialId, setDriverModalInitialId] = useState<string | undefined>(undefined);
   const [assignModalOrder, setAssignModalOrder] = useState<OrderItem | null>(null);
+  const [isDocTemplatesModalOpen, setIsDocTemplatesModalOpen] = useState<boolean>(false);
 
   // 1. Загрузка заявок
   const { data: orders = [], isLoading } = useQuery<OrderItem[]>({
@@ -939,6 +941,13 @@ export function OrdersPipelineView() {
             className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
           >
             <span>👤 Водители ({drivers.length})</span>
+          </button>
+          <button
+            onClick={() => setIsDocTemplatesModalOpen(true)}
+            title="Центр управления шаблонами документов: Путевые листы (4-С), Транспортные накладные (ТН), ЭТрн (МЧД/ЭДО)"
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+          >
+            <span>📋 Шаблоны документов</span>
           </button>
           <button
             onClick={() => {
@@ -2414,6 +2423,7 @@ export function OrdersPipelineView() {
               selectedDetailsOrder.base_doc_number || selectedDetailsOrder.order_number,
             )
           }
+          onOpenDocTemplates={() => setIsDocTemplatesModalOpen(true)}
         />
       )}
 
@@ -2550,6 +2560,13 @@ export function OrdersPipelineView() {
           </div>
         </div>
       )}
+      {/* ── ЕДИНЫЙ ЦЕНТР ШАБЛОНОВ ДОКУМЕНТОВ (ПЛ, ТН, ЭТРН) ── */}
+      <DocumentTemplatesModal
+        isOpen={isDocTemplatesModalOpen}
+        onClose={() => setIsDocTemplatesModalOpen(false)}
+        counterparties={counterparties}
+        loadingPoints={loadingPoints}
+      />
     </div>
   );
 }
@@ -2571,6 +2588,7 @@ function OrderDetailsModal({
   onComplete,
   onManualStage,
   onDelete,
+  onOpenDocTemplates,
 }: {
   order: OrderItem;
   onClose: () => void;
@@ -2582,6 +2600,7 @@ function OrderDetailsModal({
   onComplete: () => void;
   onManualStage?: (stage: OrderItem['status']) => void;
   onDelete: () => void;
+  onOpenDocTemplates?: () => void;
 }) {
   const routes: RouteStop[] = order.routes_json || order.raw_parser_payload?.routes || [];
   const isMulti = routes.length > 1;
@@ -3040,6 +3059,17 @@ function OrderDetailsModal({
               >
                 <span>📥 XML</span>
               </a>
+
+              {onOpenDocTemplates && (
+                <button
+                  type="button"
+                  onClick={onOpenDocTemplates}
+                  className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold text-xs shadow-xs transition active:scale-95 flex items-center gap-1 cursor-pointer"
+                  title="Центр управления шаблонами документов (ПЛ, ТН, ЭТрн)"
+                >
+                  <span>⚙️ Шаблоны</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

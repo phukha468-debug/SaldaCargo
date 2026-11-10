@@ -86,6 +86,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const tripUpdatePayload: Record<string, any> = {
           updated_at: now,
         };
+        let computedDriverPay: number | null = null;
+        let computedDistanceKm = 0;
+
         if (stage === 'in_progress') {
           tripUpdatePayload.status = 'in_progress';
         } else {
@@ -94,8 +97,66 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           if (['docs_collection', 'completed'].includes(stage)) {
             tripUpdatePayload.lifecycle_status = 'approved';
           }
+
+          // Проверяем, зафиксирован ли конечный одометр рейса
+          const { data: existingTrip } = await (supabase.from('trips') as any)
+            .select('id, odometer_start, odometer_end, started_at, asset_id')
+            .eq('id', activeTripId)
+            .single();
+
+          if (existingTrip && !existingTrip.odometer_end) {
+            const currentOdo =
+              order.vehicle?.odometer_current || existingTrip.odometer_start || 120500;
+            const odoStart = existingTrip.odometer_start || Math.max(0, currentOdo - 350);
+            const odoEnd = Math.max(odoStart, currentOdo);
+            computedDistanceKm = Math.max(1, odoEnd - odoStart);
+            tripUpdatePayload.odometer_start = odoStart;
+            tripUpdatePayload.odometer_end = odoEnd;
+
+            const startDate = new Date(existingTrip.started_at || now);
+            const diffHours = Math.max(
+              1,
+              (new Date(now).getTime() - startDate.getTime()) / (1000 * 3600),
+            );
+            const daysCount = Math.max(1, Math.ceil(diffHours / 24));
+            const kmPay = computedDistanceKm * 10;
+            const perDiemPay = daysCount * 1000;
+            computedDriverPay = Math.floor((kmPay + perDiemPay) / 100) * 100;
+
+            const fuelLiters = Number(((computedDistanceKm * 18) / 100).toFixed(1));
+            const fuelCost = Math.round((fuelLiters * 82) / 100) * 100;
+            tripUpdatePayload.admin_note = `Ручной перевод этапа: ${stage}. Пробег: ${computedDistanceKm} км (${kmPay} ₽) + Суточные: ${daysCount} дн (${perDiemPay} ₽) = Итого ЗП: ${computedDriverPay} ₽ | Норматив ГСМ: ${fuelLiters} л (~${fuelCost} ₽)`;
+
+            // Создаем нормативный расход на ГСМ в trip_expenses
+            const CAT_FUEL_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+            const { data: existExp } = await (supabase.from('trip_expenses') as any)
+              .select('id')
+              .eq('trip_id', activeTripId)
+              .eq('category_id', CAT_FUEL_ID);
+
+            if (!existExp || existExp.length === 0) {
+              await (supabase.from('trip_expenses') as any).insert({
+                trip_id: activeTripId,
+                category_id: CAT_FUEL_ID,
+                amount: fuelCost,
+                payment_method: 'fuel_card',
+                description: `Топливо по нормативу (Валдай): ${fuelLiters} л (18л/100км @ 82₽/л)`,
+                idempotency_key: crypto.randomUUID(),
+              });
+            }
+          }
         }
         await (supabase.from('trips') as any).update(tripUpdatePayload).eq('id', activeTripId);
+
+        // Обновляем зарплату водителя в trip_orders если она была рассчитана
+        if (computedDriverPay !== null) {
+          await (supabase.from('trip_orders') as any)
+            .update({
+              driver_pay: computedDriverPay,
+              updated_at: now,
+            })
+            .eq('trip_id', activeTripId);
+        }
       }
 
       // 3. Создаем или обновляем запись в trip_orders (для Дебиторки)

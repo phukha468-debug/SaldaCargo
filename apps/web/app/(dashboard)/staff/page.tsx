@@ -3105,25 +3105,6 @@ function PayrollHistoryModal({
     }
   }
 
-  async function handleConfirmAdmin(txId: string) {
-    if (!confirm('Подтвердить это начисление за сотрудника?')) return;
-    setSaving(true);
-    try {
-      const r = await fetch(`/api/staff/transactions/${txId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employee_confirmed: true }),
-      });
-      const json = await r.json();
-      if (!r.ok) throw new Error(json.error ?? 'Ошибка');
-      onChanged();
-    } catch (e: unknown) {
-      alert('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleDelete(txId: string, label: string) {
     if (!confirm(`Удалить запись «${label}»? Это действие необратимо.`)) return;
     setSaving(true);
@@ -3437,29 +3418,6 @@ function PayrollHistoryModal({
                                 {g.title}
                               </h4>
                             )}
-
-                            {g.employee_confirmed === false && (
-                              <div className="flex items-center gap-2 pt-0.5">
-                                <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1 bg-amber-100/80 border border-amber-300 px-2 py-0.5 rounded">
-                                  <span className="material-symbols-outlined text-[12px]">
-                                    timer
-                                  </span>
-                                  Ожидает подтверждения
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    g.works.forEach((w) => {
-                                      if (w.employee_confirmed === false) handleConfirmAdmin(w.id);
-                                    });
-                                  }}
-                                  disabled={saving}
-                                  className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 hover:bg-emerald-200 rounded px-2 py-0.5 font-bold transition-colors cursor-pointer"
-                                >
-                                  ✓ Подтвердить всё
-                                </button>
-                              </div>
-                            )}
                           </div>
 
                           <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
@@ -3552,16 +3510,6 @@ function PayrollHistoryModal({
                                         <span className="font-medium text-slate-800">
                                           {w.title}
                                         </span>
-                                        {w.employee_confirmed === false && (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleConfirmAdmin(w.id)}
-                                            disabled={saving}
-                                            className="ml-2 text-[9px] text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded px-1.5 py-0.5 font-bold transition-colors cursor-pointer"
-                                          >
-                                            ✓ Подтвердить
-                                          </button>
-                                        )}
                                       </div>
                                       <div className="flex items-center gap-2">
                                         {editingId === w.id ? (

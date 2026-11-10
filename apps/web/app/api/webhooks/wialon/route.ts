@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { handleVehicleDeparture, handleVehicleArrival } from '@saldacargo/domain-service';
+import {
+  handleVehicleDeparture,
+  handleVehicleArrival,
+  fetchWialonValdaiPositions,
+  calibrateWialonOdometer,
+} from '@saldacargo/domain-service';
 
 /**
  * Нормализация госномера (очистка от спецсимволов и приведение латинских аналогов к кириллице)
@@ -103,6 +108,27 @@ async function findAssetByWialonUnit(supabase: any, unitStr: string, unitIdStr?:
 }
 
 /**
+ * Безопасный парсинг времени Wialon (поддерживает русский формат DD.MM.YYYY HH:mm:ss, ISO и UNIX timestamp)
+ */
+function parseWialonTime(raw?: string | number): string {
+  if (!raw) return new Date().toISOString();
+  if (typeof raw === 'number') {
+    // Если передан UNIX timestamp в секундах
+    return new Date(raw > 1e11 ? raw : raw * 1000).toISOString();
+  }
+  const str = String(raw).trim();
+  // Формат DD.MM.YYYY или DD.MM.YYYY HH:mm[:ss]
+  const match = str.match(/^(\d{2})[.-](\d{2})[.-](\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (match) {
+    const [, d, m, y, hh = '00', mm = '00', ss = '00'] = match;
+    // Время базы (Верхняя Салда / Екатеринбург) — UTC+5
+    return new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}+05:00`).toISOString();
+  }
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+/**
  * Унифицированный обработчик вебхука Wialon
  * Поддерживает как GET, так и POST запросы
  */
@@ -192,12 +218,9 @@ async function processWialonEvent(req: Request) {
     }
 
     const unitIdStr = payload.unit_id ? String(payload.unit_id) : undefined;
-    const timeStr =
-      payload.time ||
-      payload.timestamp ||
-      payload.pos_time ||
-      payload.curr_time ||
-      new Date().toISOString();
+    const rawTimeCandidate =
+      payload.time ?? payload.timestamp ?? payload.pos_time ?? payload.curr_time;
+    const timeStr = parseWialonTime(rawTimeCandidate);
 
     let rawOdo =
       payload.odometer ?? payload.odo ?? payload.mileage ?? payload.mileage_km ?? payload.km;
@@ -242,10 +265,39 @@ async function processWialonEvent(req: Request) {
     }
 
     // Приоритет одометра:
-    // Если Wialon передает реальный одометр трекера (например 139xxx км), используем его напрямую.
-    // Это гарантирует, что разница (odoEnd - odoStart) считается в единой шкале трекера Wialon.
+    // Если Wialon передает реальный абсолютный одометр трекера (например 140xxx км), используем его.
+    // Если передан заниженный/относительный счетчик Wialon (%MILEAGE% = cnm, например 62802 при одометре 140075),
+    // запрашиваем реальный одометр объекта из Wialon API через fetchWialonValdaiPositions.
     const currentAssetOdo = Number(asset.odometer_current || 0);
-    const odoValue = odometer && odometer > 0 ? Math.round(odometer) : currentAssetOdo || 120000;
+    if (odometer && odometer > 0) {
+      odometer = calibrateWialonOdometer(asset.reg_number || unitStr || '', odometer);
+    }
+    let odoValue = odometer && odometer > 0 ? Math.round(odometer) : currentAssetOdo || 120000;
+
+    if (currentAssetOdo > 0 && odoValue < currentAssetOdo - 1000) {
+      console.warn(
+        `[Wialon Webhook] Получен заниженный одометр ${odoValue} км (меньше текущего ${currentAssetOdo} км). Запрашиваем фактический одометр из Wialon...`,
+      );
+      try {
+        const positions = await fetchWialonValdaiPositions(
+          process.env.WIALON_HOST || 'https://host.local4.wialon.host',
+          process.env.WIALON_TOKEN ||
+            '561a6efcd9ed8d38d0ff3b80c29253f01653C6698177A6D92E360BBD0D70D0B6AF5240DE',
+        );
+        const matchPos = positions.find(
+          (p) =>
+            normalizeRegNumber(p.regNumber) === normalizeRegNumber(asset.reg_number || '') ||
+            p.id === Number(unitIdStr),
+        );
+        if (matchPos && matchPos.odometerKm > 0) {
+          odoValue = Math.max(matchPos.odometerKm, currentAssetOdo);
+        } else {
+          odoValue = currentAssetOdo;
+        }
+      } catch {
+        odoValue = currentAssetOdo;
+      }
+    }
 
     // Проверяем текст уведомления (например "%UNIT% вышел из %ZONE%." или "Выход из геозоны")
     const fullTextCandidate =

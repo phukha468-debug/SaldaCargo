@@ -36,25 +36,14 @@ export async function GET(request: Request) {
     { data: userTrips },
     { data: userCashExpenses },
   ] = await Promise.all([
-    (supabase.from('transactions') as any)
-      .select(
-        `id, amount, description, category_id, created_at, transaction_date,
-         trip:trips(id, trip_number, started_at, asset:assets(short_name), driver:users!trips_driver_id_fkey(name)),
-         service_order:service_orders(id, order_number, asset:assets(short_name))`,
-      )
-      .eq('related_user_id', userId)
-      .eq('lifecycle_status', 'approved')
-      .eq('settlement_status', 'pending')
-      .eq('employee_confirmed', false)
-      .in('category_id', ALL_PAYROLL_CATS)
-      .order('transaction_date', { ascending: true }),
+    // Ожидают подтверждения (отключено — подтверждения больше не требуются)
+    Promise.resolve({ data: [] }),
 
     (supabase.from('transactions') as any)
       .select('amount')
       .eq('related_user_id', userId)
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'pending')
-      .or('employee_confirmed.is.null,employee_confirmed.eq.true')
       .in('category_id', ALL_PAYROLL_CATS),
 
     (supabase.from('transactions') as any)
@@ -62,7 +51,6 @@ export async function GET(request: Request) {
       .eq('related_user_id', userId)
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'completed')
-      .or('employee_confirmed.is.null,employee_confirmed.eq.true')
       .in('category_id', ALL_PAYROLL_CATS)
       .is('from_wallet_id', null),
 
@@ -257,15 +245,13 @@ export async function PATCH(request: Request) {
     let query = (supabase.from('transactions') as any)
       .update({ employee_confirmed: true })
       .eq('related_user_id', userId)
-      .eq('employee_confirmed', false)
       .in('category_id', ALL_PAYROLL_CATS);
 
     if (body.ids && body.ids.length > 0) {
       query = query.in('id', body.ids);
     }
 
-    const { error } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await query;
     return NextResponse.json({ ok: true });
   }
 

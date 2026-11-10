@@ -233,7 +233,59 @@ export async function GET(request: Request) {
         .eq('period', date.slice(0, 7)),
     ]);
 
-    // 3. Historical totals up to rangeStart (to compute morning opening balance)
+    // 3. Последний подтвержденный аудит ДО начала текущего периода (базовая точка отсчета)
+    const { data: priorAudit } = await (supabase.from('daily_finance_audits') as any)
+      .select('*')
+      .eq('status', 'confirmed')
+      .lt('date', date)
+      .order('date', { ascending: false })
+      .order('audited_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const auditCutoff =
+      priorAudit?.audited_at ||
+      (priorAudit ? `${priorAudit.date}T19:00:00Z` : '2026-10-14T09:57:13Z');
+    const baseAuditCash = Number(priorAudit?.safe_cash_actual ?? 29000);
+    const baseAuditFuel = Math.max(0, Number(priorAudit?.fuel_card_balance ?? 926.13));
+
+    let priorColQuery = (supabase.from('cash_collections') as any)
+      .select('amount, note')
+      .lt('created_at', rangeStart);
+    if (priorAudit) priorColQuery = priorColQuery.gt('created_at', auditCutoff);
+
+    let priorCashInQuery = (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('to_wallet_id', CASH_ID)
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'completed')
+      .lt('created_at', rangeStart);
+    if (priorAudit) priorCashInQuery = priorCashInQuery.gt('created_at', auditCutoff);
+
+    let priorCashOutQuery = (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('from_wallet_id', CASH_ID)
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'completed')
+      .lt('created_at', rangeStart);
+    if (priorAudit) priorCashOutQuery = priorCashOutQuery.gt('created_at', auditCutoff);
+
+    let priorFuelInQuery = (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('to_wallet_id', FUEL_CARD_ID)
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'completed')
+      .lt('created_at', rangeStart);
+    if (priorAudit) priorFuelInQuery = priorFuelInQuery.gt('created_at', auditCutoff);
+
+    let priorFuelOutQuery = (supabase.from('transactions') as any)
+      .select('amount')
+      .eq('from_wallet_id', FUEL_CARD_ID)
+      .eq('lifecycle_status', 'approved')
+      .eq('settlement_status', 'completed')
+      .lt('created_at', rangeStart);
+    if (priorAudit) priorFuelOutQuery = priorFuelOutQuery.gt('created_at', auditCutoff);
+
     const [
       { data: priorBankOrders },
       { data: priorCollections },
@@ -251,9 +303,7 @@ export async function GET(request: Request) {
         .eq('lifecycle_status', 'approved')
         .lt('created_at', rangeStart),
 
-      (supabase.from('cash_collections') as any)
-        .select('amount, note')
-        .lt('created_at', rangeStart),
+      priorColQuery,
 
       (supabase.from('transactions') as any)
         .select('amount, trip_order_id')
@@ -269,33 +319,10 @@ export async function GET(request: Request) {
         .eq('settlement_status', 'completed')
         .lt('created_at', rangeStart),
 
-      (supabase.from('transactions') as any)
-        .select('amount')
-        .eq('to_wallet_id', CASH_ID)
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed')
-        .lt('created_at', rangeStart),
-
-      (supabase.from('transactions') as any)
-        .select('amount')
-        .eq('from_wallet_id', CASH_ID)
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed')
-        .lt('created_at', rangeStart),
-
-      (supabase.from('transactions') as any)
-        .select('amount')
-        .eq('to_wallet_id', FUEL_CARD_ID)
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed')
-        .lt('created_at', rangeStart),
-
-      (supabase.from('transactions') as any)
-        .select('amount')
-        .eq('from_wallet_id', FUEL_CARD_ID)
-        .eq('lifecycle_status', 'approved')
-        .eq('settlement_status', 'completed')
-        .lt('created_at', rangeStart),
+      priorCashInQuery,
+      priorCashOutQuery,
+      priorFuelInQuery,
+      priorFuelOutQuery,
     ]);
 
     const sumArr = (arr: any[]) => (arr ?? []).reduce((s, r) => s + parseFloat(r.amount ?? '0'), 0);
@@ -315,8 +342,14 @@ export async function GET(request: Request) {
     const morningBank =
       sumArr(priorBankOrders ?? []) + priorBankInClean - sumArr(priorBankOut ?? []);
     const morningCash =
-      sumArr(cleanPriorCollections) + sumArr(priorCashIn ?? []) - sumArr(priorCashOut ?? []);
-    const morningFuel = sumArr(priorFuelIn ?? []) - sumArr(priorFuelOut ?? []);
+      (priorAudit ? baseAuditCash : 0) +
+      sumArr(cleanPriorCollections) +
+      sumArr(priorCashIn ?? []) -
+      sumArr(priorCashOut ?? []);
+    const morningFuel = Math.max(
+      0,
+      (priorAudit ? baseAuditFuel : 0) + sumArr(priorFuelIn ?? []) - sumArr(priorFuelOut ?? []),
+    );
 
     // 4. Compute day's movements per wallet
     // Дедупликация: исключаем сводные дубликаты ручных операций (например общая запись ФССП,
@@ -404,35 +437,29 @@ export async function GET(request: Request) {
         ? actualEveningBank - bankDayIn + bankDayOut
         : morningBank;
 
-    // Фактические остатки сейфа (29 000 ₽) и топливной карты (926,13 ₽),
-    // зафиксированные директором, отсекающие старые виртуальные накопления из прошлых периодов
-    const BASE_ACTUAL_CASH = 29000.0;
-    const BASE_ACTUAL_FUEL = 926.13;
-
-    let actualEveningCash = morningCash + cashDayIn - cashDayOut;
+    // Честный расчет остатков Сейфа и Топливной карты: Утро + Приход − Расход = Вечер
     let actualMorningCash = morningCash;
+    let actualEveningCash = morningCash + cashDayIn - cashDayOut;
 
-    if (auditRow && auditRow.safe_cash_actual !== undefined && auditRow.safe_cash_actual !== null) {
+    if (
+      auditRow &&
+      auditRow.safe_cash_actual !== undefined &&
+      auditRow.safe_cash_actual !== null &&
+      auditRow.status === 'confirmed'
+    ) {
       actualEveningCash = Number(auditRow.safe_cash_actual);
-      actualMorningCash = actualEveningCash - cashDayIn + cashDayOut;
-    } else if (isCurrentPeriod) {
-      actualEveningCash = BASE_ACTUAL_CASH;
-      actualMorningCash = actualEveningCash - cashDayIn + cashDayOut;
     }
 
-    let actualEveningFuel = Math.max(0, morningFuel + fuelDayIn - fuelDayOut);
     let actualMorningFuel = Math.max(0, morningFuel);
+    let actualEveningFuel = Math.max(0, morningFuel + fuelDayIn - fuelDayOut);
 
     if (
       auditRow &&
       auditRow.fuel_card_balance !== undefined &&
-      auditRow.fuel_card_balance !== null
+      auditRow.fuel_card_balance !== null &&
+      auditRow.status === 'confirmed'
     ) {
       actualEveningFuel = Math.max(0, Number(auditRow.fuel_card_balance));
-      actualMorningFuel = Math.max(0, actualEveningFuel - fuelDayIn + fuelDayOut);
-    } else if (isCurrentPeriod) {
-      actualEveningFuel = Math.max(0, BASE_ACTUAL_FUEL);
-      actualMorningFuel = Math.max(0, actualEveningFuel - fuelDayIn + fuelDayOut);
     }
 
     // Привязанные движения по складу запчастей (Гараж)

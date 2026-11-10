@@ -42,14 +42,7 @@ export async function GET(request: Request) {
     .in('category_id', PAYROLL_CATEGORY_IDS)
     .order('created_at', { ascending: true });
 
-  const queryUnconfirmedCount = (supabase.from('transactions') as any)
-    .select('*', { count: 'exact', head: true })
-    .eq('direction', 'expense')
-    .eq('lifecycle_status', 'approved')
-    .eq('settlement_status', 'pending')
-    .eq('related_user_id', userId)
-    .eq('employee_confirmed', false)
-    .in('category_id', PAYROLL_CATEGORY_IDS);
+  const queryUnconfirmedCount = Promise.resolve({ count: 0 });
 
   const queryAdvanceGiven = (supabase.from('transactions') as any)
     .select('amount')
