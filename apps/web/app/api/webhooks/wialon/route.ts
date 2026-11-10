@@ -147,6 +147,15 @@ async function processWialonEvent(req: Request) {
       }
     });
 
+    // Поддержка сырого текста в URL без параметров key=value (например "?Нигамедьянов О188ТА196 вошел в Салда.")
+    try {
+      const rawQuery = decodeURIComponent(url.search.replace(/^\?/, '').trim());
+      if (rawQuery && !rawQuery.includes('=')) {
+        if (!payload.text) payload.text = rawQuery;
+        if (!payload.raw_body) payload.raw_body = rawQuery;
+      }
+    } catch {}
+
     // Извлечение ключевых параметров Wialon
     const eventCandidate = String(
       payload.event ||
