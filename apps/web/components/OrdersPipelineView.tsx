@@ -249,6 +249,10 @@ export function OrdersPipelineView() {
   const [epeNumberInput, setEpeNumberInput] = useState<string>('');
   const [epeReceivedInput, setEpeReceivedInput] = useState<boolean>(true);
 
+  // Быстрое изменение ставки (на любом этапе рейса, в пути без сброса статуса)
+  const [rateModalOrder, setRateModalOrder] = useState<OrderItem | null>(null);
+  const [rateInput, setRateInput] = useState<string>('');
+
   // Модальные окна
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [editingOrder, setEditingOrder] = useState<OrderItem | null>(null);
@@ -694,6 +698,54 @@ export function OrdersPipelineView() {
     }
   };
 
+  // Быстрое изменение ставки рейса (на любом этапе: в пути, на ревью, в сборе документов)
+  const updateRateMutation = useMutation({
+    mutationFn: async ({
+      orderId,
+      priceWithoutVat,
+    }: {
+      orderId: string;
+      priceWithoutVat: number;
+    }) => {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ price_without_vat: priceWithoutVat }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Ошибка изменения ставки');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
+      queryClient.invalidateQueries({ queryKey: ['receivables'] });
+      if (selectedDetailsOrder && selectedDetailsOrder.id === data.order?.id) {
+        setSelectedDetailsOrder((prev) => (prev ? { ...prev, ...data.order } : data.order));
+      }
+      setRateModalOrder(null);
+    },
+    onError: (err: any) => {
+      alert(`Ошибка изменения ставки: ${err.message}`);
+    },
+  });
+
+  const handleOpenRateModal = (order: OrderItem) => {
+    setRateModalOrder(order);
+    setRateInput(order.price_without_vat ? String(order.price_without_vat) : '');
+  };
+
+  const handleSaveRate = () => {
+    if (!rateModalOrder) return;
+    const parsed = Number(rateInput.replace(/\s+/g, ''));
+    if (isNaN(parsed) || parsed < 0) {
+      alert('Пожалуйста, укажите корректную сумму ставки');
+      return;
+    }
+    updateRateMutation.mutate({ orderId: rateModalOrder.id, priceWithoutVat: parsed });
+  };
+
   // Все рейсы 3-х контрагентов (ВСМПО, Ависма, Геострой), которые в пути, на ревью, сборе документов или завершены
   const strictCounterpartyOrders = orders.filter((o) => {
     if (!isStrictDocCounterparty(o.client?.name)) return false;
@@ -1016,11 +1068,24 @@ export function OrdersPipelineView() {
                               )}
                             </div>
 
-                            <span className="font-black text-slate-900 shrink-0 text-[11px]">
-                              {order.price_without_vat
-                                ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
-                                : '—'}
-                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="font-black text-slate-900 text-[11px]">
+                                {order.price_without_vat
+                                  ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                                  : '—'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenRateModal(order);
+                                }}
+                                className="text-[10px] text-slate-400 hover:text-indigo-600 p-0.5 rounded transition cursor-pointer"
+                                title="Быстро изменить ставку рейса"
+                              >
+                                ✏️
+                              </button>
+                            </div>
                           </div>
 
                           {/* СТРОКА 2: Автомобиль/Водитель, маршрут, вес */}
@@ -1340,10 +1405,23 @@ export function OrdersPipelineView() {
 
                       {/* Ставка и тип оплаты */}
                       <div className="min-w-[110px] text-right shrink-0">
-                        <div className="font-black text-slate-900">
-                          {order.price_without_vat
-                            ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
-                            : '—'}
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="font-black text-slate-900">
+                            {order.price_without_vat
+                              ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                              : '—'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenRateModal(order);
+                            }}
+                            className="text-[11px] text-slate-400 hover:text-indigo-600 p-0.5 rounded transition cursor-pointer"
+                            title="Быстро изменить ставку рейса"
+                          >
+                            ✏️
+                          </button>
                         </div>
                         <div className="text-[9.5px] font-bold text-slate-500">
                           {isCash ? '💵 Касса' : '🏦 Дебиторка'}
@@ -2184,6 +2262,124 @@ export function OrdersPipelineView() {
           </div>
         </div>
       )}
+
+      {/* МОДАЛЬНОЕ ОКНО БЫСТРОГО ИЗМЕНЕНИЯ СТАВКИ (В ПУТИ И НА ЛЮБОМ ЭТАПЕ) */}
+      {rateModalOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl border border-slate-200 overflow-hidden p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">💰</span>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Изменить ставку рейса</h3>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    {rateModalOrder.trip?.trip_number
+                      ? `Рейс № ${rateModalOrder.trip.trip_number}`
+                      : `Заявка № ${rateModalOrder.base_doc_number || rateModalOrder.order_number}`}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setRateModalOrder(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-base cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
+              <div className="flex justify-between text-slate-600 text-[11px]">
+                <span>Контрагент:</span>
+                <span className="font-semibold text-slate-800 truncate max-w-[170px]">
+                  {rateModalOrder.client?.name || 'ПАО «Корпорация ВСМПО-АВИСМА»'}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600 text-[11px]">
+                <span>Транспорт:</span>
+                <span className="font-mono font-semibold text-slate-800">
+                  {rateModalOrder.vehicle?.reg_number || 'Авто не назначено'}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600 text-[11px]">
+                <span>Текущий статус:</span>
+                <span className="font-bold text-indigo-700">
+                  {rateModalOrder.status === 'in_progress'
+                    ? '🚛 В пути'
+                    : rateModalOrder.status === 'assigned'
+                      ? '📋 Назначен'
+                      : rateModalOrder.status === 'pending_review'
+                        ? '🔍 На ревью'
+                        : rateModalOrder.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10.5px] font-bold text-slate-700 block">
+                Новая ставка (без НДС), руб.
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="500"
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  placeholder="Например, 55000"
+                  autoFocus
+                  className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-base font-mono font-black text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <span className="absolute right-3 top-2.5 text-slate-400 font-bold text-xs">₽</span>
+              </div>
+              <div className="flex items-center gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setRateInput(String((Number(rateInput) || 0) + 1000))}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold cursor-pointer transition"
+                >
+                  +1 000
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRateInput(String((Number(rateInput) || 0) + 5000))}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold cursor-pointer transition"
+                >
+                  +5 000
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRateInput(String((Number(rateInput) || 0) + 10000))}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold cursor-pointer transition"
+                >
+                  +10 000
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                ℹ️ Изменение ставки сохраняет статус рейса и автоматически обновляет стоимость в
+                расчетах.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRateModalOrder(null)}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold cursor-pointer transition"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={updateRateMutation.isPending}
+                onClick={handleSaveRate}
+                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer transition disabled:opacity-50"
+              >
+                {updateRateMutation.isPending ? 'Сохранение...' : 'Сохранить ставку'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedDetailsOrder && (
         <OrderDetailsModal
           order={selectedDetailsOrder}
@@ -2193,6 +2389,7 @@ export function OrdersPipelineView() {
             setSelectedDetailsOrder(null);
             setIsCreateModalOpen(true);
           }}
+          onQuickEditRate={(o) => handleOpenRateModal(o)}
           onAssignVehicle={() => {
             setAssignModalOrder(selectedDetailsOrder);
             setSelectedDetailsOrder(null);
@@ -2367,6 +2564,7 @@ function OrderDetailsModal({
   order,
   onClose,
   onEdit,
+  onQuickEditRate,
   onAssignVehicle,
   onDepart,
   onArrive,
@@ -2377,6 +2575,7 @@ function OrderDetailsModal({
   order: OrderItem;
   onClose: () => void;
   onEdit: () => void;
+  onQuickEditRate?: (order: OrderItem) => void;
   onAssignVehicle: () => void;
   onDepart: () => void;
   onArrive: () => void;
@@ -2455,10 +2654,21 @@ function OrderDetailsModal({
 
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <div className="font-black text-sm text-emerald-400">
-                {order.price_without_vat
-                  ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
-                  : '—'}
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="font-black text-sm text-emerald-400">
+                  {order.price_without_vat
+                    ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                    : '—'}
+                </span>
+                {onQuickEditRate && (
+                  <button
+                    onClick={() => onQuickEditRate(order)}
+                    className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded text-[10px] font-bold cursor-pointer transition"
+                    title="Быстро изменить ставку рейса (в пути)"
+                  >
+                    ✏️
+                  </button>
+                )}
               </div>
               <div className="text-[10px] text-slate-300 font-bold">
                 {isCash ? '💵 В кассу' : '🏦 В дебиторку'}
@@ -2716,13 +2926,24 @@ function OrderDetailsModal({
                   <span className="text-slate-500">Масса брутто:</span>
                   <span className="font-bold text-slate-900">{order.weight_gross_kg} кг</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-500">Ставка (без НДС):</span>
-                  <span className="font-black text-slate-900">
-                    {order.price_without_vat
-                      ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
-                      : '—'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-black text-slate-900">
+                      {order.price_without_vat
+                        ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                        : '—'}
+                    </span>
+                    {onQuickEditRate && (
+                      <button
+                        onClick={() => onQuickEditRate(order)}
+                        className="px-1.5 py-0.5 text-[10px] text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded font-bold cursor-pointer transition"
+                        title="Быстро изменить ставку рейса"
+                      >
+                        ✏️ Изменить
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Канал оплаты:</span>
@@ -3304,6 +3525,9 @@ function CreateSmartOrderModal({
 
         assigned_vehicle_id: form.assigned_vehicle_id || null,
         assigned_driver_id: form.assigned_driver_id || null,
+
+        // Сохраняем текущий статус заявки при редактировании (не сбрасываем в пути!)
+        ...(isEditing && initialOrder?.status ? { status: initialOrder.status } : {}),
 
         // Составной рейс и мульти-стоп точки
         routes_json: isMultiStop ? routes : [],

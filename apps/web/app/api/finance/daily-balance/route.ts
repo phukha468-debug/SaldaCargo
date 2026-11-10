@@ -201,12 +201,14 @@ export async function GET(request: Request) {
         )
         .order('created_at', { ascending: false }),
 
-      // All Trip orders of this period with Bank/QR payment
+      // All Trip orders of this period with Bank/QR payment (только подтвержденные и оплаченные поступления!)
       (supabase.from('trip_orders') as any)
         .select(
           'id, amount, created_at, payment_method, description, settlement_status, lifecycle_status, counterparty:counterparties(id, name), trip:trips!inner(id, trip_number, driver_id, driver:users!trips_driver_id_fkey(id, name))',
         )
         .in('payment_method', ['bank_invoice', 'qr'])
+        .eq('settlement_status', 'completed')
+        .eq('lifecycle_status', 'approved')
         .gte('created_at', rangeStart)
         .lte('created_at', rangeEnd)
         .order('created_at', { ascending: false }),

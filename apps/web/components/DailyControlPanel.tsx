@@ -1323,22 +1323,27 @@ export function DailyControlPanel() {
         });
       });
     } else {
-      // Резервный источник по заказам, если API выписки пуст
-      (data?.trip_orders ?? []).forEach((order) => {
-        const client = order.counterparty?.name || order.description || 'Оплата счёта / QR';
-        const driver = order.trip?.driver?.name ? `вод. ${order.trip.driver.name}` : 'Рейс';
-        incomeItems.push({
-          id: `trip-${order.id}`,
-          title: `Оплата рейса · ${client}`,
-          category: 'Оплата по счёту / QR',
-          wallet: 'bank',
-          walletName: 'Р/С Банк',
-          author: driver,
-          amount: parseFloat(order.amount) || 0,
-          time: formatTxTime(order.created_at),
-          dateSort: new Date(order.created_at).getTime(),
+      // Резервный источник по заказам, если API выписки пуст (только реально оплаченные / завершенные!)
+      (data?.trip_orders ?? [])
+        .filter(
+          (order) =>
+            order.settlement_status === 'completed' && order.lifecycle_status === 'approved',
+        )
+        .forEach((order) => {
+          const client = order.counterparty?.name || order.description || 'Оплата счёта / QR';
+          const driver = order.trip?.driver?.name ? `вод. ${order.trip.driver.name}` : 'Рейс';
+          incomeItems.push({
+            id: `trip-${order.id}`,
+            title: `Оплата рейса · ${client}`,
+            category: 'Оплата по счёту / QR',
+            wallet: 'bank',
+            walletName: 'Р/С Банк',
+            author: driver,
+            amount: parseFloat(order.amount) || 0,
+            time: formatTxTime(order.created_at),
+            dateSort: new Date(order.created_at).getTime(),
+          });
         });
-      });
     }
   }
 

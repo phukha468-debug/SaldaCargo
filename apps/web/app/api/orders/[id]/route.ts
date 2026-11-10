@@ -53,9 +53,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json();
     const supabase = createAdminClient();
 
-    // Загружаем текущий raw_parser_payload заявки, чтобы не потерять другие параметры
+    // Загружаем текущий raw_parser_payload и статус заявки, чтобы не потерять параметры
     const { data: currentOrder } = await (supabase.from('orders') as any)
-      .select('raw_parser_payload')
+      .select('status, active_trip_id, raw_parser_payload')
       .eq('id', id)
       .single();
 
@@ -85,9 +85,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     };
 
     // Если назначили ТС и водителя, но статус был waiting_vehicle — переводим в assigned
+    // ВАЖНО: никогда не сбрасываем статус, если заявка уже в пути (in_progress), на ревью или в сборе документов!
     if (
       updatePayload.assigned_vehicle_id &&
       updatePayload.assigned_driver_id &&
+      currentOrder?.status === 'waiting_vehicle' &&
       (!updatePayload.status || updatePayload.status === 'waiting_vehicle')
     ) {
       updatePayload.status = 'assigned';
@@ -95,6 +97,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         const year = String(new Date().getFullYear()).slice(-2);
         updatePayload.waybill_number = `ПЛ-${year}/${Math.floor(1000 + Math.random() * 9000)}`;
       }
+    } else if (!updatePayload.status && currentOrder?.status) {
+      // Сохраняем текущий статус заявки, если он не был явно передан в теле запроса!
+      updatePayload.status = currentOrder.status;
     }
 
     const { data: updated, error } = await (supabase.from('orders') as any)
@@ -115,20 +120,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    if (
-      ['docs_collection', 'completed'].includes(updatePayload.status) &&
-      currentOrder?.active_trip_id
-    ) {
+    // Синхронизация ставки на лету (в пути): обновляем связанный trip_orders при изменении price_without_vat
+    const targetTripId = currentOrder?.active_trip_id || updated.active_trip_id;
+    if (updatePayload.price_without_vat !== undefined && targetTripId) {
+      const newPrice = Number(updatePayload.price_without_vat) || 0;
+      await (supabase.from('trip_orders') as any)
+        .update({ amount: newPrice })
+        .eq('trip_id', targetTripId);
+    }
+
+    if (['docs_collection', 'completed'].includes(updatePayload.status) && targetTripId) {
       await (supabase.from('trips') as any)
         .update({
           status: 'completed',
           lifecycle_status: 'approved',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', currentOrder.active_trip_id);
+        .eq('id', targetTripId);
       await (supabase.from('trip_orders') as any)
         .update({ lifecycle_status: 'approved' })
-        .eq('trip_id', currentOrder.active_trip_id)
+        .eq('trip_id', targetTripId)
         .neq('lifecycle_status', 'cancelled');
     }
 
