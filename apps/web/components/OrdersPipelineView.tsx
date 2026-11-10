@@ -3175,8 +3175,9 @@ function CreateSmartOrderModal({
         base_doc_number: p.order_number || prev.base_doc_number,
         base_doc_date: p.order_date || prev.base_doc_date,
         cargo_name: p.cargo_name || prev.cargo_name,
-        weight_gross_kg: p.weight_gross_kg || prev.weight_gross_kg,
-        price_without_vat: p.price_without_vat || prev.price_without_vat,
+        weight_gross_kg: p.weight_gross_kg !== undefined ? p.weight_gross_kg : prev.weight_gross_kg,
+        price_without_vat:
+          p.price_without_vat !== undefined ? p.price_without_vat : prev.price_without_vat,
         loading_city: p.loading_address?.city || prev.loading_city,
         loading_address: p.loading_address?.raw || prev.loading_address,
         unloading_city: p.unloading_address?.city || prev.unloading_city,
@@ -3203,18 +3204,22 @@ function CreateSmartOrderModal({
               unloading_address: p.unloading_address?.raw || prevRoutes[0]?.unloading_address || '',
               unloading_org: p.client_name || prevRoutes[0]?.unloading_org || '',
               cargo_name: p.cargo_name || prevRoutes[0]?.cargo_name || '',
-              weight_kg: p.weight_gross_kg || prevRoutes[0]?.weight_kg || 0,
+              weight_kg:
+                p.weight_gross_kg !== undefined ? p.weight_gross_kg : prevRoutes[0]?.weight_kg || 0,
             },
           ];
         }
         return prevRoutes;
       });
 
+      const docLabel = p.order_number?.includes('/')
+        ? `Заявка № ${p.order_number}`
+        : `Документ № ${p.order_number || ''}`;
       const summaryParts = [
-        p.order_number ? `Поручение № ${p.order_number}` : '',
+        p.order_number ? docLabel : '',
         p.cargo_name ? p.cargo_name : '',
         p.weight_gross_kg ? `${p.weight_gross_kg} кг` : '',
-        p.price_without_vat ? `${p.price_without_vat.toLocaleString('ru-RU')} ₽` : '',
+        p.price_without_vat ? `${Number(p.price_without_vat).toLocaleString('ru-RU')} ₽` : '',
       ].filter(Boolean);
 
       setStatusMessage(`✨ PDF распознан: ${summaryParts.join(' · ')}`);
