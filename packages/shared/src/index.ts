@@ -128,6 +128,7 @@ export const FINANCIAL_CATEGORIES = {
   PAYROLL_LOADER: '18792fa8-fda8-472d-8e04-e19d2c6c053c',
   FUEL: '62cebf3f-9982-4cc6-904b-48c6169cf5e4',
   OTHER: 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30',
+  CASH_COLLECT: '72f677d4-84af-4d0d-a845-a1b63c7ae607',
 } as const;
 
 // ─── Нормы расхода топлива (л / 100 км) и кубик (ДТ 1000л) ───────────────────

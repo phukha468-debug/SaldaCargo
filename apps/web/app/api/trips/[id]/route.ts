@@ -98,13 +98,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       odometer_end?: number;
       admin_note?: string;
       driver_note?: string;
+      cash_not_surrendered?: boolean;
     };
 
     const supabase = createAdminClient();
 
     // 1. Получаем данные рейса (статус, грузчики, водитель)
     const { data: trip, error: tripError } = await (supabase.from('trips') as any)
-      .select('id, lifecycle_status, driver_id, loader_id, loader2_id')
+      .select('id, lifecycle_status, driver_id, loader_id, loader2_id, admin_note, driver_note')
       .eq('id', id)
       .single();
 
@@ -112,12 +113,44 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: tripError?.message ?? 'Рейс не найден' }, { status: 404 });
     }
 
-    // 1.1 Обновление данных самого рейса (одометр, заметки)
+    // 1.1 Обновление данных самого рейса (одометр, заметки, подотчёт наличных)
     const tripUpdates: Record<string, any> = {};
     if (body.odometer_start !== undefined) tripUpdates.odometer_start = body.odometer_start;
     if (body.odometer_end !== undefined) tripUpdates.odometer_end = body.odometer_end;
     if (body.admin_note !== undefined) tripUpdates.admin_note = body.admin_note;
     if (body.driver_note !== undefined) tripUpdates.driver_note = body.driver_note;
+
+    if (body.cash_not_surrendered !== undefined) {
+      let currentAdminNote =
+        (tripUpdates.admin_note !== undefined ? tripUpdates.admin_note : (trip.admin_note ?? '')) ||
+        '';
+      let currentDriverNote =
+        (tripUpdates.driver_note !== undefined
+          ? tripUpdates.driver_note
+          : (trip.driver_note ?? '')) || '';
+
+      if (body.cash_not_surrendered) {
+        if (!currentAdminNote.includes('[CASH_NOT_SURRENDERED]')) {
+          currentAdminNote = currentAdminNote.trim()
+            ? `${currentAdminNote.trim()}\n[CASH_NOT_SURRENDERED]`
+            : '[CASH_NOT_SURRENDERED]';
+        }
+      } else {
+        currentAdminNote = currentAdminNote
+          .replace(/\[CASH_NOT_SURRENDERED\]/g, '')
+          .replace(/\n{2,}/g, '\n')
+          .trim();
+
+        currentDriverNote = currentDriverNote
+          .replace(/\[НЕ СДАНО В КАССУ:[^\]]+\]/g, '')
+          .replace(/\[CARRYOVER[^\]]*\]/g, '')
+          .replace(/\[CASH_NOT_COLLECTED\]/g, '')
+          .replace(/\n{2,}/g, '\n')
+          .trim();
+        tripUpdates.driver_note = currentDriverNote || null;
+      }
+      tripUpdates.admin_note = currentAdminNote || null;
+    }
 
     if (Object.keys(tripUpdates).length > 0) {
       tripUpdates.updated_at = new Date().toISOString();

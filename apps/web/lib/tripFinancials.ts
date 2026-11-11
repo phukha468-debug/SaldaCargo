@@ -15,6 +15,7 @@ const PAYROLL_DRIVER_CAT = FINANCIAL_CATEGORIES.PAYROLL_DRIVER;
 const PAYROLL_LOADER_CAT = FINANCIAL_CATEGORIES.PAYROLL_LOADER;
 const CAT_FUEL = FINANCIAL_CATEGORIES.FUEL;
 const CAT_OTHER = FINANCIAL_CATEGORIES.OTHER;
+const CASH_COLLECT_CAT = FINANCIAL_CATEGORIES.CASH_COLLECT;
 
 export async function syncTripFinancials(
   supabase: any,
@@ -25,7 +26,7 @@ export async function syncTripFinancials(
   const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
     .select(
       `
-      id, trip_number, driver_id, started_at, lifecycle_status,
+      id, trip_number, driver_id, loader_id, admin_note, driver_note, started_at, created_at, lifecycle_status,
       driver:users!trips_driver_id_fkey(id, name),
       trip_orders(
         id, amount, payment_method, settlement_status, lifecycle_status, description,
@@ -115,6 +116,14 @@ export async function syncTripFinancials(
   );
   const cashTotal = cashOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
   const cashIdempotency = generateDeterministicUuid(`trip-income-cash-${tripId}`);
+  const holdIdempotency = generateDeterministicUuid(`trip-cash-hold-${tripId}`);
+
+  const isCashNotSurrendered =
+    (trip.admin_note ?? '').includes('[CASH_NOT_SURRENDERED]') ||
+    (trip.driver_note ?? '').includes('[CASH_NOT_COLLECTED]') ||
+    (trip.driver_note ?? '').includes('[НЕ СДАНО В КАССУ') ||
+    (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+    (trip.driver_note ?? '').includes('[CARRYOVER]');
 
   const { data: existingCashTx } = await (supabase.from('transactions') as any)
     .select('id')
@@ -123,37 +132,115 @@ export async function syncTripFinancials(
     .eq('to_wallet_id', CASH_ID)
     .maybeSingle();
 
+  const { data: existingHoldTx } = await (supabase.from('transactions') as any)
+    .select('id')
+    .eq('trip_id', tripId)
+    .eq('category_id', CASH_COLLECT_CAT)
+    .maybeSingle();
+
+  const tripDate = trip.started_at || trip.created_at || new Date().toISOString();
+
   if (cashTotal > 0) {
-    const tripDate = trip.started_at || trip.created_at;
-    if (existingCashTx) {
-      await (supabase.from('transactions') as any)
-        .update({
+    if (isCashNotSurrendered) {
+      // Наличные НЕ сданы в кассу/сейф: удаляем доход сейфа, если он был
+      if (existingCashTx) {
+        await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
+      }
+
+      // Создаём или обновляем подотчёт сотрудника (водителя или грузчика)
+      const responsibleUserId =
+        trip.driver_id ||
+        trip.loader_id ||
+        orders.find((o: any) => o.loader_id)?.loader_id ||
+        orders.find((o: any) => o.loaders_data?.[0]?.loader_id)?.loaders_data?.[0]?.loader_id ||
+        null;
+
+      const { data: userWallet } = responsibleUserId
+        ? await (supabase.from('wallets') as any)
+            .select('id')
+            .eq('owner_user_id', responsibleUserId)
+            .in('type', ['driver_accountable', 'staff_accountable', 'employee'])
+            .limit(1)
+            .maybeSingle()
+        : { data: null };
+
+      const holdDescription = `[CARRYOVER] Рейс №${trip.trip_number} · Наличные на руках (не сданы в кассу)`;
+
+      if (existingHoldTx) {
+        await (supabase.from('transactions') as any)
+          .update({
+            amount: cashTotal.toFixed(2),
+            direction: 'transfer',
+            category_id: CASH_COLLECT_CAT,
+            from_wallet_id: userWallet?.id ?? null,
+            to_wallet_id: CASH_ID,
+            related_user_id: responsibleUserId,
+            description: holdDescription,
+            lifecycle_status: 'approved',
+            settlement_status: 'pending',
+            transaction_date: tripDate,
+          })
+          .eq('id', existingHoldTx.id);
+      } else {
+        await (supabase.from('transactions') as any).insert({
+          direction: 'transfer',
+          category_id: CASH_COLLECT_CAT,
           amount: cashTotal.toFixed(2),
+          from_wallet_id: userWallet?.id ?? null,
+          to_wallet_id: CASH_ID,
+          trip_id: tripId,
+          related_user_id: responsibleUserId,
+          description: holdDescription,
+          lifecycle_status: 'approved',
+          settlement_status: 'pending',
+          transaction_date: tripDate,
+          created_at: tripDate,
+          created_by: adminId || responsibleUserId,
+          idempotency_key: holdIdempotency,
+        });
+      }
+    } else {
+      // Наличные сданы: удаляем подотчёт рейса, если он был
+      if (existingHoldTx) {
+        await (supabase.from('transactions') as any).delete().eq('id', existingHoldTx.id);
+      }
+
+      // Создаём или обновляем доход в сейф
+      if (existingCashTx) {
+        await (supabase.from('transactions') as any)
+          .update({
+            amount: cashTotal.toFixed(2),
+            description: buildOrderDescription(cashOrders, 'Нал'),
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            transaction_date: tripDate,
+            created_at: tripDate,
+          })
+          .eq('id', existingCashTx.id);
+      } else {
+        await (supabase.from('transactions') as any).insert({
+          direction: 'income',
+          category_id: TRIP_REVENUE_CATEGORY,
+          amount: cashTotal.toFixed(2),
+          to_wallet_id: CASH_ID,
+          trip_id: tripId,
           description: buildOrderDescription(cashOrders, 'Нал'),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
           transaction_date: tripDate,
           created_at: tripDate,
-        })
-        .eq('id', existingCashTx.id);
-    } else {
-      await (supabase.from('transactions') as any).insert({
-        direction: 'income',
-        category_id: TRIP_REVENUE_CATEGORY,
-        amount: cashTotal.toFixed(2),
-        to_wallet_id: CASH_ID,
-        trip_id: tripId,
-        description: buildOrderDescription(cashOrders, 'Нал'),
-        lifecycle_status: 'approved',
-        settlement_status: 'completed',
-        transaction_date: tripDate,
-        created_at: tripDate,
-        created_by: adminId,
-        idempotency_key: cashIdempotency,
-      });
+          created_by: adminId,
+          idempotency_key: cashIdempotency,
+        });
+      }
     }
-  } else if (existingCashTx) {
-    await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
+  } else {
+    if (existingCashTx) {
+      await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
+    }
+    if (existingHoldTx) {
+      await (supabase.from('transactions') as any).delete().eq('id', existingHoldTx.id);
+    }
   }
 
   // 4. Sync QR / Bank Income (qr + legacy card_driver, excluding internal company orders)

@@ -877,6 +877,14 @@ function EditModal({
       _deleted: false,
     })),
   );
+  const [cashNotSurrendered, setCashNotSurrendered] = useState<boolean>(
+    () =>
+      (trip.admin_note ?? '').includes('[CASH_NOT_SURRENDERED]') ||
+      (trip.driver_note ?? '').includes('[CASH_NOT_COLLECTED]') ||
+      (trip.driver_note ?? '').includes('[НЕ СДАНО В КАССУ') ||
+      (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+      (trip.driver_note ?? '').includes('[CARRYOVER]'),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
@@ -1136,6 +1144,7 @@ function EditModal({
           deleted_order_ids: deletedIds.length > 0 ? deletedIds : undefined,
           expenses: expensesPayload,
           deleted_expense_ids: deletedExpenseIds.length > 0 ? deletedExpenseIds : undefined,
+          cash_not_surrendered: cashNotSurrendered,
         }),
       });
       const json = await res.json();
@@ -2023,6 +2032,34 @@ function EditModal({
           </div>
         </div>
 
+        {/* Cash Surrender / Hold Toggle */}
+        {visibleOrders.some((o) => o.payment_method === 'cash') && (
+          <div className="mx-6 mb-4 p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs bg-amber-50/70 border-amber-200">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base shrink-0">⚠️</span>
+              <div className="truncate">
+                <span className="font-bold text-amber-950 block">Статус наличных по рейсу</span>
+                <span className="text-[11px] text-amber-800 block truncate">
+                  {cashNotSurrendered
+                    ? 'Деньги НЕ попадут в сейф компании — запишутся в подотчёт сотрудника'
+                    : 'Деньги будут оприходованы в кассу/сейф компании'}
+                </span>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none shrink-0 px-3 py-1.5 rounded-xl bg-white border border-amber-300 shadow-2xs hover:bg-amber-50/50 transition-colors">
+              <input
+                type="checkbox"
+                checked={cashNotSurrendered}
+                onChange={(e) => setCashNotSurrendered(e.target.checked)}
+                className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+              />
+              <span className="text-xs font-black text-amber-900">
+                Деньги не сданы (в подотчёт)
+              </span>
+            </label>
+          </div>
+        )}
+
         {/* Error Alert */}
         {error && (
           <div className="mx-6 mb-4 px-4 py-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2.5">
@@ -2108,14 +2145,53 @@ function TripCard({
     .filter((e) => e.payment_method === 'cash')
     .reduce((s, e) => s + parseFloat(e.amount), 0);
   const cashToSurrender = Math.max(0, cashRevenue - cashExpenses);
-  const hasCarryover =
+  const isCashNotSurrendered =
+    (trip.admin_note ?? '').includes('[CASH_NOT_SURRENDERED]') ||
+    (trip.driver_note ?? '').includes('[CASH_NOT_COLLECTED]') ||
+    (trip.driver_note ?? '').includes('[НЕ СДАНО В КАССУ') ||
     (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
     (trip.driver_note ?? '').includes('[CARRYOVER]');
+  const hasCarryover = isCashNotSurrendered;
   const fuelAudit = auditTripFuel(trip);
   const wialonAudit = auditTripWialon(trip);
   const queryClient = useQueryClient();
   const [showWialonModal, setShowWialonModal] = useState(false);
   const [isApplyingWialon, setIsApplyingWialon] = useState(false);
+  const [togglingCashHold, setTogglingCashHold] = useState(false);
+
+  const handleToggleCashHold = async (checked: boolean) => {
+    try {
+      setTogglingCashHold(true);
+      const res = await fetch(`/api/trips/${trip.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cash_not_surrendered: checked }),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        alert(j.error || 'Ошибка изменения статуса сдачи наличных');
+      } else {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['trips-review'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['trips-week'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['trips-month'], refetchType: 'all' }),
+          queryClient.invalidateQueries({
+            queryKey: ['receivable-settlements'],
+            refetchType: 'all',
+          }),
+        ]);
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ['trips-review'] }),
+          queryClient.refetchQueries({ queryKey: ['trips-week'] }),
+          queryClient.refetchQueries({ queryKey: ['trips-month'] }),
+        ]);
+      }
+    } catch (err: any) {
+      alert(`Ошибка сети: ${err?.message || 'Неизвестная ошибка'}`);
+    } finally {
+      setTogglingCashHold(false);
+    }
+  };
 
   const handleApplyWialon = async (tripId: string, auditData?: TripWialonAudit) => {
     try {
@@ -2260,12 +2336,20 @@ function TripCard({
                   ⚡ QR
                 </span>
               )}
-              {activeOrders.some((o) => o.payment_method === 'cash') && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-xs flex items-center gap-0.5">
-                  💵 Нал: {cashToSurrender.toLocaleString('ru-RU')} ₽
-                </span>
-              )}
-              {hasCarryover && (
+              {activeOrders.some((o) => o.payment_method === 'cash') &&
+                (isCashNotSurrendered ? (
+                  <span
+                    className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-600 text-white shadow-xs flex items-center gap-0.5"
+                    title="Наличные не сданы в кассу: находятся в подотчёте сотрудника"
+                  >
+                    ⚠️ Подотчёт: {cashToSurrender.toLocaleString('ru-RU')} ₽
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-xs flex items-center gap-0.5">
+                    💵 Нал: {cashToSurrender.toLocaleString('ru-RU')} ₽
+                  </span>
+                ))}
+              {hasCarryover && !activeOrders.some((o) => o.payment_method === 'cash') && (
                 <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-xs flex items-center gap-0.5">
                   ⚠️ Перенос
                 </span>
@@ -2662,23 +2746,69 @@ function TripCard({
             ))}
           </div>
 
-          {/* Плашка сдачи наличных и статуса переноса */}
-          {(cashToSurrender > 0 || hasCarryover) && (
-            <div className="px-5 py-2.5 bg-emerald-50/80 border-t border-emerald-200 flex items-center justify-between text-xs">
-              <span className="font-bold text-emerald-900 flex items-center gap-1.5">
-                <span>💵</span>
-                <span>
-                  Итого наличных к сдаче за рейс:{' '}
-                  <strong>{cashToSurrender.toLocaleString('ru-RU')} ₽</strong> (Выручка налом:{' '}
-                  {cashRevenue.toLocaleString('ru-RU')} ₽ − Расходы налом:{' '}
-                  {cashExpenses.toLocaleString('ru-RU')} ₽)
+          {/* Плашка сдачи наличных и статуса подотчёта */}
+          {(cashRevenue > 0 || hasCarryover) && (
+            <div
+              className={cn(
+                'px-4 py-2 border-t flex items-center justify-between text-xs gap-3',
+                isCashNotSurrendered
+                  ? 'bg-amber-50/90 border-amber-200'
+                  : 'bg-emerald-50/80 border-emerald-200',
+              )}
+            >
+              <span
+                className={cn(
+                  'font-bold flex items-center gap-1.5 truncate',
+                  isCashNotSurrendered ? 'text-amber-950' : 'text-emerald-900',
+                )}
+              >
+                <span>{isCashNotSurrendered ? '⚠️' : '💵'}</span>
+                <span className="truncate">
+                  Наличные за рейс: <strong>{cashToSurrender.toLocaleString('ru-RU')} ₽</strong>
+                  {cashExpenses > 0 && (
+                    <span className="text-slate-500 font-normal ml-1">
+                      (выручка {cashRevenue.toLocaleString('ru-RU')} ₽ − расход{' '}
+                      {cashExpenses.toLocaleString('ru-RU')} ₽)
+                    </span>
+                  )}
+                  {isCashNotSurrendered ? (
+                    <span className="text-amber-800 font-semibold ml-1.5">
+                      · На руках у {trip.driver?.name || 'сотрудника'} (в сейф компании НЕ учтено)
+                    </span>
+                  ) : (
+                    <span className="text-emerald-700 font-normal ml-1.5">
+                      · Учтено в кассу/сейф компании
+                    </span>
+                  )}
                 </span>
               </span>
-              {hasCarryover && (
-                <span className="font-black text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider">
-                  ⚠️ Водитель зафиксировал перенос на следующий рейс
+
+              <label
+                className={cn(
+                  'flex items-center gap-1.5 cursor-pointer select-none shrink-0 px-2.5 py-1 rounded-md border shadow-2xs transition-colors',
+                  isCashNotSurrendered
+                    ? 'bg-amber-100/90 border-amber-300 hover:bg-amber-100'
+                    : 'bg-white border-slate-200 hover:bg-slate-50',
+                  togglingCashHold && 'opacity-60 pointer-events-none',
+                )}
+                title="Если включено: деньги не попадают в сейф, а ложатся в подотчёт сотрудника"
+              >
+                <input
+                  type="checkbox"
+                  checked={isCashNotSurrendered}
+                  disabled={togglingCashHold}
+                  onChange={(e) => handleToggleCashHold(e.target.checked)}
+                  className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <span
+                  className={cn(
+                    'text-[11px] font-black',
+                    isCashNotSurrendered ? 'text-amber-900' : 'text-slate-700',
+                  )}
+                >
+                  Деньги не сданы (в подотчёт)
                 </span>
-              )}
+              </label>
             </div>
           )}
 
