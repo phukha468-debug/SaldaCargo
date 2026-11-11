@@ -1502,18 +1502,36 @@ export function generateTransportWaybillHtml(
         html += '    </div>';
         html += '  </div>';
         html += '  <div style=\"display: flex; align-items: center; gap: 6px; flex-shrink: 0;\">';
-        html += '    <button type=\"button\" class=\"btn btn-primary\" style=\"padding: 5px 10px; font-size: 11px;\" onclick=\"applyTnTemplate(\'' + k + '\'); closeTnTemplateModal();\">⚡ Применить</button>';
-        html += '    <button type=\"button\" class=\"btn btn-amber\" style=\"padding: 5px 10px; font-size: 11px;\" onclick=\"overwriteTnTemplate(\'' + k + '\')\" title=\"Перезаписать этот шаблон текущими полями бланка\">💾 Обновить</button>';
-        html += '    <button type=\"button\" class=\"btn btn-danger\" style=\"padding: 5px 8px; font-size: 11px;\" onclick=\"deleteTnTemplate(\'' + k + '\')\" title=\"Удалить шаблон\">🗑️</button>';
+        html += '    <button type=\"button\" class=\"btn btn-primary\" style=\"padding: 5px 10px; font-size: 11px;\" data-tpl=\"' + k + '\" onclick=\"applyTnTemplateByName(this)\">⚡ Применить</button>';
+        html += '    <button type=\"button\" class=\"btn btn-amber\" style=\"padding: 5px 10px; font-size: 11px;\" data-tpl=\"' + k + '\" onclick=\"overwriteTnTemplateByName(this)\" title=\"Перезаписать этот шаблон текущими полями бланка\">💾 Обновить</button>';
+        html += '    <button type=\"button\" class=\"btn btn-danger\" style=\"padding: 5px 8px; font-size: 11px;\" data-tpl=\"' + k + '\" onclick=\"deleteTnTemplateByName(this)\" title=\"Удалить шаблон\">🗑️</button>';
         html += '  </div>';
         html += '</div>';
       });
       listEl.innerHTML = html;
     }
 
+    function applyTnTemplateByName(btn) {
+      const name = btn?.getAttribute('data-tpl');
+      if (name) {
+        applyTnTemplate(name);
+        closeTnTemplateModal();
+      }
+    }
+
+    function overwriteTnTemplateByName(btn) {
+      const name = btn?.getAttribute('data-tpl');
+      if (name) overwriteTnTemplate(name);
+    }
+
+    function deleteTnTemplateByName(btn) {
+      const name = btn?.getAttribute('data-tpl');
+      if (name) deleteTnTemplate(name);
+    }
+
     function handleSaveTnTemplateClick() {
       const curClient = (document.querySelector('[data-field=\"clientOrgName\"]')?.innerText || document.querySelector('[data-field=\"shipperOrgName\"]')?.innerText || '').trim();
-      const firstLine = curClient.split('\n')[0].replace(/[«»"]/g, '').trim();
+      const firstLine = curClient.split('\\n')[0].replace(/[«»"]/g, '').trim();
       const suggested = firstLine.slice(0, 30);
       if (suggested) {
         saveCurrentAsTnTemplate(suggested);

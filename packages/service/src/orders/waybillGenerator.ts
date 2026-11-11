@@ -1669,13 +1669,31 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         html += '    </div>';
         html += '  </div>';
         html += '  <div style=\"display: flex; align-items: center; gap: 6px; flex-shrink: 0;\">';
-        html += '    <button type=\"button\" class=\"btn btn-primary\" style=\"padding: 5px 10px; font-size: 11px;\" onclick=\"applyTemplate(\'' + k + '\'); closeTemplateModal();\">⚡ Применить</button>';
-        html += '    <button type=\"button\" class=\"btn btn-amber\" style=\"padding: 5px 10px; font-size: 11px;\" onclick=\"overwriteTemplate(\'' + k + '\')\" title=\"Перезаписать этот шаблон текущими полями бланка\">💾 Обновить</button>';
-        html += '    <button type=\"button\" class=\"btn btn-danger\" style=\"padding: 5px 8px; font-size: 11px;\" onclick=\"deleteTemplate(\'' + k + '\')\" title=\"Удалить шаблон\">🗑️</button>';
+        html += '    <button type=\"button\" class=\"btn btn-primary\" style=\"padding: 5px 10px; font-size: 11px;\" data-tpl=\"' + k + '\" onclick=\"applyTemplateByName(this)\">⚡ Применить</button>';
+        html += '    <button type=\"button\" class=\"btn btn-amber\" style=\"padding: 5px 10px; font-size: 11px;\" data-tpl=\"' + k + '\" onclick=\"overwriteTemplateByName(this)\" title=\"Перезаписать этот шаблон текущими полями бланка\">💾 Обновить</button>';
+        html += '    <button type=\"button\" class=\"btn btn-danger\" style=\"padding: 5px 8px; font-size: 11px;\" data-tpl=\"' + k + '\" onclick=\"deleteTemplateByName(this)\" title=\"Удалить шаблон\">🗑️</button>';
         html += '  </div>';
         html += '</div>';
       });
       listEl.innerHTML = html;
+    }
+
+    function applyTemplateByName(btn) {
+      const name = btn?.getAttribute('data-tpl');
+      if (name) {
+        applyTemplate(name);
+        closeTemplateModal();
+      }
+    }
+
+    function overwriteTemplateByName(btn) {
+      const name = btn?.getAttribute('data-tpl');
+      if (name) overwriteTemplate(name);
+    }
+
+    function deleteTemplateByName(btn) {
+      const name = btn?.getAttribute('data-tpl');
+      if (name) deleteTemplate(name);
     }
 
     function saveFromModalInput() {
