@@ -318,7 +318,9 @@ function calcOrderLoaderMetrics(
   const dcp = parseFloat(String(o.driver_car_pay || '0'));
   const amt = parseFloat(o.amount || '0');
   let loadersPool = 0;
-  if (dcp > 0 && amt > 0) {
+  if (o.direction === 'loaders_only' && amt > 0) {
+    loadersPool = amt;
+  } else if (dcp > 0 && amt > 0) {
     const mPool = Math.round(dcp / 0.3);
     loadersPool = Math.max(0, amt - mPool);
   }
@@ -327,19 +329,6 @@ function calcOrderLoaderMetrics(
   }
   const profit = Math.max(0, loadersPool - totalPaid);
   return { profit, thirdPartyPay, driverLoaderPay, totalPaid, loadersPool };
-}
-
-function calcOrderLoaderProfit(
-  o: TripOrder,
-  tripStartedAt?: string | null,
-  asset?: {
-    short_name?: string | null;
-    reg_number?: string | null;
-    asset_type_code?: string | null;
-    asset_type?: { code?: string | null } | null;
-  } | null,
-): number {
-  return calcOrderLoaderMetrics(o, tripStartedAt, asset).profit;
 }
 
 function calcTrip(trip: TripForReview, periodEndIso?: string) {
@@ -685,6 +674,11 @@ type EditableOrder = {
   counterparty_id?: string | null;
   counterparty?: { name: string } | null;
   description?: string | null;
+  direction?: string;
+  is_driver_loader?: boolean;
+  driver_car_pay?: string | number;
+  driver_loader_pay?: string | number;
+  loaders_data?: Array<{ id: string; name?: string; pay?: string | number }>;
   _selectedId: string | null;
   _inputValue: string;
   _deleted?: boolean;
@@ -853,6 +847,18 @@ function EditModal({
       }
       return {
         ...o,
+        direction:
+          o.direction || (trip.asset?.reg_number === 'БЕЗ АВТО' ? 'loaders_only' : 'local'),
+        is_driver_loader: o.is_driver_loader ?? o.direction === 'loaders_only',
+        driver_car_pay:
+          o.driver_car_pay !== undefined && o.driver_car_pay !== null
+            ? String(o.driver_car_pay)
+            : '',
+        driver_loader_pay:
+          o.driver_loader_pay !== undefined && o.driver_loader_pay !== null
+            ? String(o.driver_loader_pay)
+            : '',
+        loaders_data: o.loaders_data,
         description: o.description ?? '',
         _selectedId: o.counterparty_id,
         _inputValue: o.counterparty?.name ?? '',
@@ -873,6 +879,7 @@ function EditModal({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const queryClient = useQueryClient();
 
   const { data: counterparties = [] } = useQuery<Counterparty[]>({
     queryKey: ['counterparties-list'],
@@ -885,7 +892,7 @@ function EditModal({
     staleTime: 60000,
   });
 
-  const update = (id: string, field: keyof EditableOrder, value: string) => {
+  const update = (id: string, field: keyof EditableOrder, value: any) => {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, [field]: value } : o)));
   };
 
@@ -979,6 +986,7 @@ function EditModal({
     const defaultLoader2Id = activeOrders.find((o) => o.loader2_id)?.loader2_id ?? null;
     const defaultLoader2 = activeOrders.find((o) => o.loader2)?.loader2 ?? null;
 
+    const isTripPrr = trip.asset?.reg_number === 'БЕЗ АВТО';
     const newOrder: EditableOrder = {
       id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       isNew: true,
@@ -990,6 +998,10 @@ function EditModal({
       loader2_id: defaultLoader2Id,
       loader: defaultLoader,
       loader2: defaultLoader2,
+      direction: isTripPrr ? 'loaders_only' : 'local',
+      is_driver_loader: isTripPrr,
+      driver_car_pay: '0',
+      driver_loader_pay: '0',
       payment_method: 'debt_cash',
       settlement_status: 'pending',
       lifecycle_status: trip.lifecycle_status === 'approved' ? 'approved' : 'draft',
@@ -1086,6 +1098,15 @@ function EditModal({
       loader2_pay: o.loader2_pay ?? '0',
       loader_id: o.loader_id ?? null,
       loader2_id: o.loader2_id ?? null,
+      direction: o.direction || 'local',
+      is_driver_loader: o.direction === 'loaders_only' ? true : Boolean(o.is_driver_loader),
+      driver_car_pay:
+        o.direction === 'loaders_only' ? '0' : String(o.driver_car_pay ?? o.driver_pay ?? '0'),
+      driver_loader_pay:
+        o.direction === 'loaders_only'
+          ? String(o.driver_loader_pay ?? o.driver_pay ?? '0')
+          : String(o.driver_loader_pay ?? '0'),
+      loaders_data: o.loaders_data,
       payment_method: o.payment_method,
       counterparty_id: o._selectedId,
       description: o.description?.trim() || null,
@@ -1118,11 +1139,23 @@ function EditModal({
         }),
       });
       const json = await res.json();
-      setSaving(false);
       if (!res.ok) {
+        setSaving(false);
         setError(json.error ?? 'Ошибка сохранения');
         return;
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['trips-review'], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ['trips-week'], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ['trips-month'], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ['receivable-settlements'], refetchType: 'all' }),
+      ]);
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['trips-review'] }),
+        queryClient.refetchQueries({ queryKey: ['trips-week'] }),
+        queryClient.refetchQueries({ queryKey: ['trips-month'] }),
+      ]);
+      setSaving(false);
       onSaved();
     } catch {
       setSaving(false);
@@ -1300,8 +1333,8 @@ function EditModal({
                 className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4 bg-slate-50/50 shadow-2xs hover:border-slate-300 transition-all relative group"
               >
                 {/* Order Header */}
-                <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-3 flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xs font-black">
                       {idx + 1}
                     </span>
@@ -1313,6 +1346,64 @@ function EditModal({
                         Новая
                       </span>
                     )}
+
+                    {/* Переключатель: На машине / ППР */}
+                    <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-bold shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          update(order.id, 'direction', 'local');
+                          update(order.id, 'is_driver_loader', false);
+                          if (amtNum > 0) {
+                            update(order.id, 'driver_pay', String(Math.round(amtNum * 0.3)));
+                          }
+                        }}
+                        className={cn(
+                          'px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1',
+                          order.direction !== 'loaders_only'
+                            ? 'bg-sky-500 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900',
+                        )}
+                        title="Обычный рейс на автомобиле"
+                      >
+                        <span>🚚</span>
+                        <span>На машине</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          update(order.id, 'direction', 'loaders_only');
+                          update(order.id, 'is_driver_loader', true);
+                          if (amtNum > 0) {
+                            const hasOtherLoader = Boolean(
+                              order.loader_id || parseFloat(order.loader_pay) > 0 || trip.loader,
+                            );
+                            if (hasOtherLoader) {
+                              const halfLoading = String(Math.round(amtNum * 0.35));
+                              update(order.id, 'driver_pay', halfLoading);
+                              update(order.id, 'driver_loader_pay', halfLoading);
+                              update(order.id, 'driver_car_pay', '0');
+                              update(order.id, 'loader_pay', halfLoading);
+                            } else {
+                              const fullLoading = String(Math.round(amtNum * 0.7));
+                              update(order.id, 'driver_pay', fullLoading);
+                              update(order.id, 'driver_loader_pay', fullLoading);
+                              update(order.id, 'driver_car_pay', '0');
+                            }
+                          }
+                        }}
+                        className={cn(
+                          'px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1',
+                          order.direction === 'loaders_only'
+                            ? 'bg-amber-500 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900',
+                        )}
+                        title="Погрузочно-разгрузочные работы (без авто)"
+                      >
+                        <span>👷</span>
+                        <span>ППР (без авто)</span>
+                      </button>
+                    </div>
                   </div>
                   {visibleOrders.length > 1 && (
                     <button
@@ -1527,6 +1618,23 @@ function EditModal({
 
                 {/* Financial Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {order.direction === 'loaders_only' && (
+                    <div className="sm:col-span-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between gap-2 shadow-2xs">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <span>👷</span>
+                        <span>ППР (без авто):</span>
+                        <span className="font-medium text-amber-800">
+                          70% оплата рабочим · 30% маржа компании
+                        </span>
+                      </div>
+                      {amtNum > 0 && (
+                        <span className="text-[11px] font-black text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                          +{Math.round(amtNum * 0.3).toLocaleString('ru-RU')} ₽ маржа фирмы
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Amount */}
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
@@ -1544,7 +1652,21 @@ function EditModal({
                         if (!order.driver_pay || order.driver_pay === '0') {
                           const num = parseFloat(val);
                           if (!isNaN(num) && num > 0) {
-                            update(order.id, 'driver_pay', Math.round(num * 0.3).toString());
+                            if (order.direction === 'loaders_only') {
+                              const hasOtherLoader = Boolean(
+                                order.loader_id || parseFloat(order.loader_pay) > 0 || trip.loader,
+                              );
+                              const pct = hasOtherLoader ? 0.35 : 0.7;
+                              update(order.id, 'driver_pay', Math.round(num * pct).toString());
+                              if (
+                                hasOtherLoader &&
+                                (!order.loader_pay || order.loader_pay === '0')
+                              ) {
+                                update(order.id, 'loader_pay', Math.round(num * 0.35).toString());
+                              }
+                            } else {
+                              update(order.id, 'driver_pay', Math.round(num * 0.3).toString());
+                            }
                           }
                         }
                       }}
@@ -1555,17 +1677,56 @@ function EditModal({
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                        ЗП водителя, ₽
+                        {order.direction === 'loaders_only'
+                          ? 'ЗП водителя (как грузчик), ₽'
+                          : 'ЗП водителя, ₽'}
                       </label>
                       {amtNum > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => update(order.id, 'driver_pay', suggestedPay.toString())}
-                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
-                          title="Установить стандартные 30%"
-                        >
-                          30%: {suggestedPay.toLocaleString('ru-RU')} ₽
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {order.direction === 'loaders_only' ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  update(
+                                    order.id,
+                                    'driver_pay',
+                                    Math.round(amtNum * 0.35).toString(),
+                                  )
+                                }
+                                className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                                title="35% (при работе с другим грузчиком)"
+                              >
+                                35%: {Math.round(amtNum * 0.35).toLocaleString('ru-RU')} ₽
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  update(
+                                    order.id,
+                                    'driver_pay',
+                                    Math.round(amtNum * 0.7).toString(),
+                                  )
+                                }
+                                className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                                title="70% (водитель грузил один)"
+                              >
+                                70%: {Math.round(amtNum * 0.7).toLocaleString('ru-RU')} ₽
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                update(order.id, 'driver_pay', suggestedPay.toString())
+                              }
+                              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                              title="Установить стандартные 30%"
+                            >
+                              30%: {suggestedPay.toLocaleString('ru-RU')} ₽
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                     <input
@@ -2061,6 +2222,37 @@ function TripCard({
             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-bold shrink-0">
               #{trip.trip_number}
             </span>
+            {/* Яркие бейджи типов заказов рейса (ППР / Авто) */}
+            {(() => {
+              const pprCount = activeOrders.filter(
+                (o) => o.direction === 'loaders_only' || trip.asset?.reg_number === 'БЕЗ АВТО',
+              ).length;
+              const autoCount = activeOrders.length - pprCount;
+              if (trip.asset?.reg_number !== 'БЕЗ АВТО' && pprCount > 0) {
+                if (autoCount === 0) {
+                  return (
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-2xs shrink-0 flex items-center gap-1"
+                      title="Все заказы в этом рейсе — погрузо-разгрузочные работы (без авто)"
+                    >
+                      <span>👷</span>
+                      <span>Только ППР</span>
+                    </span>
+                  );
+                }
+                return (
+                  <span
+                    className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs shrink-0 flex items-center gap-1"
+                    title={`В рейсе ${pprCount} заказ(а) ППР и ${autoCount} на машине`}
+                  >
+                    <span>👷 ППР: {pprCount}</span>
+                    <span className="text-amber-400">·</span>
+                    <span>🚚 {autoCount}</span>
+                  </span>
+                );
+              }
+              return null;
+            })()}
             {/* Яркие бейджи способов оплаты в рейсе */}
             <div className="flex items-center gap-1 shrink-0">
               {activeOrders.some((o) => o.payment_method === 'qr') && (
@@ -2206,11 +2398,37 @@ function TripCard({
                   const amt = parseFloat(order.amount);
                   const dp = parseFloat(order.driver_pay);
                   const split = amt > 0 ? Math.round((dp / amt) * 100) : 0;
+                  const isOrderPpr =
+                    order.direction === 'loaders_only' || trip.asset?.reg_number === 'БЕЗ АВТО';
+                  const orderLoaderMetrics = calcOrderLoaderMetrics(
+                    order,
+                    trip.started_at,
+                    trip.asset,
+                  );
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-5 py-3 text-sm font-semibold text-slate-900">
-                        <div className="font-bold text-slate-900">
-                          {order.counterparty?.name ?? '—'}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900">
+                            {order.counterparty?.name ?? '—'}
+                          </span>
+                          {isOrderPpr ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs shrink-0"
+                              title="Погрузочно-разгрузочные работы (без авто)"
+                            >
+                              <span>👷</span>
+                              <span>ППР (без авто)</span>
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-sky-50 text-sky-800 border border-sky-200 shrink-0"
+                              title="Рейс на автомобиле"
+                            >
+                              <span>🚚</span>
+                              <span>На машине</span>
+                            </span>
+                          )}
                         </div>
                         {order.description && (
                           <div className="mt-1 text-xs font-semibold text-amber-950 bg-amber-50 border border-amber-300 rounded-lg p-2 max-w-sm shadow-2xs">
@@ -2226,14 +2444,50 @@ function TripCard({
                       </td>
                       <td className="px-5 py-3 text-sm font-bold text-slate-800">
                         <Money amount={order.amount} />
+                        {isOrderPpr && orderLoaderMetrics.profit > 0 && (
+                          <span
+                            className="block text-[10px] font-black text-emerald-600 leading-tight mt-0.5"
+                            title="Прибыль компании с услуг ППР (маржа 30%)"
+                          >
+                            +{Math.round(orderLoaderMetrics.profit).toLocaleString('ru-RU')} ₽ маржа
+                          </span>
+                        )}
                       </td>
-                      <td className="px-5 py-3 text-sm text-right text-emerald-600 font-bold">
-                        <Money amount={order.driver_pay} />
+                      <td className="px-5 py-3 text-sm text-right font-bold">
+                        <span className="text-emerald-600">
+                          <Money amount={order.driver_pay} />
+                        </span>
+                        {isOrderPpr ? (
+                          <span
+                            className="block text-[10px] font-bold text-amber-700 leading-tight"
+                            title="Водитель грузил сам в качестве грузчика (без управления ТС)"
+                          >
+                            👷 за погрузку
+                          </span>
+                        ) : order.is_driver_loader &&
+                          parseFloat(String(order.driver_loader_pay || '0')) > 0 ? (
+                          <span
+                            className="block text-[9px] text-slate-400 font-medium leading-tight"
+                            title={`Руль: ${Math.round(parseFloat(String(order.driver_car_pay || '0')))} ₽, Погрузка: ${Math.round(parseFloat(String(order.driver_loader_pay || '0')))} ₽`}
+                          >
+                            руль {Math.round(parseFloat(String(order.driver_car_pay || '0')))} +
+                            груз. {Math.round(parseFloat(String(order.driver_loader_pay || '0')))}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-5 py-3 text-center">
-                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                          {split}%
-                        </span>
+                        {isOrderPpr ? (
+                          <span
+                            className="text-[10px] font-black text-amber-900 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded shadow-2xs whitespace-nowrap"
+                            title="Распределение ППР: 70% бригаде грузчиков / 30% компании"
+                          >
+                            30% фирма
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                            {split}%
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-sm text-right font-medium text-slate-600">
                         {parseFloat(order.loader_pay) > 0 ||
@@ -2258,6 +2512,7 @@ function TripCard({
                               </div>
                             )}
                             {order.is_driver_loader &&
+                              !isOrderPpr &&
                               parseFloat(String(order.driver_loader_pay || '0')) > 0 && (
                                 <div className="flex items-center justify-end gap-1.5 text-amber-600">
                                   <span className="text-[10px] opacity-75 font-medium">
@@ -2266,16 +2521,13 @@ function TripCard({
                                   <Money amount={String(order.driver_loader_pay)} />
                                 </div>
                               )}
-                            {calcOrderLoaderProfit(order, trip.started_at) > 0 && (
+                            {!isOrderPpr && orderLoaderMetrics.profit > 0 && (
                               <div
                                 className="text-[9px] font-bold text-emerald-600 text-right leading-none"
                                 title="Прибыль компании с услуг погрузки (маржа 30%)"
                               >
-                                +
-                                {Math.round(
-                                  calcOrderLoaderProfit(order, trip.started_at),
-                                ).toLocaleString('ru-RU')}{' '}
-                                ₽ маржа
+                                +{Math.round(orderLoaderMetrics.profit).toLocaleString('ru-RU')} ₽
+                                маржа
                               </div>
                             )}
                           </div>
@@ -4644,11 +4896,23 @@ export default function ReviewPage() {
     });
   };
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['trips-review'] });
-    queryClient.invalidateQueries({ queryKey: ['service-orders-month'] });
-    queryClient.invalidateQueries({ queryKey: ['receivable-settlements'] });
-    queryClient.invalidateQueries({ queryKey: ['garage-review-orders'] });
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['trips-review'], refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: ['trips-week'], refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: ['trips-month'], refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: ['service-orders-day'], refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: ['service-orders-week'], refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: ['service-orders-month'], refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: ['receivable-settlements'], refetchType: 'all' }),
+      queryClient.invalidateQueries({ queryKey: ['garage-review-orders'], refetchType: 'all' }),
+    ]);
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['trips-review'] }),
+      queryClient.refetchQueries({ queryKey: ['trips-week'] }),
+      queryClient.refetchQueries({ queryKey: ['trips-month'] }),
+      queryClient.refetchQueries({ queryKey: ['receivable-settlements'] }),
+    ]);
   };
 
   // ── Заказ-наряды Гаража (Механики) для вкладки «Гараж» ─────────
@@ -6309,9 +6573,9 @@ export default function ReviewPage() {
         <EditModal
           trip={editTrip}
           onClose={() => setEditTrip(null)}
-          onSaved={() => {
+          onSaved={async () => {
             setEditTrip(null);
-            refresh();
+            await refresh();
           }}
         />
       )}

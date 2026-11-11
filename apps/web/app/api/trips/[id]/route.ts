@@ -74,6 +74,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         loader2_pay?: string;
         loader_id?: string | null;
         loader2_id?: string | null;
+        direction?: string;
+        is_driver_loader?: boolean;
+        driver_car_pay?: string | number;
+        driver_loader_pay?: string | number;
+        loaders_data?: any;
         description?: string;
         payment_method?: string;
         counterparty_id?: string | null;
@@ -217,6 +222,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             loader_pay: parseFloat(order.loader_pay ?? '0').toFixed(2),
             loader2_id: order.loader2_id ?? trip.loader2_id ?? null,
             loader2_pay: parseFloat(order.loader2_pay ?? '0').toFixed(2),
+            direction: order.direction || 'local',
+            is_driver_loader: Boolean(order.is_driver_loader),
+            driver_car_pay: parseFloat(String(order.driver_car_pay ?? '0')).toFixed(2),
+            driver_loader_pay: parseFloat(String(order.driver_loader_pay ?? '0')).toFixed(2),
+            ...(order.loaders_data ? { loaders_data: order.loaders_data } : {}),
             payment_method: paymentMethod,
             settlement_status: settlementStatus,
             lifecycle_status: trip.lifecycle_status === 'approved' ? 'approved' : 'draft',
@@ -237,6 +247,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             update.loader_pay = parseFloat(order.loader_pay).toFixed(2);
           if (order.loader2_pay !== undefined)
             update.loader2_pay = parseFloat(order.loader2_pay).toFixed(2);
+          if (order.direction !== undefined) update.direction = order.direction;
+          if (order.is_driver_loader !== undefined)
+            update.is_driver_loader = Boolean(order.is_driver_loader);
+          if (order.driver_car_pay !== undefined)
+            update.driver_car_pay = parseFloat(String(order.driver_car_pay)).toFixed(2);
+          if (order.driver_loader_pay !== undefined)
+            update.driver_loader_pay = parseFloat(String(order.driver_loader_pay)).toFixed(2);
+          if (order.loaders_data !== undefined) update.loaders_data = order.loaders_data;
           if (order.description !== undefined)
             update.description = order.description?.trim() || null;
           if (order.payment_method !== undefined) {
