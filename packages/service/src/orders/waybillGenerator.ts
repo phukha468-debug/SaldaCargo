@@ -532,7 +532,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         width: 297mm !important;
         height: auto !important;
       }
-      .print-hide {
+      .print-hide, .modal-backdrop-wrap {
         display: none !important;
       }
       .editable-field:hover, .editable-field:focus {
@@ -681,7 +681,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       </select>
 
       <!-- Кнопка + Шаблон: сохранить текущую заполненность -->
-      <button class="btn btn-success" onclick="openSaveTemplateModal()" title="Сохранить текущую заполненность путевого листа в шаблон">
+      <button class="btn btn-success" onclick="handleSaveTemplateClick()" title="Сохранить текущую заполненность путевого листа в шаблон автомобиля">
         💾 + Шаблон
       </button>
 
@@ -704,7 +704,7 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
   <div id="toastBox" style="position: fixed; top: 12px; right: 16px; z-index: 99999; display: none;"></div>
 
   <!-- Модальное окно управления шаблонами (скрыто при печати) -->
-  <div id="templateModalBackdrop" class="print-hide" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(3px); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
+  <div id="templateModalBackdrop" class="modal-backdrop-wrap" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(3px); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
     <div style="background: #ffffff; color: #0f172a; width: 100%; max-width: 600px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
       
       <!-- Шапка модалки -->
@@ -1587,7 +1587,9 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         keys.forEach(k => {
           const opt = document.createElement('option');
           opt.value = k;
-          const brand = vehicleTemplates[k].vehBrand ? ' (' + vehicleTemplates[k].vehBrand.split('(')[0].trim() + ')' : '';
+          const item = vehicleTemplates[k] || {};
+          const brandText = item.vehBrand || item.fields?.vehBrand || '';
+          const brand = brandText ? ' (' + brandText.split('(')[0].trim() + ')' : '';
           opt.textContent = '🚚 ' + k + brand;
           sel.appendChild(opt);
         });
@@ -1655,7 +1657,8 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       let html = '';
       keys.forEach(k => {
         const item = vehicleTemplates[k] || {};
-        const brand = item.vehBrand ? item.vehBrand.split('(')[0].trim() : '';
+        const brandText = item.vehBrand || item.fields?.vehBrand || '';
+        const brand = brandText ? brandText.split('(')[0].trim() : '';
         const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('ru-RU') : '';
         html += '<div style=\"display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px;\">';
         html += '  <div style=\"display: flex; align-items: center; gap: 8px; min-width: 0;\">';
@@ -1683,13 +1686,13 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         return;
       }
       saveCurrentAsTemplate(val);
-      renderModalTemplatesList();
+      closeTemplateModal();
     }
 
     function overwriteTemplate(vehicleReg) {
       if (!confirm('Перезаписать шаблон для \"' + vehicleReg + '\" текущими данными с экрана?')) return;
       saveCurrentAsTemplate(vehicleReg);
-      renderModalTemplatesList();
+      closeTemplateModal();
     }
 
     function handleSelectTemplate(val) {
@@ -1736,6 +1739,16 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
       if (curVeh && vehicleTemplates[curVeh]) {
         applyTemplate(curVeh);
       } else {
+        handleSaveTemplateClick();
+      }
+    }
+
+    function handleSaveTemplateClick() {
+      const curVeh = normalizeReg(document.querySelector('[data-field=\"vehReg\"]')?.innerText || currentVehReg || '');
+      if (curVeh) {
+        saveCurrentAsTemplate(curVeh);
+      } else {
+        showToast('⚠️ Введите госномер автомобиля в бланке', false);
         openSaveTemplateModal();
       }
     }
@@ -1795,6 +1808,8 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         console.warn('LocalStorage save error:', e);
       }
 
+      renderTemplateSelector();
+      renderModalTemplatesList();
       showToast('⏳ Сохранение шаблона \"' + vehicleReg + '\"...');
 
       // Сохраняем в базу через API
@@ -1817,7 +1832,11 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
         renderModalTemplatesList();
       });
 
-      renderTemplateSelector();
+      fetch('/api/document-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: vehicleReg, type: 'waybill', fields: templateFields })
+      }).catch(() => {});
     }
 
     function clearAllFields() {

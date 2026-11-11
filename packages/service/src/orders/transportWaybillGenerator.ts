@@ -402,7 +402,7 @@ export function generateTransportWaybillHtml(
         background: #fff !important;
         padding: 0 !important;
       }
-      .print-hide {
+      .print-hide, .modal-backdrop-wrap {
         display: none !important;
       }
       .editable-field:hover, .editable-field:focus {
@@ -595,7 +595,7 @@ export function generateTransportWaybillHtml(
       </select>
 
       <!-- Сохранить в шаблон -->
-      <button class="btn btn-success" onclick="openSaveTnTemplateModal()" title="Сохранить текущие поля накладной в шаблон">
+      <button class="btn btn-success" onclick="handleSaveTnTemplateClick()" title="Сохранить текущие поля накладной в шаблон">
         💾 + Шаблон
       </button>
 
@@ -618,7 +618,7 @@ export function generateTransportWaybillHtml(
   <div id="toastBox" style="position: fixed; top: 12px; right: 16px; z-index: 99999; display: none;"></div>
 
   <!-- Модальное окно управления шаблонами ТН (скрыто при печати) -->
-  <div id="tnTemplateModalBackdrop" class="print-hide" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(3px); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
+  <div id="tnTemplateModalBackdrop" class="modal-backdrop-wrap" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(3px); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
     <div style="background: #ffffff; color: #0f172a; width: 100%; max-width: 620px; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
       
       <!-- Шапка модалки -->
@@ -1511,6 +1511,18 @@ export function generateTransportWaybillHtml(
       listEl.innerHTML = html;
     }
 
+    function handleSaveTnTemplateClick() {
+      const curClient = (document.querySelector('[data-field=\"clientOrgName\"]')?.innerText || document.querySelector('[data-field=\"shipperOrgName\"]')?.innerText || '').trim();
+      const firstLine = curClient.split('\n')[0].replace(/[«»"]/g, '').trim();
+      const suggested = firstLine.slice(0, 30);
+      if (suggested) {
+        saveCurrentAsTnTemplate(suggested);
+      } else {
+        showToast('⚠️ Укажите название шаблона ТН', false);
+        openSaveTnTemplateModal();
+      }
+    }
+
     function saveFromTnModalInput() {
       const inp = document.getElementById('modalTnTemplateNameInput');
       const val = inp?.value?.trim();
@@ -1519,13 +1531,13 @@ export function generateTransportWaybillHtml(
         return;
       }
       saveCurrentAsTnTemplate(val);
-      renderModalTnTemplatesList();
+      closeTnTemplateModal();
     }
 
     function overwriteTnTemplate(name) {
       if (!confirm('Перезаписать шаблон ТН \"' + name + '\" текущими данными с экрана?')) return;
       saveCurrentAsTnTemplate(name);
-      renderModalTnTemplatesList();
+      closeTnTemplateModal();
     }
 
     function handleSelectTnTemplate(val) {

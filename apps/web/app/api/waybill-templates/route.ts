@@ -27,7 +27,9 @@ export async function GET() {
           id: p.id,
           name: normReg,
           vehicleReg: rawReg,
+          vehBrand: settings.fields?.vehBrand || settings.vehBrand || '',
           updatedAt: p.updated_at,
+          fields: settings.fields,
           ...settings.fields,
         };
       }
@@ -73,12 +75,16 @@ export async function POST(req: Request) {
 
     let savedId = existing?.id;
     if (existing?.id) {
-      await (supabase.from('order_presets') as any).update(payload).eq('id', existing.id);
+      const { error: updErr } = await (supabase.from('order_presets') as any)
+        .update(payload)
+        .eq('id', existing.id);
+      if (updErr) throw updErr;
     } else {
-      const { data: ins } = await (supabase.from('order_presets') as any)
+      const { data: ins, error: insErr } = await (supabase.from('order_presets') as any)
         .insert(payload)
         .select('id')
         .single();
+      if (insErr) throw insErr;
       savedId = ins?.id;
     }
 
