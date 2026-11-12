@@ -227,6 +227,93 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       targetId = found.id;
     }
 
+    if (body.action === 'approve_external') {
+      const extOrg = ((body.external_org as string) || '').trim() || 'Стороннее СТО';
+      const extTitle = ((body.external_title as string) || '').trim() || 'Сторонний ремонт';
+      const extAmount = Math.max(0, Number(body.external_amount) || 0);
+
+      const { data: curOrder, error: curErr } = await (supabase.from('service_orders') as any)
+        .select('id, order_number, asset_id, admin_note, machine_type')
+        .eq('id', targetId)
+        .single();
+
+      if (curErr || !curOrder) {
+        return NextResponse.json({ error: 'Заказ-наряд не найден' }, { status: 404 });
+      }
+
+      // 1. Очищаем старые слесарные работы и создаем одну работу стороннего сервиса
+      await (supabase.from('service_order_works') as any).delete().eq('service_order_id', targetId);
+
+      await (supabase.from('service_order_works') as any).insert({
+        service_order_id: targetId,
+        custom_work_name: `${extTitle} (${extOrg})`,
+        price_client: extAmount,
+        norm_minutes: 0,
+        actual_minutes: 0,
+        status: 'completed',
+        salary_paid: false,
+        mechanic_id: null,
+        second_mechanic_id: null,
+      });
+
+      // 2. Обновляем заказ-наряд в approved (Архив) с нулевой ЗП механиков
+      const newAdminNote = curOrder.admin_note
+        ? `[Сторонний ремонт: ${extOrg}, сумма: ${extAmount} ₽]\n${curOrder.admin_note}`
+        : `[Сторонний ремонт: ${extOrg}, сумма: ${extAmount} ₽]`;
+
+      await (supabase.from('service_orders') as any)
+        .update({
+          problem_description: `[Сторонний сервис: ${extOrg}] ${extTitle}`,
+          admin_note: newAdminNote,
+          mechanic_pay: 0,
+          second_mechanic_pay: 0,
+          assigned_mechanic_id: null,
+          second_mechanic_id: null,
+          status: 'completed',
+          lifecycle_status: 'approved',
+          payment_received: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetId);
+
+      // 3. Создаем транзакцию расхода компании на сторонний ремонт
+      if (extAmount > 0) {
+        const REPAIR_EXTERNAL_CAT = '8c5f3080-d0a8-49ea-b759-3286f2084940';
+        const paymentWallet =
+          body.payment_wallet_id === 'none'
+            ? null
+            : (body.payment_wallet_id as string) || '10000000-0000-0000-0000-000000000002';
+
+        if (paymentWallet) {
+          const { data: adminUser } = await (supabase as any)
+            .from('users')
+            .select('id')
+            .filter('roles', 'cs', '{"admin"}')
+            .limit(1)
+            .maybeSingle();
+
+          await (supabase as any).from('transactions').insert({
+            direction: 'expense',
+            amount: extAmount.toFixed(2),
+            category_id: REPAIR_EXTERNAL_CAT,
+            from_wallet_id: paymentWallet,
+            to_wallet_id: null,
+            asset_id: curOrder.asset_id || null,
+            service_order_id: targetId,
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            transaction_date: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            description: `Наряд ТО #${curOrder.order_number}: [Сторонний сервис: ${extOrg}] ${extTitle}`,
+            idempotency_key: crypto.randomUUID(),
+            created_by: adminUser?.id ?? null,
+          });
+        }
+      }
+
+      return NextResponse.json({ ok: true, action: 'approved_external', id: targetId });
+    }
+
     if (body.action === 'edit_order') {
       const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
         .select(

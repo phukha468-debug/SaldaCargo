@@ -155,7 +155,18 @@ export async function handleVehicleDeparture(
 
   // Если заявка не была создана заранее — создаем экстренную заявку со знаком внимания ⚠️
   if (!targetOrder) {
-    // Ищем последнего водителя этого автомобиля из прошлых рейсов
+    // Приоритет 1: Закрепленный за автомобилем постоянный водитель из карточки ТС (assets.assigned_driver_id)
+    if (!driverId) {
+      const { data: assetData } = await supabase
+        .from('assets')
+        .select('assigned_driver_id')
+        .eq('id', params.vehicleId)
+        .maybeSingle();
+
+      driverId = assetData?.assigned_driver_id;
+    }
+
+    // Приоритет 2: Ищем последнего водителя этого автомобиля из прошлых рейсов
     if (!driverId) {
       const { data: lastTrip } = await supabase
         .from('trips')
@@ -540,6 +551,9 @@ export async function handleVehicleArrival(
           lifecycle_status: 'draft',
           odometer_end: odoEnd,
           admin_note: updatedAdminNote,
+          mechanic_pay: 0,
+          second_mechanic_pay: 0,
+          assigned_mechanic_id: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', serviceOrderId);
@@ -558,12 +572,15 @@ export async function handleVehicleArrival(
           machine_type: 'own',
           status: 'completed',
           lifecycle_status: 'draft',
-          problem_description: 'Поездка на ремонт (СТО) по геозоне Wialon',
+          problem_description: '[Сторонний сервис: СТО] Поездка на ремонт по геозоне Wialon',
           admin_note: `Пробег перегона: ${distanceKm} км, Норматив ГСМ: ${fuelLiters} л (~${defaultFuelCost} ₽)`,
           odometer_start: odoStart,
           odometer_end: odoEnd,
           created_by: createdById,
           priority: 'normal',
+          mechanic_pay: 0,
+          second_mechanic_pay: 0,
+          assigned_mechanic_id: null,
         })
         .select('id')
         .single();

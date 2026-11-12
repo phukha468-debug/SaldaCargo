@@ -4208,8 +4208,33 @@ function formatOrderDateRange(
 
 export function calcGarageOrder(order: ReviewServiceOrder) {
   const isOwn = order.machine_type === 'own';
-  const hourlyRate = isOwn ? 1600 : 2000;
-  const salaryPct = Number(order.mechanic?.mechanic_salary_pct || 50);
+  const desc = order.problem_description || '';
+  const note = order.admin_note || '';
+
+  const externalMatch =
+    desc.match(/\[Сторонний сервис(?::\s*([^\]]+))?\]/i) ||
+    note.match(/\[Сторонний сервис(?::\s*([^\]]+))?\]/i) ||
+    note.match(/Исполнитель:\s*([^.]+)/i);
+
+  const isExternal =
+    Boolean(externalMatch) ||
+    desc.includes('[Сторонний сервис') ||
+    note.includes('[Сторонний сервис') ||
+    desc.toLowerCase().includes('поездка на ремонт') ||
+    desc.toLowerCase().includes('был на ремонте') ||
+    desc.toLowerCase().includes('(сто)') ||
+    note.toLowerCase().includes('[рейс_на_ремонт]');
+
+  let contractorName: string = 'Стороннее СТО';
+  if (externalMatch && externalMatch[1]) {
+    contractorName = externalMatch[1].trim();
+  } else if (note.includes('Исполнитель:')) {
+    const m = note.match(/Исполнитель:\s*([^.]+)/i);
+    if (m && m[1]) contractorName = m[1].trim();
+  }
+
+  const hourlyRate = isExternal ? 0 : isOwn ? 1600 : 2000;
+  const salaryPct = isExternal ? 0 : Number(order.mechanic?.mechanic_salary_pct || 50);
   const activeWorks = (order.works ?? []).filter((w) => w.status !== 'cancelled');
   const parts = order.parts ?? [];
 
@@ -4220,23 +4245,34 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
   );
 
   const worksSum = activeWorks.reduce((s, w) => {
+    const explicit = parseFloat(w.price_client || '0');
+    if (explicit > 0) return s + explicit;
+    if (isExternal) return s;
     const mins =
       Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
-    const explicit = parseFloat(w.price_client || '0');
-    return s + (explicit > 0 ? explicit : (mins / 60) * hourlyRate);
+    return s + (mins / 60) * hourlyRate;
   }, 0);
 
-  const estimatedPay = activeWorks.reduce((s, w) => {
-    const mins =
-      Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
-    const explicit = parseFloat(w.price_client || '0');
-    const wPrice = explicit > 0 ? explicit : (mins / 60) * hourlyRate;
-    const customPctMatch = w.notes ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/) : null;
-    const wPct = customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
-    return s + (wPrice * wPct) / 100;
-  }, 0);
-  const mechanicPay =
-    parseFloat(order.mechanic_pay || '0') > 0 ? parseFloat(order.mechanic_pay!) : estimatedPay;
+  const estimatedPay = isExternal
+    ? 0
+    : activeWorks.reduce((s, w) => {
+        const mins =
+          Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
+        const explicit = parseFloat(w.price_client || '0');
+        const wPrice = explicit > 0 ? explicit : (mins / 60) * hourlyRate;
+        const customPctMatch = w.notes
+          ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+          : null;
+        const wPct =
+          customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+        return s + (wPrice * wPct) / 100;
+      }, 0);
+
+  const mechanicPay = isExternal
+    ? 0
+    : parseFloat(order.mechanic_pay || '0') > 0
+      ? parseFloat(order.mechanic_pay!)
+      : estimatedPay;
 
   let partsUnitSum = 0;
   let partsClientSum = 0;
@@ -4264,6 +4300,8 @@ export function calcGarageOrder(order: ReviewServiceOrder) {
 
   return {
     isOwn,
+    isExternal,
+    contractorName,
     hourlyRate,
     salaryPct,
     activeWorks,
@@ -4288,6 +4326,7 @@ function GarageOrderRow({
   onApprove,
   onReturn,
   onDelete,
+  onApproveExternal,
   approving,
   deleting,
 }: {
@@ -4298,11 +4337,19 @@ function GarageOrderRow({
   onApprove: () => void;
   onReturn: () => void;
   onDelete: () => void;
+  onApproveExternal?: (
+    orderId: string,
+    externalOrg: string,
+    externalTitle: string,
+    externalAmount: number,
+  ) => void;
   approving: boolean;
   deleting: boolean;
 }) {
   const {
     isOwn,
+    isExternal,
+    contractorName,
     hourlyRate,
     salaryPct,
     activeWorks,
@@ -4317,6 +4364,21 @@ function GarageOrderRow({
     netProfit,
   } = calcGarageOrder(order);
 
+  const initialOrg = contractorName && contractorName !== 'Стороннее СТО' ? contractorName : '';
+  const initialTitle =
+    (order.problem_description || '')
+      .replace(/\[Сторонний сервис(?::\s*[^\]]+)?\]/i, '')
+      .replace(/\[РЕЙС_НА_РЕМОНТ\]/i, '')
+      .trim() ||
+    order.works?.[0]?.custom_work_name ||
+    'Ремонт на СТО';
+  const initialAmount = worksSum > 0 ? String(worksSum) : '';
+
+  const [extOrg, setExtOrg] = useState(initialOrg);
+  const [extTitle, setExtTitle] = useState(initialTitle);
+  const [extAmount, setExtAmount] = useState(initialAmount);
+  const [showExternalForm, setShowExternalForm] = useState(isExternal);
+
   const odo = order.odometer_end || order.odometer_start;
   const canReview = order.lifecycle_status === 'draft' || order.lifecycle_status === 'returned';
 
@@ -4328,13 +4390,15 @@ function GarageOrderRow({
     .replace('[Запчасти предоставил автосервис]', '')
     .trim();
 
-  const accentColor = isOwn
-    ? 'border-l-sky-500'
-    : netProfit > 0
-      ? 'border-l-emerald-500'
-      : netProfit < 0
-        ? 'border-l-rose-500'
-        : 'border-l-slate-300';
+  const accentColor = isExternal
+    ? 'border-l-amber-500'
+    : isOwn
+      ? 'border-l-sky-500'
+      : netProfit > 0
+        ? 'border-l-emerald-500'
+        : netProfit < 0
+          ? 'border-l-rose-500'
+          : 'border-l-slate-300';
 
   return (
     <div
@@ -4349,21 +4413,27 @@ function GarageOrderRow({
         onClick={onToggle}
       >
         <div className="flex items-center gap-3">
-          {/* Слева: Номер, тип, авто, механик, статус */}
+          {/* Слева: Номер, тип, авто, механик/СТО, статус */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <span className="font-mono text-xs font-black text-sky-900 shrink-0 bg-sky-50 border border-sky-200/70 px-2 py-0.5 rounded">
               НЗ-{order.order_number}
             </span>
-            <span
-              className={cn(
-                'text-[10px] font-black px-1.5 py-0.5 rounded shrink-0',
-                isOwn
-                  ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-              )}
-            >
-              {isOwn ? '🏢 Свой' : '🚗 Клиент'}
-            </span>
+            {isExternal ? (
+              <span className="text-[10px] font-black px-1.5 py-0.5 rounded shrink-0 bg-amber-50 text-amber-800 border border-amber-300">
+                🏢 СТО: {contractorName}
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  'text-[10px] font-black px-1.5 py-0.5 rounded shrink-0',
+                  isOwn
+                    ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                )}
+              >
+                {isOwn ? '🏢 Свой' : '🚗 Клиент'}
+              </span>
+            )}
             <span
               className="font-bold text-slate-900 text-sm truncate max-w-[190px]"
               title={vehicleTitle}
@@ -4371,9 +4441,15 @@ function GarageOrderRow({
               {vehicleTitle}
             </span>
             <span className="text-slate-300 text-xs">·</span>
-            <span className="text-xs text-slate-600 font-semibold truncate max-w-[150px]">
-              👨‍🔧 {order.mechanic?.name?.split(' ')[0] ?? '—'}
-              {order.second_mechanic && ` + ${order.second_mechanic?.name?.split(' ')[0]}`}
+            <span className="text-xs text-slate-600 font-semibold truncate max-w-[160px]">
+              {isExternal ? (
+                <span className="text-amber-800 font-bold">СТО (чужими силами)</span>
+              ) : (
+                <>
+                  👨‍🔧 {order.mechanic?.name?.split(' ')[0] ?? '—'}
+                  {order.second_mechanic && ` + ${order.second_mechanic?.name?.split(' ')[0]}`}
+                </>
+              )}
             </span>
             <span
               className={cn(
@@ -4400,7 +4476,7 @@ function GarageOrderRow({
           <div className="shrink-0 flex items-center">
             <div className="w-[90px] text-center">
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                {isOwn ? 'Работы' : 'Выручка'}
+                {isExternal ? 'Сумма СТО' : isOwn ? 'Работы' : 'Выручка'}
               </span>
               <span className="text-sm font-bold text-slate-700">
                 <Money amount={(isOwn ? worksSum : totalRevenue).toFixed(2)} />
@@ -4409,14 +4485,23 @@ function GarageOrderRow({
             <span className="w-4 text-center text-slate-200 text-sm">−</span>
             <div className="w-[105px] text-center">
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
-                {order.second_mechanic ? 'ЗП Механиков' : 'ЗП Механика'}
+                {isExternal ? 'ЗП Слесаря' : order.second_mechanic ? 'ЗП Механиков' : 'ЗП Механика'}
               </span>
-              <span className="text-sm font-bold text-amber-600">
-                <Money
-                  amount={(
-                    mechanicPay + (parseFloat(order.second_mechanic_pay || '0') || 0)
-                  ).toFixed(2)}
-                />
+              <span
+                className={cn(
+                  'text-sm font-bold',
+                  isExternal ? 'text-slate-400' : 'text-amber-600',
+                )}
+              >
+                {isExternal ? (
+                  '0 ₽'
+                ) : (
+                  <Money
+                    amount={(
+                      mechanicPay + (parseFloat(order.second_mechanic_pay || '0') || 0)
+                    ).toFixed(2)}
+                  />
+                )}
               </span>
             </div>
             <span className="w-4 text-center text-slate-200 text-sm">+</span>
@@ -4442,7 +4527,7 @@ function GarageOrderRow({
               {isOwn ? (
                 <span
                   className="text-sm font-black text-sky-900 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md inline-block"
-                  title={`Сумма, которую Гараж берёт с компании-перевозчика (работы + запчасти): ${Math.round(billedToCarrier).toLocaleString('ru-RU')} ₽\nРеальной чистой прибыли нет — это внутреннее обслуживание автопарка`}
+                  title={`Сумма счёта СТО на автопарк: ${Math.round(billedToCarrier).toLocaleString('ru-RU')} ₽\nРеальной чистой прибыли нет — это затраты на ремонт парка`}
                 >
                   <Money amount={billedToCarrier.toFixed(2)} />
                 </span>
@@ -4493,70 +4578,208 @@ function GarageOrderRow({
       {expanded && (
         <div className="animate-in fade-in slide-in-from-top-1 duration-200 border-t border-slate-100 p-4 sm:p-5 space-y-4 bg-slate-50/40">
           {/* Верхняя плашка с датами, одометром и тарифом */}
-          <div className="flex items-center justify-between flex-wrap gap-3 bg-white p-3 rounded-xl border border-slate-200/80 text-xs text-slate-700">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div>
-                <span className="text-slate-400 font-bold block uppercase text-[10px]">
-                  Период выполнения
-                </span>
-                <span className="font-bold text-slate-800">
-                  📅 {formatOrderDateRange(order.started_at, order.completed_at, order.created_at)}
-                </span>
-              </div>
-              {odo && (
+          {isExternal ? (
+            <div className="flex items-center justify-between flex-wrap gap-3 bg-white p-3 rounded-xl border border-amber-300/80 text-xs text-slate-700">
+              <div className="flex items-center gap-4 flex-wrap">
                 <div>
                   <span className="text-slate-400 font-bold block uppercase text-[10px]">
-                    Пробег / Одометр
+                    СТО / Исполнитель
+                  </span>
+                  <span className="font-bold text-amber-950">🏢 {contractorName}</span>
+                </div>
+                {odo && (
+                  <div>
+                    <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                      Пробег перегона
+                    </span>
+                    <span className="font-bold text-slate-800">
+                      🛣 {Number(odo).toLocaleString('ru-RU')} км
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                    Формат ремонта
                   </span>
                   <span className="font-bold text-slate-800">
-                    🛣 {Number(odo).toLocaleString('ru-RU')} км
+                    Сторонний сервис вне Салды (чужими силами)
                   </span>
                 </div>
-              )}
-              <div>
-                <span className="text-slate-400 font-bold block uppercase text-[10px]">
-                  Тариф нормо-часа
-                </span>
-                <span className="font-bold text-slate-800">
-                  {hourlyRate.toLocaleString('ru-RU')} ₽/ч ({isOwn ? 'Свой парк' : 'Клиент'})
-                </span>
               </div>
-              <div>
-                <span className="text-slate-400 font-bold block uppercase text-[10px]">
-                  Ставка механика
-                </span>
-                <span className="font-bold text-emerald-700">{salaryPct}% от работ</span>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <div className="text-right bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
-                <span className="text-[10px] font-black uppercase text-emerald-800 block">
-                  ЗП: {order.mechanic?.name?.split(' ')[0] ?? 'Механик 1'}
+              <div className="text-right bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                  ЗП слесарям автопарка
                 </span>
-                <span className="font-black text-emerald-700 text-sm">
-                  <Money amount={mechanicPay.toFixed(2)} />
-                </span>
+                <span className="font-black text-slate-400 text-sm">0 ₽ (нет начислений)</span>
               </div>
-              {order.second_mechanic && (
-                <div className="text-right bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-xl">
-                  <span className="text-[10px] font-black uppercase text-sky-800 block">
-                    ЗП: {order.second_mechanic?.name?.split(' ')[0] ?? 'Механик 2'}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between flex-wrap gap-3 bg-white p-3 rounded-xl border border-slate-200/80 text-xs text-slate-700">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div>
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                    Период выполнения
                   </span>
-                  <span className="font-black text-sky-700 text-sm">
-                    <Money
-                      amount={(parseFloat(order.second_mechanic_pay || '0') || 0).toFixed(2)}
-                    />
+                  <span className="font-bold text-slate-800">
+                    📅{' '}
+                    {formatOrderDateRange(order.started_at, order.completed_at, order.created_at)}
                   </span>
                 </div>
-              )}
+                {odo && (
+                  <div>
+                    <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                      Пробег / Одометр
+                    </span>
+                    <span className="font-bold text-slate-800">
+                      🛣 {Number(odo).toLocaleString('ru-RU')} км
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                    Тариф нормо-часа
+                  </span>
+                  <span className="font-bold text-slate-800">
+                    {hourlyRate.toLocaleString('ru-RU')} ₽/ч ({isOwn ? 'Свой парк' : 'Клиент'})
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">
+                    Ставка механика
+                  </span>
+                  <span className="font-bold text-emerald-700">{salaryPct}% от работ</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="text-right bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                  <span className="text-[10px] font-black uppercase text-emerald-800 block">
+                    ЗП: {order.mechanic?.name?.split(' ')[0] ?? 'Механик 1'}
+                  </span>
+                  <span className="font-black text-emerald-700 text-sm">
+                    <Money amount={mechanicPay.toFixed(2)} />
+                  </span>
+                </div>
+                {order.second_mechanic && (
+                  <div className="text-right bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-xl">
+                    <span className="text-[10px] font-black uppercase text-sky-800 block">
+                      ЗП: {order.second_mechanic?.name?.split(' ')[0] ?? 'Механик 2'}
+                    </span>
+                    <span className="font-black text-sky-700 text-sm">
+                      <Money
+                        amount={(parseFloat(order.second_mechanic_pay || '0') || 0).toFixed(2)}
+                      />
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* ФОРМА БЫСТРОГО ЗАКРЫТИЯ СТОРОННЕГО РЕМОНТА (СТО) */}
+          {canReview && showExternalForm && (
+            <div className="bg-amber-50/80 border border-amber-300 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🏢</span>
+                  <div>
+                    <h4 className="font-black text-xs text-amber-950 uppercase tracking-wide">
+                      Ремонт сторонними силами (СТО / Сервис вне Салды)
+                    </h4>
+                    <p className="text-[11px] text-amber-800">
+                      Введите данные по счёту СТО — наряд сразу будет утверждён и перенесён в Архив
+                      с фиксацией расхода на автопарк:
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded font-black text-[10px] uppercase">
+                    ЗП слесарям: 0 ₽
+                  </span>
+                  {!isExternal && (
+                    <button
+                      type="button"
+                      onClick={() => setShowExternalForm(false)}
+                      className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
+                    >
+                      ✕ Отмена
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1">
+                    1. Организация (где делали ремонт) *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="напр. ООО «Восточный Ветер» или СТО Заречный"
+                    value={extOrg}
+                    onChange={(e) => setExtOrg(e.target.value)}
+                    className="w-full text-xs font-semibold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-hidden focus:border-amber-500 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1">
+                    2. Наименование ремонта *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="напр. Замена сцепления, ремонт редуктора"
+                    value={extTitle}
+                    onChange={(e) => setExtTitle(e.target.value)}
+                    className="w-full text-xs font-semibold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-hidden focus:border-amber-500 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1">
+                    3. Общая сумма ремонта (₽) *
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Сумма по счёту / чеку"
+                    value={extAmount}
+                    onChange={(e) => setExtAmount(e.target.value)}
+                    className="w-full text-xs font-black bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-hidden focus:border-amber-500 shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] text-slate-500 italic">
+                  ✓ Автоматически созданный заказ-наряд уходит с ревью в Архив
+                </span>
+                <button
+                  type="button"
+                  disabled={approving || !extOrg.trim() || !extAmount || Number(extAmount) <= 0}
+                  onClick={() => {
+                    if (onApproveExternal) {
+                      onApproveExternal(order.id, extOrg, extTitle, Number(extAmount) || 0);
+                    }
+                  }}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>
+                    {approving ? 'Сохранение...' : '✓ Утвердить сторонний ремонт (В архив)'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 1. Перечень выполненных работ */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-500">
-              <span>Перечень выполненных работ ({activeWorks.length})</span>
+              <span>
+                {isExternal
+                  ? 'Выполненные работы СТО'
+                  : `Перечень выполненных работ (${activeWorks.length})`}
+              </span>
               <span>
                 Итого по работам:{' '}
                 <span className="text-slate-900 font-black">
@@ -4768,6 +4991,15 @@ function GarageOrderRow({
 
             {canReview && (
               <div className="flex items-center gap-2">
+                {!showExternalForm && isOwn && (
+                  <button
+                    type="button"
+                    onClick={() => setShowExternalForm(true)}
+                    className="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-900 cursor-pointer transition-colors"
+                  >
+                    🏢 Это ремонт стороннего СТО
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onReturn}
@@ -4776,14 +5008,29 @@ function GarageOrderRow({
                 >
                   ↩ На доработку
                 </button>
-                <button
-                  type="button"
-                  onClick={onApprove}
-                  disabled={approving}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
-                >
-                  {approving ? 'Утверждаем...' : '✓ Утвердить наряд (начислить ЗП)'}
-                </button>
+                {!isExternal ? (
+                  <button
+                    type="button"
+                    onClick={onApprove}
+                    disabled={approving}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    {approving ? 'Утверждаем...' : '✓ Утвердить наряд (начислить ЗП)'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={approving || !extOrg.trim() || !extAmount || Number(extAmount) <= 0}
+                    onClick={() => {
+                      if (onApproveExternal) {
+                        onApproveExternal(order.id, extOrg, extTitle, Number(extAmount) || 0);
+                      }
+                    }}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    {approving ? 'Сохранение...' : '✓ Утвердить сторонний ремонт (В архив)'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -5180,6 +5427,36 @@ export default function ReviewPage() {
       if (!res.ok) {
         const j = await res.json();
         throw new Error(j.error || 'Ошибка утверждения');
+      }
+      refresh();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
+  async function handleApproveExternalServiceOrder(
+    orderId: string,
+    externalOrg: string,
+    externalTitle: string,
+    externalAmount: number,
+  ) {
+    setApprovingId(orderId);
+    try {
+      const res = await fetch(`/api/garage/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'approve_external',
+          external_org: externalOrg,
+          external_title: externalTitle,
+          external_amount: externalAmount,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        throw new Error(j.error || 'Ошибка утверждения стороннего ремонта');
       }
       refresh();
     } catch (err) {
@@ -6127,6 +6404,7 @@ export default function ReviewPage() {
                   onToggle={() => toggleGarageOrder(order.id)}
                   onEdit={() => setEditServiceOrder(order)}
                   onApprove={() => handleApproveServiceOrder(order.id)}
+                  onApproveExternal={handleApproveExternalServiceOrder}
                   onReturn={() => handleReturnServiceOrder(order.id)}
                   onDelete={() => handleDeleteServiceOrder(order.id)}
                   approving={approvingId === order.id}
