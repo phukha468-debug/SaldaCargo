@@ -400,13 +400,20 @@ export function OrdersPipelineView() {
       vehicleId: string;
       driverId: string;
     }) => {
+      const targetOrder = assignModalOrder || orders.find((o) => o.id === orderId);
+      const isWaiting =
+        !targetOrder?.status ||
+        targetOrder.status === 'waiting_vehicle' ||
+        targetOrder.status === 'draft';
+      const targetStatus = isWaiting ? 'assigned' : targetOrder.status;
+
       const res = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           assigned_vehicle_id: vehicleId,
           assigned_driver_id: driverId,
-          status: 'assigned',
+          status: targetStatus,
         }),
       });
       if (!res.ok) throw new Error('Не удалось назначить ТС');

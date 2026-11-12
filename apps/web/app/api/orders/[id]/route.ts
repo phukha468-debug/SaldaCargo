@@ -97,6 +97,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         const year = String(new Date().getFullYear()).slice(-2);
         updatePayload.waybill_number = `ПЛ-${year}/${Math.floor(1000 + Math.random() * 9000)}`;
       }
+    } else if (
+      updatePayload.status === 'assigned' &&
+      currentOrder?.status &&
+      ['in_progress', 'pending_review', 'docs_collection', 'completed'].includes(
+        currentOrder.status,
+      )
+    ) {
+      // Защита: смена водителя/ТС не должна сбрасывать статус заявки в пути или на ревью/завершённой
+      updatePayload.status = currentOrder.status;
     } else if (!updatePayload.status && currentOrder?.status) {
       // Сохраняем текущий статус заявки, если он не был явно передан в теле запроса!
       updatePayload.status = currentOrder.status;
@@ -127,6 +136,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await (supabase.from('trip_orders') as any)
         .update({ amount: newPrice })
         .eq('trip_id', targetTripId);
+    }
+
+    // Синхронизация водителя в связанном рейсе при смене водителя на заявке
+    if (updatePayload.assigned_driver_id && targetTripId) {
+      await (supabase.from('trips') as any)
+        .update({
+          driver_id: updatePayload.assigned_driver_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetTripId);
     }
 
     if (['docs_collection', 'completed'].includes(updatePayload.status) && targetTripId) {
