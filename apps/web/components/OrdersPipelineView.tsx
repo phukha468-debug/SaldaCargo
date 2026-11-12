@@ -2615,6 +2615,13 @@ function OrderDetailsModal({
     order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
   );
   const isCash = order.payment_terms?.includes('Наличные');
+  const isRepair = Boolean(
+    order.raw_parser_payload?.is_repair ||
+    order.raw_parser_payload?.trip_type === 'repair' ||
+    order.base_doc_name?.includes('РЕМОНТ') ||
+    order.cargo_name?.toLowerCase().includes('ремонт'),
+  );
+  const serviceOrderId = order.raw_parser_payload?.service_order_id;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -2673,7 +2680,9 @@ function OrderDetailsModal({
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                {order.client?.name || 'ПАО «Корпорация ВСМПО-АВИСМА»'}
+                {isRepair
+                  ? '🔧 Внутренний выезд: Ремонт автопарка (Гараж / СТО)'
+                  : order.client?.name || 'ПАО «Корпорация ВСМПО-АВИСМА»'}
               </p>
             </div>
           </div>
@@ -2765,8 +2774,9 @@ function OrderDetailsModal({
                     </span>
                   ) : order.status === 'pending_review' ? (
                     <span className="text-orange-700 font-bold">
-                      Грузовик вернулся / разгрузился. Ожидает одобрения ЗП и ГСМ, документы в
-                      обработке.
+                      {isRepair
+                        ? '🔧 Поездка на ремонт (СТО) завершена. Перегон зафиксирован. Заполните работы и затраты в Гараже.'
+                        : 'Грузовик вернулся / разгрузился. Ожидает одобрения ЗП и ГСМ, документы в обработке.'}
                     </span>
                   ) : order.status === 'docs_collection' ? (
                     <span className="text-indigo-700 font-bold">
@@ -2825,14 +2835,22 @@ function OrderDetailsModal({
                   </button>
                 </>
               )}
-              {order.status === 'pending_review' && (
-                <button
-                  onClick={() => onManualStage && onManualStage('docs_collection')}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
-                >
-                  📑 Одобрить рейс (В сбор документов)
-                </button>
-              )}
+              {order.status === 'pending_review' &&
+                (isRepair ? (
+                  <button
+                    onClick={() => onManualStage && onManualStage('completed')}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
+                  >
+                    ✓ Завершить рейс ремонта
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onManualStage && onManualStage('docs_collection')}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-xs transition active:scale-95 cursor-pointer text-[11px]"
+                  >
+                    📑 Одобрить рейс (В сбор документов)
+                  </button>
+                ))}
               {order.status === 'docs_collection' && (
                 <button
                   onClick={onComplete}
@@ -2851,6 +2869,45 @@ function OrderDetailsModal({
               )}
             </div>
           </div>
+
+          {/* Плашка поездки на ремонт и прямая ссылка в Гараж */}
+          {isRepair && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🔧</span>
+                <div>
+                  <div className="font-bold text-amber-950 text-xs flex items-center gap-2">
+                    <span>Поездка на ремонт (СТО)</span>
+                    <span className="px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded font-mono text-[10px] font-bold">
+                      {serviceOrderId ? 'Заказ-наряд Гаража' : 'Гараж'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-amber-800 block">
+                    ТС вернулось в Салду. Перейдите в Гараж для фиксации работ, запчастей и
+                    стоимости ремонта.
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <a
+                  href={`/garage?tab=active${serviceOrderId ? `&order=${serviceOrderId}` : ''}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <span>Открыть в Гараже ↗</span>
+                </a>
+                <a
+                  href="/review?section=garage"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Ревью Гаража ↗</span>
+                </a>
+              </div>
+            </div>
+          )}
 
           {/* Блок 2: Маршрут (Мульти-стоп и транзит Салды) */}
           <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2.5">

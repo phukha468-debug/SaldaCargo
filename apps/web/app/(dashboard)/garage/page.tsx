@@ -6792,15 +6792,14 @@ export default function GaragePage() {
     staleTime: 60000,
   });
 
-  // 1. В РАБОТЕ: ТОЛЬКО ТЕ МАШИНЫ, ПО КОТОРЫМ ЕЩЕ БУДУТ ПРОХОДИТЬ РАБОТЫ (НЕТ ЗАКРЫТЫХ!)
+  // 1. В РАБОТЕ: ТОЛЬКО ТЕ МАШИНЫ, ПО КОТОРЫМ ЕЩЕ БУДУТ ПРОХОДИТЬ РАБОТЫ ИЛИ РЕВЬЮ (НЕ ЗАКРЫТЫЕ!)
   const activeOrders = useMemo(() => {
     return allOrders.filter((o) => {
       const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
       if (isCancelled) return false;
-      // Если наряд закрыт или подтверждён — он не в работе!
-      if (o.status === 'completed') return false;
+      // Если наряд утверждён/закрыт — он уходит в архив!
       if (o.lifecycle_status === 'approved') return false;
-      return o.status === 'in_progress' || o.status === 'created' || o.lifecycle_status === 'draft';
+      return true;
     });
   }, [allOrders]);
 
@@ -6823,7 +6822,7 @@ export default function GaragePage() {
       const isCancelled = o.lifecycle_status === 'cancelled' || o.status === 'cancelled';
       if (isCancelled) return true;
       if (o.machine_type === 'own') {
-        return o.status === 'completed' || o.lifecycle_status === 'approved';
+        return o.lifecycle_status === 'approved';
       }
       if (o.machine_type === 'client') {
         return (
