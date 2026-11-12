@@ -64,9 +64,12 @@ fun TripDetailScreen(
     var showAddExpenseDialog by rememberSaveable { mutableStateOf(false) }
     var showFinishDialog by rememberSaveable { mutableStateOf(false) }
     var showDeleteTripDialog by rememberSaveable { mutableStateOf(false) }
+    var showRepairDialog by rememberSaveable { mutableStateOf(false) }
+    var repairDescInput by rememberSaveable { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
     var isApproving by remember { mutableStateOf(false) }
     var isReturning by remember { mutableStateOf(false) }
+    var isConvertingRepair by remember { mutableStateOf(false) }
     var finishError by remember { mutableStateOf<String?>(null) }
 
     // Справочники
@@ -259,6 +262,9 @@ fun TripDetailScreen(
                     }
                 }
             } else if (isActive && trip != null) {
+                val isRepairTrip = (trip.driverNote ?: "").contains("[РЕЙС_НА_РЕМОНТ]") ||
+                        (trip.adminNote ?: "").contains("[РЕЙС_НА_РЕМОНТ]")
+
                 Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
@@ -270,9 +276,26 @@ fun TripDetailScreen(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (isRepairTrip) {
+                            Surface(
+                                color = SaldaOrange50,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("🔧 Поездка на ремонт (СТО)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = SaldaOrangePrimary)
+                                    Text("Ревью-Гараж по заезду", fontSize = 11.sp, color = Zinc600)
+                                }
+                            }
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
                                 onClick = { showAddOrderDialog = true },
@@ -280,9 +303,9 @@ fun TripDetailScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Заказ", fontWeight = FontWeight.Bold)
+                                Text("Заказ", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
 
                             Button(
@@ -294,9 +317,24 @@ fun TripDetailScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = Zinc800),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Icon(Icons.Default.LocalGasStation, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.LocalGasStation, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("ГСМ", fontWeight = FontWeight.Bold)
+                                Text("ГСМ", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            if (isAdmin && !isRepairTrip) {
+                                Button(
+                                    onClick = {
+                                        repairDescInput = ""
+                                        showRepairDialog = true
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SaldaOrange50),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, SaldaOrangePrimary)
+                                ) {
+                                    Text("🔧 Ремонт", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = SaldaOrangePrimary)
+                                }
                             }
                         }
 
@@ -1289,6 +1327,64 @@ fun TripDetailScreen(
                 TextButton(
                     onClick = { showDeleteTripDialog = false },
                     enabled = !isSubmitting
+                ) {
+                    Text("Отмена", color = Zinc700)
+                }
+            }
+        )
+    }
+
+    if (showRepairDialog && trip != null) {
+        AlertDialog(
+            onDismissRequest = { if (!isConvertingRepair) showRepairDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🔧 Поездка на ремонт (СТО)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Перевести рейс машины ${trip.asset?.shortName ?: ""} (${trip.asset?.regNumber ?: ""}) в поездку на ремонт?\nПо возвращении в Салду (геозона Wialon) заказ-наряд автоматически встанет на РЕВЬЮ-ГАРАЖ.",
+                        fontSize = 13.sp,
+                        color = Zinc700
+                    )
+                    OutlinedTextField(
+                        value = repairDescInput,
+                        onValueChange = { repairDescInput = it },
+                        label = { Text("Причина ремонта / СТО") },
+                        placeholder = { Text("Например: сход-развал, замена сцепления") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            isConvertingRepair = true
+                            val ok = SaldaApiClient.convertTripToRepair(tripId, repairDescInput, userId)
+                            isConvertingRepair = false
+                            showRepairDialog = false
+                            if (ok) {
+                                loadTrip()
+                                onTripUpdated()
+                            } else {
+                                errorMessage = "Не удалось перевести рейс на ремонт"
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SaldaOrangePrimary),
+                    enabled = !isConvertingRepair
+                ) {
+                    Text(if (isConvertingRepair) "Переводим..." else "Подтвердить")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showRepairDialog = false },
+                    enabled = !isConvertingRepair
                 ) {
                     Text("Отмена", color = Zinc700)
                 }

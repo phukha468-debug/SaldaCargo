@@ -15,6 +15,8 @@ export default function AdminTripDetailPage() {
   const [returnNote, setReturnNote] = useState('');
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showReissueForm, setShowReissueForm] = useState(false);
+  const [showRepairModal, setShowRepairModal] = useState(false);
+  const [repairDescription, setRepairDescription] = useState('');
   const [actionError, setActionError] = useState('');
 
   const { data: trip, isLoading } = useQuery<any>({
@@ -43,6 +45,7 @@ export default function AdminTripDetailPage() {
         router.push('/admin/trips?filter=review');
       } else {
         setShowReissueForm(false);
+        setShowRepairModal(false);
       }
     },
     onError: (e: Error) => setActionError(e.message),
@@ -87,6 +90,13 @@ export default function AdminTripDetailPage() {
 
   const isPendingReview = trip.status === 'completed' && trip.lifecycle_status === 'draft';
   const isApproved = trip.lifecycle_status === 'approved';
+  const isRepairTrip = Boolean(
+    (trip?.driver_note ?? '').includes('[РЕЙС_НА_РЕМОНТ]') ||
+    (trip?.admin_note ?? '').includes('[РЕЙС_НА_РЕМОНТ]') ||
+    (trip?.trip_orders ?? []).some((o: any) =>
+      (o.description ?? '').toLowerCase().includes('ремонт'),
+    ),
+  );
 
   const cashRevenue = activeOrders
     .filter((o: any) => o.payment_method === 'cash')
@@ -559,6 +569,101 @@ export default function AdminTripDetailPage() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Кнопка действий для активных рейсов (в пути) */}
+      {trip.status === 'in_progress' && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 p-4 space-y-3 z-50 max-w-lg mx-auto shadow-lg">
+          {actionError && (
+            <p className="text-red-600 text-xs font-black uppercase text-center bg-red-50 rounded-lg py-2 px-3">
+              ❌ {actionError}
+            </p>
+          )}
+          {isRepairTrip ? (
+            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-amber-900">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔧</span>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wider">
+                    Поездка на ремонт (СТО)
+                  </div>
+                  <div className="text-[11px] text-amber-700">
+                    По заезду в Салду встанет на РЕВЬЮ-ГАРАЖ
+                  </div>
+                </div>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full shrink-0">
+                В пути
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowRepairModal(true)}
+              disabled={action.isPending}
+              className="w-full h-14 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <span>🔧</span>
+              <span>Поездка на ремонт (СТО)</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Модальное окно подтверждения поездки на ремонт */}
+      {showRepairModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
+          onClick={(e) => e.target === e.currentTarget && setShowRepairModal(false)}
+        >
+          <div className="bg-white rounded-t-3xl w-full p-6 space-y-4 max-w-lg">
+            <div className="w-10 h-1 bg-zinc-200 rounded-full mx-auto" />
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🔧</span>
+              <div>
+                <p className="font-black text-zinc-900 text-base">Перевести в поездку на ремонт</p>
+                <p className="text-xs text-zinc-500">
+                  По заезду в геозону Салды наряд встанет на РЕВЬЮ-ГАРАЖ для фиксации работ и
+                  расходов.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-zinc-500 uppercase block mb-1.5">
+                Описание / Причина ремонта (СТО)
+              </label>
+              <textarea
+                value={repairDescription}
+                onChange={(e) => setRepairDescription(e.target.value)}
+                placeholder="Например: замена сцепления, сход-развал, ТО"
+                rows={2}
+                className="w-full rounded-xl border-2 border-zinc-200 px-3 py-2.5 text-sm font-bold focus:border-amber-500 focus:outline-none resize-none"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRepairModal(false)}
+                className="flex-1 border-2 border-zinc-200 text-zinc-600 font-black py-3 rounded-xl text-xs uppercase active:scale-95 transition-all"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  action.mutate({
+                    action: 'convert_to_repair',
+                    problem_description: repairDescription,
+                  });
+                  setShowRepairModal(false);
+                }}
+                disabled={action.isPending}
+                className="flex-1 bg-amber-500 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider active:scale-95 transition-all disabled:opacity-50 shadow-md"
+              >
+                {action.isPending ? 'Сохранение...' : 'Подтвердить'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -110,8 +110,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const adminId =
     cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id') || null;
   const body = (await request.json()) as {
-    action: 'approve' | 'return' | 'edit_orders' | 'reissue_salary' | 'confirm_payroll';
+    action:
+      | 'approve'
+      | 'return'
+      | 'edit_orders'
+      | 'reissue_salary'
+      | 'confirm_payroll'
+      | 'convert_to_repair';
     note?: string;
+    problem_description?: string;
     driver_pay?: string;
     loader_pays?: Array<{ user_id: string; name: string; amount: string }>;
     orders?: Array<{
@@ -382,6 +389,98 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     return NextResponse.json({ ok: true, action: 'salary_reissued' });
+  }
+
+  if (body.action === 'convert_to_repair') {
+    const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
+      .select(
+        'id, asset_id, driver_id, trip_number, odometer_start, driver_note, admin_note, asset:assets(short_name, reg_number, odometer_current)',
+      )
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !trip) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
+
+    // 1. Ищем или создаем заказ-наряд в service_orders
+    let serviceOrderId = null;
+    const { data: existingSo } = await (supabase.from('service_orders') as any)
+      .select('id, order_number')
+      .eq('asset_id', trip.asset_id)
+      .eq('status', 'in_progress')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSo) {
+      serviceOrderId = existingSo.id;
+    } else {
+      const problemDesc =
+        body.problem_description?.trim() ||
+        `Поездка на ремонт (рейс №${trip.trip_number || ''})`.trim();
+      const odoStart = trip.odometer_start || trip.asset?.odometer_current || null;
+
+      const { data: createdSo, error: soErr } = await (supabase.from('service_orders') as any)
+        .insert({
+          asset_id: trip.asset_id,
+          machine_type: 'own',
+          status: 'in_progress',
+          lifecycle_status: 'draft',
+          problem_description: problemDesc,
+          admin_note: `Связанный рейс: ${trip.id}${trip.trip_number ? ' (№' + trip.trip_number + ')' : ''}`,
+          odometer_start: odoStart,
+          created_by: adminId || trip.driver_id,
+          priority: 'normal',
+        })
+        .select('id, order_number')
+        .single();
+
+      if (soErr)
+        return NextResponse.json(
+          { error: `Ошибка создания заказ-наряда: ${soErr.message}` },
+          { status: 500 },
+        );
+      serviceOrderId = createdSo.id;
+    }
+
+    // 2. Находим активный заказ этого рейса
+    const { data: orders } = await (supabase.from('orders') as any)
+      .select('id, base_doc_name, raw_parser_payload')
+      .eq('active_trip_id', id);
+
+    for (const order of orders || []) {
+      const payload = (order.raw_parser_payload || {}) as Record<string, any>;
+      await (supabase.from('orders') as any)
+        .update({
+          base_doc_name: '🔧 ПОЕЗДКА НА РЕМОНТ (СТО)',
+          cargo_name: 'Поездка на ремонт / СТО',
+          raw_parser_payload: {
+            ...payload,
+            is_repair: true,
+            trip_type: 'repair',
+            service_order_id: serviceOrderId,
+            repair_description: body.problem_description || 'Поездка на ремонт',
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', order.id);
+    }
+
+    // 3. Обновляем рейс
+    const repairMarker = '[РЕЙС_НА_РЕМОНТ]';
+    const curDriverNote = trip.driver_note || '';
+    const newDriverNote = curDriverNote.includes(repairMarker)
+      ? curDriverNote
+      : `${repairMarker} Поездка на ремонт (СТО)${body.problem_description ? ': ' + body.problem_description : ''}\n${curDriverNote}`.trim();
+
+    await (supabase.from('trips') as any)
+      .update({
+        driver_note: newDriverNote,
+        admin_note: `${repairMarker} Перегон на СТО (связан с заказ-нарядом)`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    return NextResponse.json({ ok: true, action: 'converted_to_repair', serviceOrderId });
   }
 
   if (body.action === 'confirm_payroll') {

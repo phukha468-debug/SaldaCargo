@@ -184,6 +184,7 @@ data class TripDetail(
     @Serializable(with = FlexibleLongSerializer::class)
     @SerialName("odometer_end") val odometerEnd: Long? = null,
     @SerialName("driver_note") val driverNote: String? = null,
+    @SerialName("admin_note") val adminNote: String? = null,
     @SerialName("loaders_count") val loadersCount: Int = 0,
     val asset: TripAsset? = null,
     val driver: TripDriver? = null,

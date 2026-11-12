@@ -1861,6 +1861,9 @@ fun DispatcherScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    val isRepairTrip = (trip.driverNote ?: "").contains("[РЕЙС_НА_РЕМОНТ]") ||
+                                            (trip.adminNote ?: "").contains("[РЕЙС_НА_РЕМОНТ]")
+
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = "Рейс №${trip.tripNumber} • ${trip.asset?.shortName ?: "Без авто"}",
@@ -1873,16 +1876,41 @@ fun DispatcherScreen(
                                             fontSize = 12.sp,
                                             color = Zinc700
                                         )
-                                        Text(
-                                            text = "Заказов: ${activeOrders.size} • Выручка: ${rev.toInt()} ₽",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = SaldaOrangePrimary,
-                                            modifier = Modifier.padding(top = 2.dp)
-                                        )
+                                        if (isRepairTrip) {
+                                            Text(
+                                                text = "🔧 Поездка на ремонт (СТО) • В Гараж по заезду",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = SaldaOrangePrimary,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "Заказов: ${activeOrders.size} • Выручка: ${rev.toInt()} ₽",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = SaldaOrangePrimary,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+                                        }
                                     }
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (isRepairTrip) {
+                                            Surface(
+                                                color = Color(0xFFFEF3C7),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.padding(end = 6.dp)
+                                            ) {
+                                                Text(
+                                                    text = "🔧 РЕМОНТ",
+                                                    color = Color(0xFF92400E),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
                                         Surface(
                                             color = SaldaOrange50,
                                             shape = RoundedCornerShape(8.dp)

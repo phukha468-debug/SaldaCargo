@@ -461,6 +461,145 @@ export async function handleVehicleArrival(
   // Округление суммы топлива до 100 ₽ (например 8 963 ₽ -> 9 000 ₽)
   const defaultFuelCost = Math.round((fuelLiters * FUEL_PRICE_TK) / 100) * 100;
 
+  // Проверяем: является ли этот выезд поездкой на ремонт (СТО)
+  const isRepairTrip = Boolean(
+    order.raw_parser_payload?.is_repair ||
+    order.raw_parser_payload?.trip_type === 'repair' ||
+    (trip.driver_note && trip.driver_note.includes('[РЕЙС_НА_РЕМОНТ]')) ||
+    (trip.admin_note && trip.admin_note.includes('[РЕЙС_НА_РЕМОНТ]')) ||
+    (order.base_doc_name && order.base_doc_name.toLowerCase().includes('ремонт')),
+  );
+
+  if (isRepairTrip) {
+    console.log(
+      `[Wialon] 🔧 ТС ${params.vehicleId} вернулось из поездки на ремонт! Завершаем рейс и переводим заказ-наряд на РЕВЬЮ ГАРАЖА.`,
+    );
+
+    // 1. Завершаем служебный дорожный рейс
+    await supabase
+      .from('trips')
+      .update({
+        odometer_end: odoEnd,
+        ended_at: arrivalTime,
+        status: 'completed',
+        lifecycle_status: 'approved',
+        admin_note: `[РЕЙС_НА_РЕМОНТ] Сервисный перегон на СТО завершен. Пробег: ${distanceKm} км | Норматив ГСМ: ${fuelLiters} л (~${defaultFuelCost} ₽). Переведено на Ревью Гаража.`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', trip.id);
+
+    // 1.1 Добавляем нормативный расход на ГСМ
+    const CAT_FUEL_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+    await supabase.from('trip_expenses').insert({
+      trip_id: trip.id,
+      category_id: CAT_FUEL_ID,
+      amount: defaultFuelCost,
+      payment_method: 'fuel_card',
+      description: `Топливо по нормативу (Валдай, рейс на ремонт): ${fuelLiters} л (18л/100км @ ${FUEL_PRICE_TK}₽/л)`,
+      idempotency_key: crypto.randomUUID(),
+    });
+
+    // 2. Завершаем заявку без выставления коммерческого счета клиенту
+    await supabase
+      .from('orders')
+      .update({
+        status: 'completed',
+        actual_loading_departure_at: arrivalTime,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id);
+
+    // 3. Находим или создаем заказ-наряд в service_orders и переводим в status='completed', lifecycle_status='draft' (НА РЕВЬЮ ГАРАЖА)
+    let serviceOrderId = order.raw_parser_payload?.service_order_id;
+    if (!serviceOrderId) {
+      const { data: activeSo } = await (supabase.from('service_orders') as any)
+        .select('id, admin_note')
+        .eq('asset_id', params.vehicleId)
+        .eq('status', 'in_progress')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      serviceOrderId = activeSo?.id;
+    }
+
+    if (serviceOrderId) {
+      const { data: curSo } = await (supabase.from('service_orders') as any)
+        .select('admin_note')
+        .eq('id', serviceOrderId)
+        .single();
+
+      const appendNote = `[Возврат с ремонта: пробег ${distanceKm} км, ГСМ ${fuelLiters} л (~${defaultFuelCost} ₽)]`;
+      const updatedAdminNote = curSo?.admin_note
+        ? `${curSo.admin_note}\n${appendNote}`
+        : appendNote;
+
+      await (supabase.from('service_orders') as any)
+        .update({
+          status: 'completed',
+          lifecycle_status: 'draft',
+          odometer_end: odoEnd,
+          admin_note: updatedAdminNote,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', serviceOrderId);
+    } else {
+      const { data: adminUser } = await (supabase.from('users') as any)
+        .select('id')
+        .filter('roles', 'cs', '{"admin"}')
+        .limit(1)
+        .maybeSingle();
+
+      const createdById = adminUser?.id || trip.driver_id || '595e749a-6271-4799-b9e6-6132c2d89913';
+
+      const { data: createdSo } = await (supabase.from('service_orders') as any)
+        .insert({
+          asset_id: params.vehicleId,
+          machine_type: 'own',
+          status: 'completed',
+          lifecycle_status: 'draft',
+          problem_description: 'Поездка на ремонт (СТО) по геозоне Wialon',
+          admin_note: `Пробег перегона: ${distanceKm} км, Норматив ГСМ: ${fuelLiters} л (~${defaultFuelCost} ₽)`,
+          odometer_start: odoStart,
+          odometer_end: odoEnd,
+          created_by: createdById,
+          priority: 'normal',
+        })
+        .select('id')
+        .single();
+
+      serviceOrderId = createdSo?.id;
+    }
+
+    // 4. Обновляем одометр ТС
+    const { data: curAssetArr } = await supabase
+      .from('assets')
+      .select('odometer_current')
+      .eq('id', params.vehicleId)
+      .single();
+
+    if (odoEnd > (curAssetArr?.odometer_current || 0)) {
+      await supabase
+        .from('assets')
+        .update({ odometer_current: odoEnd, updated_at: new Date().toISOString() })
+        .eq('id', params.vehicleId);
+    }
+
+    return {
+      success: true,
+      isRepairTrip: true,
+      orderId: order.id,
+      tripId: trip.id,
+      serviceOrderId,
+      distanceKm,
+      daysCount,
+      fuelLiters,
+      fuelCost: defaultFuelCost,
+      status: 'pending_garage_review',
+      message: 'Поездка на ремонт завершена. Заказ-наряд переведен на РЕВЬЮ ГАРАЖА.',
+    };
+  }
+
   // 1. Обновляем рейс: статус completed, lifecycle_status = 'draft' (ждет одобрения на странице ревью)
   await supabase
     .from('trips')

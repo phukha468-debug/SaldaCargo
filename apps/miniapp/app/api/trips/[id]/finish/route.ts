@@ -240,14 +240,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   // 7. Автоматически переводим связанную заявку в orders в статус 'pending_review' («На ревью»)
   try {
+    // ВНИМАНИЕ: Связываем только заявки, явно привязанные к этому рейсу (active_trip_id) или с совпадающим номером.
+    // Категорически запрещено искать просто по assigned_vehicle_id, иначе захватываются будущие запланированные заявки!
     const orConds = [`active_trip_id.eq.${id}`];
     if (trip.trip_number) orConds.push(`order_number.eq.${trip.trip_number}`);
-    if (trip.asset_id) orConds.push(`assigned_vehicle_id.eq.${trip.asset_id}`);
 
     const { data: linkedOrders } = await (supabase.from('orders') as any)
       .select('id, status')
       .or(orConds.join(','))
-      .in('status', ['waiting_vehicle', 'assigned', 'in_progress']);
+      .in('status', ['in_progress']);
 
     if (linkedOrders && linkedOrders.length > 0) {
       for (const ord of linkedOrders) {

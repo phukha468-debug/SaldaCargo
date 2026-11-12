@@ -873,6 +873,20 @@ object SaldaApiClient {
         client.newCall(request).execute().use { it.isSuccessful }
     }
 
+    suspend fun convertTripToRepair(
+        tripId: String,
+        problemDescription: String? = null,
+        adminId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("action", "convert_to_repair")
+            if (!problemDescription.isNullOrBlank()) put("problem_description", problemDescription)
+            if (!adminId.isNullOrBlank()) put("admin_id", adminId)
+        }.toString()
+        val request = buildRequest("/api/admin/trips/$tripId", method = "PATCH", bodyJson = body, userId = adminId)
+        client.newCall(request).execute().use { it.isSuccessful }
+    }
+
     suspend fun deleteAdminServiceOrder(
         orderId: String,
         adminId: String? = null
