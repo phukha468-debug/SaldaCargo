@@ -48,6 +48,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     let activeTripId = order.active_trip_id;
 
+    // 4. Подготавливаем обновление статуса заказа
+    const updateOrderPayload: Record<string, any> = {
+      status: stage,
+      active_trip_id: activeTripId || null,
+      updated_at: now,
+    };
+
+    if (stage === 'in_progress' && !order.actual_loading_arrival_at) {
+      updateOrderPayload.actual_loading_arrival_at = now;
+    }
+
     // 2. Если перемещаем в «В пути», «На ревью», «Сбор документов» или «Завершён», проверяем наличие связанного рейса
     if (['in_progress', 'pending_review', 'docs_collection', 'completed'].includes(stage)) {
       if (!activeTripId) {
@@ -161,40 +172,65 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       // 3. Создаем или обновляем запись в trip_orders (для Дебиторки)
       if (activeTripId) {
-        const { data: existingTripOrders } = await (supabase.from('trip_orders') as any)
-          .select('id')
-          .eq('trip_id', activeTripId)
-          .limit(1);
+        let existingTripOrderId = order.raw_parser_payload?.trip_order_id;
+        let existingOrderRecord = null;
 
-        if (!existingTripOrders || existingTripOrders.length === 0) {
-          await (supabase.from('trip_orders') as any).insert({
-            idempotency_key: crypto.randomUUID(),
-            trip_id: activeTripId,
-            counterparty_id: order.client_id || null,
-            amount: Number(order.price_without_vat) || 0,
-            payment_method: order.payment_terms?.includes('Наличные') ? 'cash' : 'bank_invoice',
-            description: `Заявка № ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Перевозка'}`,
-            lifecycle_status: 'approved',
-            settlement_status: 'pending',
-            invoice_status: 'unbilled',
-          });
+        if (existingTripOrderId) {
+          const { data: foundById } = await (supabase.from('trip_orders') as any)
+            .select('id')
+            .eq('id', existingTripOrderId)
+            .maybeSingle();
+          existingOrderRecord = foundById;
+        }
+
+        if (!existingOrderRecord) {
+          // Ищем по номеру заявки в описании для этого рейса
+          const orderNumSearch = order.base_doc_number || String(order.order_number);
+          const { data: foundByDesc } = await (supabase.from('trip_orders') as any)
+            .select('id')
+            .eq('trip_id', activeTripId)
+            .ilike('description', `%${orderNumSearch}%`)
+            .maybeSingle();
+          existingOrderRecord = foundByDesc;
+          if (existingOrderRecord) existingTripOrderId = existingOrderRecord.id;
+        }
+
+        if (!existingOrderRecord) {
+          const isApprovedStage = ['docs_collection', 'completed'].includes(stage);
+          const { data: createdTo, error: insToErr } = await (supabase.from('trip_orders') as any)
+            .insert({
+              idempotency_key: crypto.randomUUID(),
+              trip_id: activeTripId,
+              counterparty_id: order.client_id || null,
+              amount: Number(order.price_without_vat) || 0,
+              payment_method: order.payment_terms?.includes('Наличные') ? 'cash' : 'bank_invoice',
+              description: `Заявка № ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Перевозка'}`,
+              lifecycle_status: isApprovedStage ? 'approved' : 'draft',
+              settlement_status: 'pending',
+              invoice_status: 'unbilled',
+            })
+            .select('id')
+            .single();
+
+          if (!insToErr && createdTo) {
+            existingTripOrderId = createdTo.id;
+          }
         } else if (['docs_collection', 'completed'].includes(stage)) {
           await (supabase.from('trip_orders') as any)
             .update({ lifecycle_status: 'approved', updated_at: now })
-            .eq('trip_id', activeTripId);
+            .eq('id', existingTripOrderId);
+        }
+
+        if (
+          existingTripOrderId &&
+          existingTripOrderId !== order.raw_parser_payload?.trip_order_id
+        ) {
+          updateOrderPayload.raw_parser_payload = {
+            ...(order.raw_parser_payload || {}),
+            trip_order_id: existingTripOrderId,
+          };
         }
       }
-    }
-
-    // 4. Обновляем статус заказа
-    const updateOrderPayload: Record<string, any> = {
-      status: stage,
-      active_trip_id: activeTripId || null,
-      updated_at: now,
-    };
-
-    if (stage === 'in_progress' && !order.actual_loading_arrival_at) {
-      updateOrderPayload.actual_loading_arrival_at = now;
     }
 
     const { data: updatedOrder, error: updateErr } = await (supabase.from('orders') as any)

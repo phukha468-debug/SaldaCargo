@@ -219,8 +219,24 @@ const KANBAN_STAGES: Array<{
 export function OrdersPipelineView() {
   const queryClient = useQueryClient();
 
-  // Вид: 'kanban' (по умолчанию) | 'list' (1 строка) | 'documents' (Документооборот ВСМПО/Ависма/Геострой)
-  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'documents'>('kanban');
+  // Вид: 'list' (по умолчанию: 1-строчный компактный вид по стандарту AGENTS.md) | 'kanban' | 'documents'
+  const [viewMode, setViewModeState] = useState<'kanban' | 'list' | 'documents'>('list');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('salda_orders_view_mode') as any;
+      if (saved && ['kanban', 'list', 'documents'].includes(saved)) {
+        setViewModeState(saved);
+      }
+    }
+  }, []);
+
+  const setViewMode = (mode: 'kanban' | 'list' | 'documents') => {
+    setViewModeState(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('salda_orders_view_mode', mode);
+    }
+  };
   const [activeStatusTab, setActiveStatusTab] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
 
@@ -877,16 +893,6 @@ export function OrdersPipelineView() {
           {/* Переключатель вида */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold">
             <button
-              onClick={() => setViewMode('kanban')}
-              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
-                viewMode === 'kanban'
-                  ? 'bg-white text-indigo-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>📊 Канбан-доска</span>
-            </button>
-            <button
               onClick={() => setViewMode('list')}
               className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
                 viewMode === 'list'
@@ -895,6 +901,16 @@ export function OrdersPipelineView() {
               }`}
             >
               <span>📑 Компактный список (1 строка)</span>
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
+                viewMode === 'kanban'
+                  ? 'bg-white text-indigo-700 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>📊 Канбан-доска</span>
             </button>
             <button
               onClick={() => setViewMode('documents')}
@@ -1104,195 +1120,105 @@ export function OrdersPipelineView() {
                             </div>
                           </div>
 
-                          {/* СТРОКА 2: Автомобиль/Водитель, маршрут, вес */}
-                          <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600">
+                          {/* СТРОКА 2: Автомобиль/Водитель, маршрут, вес + Быстрое действие этапа (Строго 2 строки по стандарту AGENTS.md) */}
+                          <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600 pt-0.5">
                             <div className="flex items-center gap-1 truncate">
                               {order.vehicle?.reg_number ? (
                                 <span className="font-mono font-bold bg-slate-100 text-slate-800 px-1 py-0.2 rounded text-[9.5px]">
                                   {order.vehicle.reg_number}
                                 </span>
                               ) : (
-                                <span className="text-amber-600 font-bold text-[9.5px]">
-                                  + Назначить
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAssignModalOrder(order);
+                                  }}
+                                  className="text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-1 py-0.2 rounded font-bold text-[9px] cursor-pointer"
+                                >
+                                  + ТС
+                                </button>
                               )}
-                              <span className="truncate max-w-[105px] font-medium text-slate-700">
+                              <span className="truncate max-w-[95px] font-medium text-slate-700">
                                 {routeText}
                               </span>
+                              {order.weight_gross_kg ? (
+                                <span className="text-slate-400 font-medium shrink-0">
+                                  {(order.weight_gross_kg / 1000).toFixed(1)} т
+                                </span>
+                              ) : null}
                             </div>
 
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="text-slate-400 font-medium">
-                                {order.weight_gross_kg
-                                  ? `${(order.weight_gross_kg / 1000).toFixed(1)} т`
-                                  : ''}
-                              </span>
-                              <span className="text-[9.5px]">{isCash ? '💵' : '🏦'}</span>
-                            </div>
-                          </div>
-
-                          {/* Индикатор сбора документов для этапа «Сбор документов» */}
-                          {order.status === 'docs_collection' && (
                             <div
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setInvoiceModalOrder({ order });
-                              }}
-                              className="mt-1 px-1.5 py-0.5 bg-indigo-50/70 border border-indigo-100 rounded flex items-center justify-between text-[9px] cursor-pointer hover:bg-indigo-100/70 transition"
-                              title="Кликните для открытия чек-листа документов"
+                              className="flex items-center gap-1 shrink-0"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <span className="font-bold text-indigo-900">Документы:</span>
-                              <div className="flex items-center gap-1 font-mono text-[8.5px]">
-                                <span
-                                  className={
-                                    order.billing_docs?.invoice_issued
-                                      ? 'text-emerald-700 font-bold'
-                                      : 'text-slate-400'
-                                  }
-                                >
-                                  {order.billing_docs?.invoice_issued ? '✓ Счёт' : '⏳ Счёт'}
-                                </span>
-                                <span>•</span>
-                                <span
-                                  className={
-                                    order.billing_docs?.tn_driver_delivered ||
-                                    order.billing_docs?.etrn_signed_edo
-                                      ? 'text-emerald-700 font-bold'
-                                      : 'text-slate-400'
-                                  }
-                                >
-                                  {order.billing_docs?.tn_driver_delivered ||
-                                  order.billing_docs?.etrn_signed_edo
-                                    ? '✓ ТН'
-                                    : '⏳ ТН'}
-                                </span>
-                                <span>•</span>
-                                <span
-                                  className={
-                                    order.billing_docs?.client_accepted_edo
-                                      ? 'text-emerald-700 font-bold'
-                                      : 'text-slate-400'
-                                  }
-                                >
-                                  {order.billing_docs?.client_accepted_edo ? '✓ ЭДО' : '⏳ ЭДО'}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* СТРОКА 3: Ручное перемещение этапа (для машин без Wialon) */}
-                          <div
-                            className="pt-1 mt-1 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px]"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="flex items-center gap-1">
+                              <span className="text-[9.5px]">{isCash ? '💵' : '🏦'}</span>
                               {order.status === 'assigned' && (
-                                <>
-                                  <button
-                                    onClick={() =>
-                                      manualStageMutation.mutate({
-                                        orderId: order.id,
-                                        stage: 'in_progress',
-                                      })
-                                    }
-                                    title="Отправить в рейс (В пути)"
-                                    className="px-1.5 py-0.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded border border-purple-200 cursor-pointer"
-                                  >
-                                    🚀 В рейс
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      manualStageMutation.mutate({
-                                        orderId: order.id,
-                                        stage: 'pending_review',
-                                      })
-                                    }
-                                    title="Машина уже разгрузилась — сразу перевести на ревью и сбор документов"
-                                    className="px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded border border-orange-300 cursor-pointer"
-                                  >
-                                    ⏩ Разгружен (Ревью)
-                                  </button>
-                                </>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    manualStageMutation.mutate({
+                                      orderId: order.id,
+                                      stage: 'in_progress',
+                                    })
+                                  }
+                                  title="Отправить в рейс"
+                                  className="px-1.5 py-0.2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded font-bold text-[9px] cursor-pointer"
+                                >
+                                  🚀 Рейс
+                                </button>
                               )}
                               {order.status === 'in_progress' && (
                                 <button
+                                  type="button"
                                   onClick={() =>
                                     manualStageMutation.mutate({
                                       orderId: order.id,
                                       stage: 'pending_review',
                                     })
                                   }
-                                  title="Завершить рейс и отправить на ревью"
-                                  className="px-2 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded border border-orange-300 cursor-pointer"
+                                  title="Машина разгрузилась — на ревью"
+                                  className="px-1.5 py-0.2 bg-orange-100 hover:bg-orange-200 text-orange-900 border border-orange-300 rounded font-bold text-[9px] cursor-pointer"
                                 >
-                                  🏁 Разгружен (Ревью)
+                                  🏁 Ревью
                                 </button>
                               )}
                               {order.status === 'pending_review' && (
                                 <button
+                                  type="button"
                                   onClick={() =>
                                     manualStageMutation.mutate({
                                       orderId: order.id,
                                       stage: 'docs_collection',
                                     })
                                   }
-                                  title="Одобрить рейс (ЗП выплачена) и перейти к сбору документов"
-                                  className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded shadow-2xs cursor-pointer text-[9.5px]"
+                                  title="Одобрить и в сбор документов"
+                                  className="px-1.5 py-0.2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-[9px] cursor-pointer shadow-2xs"
                                 >
-                                  📑 В документы
+                                  📑 Доки
                                 </button>
                               )}
                               {order.status === 'docs_collection' && (
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => setInvoiceModalOrder({ order })}
-                                    title="Открыть чек-лист сбора документов"
-                                    className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded border border-indigo-200 cursor-pointer text-[9px]"
-                                  >
-                                    📑 Документы
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      manualStageMutation.mutate({
-                                        orderId: order.id,
-                                        stage: 'completed',
-                                      })
-                                    }
-                                    title="Завершить сделку"
-                                    className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-2xs cursor-pointer text-[9px]"
-                                  >
-                                    ✓ Завершить
-                                  </button>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setInvoiceModalOrder({ order })}
+                                  title="Открыть чек-лист сбора документов"
+                                  className="px-1.5 py-0.2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded font-bold text-[9px] cursor-pointer"
+                                >
+                                  📑 Документы
+                                </button>
                               )}
                               {order.status === 'waiting_vehicle' && (
                                 <button
+                                  type="button"
                                   onClick={() => setAssignModalOrder(order)}
-                                  className="px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded shadow-2xs cursor-pointer"
+                                  className="px-1.5 py-0.2 bg-amber-500 hover:bg-amber-600 text-white rounded font-bold text-[9px] cursor-pointer shadow-2xs"
                                 >
-                                  + Назначить ТС
+                                  + ТС
                                 </button>
                               )}
                             </div>
-
-                            <select
-                              value={order.status}
-                              onChange={(e) =>
-                                manualStageMutation.mutate({
-                                  orderId: order.id,
-                                  stage: e.target.value as any,
-                                })
-                              }
-                              className="bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[9.5px] font-bold text-slate-700 cursor-pointer focus:outline-none"
-                              title="Переместить заявку на любой этап вручную"
-                            >
-                              <option value="waiting_vehicle">Лист ожидания</option>
-                              <option value="assigned">Назначен</option>
-                              <option value="in_progress">В пути</option>
-                              <option value="pending_review">На ревью</option>
-                              <option value="docs_collection">Сбор документов</option>
-                              <option value="completed">Завершён</option>
-                            </select>
                           </div>
                         </div>
                       );
@@ -3198,7 +3124,7 @@ function CreateSmartOrderModal({
   const isEditing = Boolean(initialOrder);
 
   const [selectedClientType, setSelectedClientType] = useState<'vsmpo' | 'geostroy' | 'manual'>(
-    'vsmpo',
+    'manual',
   );
   const [isParsing, setIsParsing] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -3219,31 +3145,31 @@ function CreateSmartOrderModal({
     if (existing && Array.isArray(existing) && existing.length > 0) {
       return existing.map((r: any, idx: number) => ({
         id: String(idx + 1),
-        loading_city: r.loading_city || r.loadingCity || 'Шайтанка',
-        loading_address: r.loading_address || r.loadingAddress || 'Шайтанка',
+        loading_city: r.loading_city || r.loadingCity || '',
+        loading_address: r.loading_address || r.loadingAddress || '',
         loading_org: r.loading_org || r.clientName || '',
-        unloading_city: r.unloading_city || r.unloadingCity || 'Маминское',
-        unloading_address: r.unloading_address || r.unloadingAddress || 'Маминское',
+        unloading_city: r.unloading_city || r.unloadingCity || '',
+        unloading_address: r.unloading_address || r.unloadingAddress || '',
         unloading_org: r.unloading_org || '',
-        cargo_name: r.cargo_name || r.cargoName || 'Пробы',
+        cargo_name: r.cargo_name || r.cargoName || '',
         weight_kg: r.weight_kg
           ? Number(r.weight_kg)
           : r.weightTons
             ? Math.round(Number(r.weightTons) * 1000)
-            : 4000,
+            : 0,
       }));
     }
     return [
       {
         id: '1',
-        loading_city: initialOrder?.loading_address_json?.city || 'Шайтанка',
-        loading_address: initialOrder?.loading_address_json?.raw || 'Шайтанка',
-        loading_org: initialOrder?.loading_org_name || 'ООО "Геостройиндустрия" (ЛОП)',
-        unloading_city: initialOrder?.unloading_address_json?.city || 'Маминское',
-        unloading_address: initialOrder?.unloading_address_json?.raw || 'Маминское',
-        unloading_org: initialOrder?.client?.name || 'ООО "Геостройиндустрия"',
-        cargo_name: initialOrder?.cargo_name || 'Пробы',
-        weight_kg: initialOrder?.weight_gross_kg || 4000,
+        loading_city: initialOrder?.loading_address_json?.city || '',
+        loading_address: initialOrder?.loading_address_json?.raw || '',
+        loading_org: initialOrder?.loading_org_name || '',
+        unloading_city: initialOrder?.unloading_address_json?.city || '',
+        unloading_address: initialOrder?.unloading_address_json?.raw || '',
+        unloading_org: initialOrder?.client?.name || '',
+        cargo_name: initialOrder?.cargo_name || '',
+        weight_kg: initialOrder?.weight_gross_kg || 0,
       },
     ];
   });
@@ -3263,25 +3189,27 @@ function CreateSmartOrderModal({
         base_doc_number: initialOrder.base_doc_number || String(initialOrder.order_number),
         base_doc_date: initialOrder.base_doc_date || initialOrder.created_at?.slice(0, 10),
         client_id: initialOrder.client?.id || '',
-        client_name: initialOrder.client?.name || 'ООО "Геостройиндустрия"',
-        client_inn: initialOrder.client?.inn || '6623101234',
+        client_name: initialOrder.client?.name || '',
+        client_inn: initialOrder.client?.inn || '',
         forwarder_id: initialOrder.forwarder?.id || '',
         forwarder_name: initialOrder.forwarder?.name || '— (Прямой заказчик)',
         preset_id: '',
         loading_point_id: '',
 
-        loading_address: initialOrder.loading_address_json?.raw || 'Шайтанка',
-        loading_city: initialOrder.loading_address_json?.city || 'Шайтанка',
-        loading_org_name: initialOrder.loading_org_name || 'ООО "Геостройиндустрия" (ЛОП)',
+        loading_address: initialOrder.loading_address_json?.raw || '',
+        loading_city: initialOrder.loading_address_json?.city || '',
+        loading_org_name: initialOrder.loading_org_name || '',
 
-        unloading_address: initialOrder.unloading_address_json?.raw || 'Маминское',
-        unloading_city: initialOrder.unloading_address_json?.city || 'Маминское',
+        unloading_address: initialOrder.unloading_address_json?.raw || '',
+        unloading_city: initialOrder.unloading_address_json?.city || '',
 
-        cargo_name: initialOrder.cargo_name || 'Пробы',
-        weight_gross_kg: initialOrder.weight_gross_kg || 4000,
+        cargo_name: initialOrder.cargo_name || '',
+        weight_gross_kg:
+          initialOrder.weight_gross_kg !== undefined ? initialOrder.weight_gross_kg : '',
         places_count: initialOrder.places_count || 1,
-        packaging_type: 'палетты',
-        price_without_vat: initialOrder.price_without_vat || 60000,
+        packaging_type: (initialOrder as any).packaging_type || 'паллеты',
+        price_without_vat:
+          initialOrder.price_without_vat !== undefined ? initialOrder.price_without_vat : '',
 
         payment_method: initialOrder.payment_terms?.includes('Наличные') ? 'cash' : 'bank_invoice',
         payment_terms:
@@ -3295,39 +3223,37 @@ function CreateSmartOrderModal({
           initialOrder.planned_delivery_at?.slice(0, 16) ||
           new Date().toISOString().slice(0, 10) + 'T18:00',
 
-        assigned_vehicle_id: initialOrder.assigned_vehicle_id || vehicles[0]?.id || '',
-        assigned_driver_id: initialOrder.assigned_driver_id || drivers[0]?.id || '',
+        assigned_vehicle_id: initialOrder.assigned_vehicle_id || '',
+        assigned_driver_id: initialOrder.assigned_driver_id || '',
       };
     }
 
-    // По умолчанию для новой заявки (по скриншоту пользователя: Геостройиндустрия, Шайтанка -> Маминское)
-    const valdaiCar = vehicles.find((v: any) => v.reg_number?.includes('188')) || vehicles[0];
-    const nasrtdinov = drivers.find((d: any) => d.name?.includes('Насртдинов')) || drivers[0];
+    // Чистые пустые поля по умолчанию для новой заявки
     const today = new Date().toISOString().slice(0, 10);
 
     return {
       base_doc_number: '',
       base_doc_date: today,
       client_id: '',
-      client_name: 'ООО "Геостройиндустрия"',
-      client_inn: '6623101234',
+      client_name: '',
+      client_inn: '',
       forwarder_id: '',
       forwarder_name: '— (Прямой заказчик)',
       preset_id: '',
       loading_point_id: '',
 
-      loading_address: 'Шайтанка',
-      loading_city: 'Шайтанка',
-      loading_org_name: 'ООО "Геостройиндустрия" (ЛОП)',
+      loading_address: '',
+      loading_city: '',
+      loading_org_name: '',
 
-      unloading_address: 'Маминское',
-      unloading_city: 'Маминское',
+      unloading_address: '',
+      unloading_city: '',
 
-      cargo_name: 'Пробы',
-      weight_gross_kg: 4000,
+      cargo_name: '',
+      weight_gross_kg: '',
       places_count: 1,
-      packaging_type: 'палетты',
-      price_without_vat: 60000,
+      packaging_type: 'паллеты',
+      price_without_vat: '',
 
       payment_method: 'bank_invoice',
       payment_terms: 'Безналичный расчет (Дебиторская задолженность)',
@@ -3335,8 +3261,8 @@ function CreateSmartOrderModal({
       planned_loading_at: `${today}T08:00`,
       planned_delivery_at: `${today}T18:00`,
 
-      assigned_vehicle_id: valdaiCar?.id || '',
-      assigned_driver_id: nasrtdinov?.id || '',
+      assigned_vehicle_id: '',
+      assigned_driver_id: '',
     };
   });
 
@@ -3362,7 +3288,7 @@ function CreateSmartOrderModal({
     }
   }, [isEditing]);
 
-  // Быстрое переключение пресетов
+  // Быстрое переключение шаблонов (пресетов)
   const selectClientPreset = (type: 'vsmpo' | 'geostroy' | 'manual') => {
     setSelectedClientType(type);
     if (type === 'vsmpo') {
@@ -3386,7 +3312,20 @@ function CreateSmartOrderModal({
         payment_method: 'bank_invoice',
         payment_terms: 'Безналичный расчет (Дебиторская задолженность, отсрочка 15 дней)',
       }));
-      setStatusMessage('⭐ Предзаполнена схема ВСМПО-АВИСМА через экспедитора ИП Парфенов А.В.');
+      setRoutes([
+        {
+          id: '1',
+          loading_city: 'Заречный',
+          loading_address: '624250, Свердловская область, г. Заречный, ул. Промзона БЗСК, д 2',
+          loading_org: 'ООО "Континенталь"',
+          unloading_city: 'Верхняя Салда',
+          unloading_address: '624760, Свердловская область, г. Верхняя Салда, ул. Парковая, д 1',
+          unloading_org: 'ПАО «Корпорация ВСМПО-АВИСМА»',
+          cargo_name: 'Пруток 20мм, труба нерж.сталь',
+          weight_kg: 110,
+        },
+      ]);
+      setStatusMessage('⭐ Шаблон: схема ВСМПО-АВИСМА через экспедитора ИП Парфенов А.В.');
     } else if (type === 'geostroy') {
       const geoCp = counterparties.find((c: any) => c.name?.includes('Геострой'));
       setForm((prev: any) => ({
@@ -3407,7 +3346,20 @@ function CreateSmartOrderModal({
         payment_method: 'bank_invoice',
         payment_terms: 'Безналичный расчет (Дебиторская задолженность)',
       }));
-      setStatusMessage('⭐ Предзаполнена схема ООО "Геостройиндустрия": прямой заказчик.');
+      setRoutes([
+        {
+          id: '1',
+          loading_city: 'Шайтанка',
+          loading_address: 'Шайтанка',
+          loading_org: 'ООО "Геостройиндустрия" (ЛОП)',
+          unloading_city: 'Маминское',
+          unloading_address: 'Маминское',
+          unloading_org: 'ООО "Геостройиндустрия"',
+          cargo_name: 'Пробы',
+          weight_kg: 4000,
+        },
+      ]);
+      setStatusMessage('⭐ Шаблон: ООО "Геостройиндустрия" (прямой заказчик).');
     } else {
       setForm((prev: any) => ({
         ...prev,
@@ -3423,12 +3375,25 @@ function CreateSmartOrderModal({
         unloading_address: '',
         unloading_city: '',
         cargo_name: '',
-        weight_gross_kg: 1000,
-        price_without_vat: 20000,
+        weight_gross_kg: '',
+        price_without_vat: '',
         payment_method: 'bank_invoice',
         payment_terms: 'Безналичный расчет (Дебиторская задолженность)',
       }));
-      setStatusMessage('📝 Ручной ввод по карточке предприятия.');
+      setRoutes([
+        {
+          id: '1',
+          loading_city: '',
+          loading_address: '',
+          loading_org: '',
+          unloading_city: '',
+          unloading_address: '',
+          unloading_org: '',
+          cargo_name: '',
+          weight_kg: 0,
+        },
+      ]);
+      setStatusMessage('📝 Очищено: ручной ввод пустой заявки.');
     }
   };
 
@@ -3438,16 +3403,17 @@ function CreateSmartOrderModal({
       alert('Максимальное количество сегментов маршрута для Путевого листа — 6');
       return;
     }
+    const prevStop = routes[routes.length - 1];
     const newStop: RouteStop = {
       id: String(Date.now()),
-      loading_city: 'Верхняя Салда',
-      loading_address: 'г. Верхняя Салда, база',
-      loading_org: form.client_name || 'ООО "Геостройиндустрия"',
-      unloading_city: 'Маминское',
-      unloading_address: 'с. Маминское, склад 2',
-      unloading_org: form.client_name || 'ООО "Геостройиндустрия"',
-      cargo_name: form.cargo_name || 'Пробы',
-      weight_kg: 2000,
+      loading_city: prevStop?.unloading_city || form.loading_city || '',
+      loading_address: prevStop?.unloading_address || form.loading_address || '',
+      loading_org: form.loading_org_name || '',
+      unloading_city: '',
+      unloading_address: '',
+      unloading_org: form.client_name || '',
+      cargo_name: form.cargo_name || '',
+      weight_kg: 0,
     };
     setRoutes([...routes, newStop]);
     setIsMultiStop(true);
@@ -3595,12 +3561,12 @@ function CreateSmartOrderModal({
         preset_id: form.preset_id || null,
         loading_point_id: form.loading_point_id || null,
 
-        cargo_name: form.cargo_name,
-        weight_gross_kg: totalWeightKg,
-        weight_net_kg: totalWeightKg,
-        places_count: Number(form.places_count),
-        packaging_type: form.packaging_type,
-        price_without_vat: Number(form.price_without_vat),
+        cargo_name: form.cargo_name || 'Груз',
+        weight_gross_kg: totalWeightKg || 0,
+        weight_net_kg: totalWeightKg || 0,
+        places_count: Number(form.places_count) || 1,
+        packaging_type: form.packaging_type || 'паллеты',
+        price_without_vat: Number(form.price_without_vat) || 0,
         payment_terms:
           form.payment_method === 'cash'
             ? 'Оплата наличными водителю (В кассу)'
@@ -3676,41 +3642,41 @@ function CreateSmartOrderModal({
           </button>
         </div>
 
-        {/* Быстрые пресеты клиентов */}
+        {/* Быстрые шаблоны клиентов или чистая заявка */}
         {!isEditing && (
           <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => selectClientPreset('manual')}
+              className={`py-1.5 rounded-lg transition cursor-pointer ${
+                selectedClientType === 'manual'
+                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                  : 'text-slate-600'
+              }`}
+            >
+              📝 Чистая заявка
+            </button>
             <button
               type="button"
               onClick={() => selectClientPreset('vsmpo')}
               className={`py-1.5 rounded-lg transition cursor-pointer ${
                 selectedClientType === 'vsmpo'
-                  ? 'bg-white text-indigo-700 shadow-2xs'
+                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                   : 'text-slate-600'
               }`}
             >
-              🏢 ВСМПО-АВИСМА (Парфенов)
+              🏢 Шаблон ВСМПО (Парфенов)
             </button>
             <button
               type="button"
               onClick={() => selectClientPreset('geostroy')}
               className={`py-1.5 rounded-lg transition cursor-pointer ${
                 selectedClientType === 'geostroy'
-                  ? 'bg-white text-indigo-700 shadow-2xs'
+                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                   : 'text-slate-600'
               }`}
             >
-              🏗️ ООО «Геостройиндустрия»
-            </button>
-            <button
-              type="button"
-              onClick={() => selectClientPreset('manual')}
-              className={`py-1.5 rounded-lg transition cursor-pointer ${
-                selectedClientType === 'manual'
-                  ? 'bg-white text-indigo-700 shadow-2xs'
-                  : 'text-slate-600'
-              }`}
-            >
-              ➕ Новый клиент / По карточке
+              🏗️ Шаблон Геострой
             </button>
           </div>
         )}

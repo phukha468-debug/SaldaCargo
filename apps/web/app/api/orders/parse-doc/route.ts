@@ -27,11 +27,13 @@ export async function POST(req: Request) {
 
     const supabase = createAdminClient();
 
-    // 1. Поиск контрагентов по ИНН в базе counterparties
+    // 1. Поиск контрагентов по ИНН в базе counterparties (только среди активных)
     if (parsedData.client_inn) {
       const { data: clientCp } = await (supabase.from('counterparties') as any)
         .select('*')
         .eq('inn', parsedData.client_inn)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
       if (clientCp) {
@@ -47,6 +49,8 @@ export async function POST(req: Request) {
       const { data: forwarderCp } = await (supabase.from('counterparties') as any)
         .select('*')
         .eq('inn', parsedData.forwarder_inn)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
       if (forwarderCp) {

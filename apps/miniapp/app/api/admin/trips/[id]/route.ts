@@ -154,10 +154,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (cpId) return cpId;
       const name = cpName?.trim();
       if (!name) return null;
+
+      // Защита от дублей ВСМПО-АВИСМА
+      const lower = name.toLowerCase();
+      if (lower.includes('всмпо') || lower.includes('ависма')) {
+        const { data: vsmpo } = await (supabase.from('counterparties') as any)
+          .select('id')
+          .or('id.eq.6024c9f4-5d67-4b8c-93ae-e4e66ce21441,inn.eq.6607000556')
+          .eq('is_active', true)
+          .limit(1);
+        if (vsmpo && vsmpo.length > 0) return vsmpo[0].id;
+      }
+
       const { data: foundList } = await (supabase.from('counterparties') as any)
         .select('id')
         .ilike('name', name)
-        .order('is_active', { ascending: false })
+        .eq('is_active', true)
         .limit(1);
       if (foundList && foundList.length > 0) return foundList[0].id;
       const { data: created, error: createErr } = await (supabase.from('counterparties') as any)

@@ -149,11 +149,7 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
       desc.startsWith('выплата зарплаты') ||
       desc.startsWith('выплата зп');
     const isAdv = t.category_id === ADVANCE_CATEGORY_ID || desc.includes('аванс');
-    return (
-      (SALARY_CATEGORY_IDS.includes(t.category_id) || t.direction === 'expense') &&
-      !isPayout &&
-      !isAdv
-    );
+    return SALARY_CATEGORY_IDS.includes(t.category_id) && !isPayout && !isAdv;
   };
 
   const isDebtRepayment = (t: PayrollHistoryItem) => {
@@ -227,15 +223,10 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   } else if (periodMode === 'valday') {
     // 🚛 ВАЛДАЙ / ПО ФАКТУ: Все невыплаченные смены
     accruals = allHistory.filter((t) => isSalaryAccrual(t) && t.settlement_status === 'pending');
-    if (accruals.length === 0) {
-      accruals = allHistory.filter(isSalaryAccrual);
-    }
-    debtRepayments = allHistory.filter(isDebtRepayment);
-    if (
-      debtRepayments.length === 0 &&
-      userAdvanceOffset > 0 &&
-      accruals.some((t) => t.settlement_status === 'pending')
-    ) {
+    debtRepayments = allHistory.filter(
+      (t) => isDebtRepayment(t) && t.settlement_status === 'pending',
+    );
+    if (debtRepayments.length === 0 && userAdvanceOffset > 0 && accruals.length > 0) {
       const sumAcc = accruals.reduce((s, t) => s + parseFloat(t.amount || '0'), 0);
       debtRepayments = [
         {
@@ -300,8 +291,8 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   const allAccrualsPending =
     accruals.length > 0 && accruals.every((t) => t.settlement_status === 'pending');
 
-  if (allAccrualsPending) {
-    // Начисления за этот период ещё не выплачивались — выдано 0 ₽
+  if (accruals.length === 0 || allAccrualsPending) {
+    // Начислений нет вообще или они ещё не выплачивались — выдано 0 ₽
     salaryPayouts = [];
   } else {
     salaryPayouts = allHistory.filter((t) => {
@@ -312,6 +303,14 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
       // Выплата должна быть произведена НЕ раньше появления начислений этого периода
       if (minAccrualTime > 0 && tTime < minAccrualTime - 60000) return false;
 
+      if (periodMode === 'gazelle') {
+        const sTime = weekCycle.start.getTime();
+        const eTime = weekCycle.end.getTime() + 4 * 86400000;
+        return tTime >= sTime && tTime <= eTime;
+      }
+      if (periodMode === 'valday') {
+        return false;
+      }
       if (periodMode === 'custom') {
         const sDate = new Date(customStart + 'T00:00:00').getTime();
         const eDate = new Date(customEnd + 'T23:59:59.999').getTime();
@@ -321,7 +320,7 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
         const d = new Date(rawDate);
         return d.getFullYear() === year && d.getMonth() + 1 === monthNumber;
       }
-      return true;
+      return false;
     });
   }
 
@@ -336,15 +335,15 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
   const periodRemainingOnHand = Math.max(0, periodNetEarned - sumSalaryPayouts);
 
   // Фактическая сумма к выдаче для печати на бандероли/в шапке:
-  // Если ЗП за период ещё не выплачена — к выдаче ровно periodNetEarned.
-  // Если ЗП уже была выплачена деньгами и остаток обнулился — сумма проведённой выплаты за период.
-  // Ни при каких условиях не подмешивает глобальный долг за все времена с будущими сменами!
+  // 1. Если есть невыплаченный остаток (> 0) — выводим его к оплате.
+  // 2. Если начислено > 0 и всё уже выплачено деньгами (остаток 0) — сумма проведённой выплаты за период.
+  // 3. Если за период начислений не было (periodNetEarned === 0) — строго 0 ₽!
   const payoutToPrint =
     periodRemainingOnHand > 0
       ? periodRemainingOnHand
-      : sumSalaryPayouts > 0
-        ? Math.min(sumSalaryPayouts, periodNetEarned || sumSalaryPayouts)
-        : periodNetEarned;
+      : periodNetEarned > 0 && sumSalaryPayouts > 0
+        ? Math.min(sumSalaryPayouts, periodNetEarned)
+        : 0;
 
   // Формирование точного заголовка периода
   let periodLabel = '';
@@ -621,8 +620,13 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
                     {rolesLabel || 'Сотрудник'}
                   </div>
 
-                  <div className="font-mono font-black text-lg text-slate-950 bg-slate-100 border-2 border-slate-950 rounded-lg py-1 px-3 mt-1 inline-block">
-                    {payoutToPrint.toLocaleString('ru-RU')} ₽
+                  <div className="font-mono font-black text-lg text-slate-950 bg-slate-100 border-2 border-slate-950 rounded-lg py-1 px-3 mt-1 inline-flex items-center gap-1.5">
+                    <span>{payoutToPrint.toLocaleString('ru-RU')} ₽</span>
+                    {periodRemainingOnHand === 0 && periodNetEarned > 0 && sumSalaryPayouts > 0 && (
+                      <span className="text-[7.5px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded tracking-wide uppercase">
+                        ВЫПЛАЧЕНО
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -951,10 +955,18 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
             <div className="flex items-center justify-between pt-0.5">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-wide text-slate-950">
-                  ИТОГО К ВЫПЛАТЕ НА РУКИ:
+                  {periodRemainingOnHand > 0
+                    ? 'ИТОГО К ВЫПЛАТЕ НА РУКИ:'
+                    : periodNetEarned > 0
+                      ? 'ВЫПЛАЧЕНО В ПОЛНОМ ОБЪЁМЕ:'
+                      : 'НЕТ НАЧИСЛЕНИЙ К ВЫПЛАТЕ:'}
                 </div>
                 <div className="text-[9px] text-slate-600">
-                  Сумма к выдаче деньгами за отчётный период (срез по Чт-вечер)
+                  {periodRemainingOnHand > 0
+                    ? 'Сумма к выдаче деньгами за отчётный период'
+                    : periodNetEarned > 0
+                      ? `Зарплата за выбранный период полностью выдана деньгами (остаток: 0 ₽)`
+                      : 'За выбранный период у сотрудника нет отработанных смен'}
                 </div>
               </div>
               <div className="text-xl sm:text-2xl font-black font-mono text-slate-950 px-3 py-1 border-2 border-slate-900 rounded bg-white">

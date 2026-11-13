@@ -501,7 +501,7 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
         result.loading_org_inn = orgInnMatch[1];
       }
 
-      let city = 'Екатеринбург';
+      let city = '';
       const cityM = rawBlock.match(
         /(?:г\.|город)?\s*(Екатеринбург|Верхняя Салда|Нижний Тагил|Заречный|Березовский|Первоуральск|Ревда|Полевской|Тюмень|Челябинск|Курган|Пермь|Москва|Санкт-Петербург)/i,
       );
@@ -531,9 +531,10 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
           .trim();
       }
       result.loading_address = {
-        raw: cleanAddress.toLowerCase().includes(city.toLowerCase())
-          ? cleanAddress
-          : `г. ${city}, ${cleanAddress}`,
+        raw:
+          city && !cleanAddress.toLowerCase().includes(city.toLowerCase())
+            ? `г. ${city}, ${cleanAddress}`
+            : cleanAddress,
         city: city,
         street: cleanAddress,
       };
@@ -575,35 +576,35 @@ export function parseForwarderOrderText(rawText: string): ParsedForwarderOrder {
     if (unloadSectionMatch && unloadSectionMatch[1]) {
       const rawBlock = unloadSectionMatch[1].trim();
 
-      let city = 'Верхняя Салда';
+      let city = '';
       if (rawBlock.includes('В-Салда') || rawBlock.includes('Верхняя Салда')) {
         city = 'Верхняя Салда';
       } else {
         const cityM = rawBlock.match(
-          /(?:г\.|город)?\s*(Екатеринбург|Верхняя Салда|Нижний Тагил|Заречный|Березовский|Первоуральск|Тюмень|Челябинск|Москва)/i,
+          /(?:г\.|город)?\s*(Екатеринбург|Верхняя Салда|Нижний Тагил|Заречный|Березовский|Первоуральск|Ревда|Полевской|Тюмень|Челябинск|Курган|Пермь|Москва|Санкт-Петербург)/i,
         );
-        if (cityM && cityM[1]) city = cityM[1];
+        if (cityM && cityM[1]) city = cityM[1].trim();
       }
 
-      let street = 'ул. Парковая 1';
+      let street = '';
       const streetM = rawBlock.match(
-        /((?:ул\.|улица)\s*[^,;\n]+(?:,\s*(?:склад|пл|цех)\s*[^,;\n]+)*)/i,
+        /((?:ул\.|улица)\s*[^,;\n]+(?:,\s*(?:склад|пл|цех|д\.|д\s*\d+)\s*[^,;\n]+)*)/i,
       );
       if (streetM && streetM[1]) {
         street = streetM[1].replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
       }
 
+      const firstLineUnload = rawBlock.split(/\r?\n/)[0]?.trim() || '';
       result.unloading_address = {
-        raw: `624760, Свердловская область, г. Верхняя Салда, ${street}`,
+        raw: firstLineUnload || (city ? (street ? `г. ${city}, ${street}` : `г. ${city}`) : ''),
         city: city,
         street: street,
-        gar_guid: '0ee97715-6406-4a23-958e-b98741ba48e0',
+        gar_guid: city === 'Верхняя Салда' ? '0ee97715-6406-4a23-958e-b98741ba48e0' : '',
         region_code: '66',
       };
     } else if (
-      rawText.includes('Верхняя Салда') ||
-      rawText.includes('Парковая') ||
-      rawText.includes('В-Салда')
+      rawText.includes('Парковая') &&
+      (rawText.includes('Верхняя Салда') || rawText.includes('В-Салда'))
     ) {
       result.unloading_address = {
         raw: '624760, Свердловская область, г. Верхняя Салда, ул. Парковая, д 1',

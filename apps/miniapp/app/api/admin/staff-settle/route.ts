@@ -409,14 +409,20 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: splitErr }, { status: 400 });
         }
 
-        const baseKey = body.idempotency_key || crypto.randomUUID();
+        const baseKey =
+          body.idempotency_key &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            body.idempotency_key,
+          )
+            ? body.idempotency_key
+            : crypto.randomUUID();
         const insertOps = splits.map((s, idx) => {
           const wLabel = WALLET_LABELS[s.wallet_id] || `Кошелёк ${idx + 1}`;
           const desc =
             splits.length > 1
               ? `Выплата зарплаты (${wLabel}): ${employeeName} — ${dateLabel}`
               : `Выплата зарплаты: ${employeeName} — ${dateLabel}`;
-          const idempKey = splits.length > 1 ? `${baseKey}_split_${s.wallet_id}` : baseKey;
+          const idempKey = idx === 0 ? baseKey : crypto.randomUUID();
 
           return (supabase.from('transactions') as any).insert({
             direction: 'expense',
@@ -563,7 +569,11 @@ export async function POST(request: Request) {
     const payoutDescription = `Выплата зарплаты: ${employeeName}${breakdownText}`;
 
     const ops: Promise<any>[] = [];
-    const batchId = body.idempotency_key || crypto.randomUUID();
+    const batchId =
+      body.idempotency_key &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.idempotency_key)
+        ? body.idempotency_key
+        : crypto.randomUUID();
 
     if (actualPayout > 0 && splits.length > 0) {
       splits.forEach((s, idx) => {
@@ -572,7 +582,7 @@ export async function POST(request: Request) {
           splits.length > 1
             ? `Выплата зарплаты (${wLabel}): ${employeeName}${breakdownText}`
             : payoutDescription;
-        const idempKey = splits.length > 1 ? `${batchId}_split_${s.wallet_id}` : batchId;
+        const idempKey = idx === 0 ? batchId : crypto.randomUUID();
 
         ops.push(
           (supabase.from('transactions') as any).insert({
@@ -658,7 +668,7 @@ export async function POST(request: Request) {
           settlement_status: 'completed',
           related_user_id: body.user_id,
           created_by: adminId,
-          idempotency_key: `${batchId}_netting_cash`,
+          idempotency_key: crypto.randomUUID(),
         }),
       );
     }

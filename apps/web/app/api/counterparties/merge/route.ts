@@ -54,6 +54,23 @@ export async function POST(request: Request) {
       .update({ counterparty_id: target_id })
       .eq('counterparty_id', source_id);
 
+    // 2.1. Перепривязываем логистические заказы (orders: client_id, shipper_id, consignee_id, forwarder_id)
+    await Promise.all([
+      (supabase as any).from('orders').update({ client_id: target_id }).eq('client_id', source_id),
+      (supabase as any)
+        .from('orders')
+        .update({ shipper_id: target_id })
+        .eq('shipper_id', source_id),
+      (supabase as any)
+        .from('orders')
+        .update({ consignee_id: target_id })
+        .eq('consignee_id', source_id),
+      (supabase as any)
+        .from('orders')
+        .update({ forwarder_id: target_id })
+        .eq('forwarder_id', source_id),
+    ]);
+
     // 3. Перепривязываем финансовые транзакции (transactions)
     await (supabase as any)
       .from('transactions')
@@ -106,12 +123,40 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    if (!targetCp.phone && sourceCp.phone) {
-      updateTarget.phone = sourceCp.phone;
+    if (!targetCp.phone && sourceCp.phone) updateTarget.phone = sourceCp.phone;
+    if (!targetCp.email && sourceCp.email) updateTarget.email = sourceCp.email;
+    if (!targetCp.inn && sourceCp.inn) updateTarget.inn = sourceCp.inn;
+    if (!targetCp.kpp && sourceCp.kpp) updateTarget.kpp = sourceCp.kpp;
+    if (!targetCp.ogrn && sourceCp.ogrn) updateTarget.ogrn = sourceCp.ogrn;
+    if (!targetCp.legal_address && sourceCp.legal_address)
+      updateTarget.legal_address = sourceCp.legal_address;
+    if (!targetCp.actual_address && sourceCp.actual_address)
+      updateTarget.actual_address = sourceCp.actual_address;
+    if (!targetCp.contact_person && sourceCp.contact_person)
+      updateTarget.contact_person = sourceCp.contact_person;
+    if (!targetCp.ati_code && sourceCp.ati_code) updateTarget.ati_code = sourceCp.ati_code;
+    if (!targetCp.bank_name && sourceCp.bank_name) updateTarget.bank_name = sourceCp.bank_name;
+    if (!targetCp.bik && sourceCp.bik) updateTarget.bik = sourceCp.bik;
+    if (!targetCp.bank_account && sourceCp.bank_account)
+      updateTarget.bank_account = sourceCp.bank_account;
+    if (!targetCp.corr_account && sourceCp.corr_account)
+      updateTarget.corr_account = sourceCp.corr_account;
+    if (!targetCp.edo_participant_id && sourceCp.edo_participant_id)
+      updateTarget.edo_participant_id = sourceCp.edo_participant_id;
+    if (!targetCp.gar_guid && sourceCp.gar_guid) updateTarget.gar_guid = sourceCp.gar_guid;
+    if (
+      (!targetCp.structured_address || Object.keys(targetCp.structured_address).length === 0) &&
+      sourceCp.structured_address
+    ) {
+      updateTarget.structured_address = sourceCp.structured_address;
     }
-    if (!targetCp.email && sourceCp.email) {
-      updateTarget.email = sourceCp.email;
-    }
+    if (!targetCp.contact_phone && sourceCp.contact_phone)
+      updateTarget.contact_phone = sourceCp.contact_phone;
+    if (!targetCp.contact_person_fio && sourceCp.contact_person_fio)
+      updateTarget.contact_person_fio = sourceCp.contact_person_fio;
+    if (!targetCp.contact_person_position && sourceCp.contact_person_position)
+      updateTarget.contact_person_position = sourceCp.contact_person_position;
+
     if (sourceCp.is_regular && !targetCp.is_regular) {
       updateTarget.is_regular = true;
     }
@@ -130,12 +175,13 @@ export async function POST(request: Request) {
 
     await (supabase as any).from('counterparties').update(updateTarget).eq('id', target_id);
 
-    // 8. Деактивируем исходного контрагента (дубль)
+    // 8. Деактивируем исходного контрагента (дубль) и очищаем его ИНН, чтобы не конфликтовал с уникальным индексом
     const deactivatedNote = `[Дубль, объединён в «${targetCp.name}» (ID: ${target_id}) ${new Date().toLocaleDateString('ru-RU')}]`;
     await (supabase as any)
       .from('counterparties')
       .update({
         is_active: false,
+        inn: null,
         payable_amount: '0.00',
         notes: sourceCp.notes ? `${sourceCp.notes}\n${deactivatedNote}` : deactivatedNote,
         updated_at: new Date().toISOString(),

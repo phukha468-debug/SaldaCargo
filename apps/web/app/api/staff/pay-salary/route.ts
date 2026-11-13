@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         splits.length > 1
           ? `${baseDescription} (${wLabel}: ${s.amount.toFixed(2)} ₽)`
           : baseDescription;
-      const idempKey = splits.length > 1 ? `${baseIdemp}_split_${s.wallet_id}` : baseIdemp;
+      const idempKey = i === 0 ? baseIdemp : crypto.randomUUID();
 
       const { data, error } = await (supabase.from('transactions') as any)
         .insert({

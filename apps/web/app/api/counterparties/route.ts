@@ -485,11 +485,67 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Название обязательно' }, { status: 400 });
     }
 
+    const cleanName = body.name.trim();
+    const cleanInn = body.inn?.trim() || null;
     const supabase = createAdminClient();
+
+    // 1. Защита от дублей по ИНН
+    if (cleanInn) {
+      const { data: existingByInn } = await (supabase.from('counterparties') as any)
+        .select('id, name, is_active')
+        .eq('inn', cleanInn)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existingByInn) {
+        return NextResponse.json(
+          {
+            error: `Контрагент с ИНН ${cleanInn} уже существует: «${existingByInn.name}» (ID: ${existingByInn.id}). Создание дубликата запрещено.`,
+            existing_id: existingByInn.id,
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    // 2. Защита от дублей ВСМПО-АВИСМА
+    if (/всмпо|ависма|vsmpo|avisma/i.test(cleanName)) {
+      const { data: vsmpoMaster } = await (supabase.from('counterparties') as any)
+        .select('id, name')
+        .eq('inn', '6607000556')
+        .eq('is_active', true)
+        .maybeSingle();
+      if (vsmpoMaster) {
+        return NextResponse.json(
+          {
+            error: `Попытка создать дубликат ВСМПО-АВИСМА! В системе уже есть основной контрагент «${vsmpoMaster.name}» (ID: ${vsmpoMaster.id}). Используйте существующего контрагента.`,
+            existing_id: vsmpoMaster.id,
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    // 3. Защита от дублей по точному наименованию среди активных
+    const { data: existingByName } = await (supabase.from('counterparties') as any)
+      .select('id, name, is_active')
+      .ilike('name', cleanName)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (existingByName) {
+      return NextResponse.json(
+        {
+          error: `Контрагент с названием «${existingByName.name}» уже существует (ID: ${existingByName.id}).`,
+          existing_id: existingByName.id,
+        },
+        { status: 409 },
+      );
+    }
 
     const { data, error } = await (supabase.from('counterparties') as any)
       .insert({
-        name: body.name.trim(),
+        name: cleanName,
         type: body.type || 'client',
         client_role: body.client_role || 'owner',
         phone: body.phone?.trim() || null,
@@ -500,7 +556,7 @@ export async function POST(request: Request) {
         is_active: true,
         is_regular: body.is_regular !== undefined ? body.is_regular : false,
         is_legal_entity: Boolean(body.is_legal_entity),
-        inn: body.inn?.trim() || null,
+        inn: cleanInn,
         kpp: body.kpp?.trim() || null,
         ogrn: body.ogrn?.trim() || null,
         legal_address: body.legal_address?.trim() || null,

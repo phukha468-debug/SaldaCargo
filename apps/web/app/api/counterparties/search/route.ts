@@ -32,19 +32,46 @@ export async function GET(request: Request) {
   return NextResponse.json(result);
 }
 
-/** POST /api/counterparties/search — создать нового клиента */
+/** POST /api/counterparties/search — создать нового клиента или вернуть существующего */
 export async function POST(request: Request) {
   const body = await request.json();
   const { name, phone } = body;
 
-  if (!name?.trim()) {
+  const cleanName = name?.trim();
+  if (!cleanName) {
     return NextResponse.json({ error: 'Имя клиента обязательно' }, { status: 400 });
   }
 
   const supabase = createAdminClient();
+
+  // 1. Защита от дублирования ВСМПО-АВИСМА
+  const lowerName = cleanName.toLowerCase();
+  if (lowerName.includes('всмпо') || lowerName.includes('ависма')) {
+    const { data: vsmpoMaster } = await (supabase.from('counterparties') as any)
+      .select('id, name, phone')
+      .or('id.eq.6024c9f4-5d67-4b8c-93ae-e4e66ce21441,inn.eq.6607000556')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (vsmpoMaster) {
+      return NextResponse.json(vsmpoMaster, { status: 200 });
+    }
+  }
+
+  // 2. Поиск существующего по точному наименованию среди активных
+  const { data: existingByName } = await (supabase.from('counterparties') as any)
+    .select('id, name, phone')
+    .ilike('name', cleanName)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (existingByName) {
+    return NextResponse.json(existingByName, { status: 200 });
+  }
+
   const { data, error } = await (supabase.from('counterparties') as any)
     .insert({
-      name: name.trim(),
+      name: cleanName,
       phone: phone?.trim() || null,
       type: 'client',
       is_active: true,
