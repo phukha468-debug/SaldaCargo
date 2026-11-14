@@ -4,7 +4,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useMemo } from 'react';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatTime } from '@saldacargo/shared';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
@@ -34,8 +34,14 @@ function calcTrip(trip: any) {
     (o: any) => o.lifecycle_status !== 'cancelled',
   );
   const expenses = trip.trip_expenses ?? [];
-  const revenue = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.amount), 0);
-  const driverPay = activeOrders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay), 0);
+  const revenue = activeOrders.reduce(
+    (s: number, o: any) => s + (parseFloat(o.amount || '0') || 0),
+    0,
+  );
+  const driverPay = activeOrders.reduce(
+    (s: number, o: any) => s + (parseFloat(o.driver_pay || '0') || 0),
+    0,
+  );
   const loaderPay = activeOrders.reduce((sum: number, o: any) => {
     if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
       return (
@@ -45,11 +51,88 @@ function calcTrip(trip: any) {
     }
     return sum + (parseFloat(o.loader_pay ?? '0') || 0) + (parseFloat(o.loader2_pay ?? '0') || 0);
   }, 0);
-  const totalExpenses = expenses.reduce((s: number, e: any) => s + parseFloat(e.amount), 0);
+  const fuelExpense = expenses
+    .filter((e: any) => {
+      const name =
+        e.category?.name ||
+        e.expense_category?.name ||
+        (typeof e.category === 'string' ? e.category : '');
+      return String(name).toUpperCase() === 'ГСМ';
+    })
+    .reduce((s: number, e: any) => s + (parseFloat(e.amount || '0') || 0), 0);
+  const totalExpenses = expenses.reduce(
+    (s: number, e: any) => s + (parseFloat(e.amount || '0') || 0),
+    0,
+  );
   const mileage =
     trip.odometer_end && trip.odometer_start ? trip.odometer_end - trip.odometer_start : null;
   const profit = revenue - driverPay - loaderPay - totalExpenses;
-  return { activeOrders, expenses, revenue, driverPay, loaderPay, totalExpenses, mileage, profit };
+  return {
+    activeOrders,
+    expenses,
+    revenue,
+    driverPay,
+    loaderPay,
+    fuelExpense,
+    totalExpenses,
+    mileage,
+    profit,
+  };
+}
+
+function calcLoaderProfit(trip: any) {
+  const activeOrders = (trip.trip_orders ?? []).filter(
+    (o: any) => o.lifecycle_status !== 'cancelled',
+  );
+  let totalLoaderProfit = 0;
+  for (const o of activeOrders) {
+    const amt = parseFloat(o.amount || '0') || 0;
+    let thirdPartyPay = 0;
+    if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+      thirdPartyPay = o.loaders_data.reduce(
+        (s: number, l: any) => s + (parseFloat(l.pay || '0') || 0),
+        0,
+      );
+    } else {
+      thirdPartyPay =
+        (parseFloat(o.loader_pay || '0') || 0) + (parseFloat(o.loader2_pay || '0') || 0);
+    }
+    const driverLoaderPay = o.is_driver_loader ? parseFloat(o.driver_loader_pay || '0') || 0 : 0;
+    const totalPaid = thirdPartyPay + driverLoaderPay;
+    if (totalPaid <= 0) continue;
+
+    let loadersPool = 0;
+    if (o.direction === 'loaders_only' && amt > 0) {
+      loadersPool = amt;
+    } else {
+      loadersPool = Math.round(totalPaid / 0.7);
+    }
+    const profit = Math.max(0, loadersPool - totalPaid);
+    totalLoaderProfit += profit;
+  }
+  return totalLoaderProfit;
+}
+
+function calcServiceOrder(order: any) {
+  const parts = order.parts || [];
+  const works = order.works || [];
+  const partsCost = parts.reduce(
+    (sum: number, p: any) =>
+      sum +
+      (parseFloat(p.unit_price || p.price || p.cost_price || '0') || 0) *
+        (parseFloat(p.quantity || '1') || 1),
+    0,
+  );
+  let salaryCost =
+    (parseFloat(order.mechanic_pay || '0') || 0) +
+    (parseFloat(order.second_mechanic_pay || '0') || 0);
+  if (salaryCost <= 0 && works.length > 0) {
+    salaryCost = works
+      .filter((w: any) => w.status !== 'cancelled')
+      .reduce((sum: number, w: any) => sum + (parseFloat(w.price_client || '0') || 0) * 0.5, 0);
+  }
+  const totalCost = partsCost + salaryCost;
+  return { partsCost, salaryCost, totalCost };
 }
 
 function getWeekDates(dateStr: string) {
@@ -63,11 +146,11 @@ function getWeekDates(dateStr: string) {
   return { weekStart: mon.toISOString().slice(0, 10), weekEnd: sun.toISOString().slice(0, 10) };
 }
 
-// ── DateNav (мобильная навигация по датам и периодам) ───────
+// ── DateNav (Светлый Финтех: чистый белый стиль без черных фонов) ───
 
 function DateNav({
   date,
-  period = 'day',
+  period = 'month',
   onChange,
   setPeriod,
   tripSearch = '',
@@ -147,18 +230,15 @@ function DateNav({
     period === 'week' && getWeekDates(date).weekStart === getWeekDates(today).weekStart;
   const isFuture =
     period === 'month' ? isCurrentMonth : period === 'week' ? isCurrentWeek : date >= today;
-  const showJumpToToday =
-    period === 'month' ? !isCurrentMonth : period === 'week' ? !isCurrentWeek : !isToday;
-  const jumpLabel = period === 'month' ? '→ тек.' : period === 'week' ? '→ тек.' : '→ сег.';
 
   return (
-    <div className="bg-zinc-900 border-b border-zinc-800">
-      {/* Переключатель режима: День / Неделя / Месяц */}
+    <div className="bg-white border-b border-slate-200">
+      {/* Верхняя строка: Выбор День / Неделя / Месяц */}
       {setPeriod && (
-        <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-950 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-100">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase text-zinc-500">Период:</span>
-            <div className="inline-flex bg-zinc-800 p-0.5 rounded-lg border border-zinc-700">
+            <span className="text-[10px] font-black uppercase text-slate-500">Период:</span>
+            <div className="inline-flex bg-slate-200/70 p-0.5 rounded-lg border border-slate-300/60">
               {(['day', 'week', 'month'] as const).map((p) => {
                 const label = p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц';
                 const active = period === p;
@@ -168,8 +248,10 @@ function DateNav({
                     type="button"
                     onClick={() => setPeriod(p)}
                     className={cn(
-                      'px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer',
-                      active ? 'bg-sky-600 text-white shadow-xs' : 'text-zinc-400 hover:text-white',
+                      'px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer',
+                      active
+                        ? 'bg-sky-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900',
                     )}
                   >
                     {label}
@@ -178,78 +260,100 @@ function DateNav({
               })}
             </div>
           </div>
-          <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">
-            {period === 'month' ? '📅 Целый месяц' : period === 'week' ? '📅 7 дней' : '📅 1 день'}
+          <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
+            {period === 'month' ? '📅 По машинам' : period === 'week' ? '📅 7 дней' : '📅 1 день'}
           </span>
         </div>
       )}
 
-      {/* Навигация по выбранному периоду */}
-      <div className="flex items-stretch h-12">
-        <button
-          type="button"
-          onClick={() => shift(-1)}
-          className="flex items-center justify-center w-12 bg-sky-600 active:bg-sky-700 transition-colors text-white shrink-0 cursor-pointer"
-          aria-label="Предыдущий период"
-        >
-          <span className="text-xl font-black select-none">←</span>
-        </button>
+      {/* Центральный селектор месяца со стрелками */}
+      <div className="p-2">
+        <div className="flex items-center justify-between bg-slate-50 rounded-xl p-1 border border-slate-200">
+          <button
+            type="button"
+            onClick={() => shift(-1)}
+            className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-black flex items-center justify-center shadow-2xs cursor-pointer transition-colors"
+            aria-label="Предыдущий период"
+          >
+            ◀
+          </button>
 
-        <label className="flex-1 flex items-center justify-center gap-2 cursor-pointer px-2">
-          {period === 'month' ? (
-            <input
-              type="month"
-              value={date.slice(0, 7)}
-              max={today.slice(0, 7)}
-              onChange={(e) => e.target.value && onChange(`${e.target.value}-01`)}
-              className="sr-only"
-            />
-          ) : (
-            <input
-              type="date"
-              value={date}
-              max={today}
-              onChange={(e) => e.target.value && onChange(e.target.value)}
-              className="sr-only"
-            />
-          )}
-          <span className="material-symbols-outlined text-sky-400 text-[18px] pointer-events-none select-none">
-            calendar_today
-          </span>
-          <span className="text-white font-black text-xs sm:text-sm text-center leading-tight">
-            {dateLabel}
-          </span>
-          {showJumpToToday && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onChange(today);
-              }}
-              className="text-[9px] font-bold text-sky-300 bg-sky-600/30 hover:bg-sky-600/50 border border-sky-500/30 px-1.5 py-0.5 rounded-full whitespace-nowrap cursor-pointer"
-            >
-              {jumpLabel}
-            </button>
-          )}
-        </label>
+          <label className="flex-1 flex items-center justify-center gap-1.5 cursor-pointer px-2">
+            {period === 'month' ? (
+              <input
+                type="month"
+                value={date.slice(0, 7)}
+                max={today.slice(0, 7)}
+                onChange={(e) => e.target.value && onChange(`${e.target.value}-01`)}
+                className="sr-only"
+              />
+            ) : (
+              <input
+                type="date"
+                value={date}
+                max={today}
+                onChange={(e) => e.target.value && onChange(e.target.value)}
+                className="sr-only"
+              />
+            )}
+            <span className="material-symbols-outlined text-sky-600 text-[17px] pointer-events-none select-none">
+              calendar_today
+            </span>
+            <span className="text-slate-900 font-black text-xs sm:text-sm text-center leading-tight uppercase tracking-wider">
+              {dateLabel}
+            </span>
+            {(period === 'month'
+              ? isCurrentMonth
+              : period === 'week'
+                ? isCurrentWeek
+                : isToday) && (
+              <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-full">
+                текущий
+              </span>
+            )}
+          </label>
 
-        <button
-          type="button"
-          onClick={() => shift(1)}
-          disabled={isFuture}
-          className="flex items-center justify-center w-12 bg-sky-600 active:bg-sky-700 transition-colors text-white shrink-0 disabled:bg-zinc-800 disabled:text-zinc-600 cursor-pointer"
-          aria-label="Следующий период"
-        >
-          <span className="text-xl font-black select-none">→</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => shift(1)}
+            disabled={isFuture}
+            className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-black flex items-center justify-center shadow-2xs cursor-pointer disabled:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+            aria-label="Следующий период"
+          >
+            ▶
+          </button>
+        </div>
       </div>
+
+      {/* Быстрые месяцы (Светлые пилюли) */}
+      {period === 'month' && (
+        <div className="flex gap-1 px-2 pb-2 text-[10px] font-bold uppercase">
+          {months.map((m) => {
+            const active = curYear === m.year && curMonth === m.month;
+            return (
+              <button
+                key={`${m.year}-${m.month}`}
+                type="button"
+                onClick={() => goMonth(m.year, m.month)}
+                className={cn(
+                  'flex-1 py-1 rounded-md text-[10px] font-black transition-all cursor-pointer',
+                  active
+                    ? 'bg-sky-600 text-white shadow-2xs'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80',
+                )}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Поиск по номеру рейса */}
       {onTripSearchChange && (
-        <div className="px-3 py-1.5 bg-zinc-800/80 border-t border-zinc-700/60 flex items-center gap-2">
-          <div className="relative flex-1 flex items-center">
-            <span className="material-symbols-outlined absolute left-2.5 text-zinc-400 text-[16px] pointer-events-none select-none">
+        <div className="px-2 pb-2">
+          <div className="relative flex items-center">
+            <span className="material-symbols-outlined absolute left-2.5 text-slate-400 text-[16px] pointer-events-none select-none">
               search
             </span>
             <input
@@ -257,113 +361,614 @@ function DateNav({
               value={tripSearch}
               onChange={(e) => onTripSearchChange(e.target.value)}
               placeholder="Поиск по № рейса..."
-              className="w-full pl-8 pr-7 py-1 bg-zinc-900 border border-zinc-700 focus:border-sky-500 rounded-lg text-xs font-bold text-white placeholder:text-zinc-500 outline-none"
+              className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 focus:border-sky-500 focus:bg-white rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 outline-none transition-all"
             />
             {tripSearch && (
               <button
                 type="button"
                 onClick={() => onTripSearchChange('')}
-                className="absolute right-2 text-zinc-400 hover:text-white text-xs font-bold p-0.5 cursor-pointer"
-                title="Очистить поиск"
+                className="absolute right-2.5 text-slate-400 hover:text-slate-600 font-black text-sm cursor-pointer"
               >
-                ✕
+                ×
               </button>
             )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Быстрые кнопки месяцев */}
-      <div className="flex border-t border-zinc-800">
-        {months.map((m) => {
-          const active = m.month === curMonth && m.year === curYear;
-          return (
-            <button
-              key={`${m.year}-${m.month}`}
-              type="button"
-              onClick={() => {
-                goMonth(m.year, m.month);
-              }}
-              className={cn(
-                'flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors border-r border-zinc-800 last:border-r-0 cursor-pointer',
-                active
-                  ? 'bg-sky-600 text-white font-black'
-                  : 'text-zinc-500 active:bg-zinc-800 active:text-zinc-200 hover:text-zinc-300',
-              )}
-            >
-              {m.label}
-            </button>
-          );
-        })}
+// ── Тип сгруппированной машины ──────────────────────────────
+
+interface VehicleGroup {
+  assetKey: string;
+  assetName: string;
+  regNumber: string;
+  isPrr: boolean;
+  trips: any[];
+  serviceOrders: any[];
+  tripsRevenue: number;
+  tripsPayroll: number;
+  driverPayroll: number;
+  loaderPayroll: number;
+  loaderProfit: number;
+  tripsFuel: number;
+  tripsExpenses: number;
+  tripsProfit: number;
+  maintenanceParts: number;
+  maintenanceSalary: number;
+  maintenanceTotal: number;
+  netProfit: number;
+}
+
+// ── Сводная карточка автопарка (Светлый Финтех) ───────────────
+
+function FleetHistorySummary({
+  totalRevenue,
+  totalPayroll,
+  totalFuel,
+  totalMaintenance,
+  totalNetProfit,
+  tripsCount,
+  ordersCount,
+}: {
+  totalRevenue: number;
+  totalPayroll: number;
+  totalFuel: number;
+  totalMaintenance: number;
+  totalNetProfit: number;
+  tripsCount: number;
+  ordersCount: number;
+}) {
+  return (
+    <div className="p-2.5">
+      <div className="bg-white rounded-2xl border-2 border-slate-200/90 p-2.5 shadow-xs space-y-1.5">
+        <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-wider text-slate-500 pb-1 border-b border-slate-100">
+          <span>
+            ИТОГО АВТОПАРК · {tripsCount} РЕЙС{tripsCount === 1 ? '' : tripsCount < 5 ? 'А' : 'ОВ'}{' '}
+            · {ordersCount} ТО
+          </span>
+          <span
+            className={cn(
+              'font-black px-1.5 py-0.5 rounded border text-[9px]',
+              totalNetProfit >= 0
+                ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                : 'text-rose-700 bg-rose-50 border-rose-200',
+            )}
+          >
+            {totalNetProfit >= 0 ? '+' : ''}
+            {Math.round(totalNetProfit).toLocaleString('ru-RU')} ₽ ЧИСТЫМИ
+          </span>
+        </div>
+        <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
+          <div className="bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+            <span className="text-[7px] text-slate-400 font-bold block uppercase">Выручка</span>
+            <span className="font-black text-slate-900 text-xs sm:text-sm">
+              {Math.round(totalRevenue).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+          <div className="bg-amber-50/60 p-1.5 rounded-xl border border-amber-100">
+            <span className="text-[7px] text-amber-600 font-bold block uppercase">ЗП (ФОТ)</span>
+            <span className="font-black text-amber-600 text-xs sm:text-sm">
+              {Math.round(totalPayroll).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+          <div className="bg-rose-50/60 p-1.5 rounded-xl border border-rose-100">
+            <span className="text-[7px] text-rose-600 font-bold block uppercase">ГСМ</span>
+            <span className="font-black text-rose-600 text-xs sm:text-sm">
+              {Math.round(totalFuel).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+          <div className="bg-rose-50 p-1.5 rounded-xl border border-rose-200">
+            <span className="text-[7px] text-rose-700 font-bold block uppercase">Ремонт ТО</span>
+            <span className="font-black text-rose-700 text-xs sm:text-sm">
+              {totalMaintenance > 0
+                ? `−${Math.round(totalMaintenance).toLocaleString('ru-RU')} ₽`
+                : '0 ₽'}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Итоги за выбранный период ───────────────────────────────
+// ── Карточка машины в режиме История (Ультра 1-Line / Плотный вид) ─
 
-function DailyTotals({
-  trips,
-  period = 'day',
-}: {
-  trips: any[];
-  period?: 'day' | 'week' | 'month';
-}) {
-  const totalRevenue = trips.reduce((s, t) => s + calcTrip(t).revenue, 0);
-  const totalCosts = trips.reduce((s, t) => {
-    const c = calcTrip(t);
-    return s + c.driverPay + c.loaderPay + c.totalExpenses;
-  }, 0);
-  const totalProfit = trips.reduce((s, t) => s + calcTrip(t).profit, 0);
-
-  const titlePrefix =
-    period === 'month' ? 'Итого за месяц' : period === 'week' ? 'Итого за неделю' : 'Итого за день';
-
+function VehicleGroupCard({ group, onClick }: { group: VehicleGroup; onClick: () => void }) {
   return (
-    <div className="mx-4 mb-4 rounded-2xl bg-zinc-900 text-white overflow-hidden">
-      <div className="px-4 py-2 border-b border-zinc-800">
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-          {titlePrefix} · {trips.length} рейс
-          {trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}
-        </span>
-      </div>
-      <div className="flex px-4 py-3 gap-0">
-        <div className="flex-1 text-center">
-          <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">
-            Выручка
-          </p>
-          <p className="font-black text-white text-sm">
-            <Money amount={totalRevenue.toFixed(2)} />
-          </p>
-        </div>
-        <div className="text-zinc-700 flex items-center text-sm px-1">−</div>
-        <div className="flex-1 text-center">
-          <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">
-            Расходы
-          </p>
-          <p className="font-black text-rose-400 text-sm">
-            <Money amount={totalCosts.toFixed(2)} />
-          </p>
-        </div>
-        <div className="text-zinc-700 flex items-center text-sm px-1">=</div>
-        <div className="flex-1 text-center">
-          <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">
-            Прибыль
-          </p>
-          <p
+    <div
+      onClick={onClick}
+      className="bg-white border border-slate-200 hover:border-sky-300 rounded-2xl p-2.5 shadow-2xs cursor-pointer transition-all active:scale-[0.99] space-y-1.5"
+    >
+      {/* Строка 1: Машина, чипы и Прибыль */}
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div
             className={cn(
-              'font-black text-base',
-              totalProfit > 0
-                ? 'text-emerald-400'
-                : totalProfit < 0
-                  ? 'text-rose-400'
-                  : 'text-zinc-400',
+              'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm',
+              group.isPrr ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-600',
             )}
           >
-            {totalProfit < 0 ? '−' : ''}
-            <Money amount={Math.abs(totalProfit).toFixed(2)} />
-          </p>
+            {group.isPrr ? '👷' : '🚚'}
+          </div>
+          <div className="min-w-0 truncate">
+            <div className="flex items-center gap-1">
+              <span className="font-black text-slate-900 text-xs truncate">{group.assetName}</span>
+              {group.regNumber && (
+                <span className="text-[10px] text-slate-400 font-semibold truncate shrink-0">
+                  ({group.regNumber})
+                </span>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* Справа: ЧИСТАЯ ПРИБЫЛЬ */}
+        <div className="flex items-center gap-1 shrink-0">
+          <div className="text-right">
+            <span className="text-[7px] font-bold uppercase tracking-wider text-slate-400 block leading-none">
+              Прибыль
+            </span>
+            <span
+              className={cn(
+                'text-xs font-black',
+                group.netProfit > 0
+                  ? 'text-emerald-600'
+                  : group.netProfit < 0
+                    ? 'text-rose-600'
+                    : 'text-slate-500',
+              )}
+            >
+              {group.netProfit > 0 ? '+' : ''}
+              {Math.round(group.netProfit).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+          <span className="text-slate-300 text-sm font-bold pl-0.5">›</span>
+        </div>
+      </div>
+
+      {/* Строка 2: Чипы рейсов/ТО слева + 4 метрики (Выручка, ЗП, ГСМ, ТО) */}
+      <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100 text-[10px]">
+        {/* Бейджи рейсов и нарядов ТО */}
+        <div className="flex items-center gap-1 shrink-0">
+          {group.trips.length > 0 && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-100 font-bold text-[9px]">
+              <span>📋</span>
+              <span>{group.trips.length}р</span>
+            </span>
+          )}
+          {group.serviceOrders.length > 0 && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[9px]">
+              <span>🔧</span>
+              <span>{group.serviceOrders.length} ТО</span>
+            </span>
+          )}
+          {group.trips.length === 0 && group.serviceOrders.length === 0 && (
+            <span className="text-slate-400 text-[9px]">Нет рейсов</span>
+          )}
+        </div>
+
+        {/* Метрики в строку: Выручка · ЗП · ГСМ · ТО */}
+        <div className="flex items-center gap-1.5 shrink-0 text-right">
+          <div title="Выручка">
+            <span className="text-[7px] text-slate-400 block font-bold uppercase leading-none">
+              Выр
+            </span>
+            <span className="font-bold text-slate-800 text-[10px]">
+              {Math.round(group.tripsRevenue).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+
+          <div title="Зарплата (ФОТ)">
+            <span className="text-[7px] text-amber-600 block font-bold uppercase leading-none">
+              ЗП
+            </span>
+            <span className="font-bold text-amber-600 text-[10px]">
+              {Math.round(group.tripsPayroll).toLocaleString('ru-RU')} ₽
+            </span>
+          </div>
+
+          {!group.isPrr && (
+            <div title="ГСМ">
+              <span className="text-[7px] text-rose-500 block font-bold uppercase leading-none">
+                ГСМ
+              </span>
+              <span className="font-bold text-rose-600 text-[10px]">
+                {Math.round(group.tripsFuel).toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
+          )}
+
+          {group.maintenanceTotal > 0 && (
+            <div
+              className="bg-rose-50 border border-rose-200 px-1 py-0.2 rounded"
+              title="Ремонт ТО"
+            >
+              <span className="text-[7px] text-rose-700 block font-bold uppercase leading-none">
+                ТО
+              </span>
+              <span className="font-black text-rose-700 text-[10px]">
+                −{Math.round(group.maintenanceTotal).toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
+          )}
+
+          {group.isPrr && group.loaderProfit > 0 && (
+            <div
+              className="bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded"
+              title="Маржа компании 30%"
+            >
+              <span className="text-[7px] text-emerald-700 block font-bold uppercase leading-none">
+                Маржа
+              </span>
+              <span className="font-black text-emerald-700 text-[10px]">
+                +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Мобильная шторка (Bottom Sheet) детализации по машине / ПРР ────
+
+function VehicleDetailSheet({
+  group,
+  onClose,
+  onEditTrip,
+}: {
+  group: VehicleGroup;
+  onClose: () => void;
+  onEditTrip: (trip: any) => void;
+}) {
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col justify-end"
+      style={{
+        background: 'rgba(0,0,0,0.5)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 56px)',
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="bg-slate-50 rounded-t-3xl shadow-2xl flex flex-col"
+        style={
+          {
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            maxHeight: 'calc(100vh - 70px)',
+          } as React.CSSProperties
+        }
+      >
+        {/* Хэндл шторки */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-slate-300 rounded-full" />
+        </div>
+
+        {/* Заголовок */}
+        <div className="px-4 py-3 bg-white border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              className={cn(
+                'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-lg',
+                group.isPrr ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-600',
+              )}
+            >
+              {group.isPrr ? '👷' : '🚚'}
+            </div>
+            <div className="min-w-0 truncate">
+              <h2 className="font-black text-slate-900 text-sm truncate">{group.assetName}</h2>
+              {group.regNumber && (
+                <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                  Госномер: {group.regNumber}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 text-xl font-bold cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Финансовый срез */}
+        <div className="p-3">
+          <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-xs space-y-2">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                Финансовый результат
+              </span>
+              <span
+                className={cn(
+                  'px-2 py-0.5 rounded-md font-black text-xs border',
+                  group.netProfit >= 0
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-rose-50 text-rose-700 border-rose-200',
+                )}
+              >
+                {group.netProfit >= 0 ? '+' : ''}
+                {Math.round(group.netProfit).toLocaleString('ru-RU')} ₽ ЧИСТЫМИ
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                <span className="text-[9px] text-slate-400 font-bold uppercase block">Выручка</span>
+                <span className="font-black text-slate-900 text-sm">
+                  {Math.round(group.tripsRevenue).toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              <div className="bg-amber-50/50 p-2 rounded-xl border border-amber-100">
+                <span className="text-[9px] text-amber-600 font-bold uppercase block">
+                  ФОТ (ЗП)
+                </span>
+                <span className="font-black text-amber-600 text-sm">
+                  {Math.round(group.tripsPayroll).toLocaleString('ru-RU')} ₽
+                </span>
+                <span className="text-[9px] text-slate-400 block mt-0.5">
+                  Водитель: {Math.round(group.driverPayroll).toLocaleString('ru-RU')} ₽ · Грузчики:{' '}
+                  {Math.round(group.loaderPayroll).toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              {!group.isPrr && (
+                <div className="bg-rose-50/50 p-2 rounded-xl border border-rose-100">
+                  <span className="text-[9px] text-rose-600 font-bold uppercase block">ГСМ</span>
+                  <span className="font-black text-rose-600 text-sm">
+                    {Math.round(group.tripsFuel).toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+              )}
+              {!group.isPrr && (
+                <div className="bg-rose-50/50 p-2 rounded-xl border border-rose-200">
+                  <span className="text-[9px] text-rose-700 font-bold uppercase block">
+                    Ремонт ТО (Гараж)
+                  </span>
+                  <span className="font-black text-rose-700 text-sm">
+                    {group.maintenanceTotal > 0
+                      ? `−${Math.round(group.maintenanceTotal).toLocaleString('ru-RU')} ₽`
+                      : '0 ₽'}
+                  </span>
+                  {group.maintenanceTotal > 0 && (
+                    <span className="text-[9px] text-slate-400 block mt-0.5">
+                      Запчасти: {Math.round(group.maintenanceParts).toLocaleString('ru-RU')} ₽ ·
+                      Работы: {Math.round(group.maintenanceSalary).toLocaleString('ru-RU')} ₽
+                    </span>
+                  )}
+                </div>
+              )}
+              {group.isPrr && (
+                <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-200 col-span-2">
+                  <span className="text-[9px] text-emerald-700 font-bold uppercase block">
+                    Маржа компании с грузчиков (30%)
+                  </span>
+                  <span className="font-black text-emerald-700 text-sm">
+                    +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Список рейсов */}
+        {group.trips.length > 0 && (
+          <div className="px-3 pb-3 space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-600">
+                Рейсы ({group.trips.length})
+              </span>
+            </div>
+            {group.trips.map((trip: any) => {
+              const ct = calcTrip(trip);
+              const isExp = expandedTripId === trip.id;
+              return (
+                <div
+                  key={trip.id}
+                  className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-2xs space-y-1.5"
+                >
+                  <div
+                    onClick={() => setExpandedTripId(isExp ? null : trip.id)}
+                    className="flex items-center justify-between cursor-pointer"
+                  >
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-slate-900 text-xs">
+                          Рейс #{trip.trip_number}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {formatDate(trip.started_at || trip.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                        {trip.driver?.name || 'Водитель не назначен'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[8px] font-bold text-slate-400 block uppercase">
+                        Прибыль
+                      </span>
+                      <span
+                        className={cn(
+                          'text-xs font-black',
+                          ct.profit >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                        )}
+                      >
+                        {ct.profit >= 0 ? '+' : ''}
+                        {Math.round(ct.profit).toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Краткая строка метрик */}
+                  <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100 text-slate-600">
+                    <span>
+                      Выр:{' '}
+                      <b className="text-slate-800">
+                        {Math.round(ct.revenue).toLocaleString('ru-RU')} ₽
+                      </b>
+                    </span>
+                    <span>
+                      ЗП:{' '}
+                      <b className="text-amber-600">
+                        {Math.round(ct.driverPay + ct.loaderPay).toLocaleString('ru-RU')} ₽
+                      </b>
+                    </span>
+                    <span>
+                      ГСМ:{' '}
+                      <b className="text-rose-600">
+                        {Math.round(ct.fuelExpense).toLocaleString('ru-RU')} ₽
+                      </b>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTrip(trip);
+                      }}
+                      className="text-sky-600 hover:underline font-bold text-[10px] cursor-pointer"
+                    >
+                      ✏️ Изм.
+                    </button>
+                  </div>
+
+                  {/* Раскрывающийся список заявок рейса */}
+                  {isExp && ct.activeOrders.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100 space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Заявки рейса ({ct.activeOrders.length}):
+                      </span>
+                      {ct.activeOrders.map((o: any, idx: number) => (
+                        <div
+                          key={o.id || idx}
+                          className="bg-slate-50 p-2 rounded-lg text-[11px] flex items-center justify-between"
+                        >
+                          <div>
+                            <span className="font-bold text-slate-800 block">
+                              #{idx + 1} {o.counterparty_name || o.counterparty?.name || 'Клиент'}
+                            </span>
+                            {o.address_to && (
+                              <span className="text-[9px] text-slate-500 block truncate max-w-[200px]">
+                                {o.address_to}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <span className="font-black text-slate-900 block">
+                              {Math.round(parseFloat(o.amount || '0')).toLocaleString('ru-RU')} ₽
+                            </span>
+                            <span className="text-[9px] text-slate-500 block">
+                              ЗП вод:{' '}
+                              {Math.round(parseFloat(o.driver_pay || '0')).toLocaleString('ru-RU')}{' '}
+                              ₽
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Список заказ-нарядов ТО */}
+        {group.serviceOrders.length > 0 && (
+          <div className="px-3 pb-3 space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-rose-700">
+                Заказ-наряды ТО ({group.serviceOrders.length})
+              </span>
+            </div>
+            {group.serviceOrders.map((order: any) => {
+              const cso = calcServiceOrder(order);
+              const isExp = expandedOrderId === order.id;
+              return (
+                <div
+                  key={order.id}
+                  className="bg-white rounded-xl border border-rose-200 p-2.5 shadow-2xs space-y-1.5"
+                >
+                  <div
+                    onClick={() => setExpandedOrderId(isExp ? null : order.id)}
+                    className="flex items-center justify-between cursor-pointer"
+                  >
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-rose-800 text-xs">
+                          Наряд #{order.order_number || order.id?.slice(0, 6)}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {formatDate(order.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-0.5 line-clamp-1">
+                        {order.problem_description || 'Ремонт / ТО'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[8px] font-bold text-slate-400 block uppercase">
+                        Сумма ТО
+                      </span>
+                      <span className="text-xs font-black text-rose-600">
+                        −{Math.round(cso.totalCost).toLocaleString('ru-RU')} ₽
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] pt-1 border-t border-rose-100 text-slate-600">
+                    <span>
+                      Запчасти:{' '}
+                      <b className="text-slate-800">
+                        {Math.round(cso.partsCost).toLocaleString('ru-RU')} ₽
+                      </b>
+                    </span>
+                    <span>
+                      Работы:{' '}
+                      <b className="text-slate-800">
+                        {Math.round(cso.salaryCost).toLocaleString('ru-RU')} ₽
+                      </b>
+                    </span>
+                    <span className="text-slate-500">{order.mechanic?.name || 'Механик'}</span>
+                  </div>
+
+                  {isExp && order.parts && order.parts.length > 0 && (
+                    <div className="pt-2 border-t border-rose-100 space-y-1">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Установленные запчасти:
+                      </span>
+                      {order.parts.map((p: any, idx: number) => (
+                        <div
+                          key={p.id || idx}
+                          className="bg-rose-50/50 p-1.5 rounded-lg text-[10px] flex items-center justify-between"
+                        >
+                          <span className="text-slate-700">
+                            {p.custom_part_name || p.part?.name || 'Деталь'} ({p.quantity || 1} шт)
+                          </span>
+                          <span className="font-bold text-rose-700">
+                            {Math.round(
+                              (parseFloat(p.unit_price || p.price || 0) || 0) *
+                                (parseFloat(p.quantity || 1) || 1),
+                            ).toLocaleString('ru-RU')}{' '}
+                            ₽
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1769,7 +2374,7 @@ function TripsContent() {
 
   const today = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
+  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('month');
   const [tripSearch, setTripSearch] = useState('');
   const searchTripNumber = tripSearch.trim().replace(/[^0-9]/g, '');
   const [editTrip, setEditTrip] = useState<any>(null);
@@ -1785,13 +2390,6 @@ function TripsContent() {
     staleTime: 30000,
   });
 
-  // Автоматическое переключение на Авто при поиске рейса
-  useEffect(() => {
-    if (filter === 'history' && searchTripNumber.length > 0 && section !== 'auto') {
-      setSection('auto');
-    }
-  }, [filter, searchTripNumber, section]);
-
   // Запрос для review/active (Авто)
   const { data: simpleTrips = [], isLoading: simpleLoading } = useQuery<any[]>({
     queryKey: ['admin-trips', filter],
@@ -1801,7 +2399,7 @@ function TripsContent() {
     refetchInterval: 30000,
   });
 
-  // Запрос для history (Авто)
+  // Запрос для history (Авто - все рейсы за период для статистики)
   const { data: historyTrips = [], isLoading: historyLoading } = useQuery<any[]>({
     queryKey: ['admin-trips-history', selectedDate, period],
     queryFn: () => {
@@ -1816,7 +2414,7 @@ function TripsContent() {
       }
       return fetch(url).then((r) => r.json());
     },
-    enabled: filter === 'history' && section === 'auto',
+    enabled: filter === 'history',
     staleTime: 30000,
   });
 
@@ -1829,7 +2427,7 @@ function TripsContent() {
     refetchInterval: 30000,
   });
 
-  // Запрос для history (Гараж)
+  // Запрос для history (Гараж - все наряды за период для статистики)
   const { data: historyOrders = [], isLoading: ordersHistoryLoading } = useQuery<any[]>({
     queryKey: ['admin-service-orders-history', selectedDate, period],
     queryFn: () => {
@@ -1844,9 +2442,138 @@ function TripsContent() {
       }
       return fetch(url).then((r) => r.json());
     },
-    enabled: filter === 'history' && section === 'garage',
+    enabled: filter === 'history',
     staleTime: 30000,
   });
+
+  // Группировка рейсов и заказ-нарядов по машинам (для режима История)
+  const vehicleGroups = useMemo<VehicleGroup[]>(() => {
+    if (filter !== 'history') return [];
+
+    const map = new Map<string, VehicleGroup>();
+    const safeTrips = Array.isArray(historyTrips) ? historyTrips : [];
+    const safeOrders = Array.isArray(historyOrders) ? historyOrders : [];
+
+    for (const t of safeTrips) {
+      const isPrr =
+        t.asset?.reg_number === 'БЕЗ АВТО' || t.asset?.short_name === 'БЕЗ АВТО' || !t.asset;
+      const assetKey = isPrr
+        ? '👷 ПРР (без авто)'
+        : `${t.asset.short_name} (${t.asset.reg_number})`;
+
+      if (!map.has(assetKey)) {
+        map.set(assetKey, {
+          assetKey,
+          assetName: isPrr ? '👷 ПРР' : t.asset.short_name || 'Машина',
+          regNumber: isPrr ? 'без авто' : t.asset.reg_number || '',
+          isPrr,
+          trips: [],
+          serviceOrders: [],
+          tripsRevenue: 0,
+          tripsPayroll: 0,
+          driverPayroll: 0,
+          loaderPayroll: 0,
+          loaderProfit: 0,
+          tripsFuel: 0,
+          tripsExpenses: 0,
+          tripsProfit: 0,
+          maintenanceParts: 0,
+          maintenanceSalary: 0,
+          maintenanceTotal: 0,
+          netProfit: 0,
+        });
+      }
+      const g = map.get(assetKey)!;
+      g.trips.push(t);
+      const ct = calcTrip(t);
+      g.tripsRevenue += ct.revenue;
+      g.tripsPayroll += ct.driverPay + ct.loaderPay;
+      g.driverPayroll += ct.driverPay;
+      g.loaderPayroll += ct.loaderPay;
+      g.loaderProfit += calcLoaderProfit(t);
+      g.tripsFuel += ct.fuelExpense;
+      g.tripsExpenses += ct.totalExpenses;
+      g.tripsProfit += ct.profit;
+    }
+
+    for (const so of safeOrders) {
+      if (so.machine_type !== 'own' || !so.asset) continue;
+      const assetKey = `${so.asset.short_name ?? 'Свой ТС'} (${so.asset.reg_number ?? ''})`;
+      if (!map.has(assetKey)) {
+        map.set(assetKey, {
+          assetKey,
+          assetName: so.asset.short_name ?? 'Свой ТС',
+          regNumber: so.asset.reg_number ?? '',
+          isPrr: false,
+          trips: [],
+          serviceOrders: [],
+          tripsRevenue: 0,
+          tripsPayroll: 0,
+          driverPayroll: 0,
+          loaderPayroll: 0,
+          loaderProfit: 0,
+          tripsFuel: 0,
+          tripsExpenses: 0,
+          tripsProfit: 0,
+          maintenanceParts: 0,
+          maintenanceSalary: 0,
+          maintenanceTotal: 0,
+          netProfit: 0,
+        });
+      }
+      const g = map.get(assetKey)!;
+      g.serviceOrders.push(so);
+      const cso = calcServiceOrder(so);
+      g.maintenanceParts += cso.partsCost;
+      g.maintenanceSalary += cso.salaryCost;
+      g.maintenanceTotal += cso.totalCost;
+    }
+
+    const groups = Array.from(map.values()).map((g) => {
+      g.netProfit = g.tripsProfit - g.maintenanceTotal;
+      return g;
+    });
+
+    return groups.sort((a, b) => {
+      if (a.isPrr) return 1;
+      if (b.isPrr) return -1;
+      return a.assetKey.localeCompare(b.assetKey);
+    });
+  }, [filter, historyTrips, historyOrders]);
+
+  const totalFleetRevenue = useMemo(
+    () => vehicleGroups.reduce((s, g) => s + g.tripsRevenue, 0),
+    [vehicleGroups],
+  );
+  const totalFleetPayroll = useMemo(
+    () => vehicleGroups.reduce((s, g) => s + g.tripsPayroll, 0),
+    [vehicleGroups],
+  );
+  const totalFleetFuel = useMemo(
+    () => vehicleGroups.reduce((s, g) => s + g.tripsFuel, 0),
+    [vehicleGroups],
+  );
+  const totalFleetMaintenance = useMemo(
+    () => vehicleGroups.reduce((s, g) => s + g.maintenanceTotal, 0),
+    [vehicleGroups],
+  );
+  const totalFleetNetProfit = useMemo(
+    () => vehicleGroups.reduce((s, g) => s + g.netProfit, 0),
+    [vehicleGroups],
+  );
+  const totalFleetTripsCount = useMemo(
+    () => vehicleGroups.reduce((s, g) => s + g.trips.length, 0),
+    [vehicleGroups],
+  );
+  const totalFleetOrdersCount = useMemo(
+    () => vehicleGroups.reduce((s, g) => s + g.serviceOrders.length, 0),
+    [vehicleGroups],
+  );
+
+  const [selectedGroup, setSelectedGroup] = useState<VehicleGroup | null>(null);
+  const activeSelectedGroup = selectedGroup
+    ? vehicleGroups.find((g) => g.assetKey === selectedGroup.assetKey) || selectedGroup
+    : null;
 
   const trips =
     filter === 'history' ? (searchTripNumber.length > 0 ? searchTrips : historyTrips) : simpleTrips;
@@ -2122,52 +2849,103 @@ function TripsContent() {
           onChange={setSelectedDate}
           setPeriod={setPeriod}
           tripSearch={tripSearch}
-          onTripSearchChange={setTripSearch}
+          onTripSearchChange={(val) => {
+            setTripSearch(val);
+            if (val.trim().length > 0 && section !== 'auto') {
+              setSection('auto');
+            }
+          }}
         />
       )}
 
       {/* Информационный бейдж активного поиска по номеру рейса */}
       {filter === 'history' && searchTripNumber.length > 0 && (
-        <div className="mx-4 mt-2 px-3 py-1.5 rounded-xl bg-sky-950/60 border border-sky-800/60 text-xs flex items-center justify-between text-sky-200">
+        <div className="mx-4 mt-2 px-3 py-1.5 rounded-xl bg-sky-50 border border-sky-200 text-xs flex items-center justify-between text-sky-800">
           <span>
             🔍 Рейс №{searchTripNumber} (найдено: {searchTrips.length})
           </span>
           <button
             type="button"
             onClick={() => setTripSearch('')}
-            className="text-[10px] font-bold text-sky-400 hover:underline"
+            className="text-[10px] font-bold text-sky-600 hover:underline cursor-pointer"
           >
             ✕ Сбросить
           </button>
         </div>
       )}
 
-      {/* Контент: АВТО vs ГАРАЖ */}
+      {/* Контент: АВТО vs ГАРАЖ vs ИСТОРИЯ СТАТИСТИКА ПО МАШИНАМ */}
       {isLoading ? (
         <Skeleton />
+      ) : filter === 'history' && searchTripNumber.length > 0 ? (
+        /* Если админ ищет конкретный рейс по номеру в истории */
+        searchTrips.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-zinc-400">
+            <span className="text-5xl mb-4">🔍</span>
+            <p className="font-bold uppercase tracking-widest text-sm">
+              Рейс №{searchTripNumber} не найден
+            </p>
+          </div>
+        ) : (
+          <div className="p-4 space-y-3">
+            {searchTrips.map((trip: any) => (
+              <HistoryTripCard
+                key={trip.id}
+                trip={trip}
+                onEdit={(t) => setEditTrip(t)}
+                onApprove={handleApprove}
+                onReturn={handleReturn}
+                onDelete={handleDelete}
+                approving={approvingId === trip.id}
+              />
+            ))}
+          </div>
+        )
+      ) : filter === 'history' ? (
+        /* Режим История: Светлый Финтех со статистикой по машинам */
+        vehicleGroups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-zinc-400">
+            <span className="text-5xl mb-4">📅</span>
+            <p className="font-bold uppercase tracking-widest text-sm">
+              Нет данных за выбранный период
+            </p>
+          </div>
+        ) : (
+          <>
+            <FleetHistorySummary
+              totalRevenue={totalFleetRevenue}
+              totalPayroll={totalFleetPayroll}
+              totalFuel={totalFleetFuel}
+              totalMaintenance={totalFleetMaintenance}
+              totalNetProfit={totalFleetNetProfit}
+              tripsCount={totalFleetTripsCount}
+              ordersCount={totalFleetOrdersCount}
+            />
+
+            <div className="px-3 pb-6 space-y-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 flex items-center justify-between">
+                <span>Машины автопарка ({vehicleGroups.length})</span>
+                <span className="text-[9px] text-sky-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                  Тап для деталей
+                </span>
+              </div>
+
+              {vehicleGroups.map((group) => (
+                <VehicleGroupCard
+                  key={group.assetKey}
+                  group={group}
+                  onClick={() => setSelectedGroup(group)}
+                />
+              ))}
+            </div>
+          </>
+        )
       ) : section === 'auto' ? (
         trips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-zinc-400">
             <span className="text-5xl mb-4">{emptyIcon}</span>
             <p className="font-bold uppercase tracking-widest text-sm">{emptyLabel}</p>
           </div>
-        ) : filter === 'history' ? (
-          <>
-            <div className="p-4 space-y-3">
-              {trips.map((trip: any) => (
-                <HistoryTripCard
-                  key={trip.id}
-                  trip={trip}
-                  onEdit={(t) => setEditTrip(t)}
-                  onApprove={handleApprove}
-                  onReturn={handleReturn}
-                  onDelete={handleDelete}
-                  approving={approvingId === trip.id}
-                />
-              ))}
-            </div>
-            <DailyTotals trips={trips} period={period} />
-          </>
         ) : (
           <div className="p-4 space-y-3">
             {trips.map((trip: any) =>
@@ -2206,6 +2984,15 @@ function TripsContent() {
             />
           ))}
         </div>
+      )}
+
+      {/* Bottom Sheet детализации по машине / ПРР */}
+      {activeSelectedGroup && (
+        <VehicleDetailSheet
+          group={activeSelectedGroup}
+          onClose={() => setSelectedGroup(null)}
+          onEditTrip={(trip) => setEditTrip(trip)}
+        />
       )}
 
       {/* Модал редактирования рейса */}
