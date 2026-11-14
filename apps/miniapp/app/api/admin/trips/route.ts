@@ -65,7 +65,7 @@ export async function GET(request: Request) {
         )
       `,
       )
-      .neq('lifecycle_status', 'cancelled')
+      .eq('lifecycle_status', 'approved')
       .order('started_at', { ascending: false })
       .limit(500);
 

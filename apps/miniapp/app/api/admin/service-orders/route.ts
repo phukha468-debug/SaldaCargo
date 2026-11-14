@@ -54,20 +54,28 @@ export async function GET(request: Request) {
     } else if (filter === 'active') {
       q = q.in('status', ['created', 'in_progress']).neq('lifecycle_status', 'cancelled');
     } else if (filter === 'history') {
-      q = q.neq('lifecycle_status', 'cancelled').limit(500);
+      q = q.eq('lifecycle_status', 'approved').limit(500);
       if (month) {
-        const parts = month.split('-');
-        const y = parseInt(parts[0]!, 10);
-        const m = parseInt(parts[1]!, 10);
-        const start = new Date(Date.UTC(y, m - 1, 1)).toISOString();
-        const end = new Date(Date.UTC(y, m, 1)).toISOString();
-        q = q.gte('created_at', start).lt('created_at', end);
+        const [yStr, mStr] = month.split('-');
+        const y = Number(yStr);
+        const m = Number(mStr);
+        if (!isNaN(y) && !isNaN(m)) {
+          const start = `${month}-01T00:00:00.000Z`;
+          const nextM = m === 12 ? 1 : m + 1;
+          const nextY = m === 12 ? y + 1 : y;
+          const end = `${nextY}-${String(nextM).padStart(2, '0')}-01T00:00:00.000Z`;
+          q = q.or(
+            `and(created_at.gte.${start},created_at.lt.${end}),and(updated_at.gte.${start},updated_at.lt.${end})`,
+          );
+        }
       } else if (weekStart && weekEnd) {
-        q = q.gte('created_at', `${weekStart}T00:00:00Z`).lte('created_at', `${weekEnd}T23:59:59Z`);
+        q = q.or(
+          `and(created_at.gte.${weekStart}T00:00:00Z,created_at.lte.${weekEnd}T23:59:59Z),and(updated_at.gte.${weekStart}T00:00:00Z,updated_at.lte.${weekEnd}T23:59:59Z)`,
+        );
       } else if (date) {
-        q = q.gte('created_at', `${date}T00:00:00Z`).lte('created_at', `${date}T23:59:59Z`);
-      } else {
-        q = q.eq('lifecycle_status', 'approved');
+        q = q.or(
+          `and(created_at.gte.${date}T00:00:00Z,created_at.lte.${date}T23:59:59Z),and(updated_at.gte.${date}T00:00:00Z,updated_at.lte.${date}T23:59:59Z)`,
+        );
       }
     }
 
@@ -94,6 +102,14 @@ export async function GET(request: Request) {
           (txByOrder.get(t.service_order_id) ?? 0) + (parseFloat(t.amount ?? '0') || 0),
         );
       }
+    }
+
+    function getOrderEffectiveDate(o: any) {
+      const dates = extractOrderDates(o);
+      if (dates.completed_at) return dates.completed_at;
+      if (dates.started_at) return dates.started_at;
+      if (o.status === 'completed' && o.updated_at) return o.updated_at;
+      return o.created_at;
     }
 
     const enriched = orders.map((o: any) => {
@@ -137,11 +153,15 @@ export async function GET(request: Request) {
         Boolean(o.mechanic_note && o.mechanic_note.includes('[Запчасти предоставил автосервис]'));
 
       const orderDates = extractOrderDates(o);
+      const effectiveDate = getOrderEffectiveDate(o);
 
       return {
         ...o,
         started_at: orderDates.started_at,
         completed_at: orderDates.completed_at,
+        effective_date: effectiveDate,
+        raw_mechanic_pay: o.mechanic_pay,
+        second_mechanic_pay: o.second_mechanic_pay,
         mechanic_note: cleanOrderNotes(o.mechanic_note),
         admin_note: cleanOrderNotes(o.admin_note),
         hourly_rate: hourlyRate,
@@ -151,12 +171,30 @@ export async function GET(request: Request) {
         parts_total: partsSum.toFixed(2),
         order_total: (worksClientSum + partsSum).toFixed(2),
         estimated_pay: estimatedPay.toFixed(2),
-        mechanic_pay: effectivePay.toFixed(2),
+        mechanic_pay: o.mechanic_pay != null ? o.mechanic_pay : effectivePay.toFixed(2),
         parts_provided_by_service: partsFromService,
       };
     });
 
-    return NextResponse.json(enriched);
+    let finalOrders = enriched;
+    if (filter === 'history') {
+      if (date) {
+        finalOrders = finalOrders.filter(
+          (o: any) => (o.effective_date || o.created_at)?.slice(0, 10) === date,
+        );
+      } else if (weekStart && weekEnd) {
+        finalOrders = finalOrders.filter((o: any) => {
+          const d = (o.effective_date || o.created_at)?.slice(0, 10);
+          return d && d >= weekStart && d <= weekEnd;
+        });
+      } else if (month) {
+        finalOrders = finalOrders.filter((o: any) =>
+          (o.effective_date || o.created_at)?.startsWith(month),
+        );
+      }
+    }
+
+    return NextResponse.json(finalOrders);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }

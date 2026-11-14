@@ -116,6 +116,19 @@ function calcLoaderProfit(trip: any) {
 function calcServiceOrder(order: any) {
   const parts = order.parts || [];
   const works = order.works || [];
+  const desc = order.problem_description || '';
+  const note = order.admin_note || '';
+
+  const externalMatch =
+    desc.match(/\[Сторонний сервис(?::\s*([^\]]+))?\]/i) ||
+    note.match(/\[Сторонний сервис(?::\s*([^\]]+))?\]/i) ||
+    note.match(/Исполнитель:\s*([^.]+)/i);
+
+  const isExternal =
+    Boolean(externalMatch) ||
+    desc.includes('[Сторонний сервис') ||
+    note.includes('[Сторонний сервис');
+
   const partsCost = parts.reduce(
     (sum: number, p: any) =>
       sum +
@@ -123,16 +136,36 @@ function calcServiceOrder(order: any) {
         (parseFloat(p.quantity || '1') || 1),
     0,
   );
-  let salaryCost =
-    (parseFloat(order.mechanic_pay || '0') || 0) +
-    (parseFloat(order.second_mechanic_pay || '0') || 0);
-  if (salaryCost <= 0 && works.length > 0) {
-    salaryCost = works
+
+  let salaryCost = 0;
+  let worksCost = 0;
+
+  if (isExternal) {
+    worksCost = works
       .filter((w: any) => w.status !== 'cancelled')
-      .reduce((sum: number, w: any) => sum + (parseFloat(w.price_client || '0') || 0) * 0.5, 0);
+      .reduce((sum: number, w: any) => sum + (parseFloat(w.price_client || '0') || 0), 0);
+    salaryCost = 0;
+  } else {
+    const rawPay = order.raw_mechanic_pay != null ? order.raw_mechanic_pay : order.mechanic_pay;
+    const m1Pay = parseFloat(rawPay || '0') || 0;
+    const m2Pay = parseFloat(order.second_mechanic_pay || '0') || 0;
+    salaryCost = m1Pay + m2Pay;
+    if (salaryCost <= 0) {
+      salaryCost = works
+        .filter((w: any) => w.status !== 'cancelled')
+        .reduce((sum: number, w: any) => {
+          const customPctMatch = w.notes
+            ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+            : null;
+          const pct =
+            customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) / 100 : 0.5;
+          return sum + (parseFloat(w.price_client || '0') || 0) * pct;
+        }, 0);
+    }
   }
-  const totalCost = partsCost + salaryCost;
-  return { partsCost, salaryCost, totalCost };
+
+  const totalCost = isExternal ? partsCost + worksCost : partsCost + salaryCost;
+  return { partsCost, salaryCost, worksCost, totalCost, isExternal };
 }
 
 function getWeekDates(dateStr: string) {
@@ -296,9 +329,6 @@ function DateNav({
                 className="sr-only"
               />
             )}
-            <span className="material-symbols-outlined text-sky-600 text-[17px] pointer-events-none select-none">
-              calendar_today
-            </span>
             <span className="text-slate-900 font-black text-xs sm:text-sm text-center leading-tight uppercase tracking-wider">
               {dateLabel}
             </span>
@@ -353,9 +383,19 @@ function DateNav({
       {onTripSearchChange && (
         <div className="px-2 pb-2">
           <div className="relative flex items-center">
-            <span className="material-symbols-outlined absolute left-2.5 text-slate-400 text-[16px] pointer-events-none select-none">
-              search
-            </span>
+            <svg
+              className="w-4 h-4 text-slate-400 absolute left-2.5 pointer-events-none shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
             <input
               type="text"
               value={tripSearch}
