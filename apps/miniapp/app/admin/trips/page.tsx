@@ -52,26 +52,48 @@ function calcTrip(trip: any) {
   return { activeOrders, expenses, revenue, driverPay, loaderPay, totalExpenses, mileage, profit };
 }
 
-// ── DateNav (мобильная навигация по датам) ──────────────────
+function getWeekDates(dateStr: string) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const dow = d.getDay();
+  const monOffset = dow === 0 ? -6 : 1 - dow;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + monOffset);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return { weekStart: mon.toISOString().slice(0, 10), weekEnd: sun.toISOString().slice(0, 10) };
+}
+
+// ── DateNav (мобильная навигация по датам и периодам) ───────
 
 function DateNav({
   date,
+  period = 'day',
   onChange,
+  setPeriod,
   tripSearch = '',
   onTripSearchChange,
 }: {
   date: string;
+  period?: 'day' | 'week' | 'month';
   onChange: (d: string) => void;
+  setPeriod?: (p: 'day' | 'week' | 'month') => void;
   tripSearch?: string;
   onTripSearchChange?: (val: string) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
 
-  const shift = (days: number) => {
+  const shift = (amount: number) => {
     const d = new Date(date + 'T12:00:00');
-    d.setDate(d.getDate() + days);
+    if (period === 'day') {
+      d.setDate(d.getDate() + amount);
+    } else if (period === 'week') {
+      d.setDate(d.getDate() + amount * 7);
+    } else if (period === 'month') {
+      d.setMonth(d.getMonth() + amount);
+    }
     const s = d.toISOString().slice(0, 10);
     if (s <= today) onChange(s);
+    else onChange(today);
   };
 
   const months = Array.from({ length: 5 }, (_, i) => {
@@ -100,55 +122,132 @@ function DateNav({
   const curYear = dt.getFullYear();
   const isToday = date === today;
 
-  const dateLabel = dt.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    weekday: 'short',
-  });
+  let dateLabel = '';
+  if (period === 'day') {
+    dateLabel = dt.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      weekday: 'short',
+    });
+  } else if (period === 'week') {
+    const { weekStart, weekEnd } = getWeekDates(date);
+    const ws = new Date(weekStart + 'T12:00:00');
+    const we = new Date(weekEnd + 'T12:00:00');
+    dateLabel = `${ws.getDate()} ${ws.toLocaleDateString('ru-RU', { month: 'short' })} — ${we.getDate()} ${we.toLocaleDateString('ru-RU', { month: 'short' })}`;
+  } else if (period === 'month') {
+    const raw = dt.toLocaleDateString('ru-RU', {
+      month: 'long',
+      year: 'numeric',
+    });
+    dateLabel = raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+
+  const isCurrentMonth = curYear === new Date().getFullYear() && curMonth === new Date().getMonth();
+  const isCurrentWeek =
+    period === 'week' && getWeekDates(date).weekStart === getWeekDates(today).weekStart;
+  const isFuture =
+    period === 'month' ? isCurrentMonth : period === 'week' ? isCurrentWeek : date >= today;
+  const showJumpToToday =
+    period === 'month' ? !isCurrentMonth : period === 'week' ? !isCurrentWeek : !isToday;
+  const jumpLabel = period === 'month' ? '→ тек.' : period === 'week' ? '→ тек.' : '→ сег.';
 
   return (
-    <div className="bg-zinc-900">
-      {/* Навигация по дням */}
-      <div className="flex items-stretch h-14">
+    <div className="bg-zinc-900 border-b border-zinc-800">
+      {/* Переключатель режима: День / Неделя / Месяц */}
+      {setPeriod && (
+        <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-950 border-b border-zinc-800">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-black uppercase text-zinc-500">Период:</span>
+            <div className="inline-flex bg-zinc-800 p-0.5 rounded-lg border border-zinc-700">
+              {(['day', 'week', 'month'] as const).map((p) => {
+                const label = p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц';
+                const active = period === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPeriod(p)}
+                    className={cn(
+                      'px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer',
+                      active ? 'bg-sky-600 text-white shadow-xs' : 'text-zinc-400 hover:text-white',
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">
+            {period === 'month' ? '📅 Целый месяц' : period === 'week' ? '📅 7 дней' : '📅 1 день'}
+          </span>
+        </div>
+      )}
+
+      {/* Навигация по выбранному периоду */}
+      <div className="flex items-stretch h-12">
         <button
+          type="button"
           onClick={() => shift(-1)}
-          className="flex items-center justify-center w-16 bg-sky-600 active:bg-sky-700 transition-colors text-white shrink-0"
-          aria-label="Предыдущий день"
+          className="flex items-center justify-center w-12 bg-sky-600 active:bg-sky-700 transition-colors text-white shrink-0 cursor-pointer"
+          aria-label="Предыдущий период"
         >
-          <span className="text-2xl font-black select-none">←</span>
+          <span className="text-xl font-black select-none">←</span>
         </button>
 
         <label className="flex-1 flex items-center justify-center gap-2 cursor-pointer px-2">
-          <input
-            type="date"
-            value={date}
-            max={today}
-            onChange={(e) => e.target.value && onChange(e.target.value)}
-            className="sr-only"
-          />
-          <span className="text-white font-black text-sm text-center leading-tight">
+          {period === 'month' ? (
+            <input
+              type="month"
+              value={date.slice(0, 7)}
+              max={today.slice(0, 7)}
+              onChange={(e) => e.target.value && onChange(`${e.target.value}-01`)}
+              className="sr-only"
+            />
+          ) : (
+            <input
+              type="date"
+              value={date}
+              max={today}
+              onChange={(e) => e.target.value && onChange(e.target.value)}
+              className="sr-only"
+            />
+          )}
+          <span className="material-symbols-outlined text-sky-400 text-[18px] pointer-events-none select-none">
+            calendar_today
+          </span>
+          <span className="text-white font-black text-xs sm:text-sm text-center leading-tight">
             {dateLabel}
           </span>
-          {!isToday && (
-            <span className="text-[9px] font-bold text-sky-300 bg-sky-600/30 border border-sky-500/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-              → сег.
-            </span>
+          {showJumpToToday && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(today);
+              }}
+              className="text-[9px] font-bold text-sky-300 bg-sky-600/30 hover:bg-sky-600/50 border border-sky-500/30 px-1.5 py-0.5 rounded-full whitespace-nowrap cursor-pointer"
+            >
+              {jumpLabel}
+            </button>
           )}
         </label>
 
         <button
+          type="button"
           onClick={() => shift(1)}
-          disabled={date >= today}
-          className="flex items-center justify-center w-16 bg-sky-600 active:bg-sky-700 transition-colors text-white shrink-0 disabled:bg-zinc-800 disabled:text-zinc-600"
-          aria-label="Следующий день"
+          disabled={isFuture}
+          className="flex items-center justify-center w-12 bg-sky-600 active:bg-sky-700 transition-colors text-white shrink-0 disabled:bg-zinc-800 disabled:text-zinc-600 cursor-pointer"
+          aria-label="Следующий период"
         >
-          <span className="text-2xl font-black select-none">→</span>
+          <span className="text-xl font-black select-none">→</span>
         </button>
       </div>
 
       {/* Поиск по номеру рейса */}
       {onTripSearchChange && (
-        <div className="px-3 py-2 bg-zinc-800/80 border-t border-zinc-700/60 flex items-center gap-2">
+        <div className="px-3 py-1.5 bg-zinc-800/80 border-t border-zinc-700/60 flex items-center gap-2">
           <div className="relative flex-1 flex items-center">
             <span className="material-symbols-outlined absolute left-2.5 text-zinc-400 text-[16px] pointer-events-none select-none">
               search
@@ -158,7 +257,7 @@ function DateNav({
               value={tripSearch}
               onChange={(e) => onTripSearchChange(e.target.value)}
               placeholder="Поиск по № рейса..."
-              className="w-full pl-8 pr-7 py-1.5 bg-zinc-900 border border-zinc-700 focus:border-sky-500 rounded-xl text-xs font-bold text-white placeholder:text-zinc-500 outline-none"
+              className="w-full pl-8 pr-7 py-1 bg-zinc-900 border border-zinc-700 focus:border-sky-500 rounded-lg text-xs font-bold text-white placeholder:text-zinc-500 outline-none"
             />
             {tripSearch && (
               <button
@@ -181,12 +280,15 @@ function DateNav({
           return (
             <button
               key={`${m.year}-${m.month}`}
-              onClick={() => goMonth(m.year, m.month)}
+              type="button"
+              onClick={() => {
+                goMonth(m.year, m.month);
+              }}
               className={cn(
-                'flex-1 py-2 text-[11px] font-bold uppercase tracking-wide transition-colors border-r border-zinc-800 last:border-r-0',
+                'flex-1 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors border-r border-zinc-800 last:border-r-0 cursor-pointer',
                 active
-                  ? 'bg-sky-600 text-white'
-                  : 'text-zinc-500 active:bg-zinc-800 active:text-zinc-200',
+                  ? 'bg-sky-600 text-white font-black'
+                  : 'text-zinc-500 active:bg-zinc-800 active:text-zinc-200 hover:text-zinc-300',
               )}
             >
               {m.label}
@@ -198,9 +300,15 @@ function DateNav({
   );
 }
 
-// ── Итоги за день ────────────────────────────────────────────
+// ── Итоги за выбранный период ───────────────────────────────
 
-function DailyTotals({ trips }: { trips: any[] }) {
+function DailyTotals({
+  trips,
+  period = 'day',
+}: {
+  trips: any[];
+  period?: 'day' | 'week' | 'month';
+}) {
   const totalRevenue = trips.reduce((s, t) => s + calcTrip(t).revenue, 0);
   const totalCosts = trips.reduce((s, t) => {
     const c = calcTrip(t);
@@ -208,11 +316,14 @@ function DailyTotals({ trips }: { trips: any[] }) {
   }, 0);
   const totalProfit = trips.reduce((s, t) => s + calcTrip(t).profit, 0);
 
+  const titlePrefix =
+    period === 'month' ? 'Итого за месяц' : period === 'week' ? 'Итого за неделю' : 'Итого за день';
+
   return (
     <div className="mx-4 mb-4 rounded-2xl bg-zinc-900 text-white overflow-hidden">
       <div className="px-4 py-2 border-b border-zinc-800">
         <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-          Итого за день · {trips.length} рейс
+          {titlePrefix} · {trips.length} рейс
           {trips.length === 1 ? '' : trips.length < 5 ? 'а' : 'ов'}
         </span>
       </div>
@@ -1658,6 +1769,7 @@ function TripsContent() {
 
   const today = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(today);
+  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [tripSearch, setTripSearch] = useState('');
   const searchTripNumber = tripSearch.trim().replace(/[^0-9]/g, '');
   const [editTrip, setEditTrip] = useState<any>(null);
@@ -1691,9 +1803,19 @@ function TripsContent() {
 
   // Запрос для history (Авто)
   const { data: historyTrips = [], isLoading: historyLoading } = useQuery<any[]>({
-    queryKey: ['admin-trips-history', selectedDate],
-    queryFn: () =>
-      fetch(`/api/admin/trips?filter=history&date=${selectedDate}`).then((r) => r.json()),
+    queryKey: ['admin-trips-history', selectedDate, period],
+    queryFn: () => {
+      let url = `/api/admin/trips?filter=history`;
+      if (period === 'month') {
+        url += `&month=${selectedDate.slice(0, 7)}`;
+      } else if (period === 'week') {
+        const { weekStart, weekEnd } = getWeekDates(selectedDate);
+        url += `&weekStart=${weekStart}&weekEnd=${weekEnd}`;
+      } else {
+        url += `&date=${selectedDate}`;
+      }
+      return fetch(url).then((r) => r.json());
+    },
     enabled: filter === 'history' && section === 'auto',
     staleTime: 30000,
   });
@@ -1709,9 +1831,19 @@ function TripsContent() {
 
   // Запрос для history (Гараж)
   const { data: historyOrders = [], isLoading: ordersHistoryLoading } = useQuery<any[]>({
-    queryKey: ['admin-service-orders-history', selectedDate],
-    queryFn: () =>
-      fetch(`/api/admin/service-orders?filter=history&date=${selectedDate}`).then((r) => r.json()),
+    queryKey: ['admin-service-orders-history', selectedDate, period],
+    queryFn: () => {
+      let url = `/api/admin/service-orders?filter=history`;
+      if (period === 'month') {
+        url += `&month=${selectedDate.slice(0, 7)}`;
+      } else if (period === 'week') {
+        const { weekStart, weekEnd } = getWeekDates(selectedDate);
+        url += `&weekStart=${weekStart}&weekEnd=${weekEnd}`;
+      } else {
+        url += `&date=${selectedDate}`;
+      }
+      return fetch(url).then((r) => r.json());
+    },
     enabled: filter === 'history' && section === 'garage',
     staleTime: 30000,
   });
@@ -1733,8 +1865,8 @@ function TripsContent() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-summary'] });
     if (filter === 'history') {
-      queryClient.invalidateQueries({ queryKey: ['admin-trips-history', selectedDate] });
-      queryClient.invalidateQueries({ queryKey: ['admin-service-orders-history', selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ['admin-trips-history'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-service-orders-history'] });
     } else {
       queryClient.invalidateQueries({ queryKey: ['admin-trips', filter] });
       queryClient.invalidateQueries({ queryKey: ['admin-service-orders', filter] });
@@ -1864,12 +1996,20 @@ function TripsContent() {
           ? 'Нет рейсов на ревью'
           : filter === 'active'
             ? 'Нет активных рейсов'
-            : 'Нет рейсов за этот день'
+            : period === 'month'
+              ? 'Нет рейсов за этот месяц'
+              : period === 'week'
+                ? 'Нет рейсов за эту неделю'
+                : 'Нет рейсов за этот день'
       : filter === 'review'
         ? 'Нет заказ-нарядов на ревью'
         : filter === 'active'
           ? 'Нет нарядов в работе'
-          : 'Нет заказ-нарядов за этот день';
+          : period === 'month'
+            ? 'Нет заказ-нарядов за этот месяц'
+            : period === 'week'
+              ? 'Нет заказ-нарядов за эту неделю'
+              : 'Нет заказ-нарядов за этот день';
 
   const emptyIcon = filter === 'review' ? '✅' : section === 'auto' ? '🚛' : '🔧';
 
@@ -1978,7 +2118,9 @@ function TripsContent() {
       {filter === 'history' && (
         <DateNav
           date={selectedDate}
+          period={period}
           onChange={setSelectedDate}
+          setPeriod={setPeriod}
           tripSearch={tripSearch}
           onTripSearchChange={setTripSearch}
         />
@@ -2024,7 +2166,7 @@ function TripsContent() {
                 />
               ))}
             </div>
-            <DailyTotals trips={trips} />
+            <DailyTotals trips={trips} period={period} />
           </>
         ) : (
           <div className="p-4 space-y-3">

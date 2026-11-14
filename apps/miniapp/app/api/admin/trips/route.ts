@@ -2,11 +2,14 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 
-/** GET /api/admin/trips?filter=review|active|history&date=YYYY-MM-DD */
+/** GET /api/admin/trips?filter=review|active|history&date=YYYY-MM-DD&month=YYYY-MM&weekStart=YYYY-MM-DD&weekEnd=YYYY-MM-DD */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const filter = searchParams.get('filter') ?? 'review';
   const date = searchParams.get('date');
+  const month = searchParams.get('month'); // YYYY-MM
+  const weekStart = searchParams.get('weekStart'); // YYYY-MM-DD
+  const weekEnd = searchParams.get('weekEnd'); // YYYY-MM-DD
   const tripNumberParam = searchParams.get('trip_number') || searchParams.get('search');
   const cleanTripNum = tripNumberParam ? tripNumberParam.replace(/[^0-9]/g, '') : null;
 
@@ -64,9 +67,20 @@ export async function GET(request: Request) {
       )
       .neq('lifecycle_status', 'cancelled')
       .order('started_at', { ascending: false })
-      .limit(100);
+      .limit(500);
 
-    if (date) {
+    if (month) {
+      const parts = month.split('-');
+      const y = parseInt(parts[0]!, 10);
+      const m = parseInt(parts[1]!, 10);
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+      const end = new Date(Date.UTC(y, m, 1)).toISOString();
+      query = query.gte('started_at', start).lt('started_at', end);
+    } else if (weekStart && weekEnd) {
+      const start = `${weekStart}T00:00:00Z`;
+      const end = `${weekEnd}T23:59:59Z`;
+      query = query.gte('started_at', start).lte('started_at', end);
+    } else if (date) {
       const start = `${date}T00:00:00Z`;
       const end = `${date}T23:59:59Z`;
       query = query.gte('started_at', start).lte('started_at', end);

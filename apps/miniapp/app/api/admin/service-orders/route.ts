@@ -3,11 +3,14 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { extractOrderDates, cleanOrderNotes } from '@saldacargo/shared';
 
-/** GET /api/admin/service-orders?filter=review|active|history&date=YYYY-MM-DD */
+/** GET /api/admin/service-orders?filter=review|active|history&date=YYYY-MM-DD&month=YYYY-MM&weekStart=YYYY-MM-DD&weekEnd=YYYY-MM-DD */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const filter = searchParams.get('filter') ?? 'review';
   const date = searchParams.get('date');
+  const month = searchParams.get('month'); // YYYY-MM
+  const weekStart = searchParams.get('weekStart'); // YYYY-MM-DD
+  const weekEnd = searchParams.get('weekEnd'); // YYYY-MM-DD
 
   try {
     const supabase = createAdminClient();
@@ -51,8 +54,17 @@ export async function GET(request: Request) {
     } else if (filter === 'active') {
       q = q.in('status', ['created', 'in_progress']).neq('lifecycle_status', 'cancelled');
     } else if (filter === 'history') {
-      q = q.neq('lifecycle_status', 'cancelled');
-      if (date) {
+      q = q.neq('lifecycle_status', 'cancelled').limit(500);
+      if (month) {
+        const parts = month.split('-');
+        const y = parseInt(parts[0]!, 10);
+        const m = parseInt(parts[1]!, 10);
+        const start = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+        const end = new Date(Date.UTC(y, m, 1)).toISOString();
+        q = q.gte('created_at', start).lt('created_at', end);
+      } else if (weekStart && weekEnd) {
+        q = q.gte('created_at', `${weekStart}T00:00:00Z`).lte('created_at', `${weekEnd}T23:59:59Z`);
+      } else if (date) {
         q = q.gte('created_at', `${date}T00:00:00Z`).lte('created_at', `${date}T23:59:59Z`);
       } else {
         q = q.eq('lifecycle_status', 'approved');
