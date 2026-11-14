@@ -23,12 +23,12 @@ export async function GET(request: Request) {
         id, trip_number, status, lifecycle_status, started_at, ended_at,
         trip_type, odometer_start, odometer_end, driver_note,
         driver:users!trips_driver_id_fkey(id, name),
-        asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code)),
+        asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code, name)),
         trip_orders(
           id, amount, driver_pay, loader_pay, loader2_pay, loaders_data,
-          is_driver_loader, driver_loader_pay, driver_car_pay,
+          direction, is_driver_loader, driver_loader_pay, driver_car_pay,
           payment_method, settlement_status, lifecycle_status,
-          counterparty:counterparties(name)
+          counterparty:counterparties(id, name)
         ),
         trip_expenses(
           id, amount, payment_method, description,
@@ -52,12 +52,12 @@ export async function GET(request: Request) {
         id, trip_number, status, lifecycle_status, started_at, ended_at,
         trip_type, odometer_start, odometer_end, driver_note,
         driver:users!trips_driver_id_fkey(id, name),
-        asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code)),
+        asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code, name)),
         trip_orders(
           id, amount, driver_pay, loader_pay, loader2_pay, loaders_data,
-          is_driver_loader, driver_loader_pay, driver_car_pay,
+          direction, is_driver_loader, driver_loader_pay, driver_car_pay,
           payment_method, settlement_status, lifecycle_status,
-          counterparty:counterparties(name)
+          counterparty:counterparties(id, name)
         ),
         trip_expenses(
           id, amount, payment_method, description,

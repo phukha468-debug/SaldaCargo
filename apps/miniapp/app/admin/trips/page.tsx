@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
-import { formatDate, formatTime } from '@saldacargo/shared';
+import { formatDate, formatTime, isInternalCounterparty, isTruckAsset } from '@saldacargo/shared';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
 
 // ── Константы ────────────────────────────────────────────────
@@ -35,22 +35,19 @@ function calcTrip(trip: any) {
   );
   const expenses = trip.trip_expenses ?? [];
   const revenue = activeOrders.reduce(
-    (s: number, o: any) => s + (parseFloat(o.amount || '0') || 0),
+    (s: number, o: any) =>
+      s + (isInternalCounterparty(o.counterparty) ? 0 : parseFloat(o.amount || '0') || 0),
     0,
   );
   const driverPay = activeOrders.reduce(
     (s: number, o: any) => s + (parseFloat(o.driver_pay || '0') || 0),
     0,
   );
-  const loaderPay = activeOrders.reduce((sum: number, o: any) => {
-    if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
-      return (
-        sum +
-        o.loaders_data.reduce((sub: number, l: any) => sub + (parseFloat(l.pay || '0') || 0), 0)
-      );
-    }
-    return sum + (parseFloat(o.loader_pay ?? '0') || 0) + (parseFloat(o.loader2_pay ?? '0') || 0);
-  }, 0);
+  const loaderPay = activeOrders.reduce(
+    (s: number, o: any) =>
+      s + (parseFloat(o.loader_pay || '0') || 0) + (parseFloat(o.loader2_pay || '0') || 0),
+    0,
+  );
   const fuelExpense = expenses
     .filter((e: any) => {
       const name =
@@ -65,7 +62,9 @@ function calcTrip(trip: any) {
     0,
   );
   const mileage =
-    trip.odometer_end && trip.odometer_start ? trip.odometer_end - trip.odometer_start : null;
+    trip.odometer_end && trip.odometer_start && trip.odometer_end >= trip.odometer_start
+      ? trip.odometer_end - trip.odometer_start
+      : null;
   const profit = revenue - driverPay - loaderPay - totalExpenses;
   return {
     activeOrders,
@@ -73,6 +72,7 @@ function calcTrip(trip: any) {
     revenue,
     driverPay,
     loaderPay,
+    totalPayroll: driverPay + loaderPay,
     fuelExpense,
     totalExpenses,
     mileage,
@@ -86,25 +86,38 @@ function calcLoaderProfit(trip: any) {
   );
   let totalLoaderProfit = 0;
   for (const o of activeOrders) {
-    const amt = parseFloat(o.amount || '0') || 0;
+    if (isInternalCounterparty(o.counterparty)) continue;
+    if (isTruckAsset(trip.asset)) continue;
+    const tripStartedAt = trip.started_at;
+    if (tripStartedAt && tripStartedAt.slice(0, 10) < '2026-09-01') continue;
+
+    const lp1 = parseFloat(o.loader_pay || '0') || 0;
+    const lp2 = parseFloat(o.loader2_pay || '0') || 0;
     let thirdPartyPay = 0;
     if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
       thirdPartyPay = o.loaders_data.reduce(
-        (s: number, l: any) => s + (parseFloat(l.pay || '0') || 0),
+        (s: number, l: any) => s + (parseFloat(String(l.pay)) || 0),
         0,
       );
     } else {
-      thirdPartyPay =
-        (parseFloat(o.loader_pay || '0') || 0) + (parseFloat(o.loader2_pay || '0') || 0);
+      thirdPartyPay = lp1 + lp2;
     }
-    const driverLoaderPay = o.is_driver_loader ? parseFloat(o.driver_loader_pay || '0') || 0 : 0;
+    const driverLoaderPay = o.is_driver_loader
+      ? parseFloat(String(o.driver_loader_pay || '0')) || 0
+      : 0;
     const totalPaid = thirdPartyPay + driverLoaderPay;
     if (totalPaid <= 0) continue;
 
+    const dcp = parseFloat(String(o.driver_car_pay || '0')) || 0;
+    const amt = parseFloat(o.amount || '0') || 0;
     let loadersPool = 0;
     if (o.direction === 'loaders_only' && amt > 0) {
       loadersPool = amt;
-    } else {
+    } else if (dcp > 0 && amt > 0) {
+      const mPool = Math.round(dcp / 0.3);
+      loadersPool = Math.max(0, amt - mPool);
+    }
+    if (loadersPool < totalPaid) {
       loadersPool = Math.round(totalPaid / 0.7);
     }
     const profit = Math.max(0, loadersPool - totalPaid);
@@ -129,11 +142,16 @@ function calcServiceOrder(order: any) {
     desc.includes('[Сторонний сервис') ||
     note.includes('[Сторонний сервис');
 
+  let contractorName: string | null = null;
+  if (externalMatch && externalMatch[1]) {
+    contractorName = externalMatch[1].trim();
+  } else if (note.includes('Исполнитель:')) {
+    const m = note.match(/Исполнитель:\s*([^.]+)/i);
+    if (m && m[1]) contractorName = m[1].trim();
+  }
+
   const partsCost = parts.reduce(
-    (sum: number, p: any) =>
-      sum +
-      (parseFloat(p.unit_price || p.price || p.cost_price || '0') || 0) *
-        (parseFloat(p.quantity || '1') || 1),
+    (sum: number, p: any) => sum + (Number(p.unit_price) || 0) * (Number(p.quantity) || 1),
     0,
   );
 
@@ -143,12 +161,12 @@ function calcServiceOrder(order: any) {
   if (isExternal) {
     worksCost = works
       .filter((w: any) => w.status !== 'cancelled')
-      .reduce((sum: number, w: any) => sum + (parseFloat(w.price_client || '0') || 0), 0);
+      .reduce((sum: number, w: any) => sum + (Number(w.price_client) || 0), 0);
     salaryCost = 0;
   } else {
     const rawPay = order.raw_mechanic_pay != null ? order.raw_mechanic_pay : order.mechanic_pay;
-    const m1Pay = parseFloat(rawPay || '0') || 0;
-    const m2Pay = parseFloat(order.second_mechanic_pay || '0') || 0;
+    const m1Pay = Number(rawPay) || 0;
+    const m2Pay = Number(order.second_mechanic_pay) || 0;
     salaryCost = m1Pay + m2Pay;
     if (salaryCost <= 0) {
       salaryCost = works
@@ -159,13 +177,13 @@ function calcServiceOrder(order: any) {
             : null;
           const pct =
             customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) / 100 : 0.5;
-          return sum + (parseFloat(w.price_client || '0') || 0) * pct;
+          return sum + (Number(w.price_client) || 0) * pct;
         }, 0);
     }
   }
 
   const totalCost = isExternal ? partsCost + worksCost : partsCost + salaryCost;
-  return { partsCost, salaryCost, worksCost, totalCost, isExternal };
+  return { partsCost, salaryCost, worksCost, totalCost, isExternal, contractorName };
 }
 
 function getWeekDates(dateStr: string) {
@@ -426,6 +444,7 @@ interface VehicleGroup {
   assetName: string;
   regNumber: string;
   isPrr: boolean;
+  isTruck: boolean;
   trips: any[];
   serviceOrders: any[];
   tripsRevenue: number;
@@ -517,12 +536,18 @@ function FleetHistorySummary({
 // ── Карточка машины в режиме История (Ультра 1-Line / Плотный вид) ─
 
 function VehicleGroupCard({ group, onClick }: { group: VehicleGroup; onClick: () => void }) {
+  const displayedPay = group.isPrr
+    ? group.loaderPayroll
+    : group.isTruck
+      ? group.driverPayroll
+      : group.tripsPayroll;
+
   return (
     <div
       onClick={onClick}
       className="bg-white border border-slate-200 hover:border-sky-300 rounded-2xl p-2.5 shadow-2xs cursor-pointer transition-all active:scale-[0.99] space-y-1.5"
     >
-      {/* Строка 1: Машина, чипы и Прибыль */}
+      {/* Строка 1: Машина слева, справа Прибыль */}
       <div className="flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <div
@@ -569,20 +594,28 @@ function VehicleGroupCard({ group, onClick }: { group: VehicleGroup; onClick: ()
         </div>
       </div>
 
-      {/* Строка 2: Чипы рейсов/ТО слева + 4 метрики (Выручка, ЗП, ГСМ, ТО) */}
+      {/* Строка 2: Чипы рейсов/ТО слева + 4 колонки метрик (Выручка, ЗП, ГСМ, Ремонт ТО) */}
       <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100 text-[10px]">
         {/* Бейджи рейсов и нарядов ТО */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 flex-wrap">
           {group.trips.length > 0 && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-100 font-bold text-[9px]">
               <span>📋</span>
-              <span>{group.trips.length}р</span>
+              <span>
+                {group.trips.length} рейс
+                {group.trips.length === 1 ? '' : group.trips.length < 5 ? 'а' : 'ов'}
+              </span>
+              <span className="text-[8px] text-sky-500">▾</span>
             </span>
           )}
           {group.serviceOrders.length > 0 && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[9px]">
               <span>🔧</span>
-              <span>{group.serviceOrders.length} ТО</span>
+              <span>
+                {group.serviceOrders.length} ТО (−
+                {Math.round(group.maintenanceTotal).toLocaleString('ru-RU')} ₽)
+              </span>
+              <span className="text-[8px] text-rose-500">▾</span>
             </span>
           )}
           {group.trips.length === 0 && group.serviceOrders.length === 0 && (
@@ -590,32 +623,39 @@ function VehicleGroupCard({ group, onClick }: { group: VehicleGroup; onClick: ()
           )}
         </div>
 
-        {/* Метрики в строку: Выручка · ЗП · ГСМ · ТО */}
+        {/* Метрики в строку: Выручка · ЗП (ФОТ) · ГСМ · Ремонт ТО */}
         <div className="flex items-center gap-1.5 shrink-0 text-right">
           <div title="Выручка">
             <span className="text-[7px] text-slate-400 block font-bold uppercase leading-none">
-              Выр
+              Выручка
             </span>
             <span className="font-bold text-slate-800 text-[10px]">
               {Math.round(group.tripsRevenue).toLocaleString('ru-RU')} ₽
             </span>
           </div>
 
-          <div title="Зарплата (ФОТ)">
-            <span className="text-[7px] text-amber-600 block font-bold uppercase leading-none">
-              ЗП
+          <div
+            title={group.isTruck ? 'Зарплата водителя' : group.isPrr ? 'ФОТ грузчиков' : 'ЗП (ФОТ)'}
+          >
+            <span className="text-[7px] text-slate-400 block font-bold uppercase leading-none">
+              ЗП (ФОТ)
             </span>
-            <span className="font-bold text-amber-600 text-[10px]">
-              {Math.round(group.tripsPayroll).toLocaleString('ru-RU')} ₽
+            <span className="font-bold text-amber-500 text-[10px] block">
+              {Math.round(displayedPay).toLocaleString('ru-RU')} ₽
             </span>
+            {group.loaderProfit > 0 && !group.isPrr && !group.isTruck && (
+              <span className="text-[7px] font-bold text-emerald-600 block leading-none">
+                +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽ с гр.
+              </span>
+            )}
           </div>
 
           {!group.isPrr && (
             <div title="ГСМ">
-              <span className="text-[7px] text-rose-500 block font-bold uppercase leading-none">
+              <span className="text-[7px] text-slate-400 block font-bold uppercase leading-none">
                 ГСМ
               </span>
-              <span className="font-bold text-rose-600 text-[10px]">
+              <span className="font-bold text-rose-500 text-[10px]">
                 {Math.round(group.tripsFuel).toLocaleString('ru-RU')} ₽
               </span>
             </div>
@@ -623,28 +663,14 @@ function VehicleGroupCard({ group, onClick }: { group: VehicleGroup; onClick: ()
 
           {group.maintenanceTotal > 0 && (
             <div
-              className="bg-rose-50 border border-rose-200 px-1 py-0.2 rounded"
+              className="bg-rose-50 border border-rose-200 px-1 py-0.5 rounded"
               title="Ремонт ТО"
             >
               <span className="text-[7px] text-rose-700 block font-bold uppercase leading-none">
-                ТО
+                Ремонт ТО
               </span>
-              <span className="font-black text-rose-700 text-[10px]">
+              <span className="font-black text-rose-600 text-[10px]">
                 −{Math.round(group.maintenanceTotal).toLocaleString('ru-RU')} ₽
-              </span>
-            </div>
-          )}
-
-          {group.isPrr && group.loaderProfit > 0 && (
-            <div
-              className="bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded"
-              title="Маржа компании 30%"
-            >
-              <span className="text-[7px] text-emerald-700 block font-bold uppercase leading-none">
-                Маржа
-              </span>
-              <span className="font-black text-emerald-700 text-[10px]">
-                +{Math.round(group.loaderProfit).toLocaleString('ru-RU')} ₽
               </span>
             </div>
           )}
@@ -974,10 +1000,17 @@ function VehicleDetailSheet({
                     <span>
                       Работы:{' '}
                       <b className="text-slate-800">
-                        {Math.round(cso.salaryCost).toLocaleString('ru-RU')} ₽
+                        {Math.round(cso.isExternal ? cso.worksCost : cso.salaryCost).toLocaleString(
+                          'ru-RU',
+                        )}{' '}
+                        ₽
                       </b>
                     </span>
-                    <span className="text-slate-500">{order.mechanic?.name || 'Механик'}</span>
+                    <span className="text-slate-500">
+                      {cso.isExternal
+                        ? cso.contractorName || 'Сторонний сервис'
+                        : order.mechanic?.name || 'Механик'}
+                    </span>
                   </div>
 
                   {isExp && order.parts && order.parts.length > 0 && (
@@ -2471,7 +2504,7 @@ function TripsContent() {
   const { data: historyOrders = [], isLoading: ordersHistoryLoading } = useQuery<any[]>({
     queryKey: ['admin-service-orders-history', selectedDate, period],
     queryFn: () => {
-      let url = `/api/admin/service-orders?filter=history`;
+      let url = `/api/admin/service-orders?filter=history&machine_type=own`;
       if (period === 'month') {
         url += `&month=${selectedDate.slice(0, 7)}`;
       } else if (period === 'week') {
@@ -2497,6 +2530,7 @@ function TripsContent() {
     for (const t of safeTrips) {
       const isPrr =
         t.asset?.reg_number === 'БЕЗ АВТО' || t.asset?.short_name === 'БЕЗ АВТО' || !t.asset;
+      const isTruck = isTruckAsset(t.asset);
       const assetKey = isPrr
         ? '👷 ПРР (без авто)'
         : `${t.asset.short_name} (${t.asset.reg_number})`;
@@ -2507,6 +2541,7 @@ function TripsContent() {
           assetName: isPrr ? '👷 ПРР' : t.asset.short_name || 'Машина',
           regNumber: isPrr ? 'без авто' : t.asset.reg_number || '',
           isPrr,
+          isTruck,
           trips: [],
           serviceOrders: [],
           tripsRevenue: 0,
@@ -2527,7 +2562,7 @@ function TripsContent() {
       g.trips.push(t);
       const ct = calcTrip(t);
       g.tripsRevenue += ct.revenue;
-      g.tripsPayroll += ct.driverPay + ct.loaderPay;
+      g.tripsPayroll += ct.totalPayroll;
       g.driverPayroll += ct.driverPay;
       g.loaderPayroll += ct.loaderPay;
       g.loaderProfit += calcLoaderProfit(t);
@@ -2538,6 +2573,7 @@ function TripsContent() {
 
     for (const so of safeOrders) {
       if (so.machine_type !== 'own' || !so.asset) continue;
+      const isTruck = isTruckAsset(so.asset);
       const assetKey = `${so.asset.short_name ?? 'Свой ТС'} (${so.asset.reg_number ?? ''})`;
       if (!map.has(assetKey)) {
         map.set(assetKey, {
@@ -2545,6 +2581,7 @@ function TripsContent() {
           assetName: so.asset.short_name ?? 'Свой ТС',
           regNumber: so.asset.reg_number ?? '',
           isPrr: false,
+          isTruck,
           trips: [],
           serviceOrders: [],
           tripsRevenue: 0,

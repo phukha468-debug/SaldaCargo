@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   const month = searchParams.get('month'); // YYYY-MM
   const weekStart = searchParams.get('weekStart'); // YYYY-MM-DD
   const weekEnd = searchParams.get('weekEnd'); // YYYY-MM-DD
+  const machineType = searchParams.get('machine_type');
 
   try {
     const supabase = createAdminClient();
@@ -54,7 +55,14 @@ export async function GET(request: Request) {
     } else if (filter === 'active') {
       q = q.in('status', ['created', 'in_progress']).neq('lifecycle_status', 'cancelled');
     } else if (filter === 'history') {
-      q = q.eq('lifecycle_status', 'approved').limit(500);
+      q = q
+        .or(
+          'lifecycle_status.in.(cancelled,returned),and(lifecycle_status.eq.approved,payment_received.eq.true)',
+        )
+        .limit(500);
+      if (machineType) {
+        q = q.eq('machine_type', machineType);
+      }
       if (month) {
         const [yStr, mStr] = month.split('-');
         const y = Number(yStr);
