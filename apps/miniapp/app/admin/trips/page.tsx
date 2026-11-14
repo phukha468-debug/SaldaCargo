@@ -54,7 +54,17 @@ function calcTrip(trip: any) {
 
 // ── DateNav (мобильная навигация по датам) ──────────────────
 
-function DateNav({ date, onChange }: { date: string; onChange: (d: string) => void }) {
+function DateNav({
+  date,
+  onChange,
+  tripSearch = '',
+  onTripSearchChange,
+}: {
+  date: string;
+  onChange: (d: string) => void;
+  tripSearch?: string;
+  onTripSearchChange?: (val: string) => void;
+}) {
   const today = new Date().toISOString().slice(0, 10);
 
   const shift = (days: number) => {
@@ -135,6 +145,34 @@ function DateNav({ date, onChange }: { date: string; onChange: (d: string) => vo
           <span className="text-2xl font-black select-none">→</span>
         </button>
       </div>
+
+      {/* Поиск по номеру рейса */}
+      {onTripSearchChange && (
+        <div className="px-3 py-2 bg-zinc-800/80 border-t border-zinc-700/60 flex items-center gap-2">
+          <div className="relative flex-1 flex items-center">
+            <span className="material-symbols-outlined absolute left-2.5 text-zinc-400 text-[16px] pointer-events-none select-none">
+              search
+            </span>
+            <input
+              type="text"
+              value={tripSearch}
+              onChange={(e) => onTripSearchChange(e.target.value)}
+              placeholder="Поиск по № рейса..."
+              className="w-full pl-8 pr-7 py-1.5 bg-zinc-900 border border-zinc-700 focus:border-sky-500 rounded-xl text-xs font-bold text-white placeholder:text-zinc-500 outline-none"
+            />
+            {tripSearch && (
+              <button
+                type="button"
+                onClick={() => onTripSearchChange('')}
+                className="absolute right-2 text-zinc-400 hover:text-white text-xs font-bold p-0.5 cursor-pointer"
+                title="Очистить поиск"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Быстрые кнопки месяцев */}
       <div className="flex border-t border-zinc-800">
@@ -1620,10 +1658,27 @@ function TripsContent() {
 
   const today = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(today);
+  const [tripSearch, setTripSearch] = useState('');
+  const searchTripNumber = tripSearch.trim().replace(/[^0-9]/g, '');
   const [editTrip, setEditTrip] = useState<any>(null);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [showPrrModal, setShowPrrModal] = useState(false);
+
+  // Запрос для поиска по номеру рейса (История)
+  const { data: searchTrips = [], isLoading: searchTripsLoading } = useQuery<any[]>({
+    queryKey: ['admin-trips-search', searchTripNumber],
+    queryFn: () => fetch(`/api/admin/trips?trip_number=${searchTripNumber}`).then((r) => r.json()),
+    enabled: filter === 'history' && searchTripNumber.length > 0,
+    staleTime: 30000,
+  });
+
+  // Автоматическое переключение на Авто при поиске рейса
+  useEffect(() => {
+    if (filter === 'history' && searchTripNumber.length > 0 && section !== 'auto') {
+      setSection('auto');
+    }
+  }, [filter, searchTripNumber, section]);
 
   // Запрос для review/active (Авто)
   const { data: simpleTrips = [], isLoading: simpleLoading } = useQuery<any[]>({
@@ -1661,12 +1716,15 @@ function TripsContent() {
     staleTime: 30000,
   });
 
-  const trips = filter === 'history' ? historyTrips : simpleTrips;
+  const trips =
+    filter === 'history' ? (searchTripNumber.length > 0 ? searchTrips : historyTrips) : simpleTrips;
   const serviceOrders = filter === 'history' ? historyOrders : simpleOrders;
   const isLoading =
     section === 'auto'
       ? filter === 'history'
-        ? historyLoading
+        ? searchTripNumber.length > 0
+          ? searchTripsLoading
+          : historyLoading
         : simpleLoading
       : filter === 'history'
         ? ordersHistoryLoading
@@ -1800,11 +1858,13 @@ function TripsContent() {
 
   const emptyLabel =
     section === 'auto'
-      ? filter === 'review'
-        ? 'Нет рейсов на ревью'
-        : filter === 'active'
-          ? 'Нет активных рейсов'
-          : 'Нет рейсов за этот день'
+      ? filter === 'history' && searchTripNumber.length > 0
+        ? `Рейс №${searchTripNumber} не найден`
+        : filter === 'review'
+          ? 'Нет рейсов на ревью'
+          : filter === 'active'
+            ? 'Нет активных рейсов'
+            : 'Нет рейсов за этот день'
       : filter === 'review'
         ? 'Нет заказ-нарядов на ревью'
         : filter === 'active'
@@ -1915,7 +1975,30 @@ function TripsContent() {
       </div>
 
       {/* DateNav для режима История */}
-      {filter === 'history' && <DateNav date={selectedDate} onChange={setSelectedDate} />}
+      {filter === 'history' && (
+        <DateNav
+          date={selectedDate}
+          onChange={setSelectedDate}
+          tripSearch={tripSearch}
+          onTripSearchChange={setTripSearch}
+        />
+      )}
+
+      {/* Информационный бейдж активного поиска по номеру рейса */}
+      {filter === 'history' && searchTripNumber.length > 0 && (
+        <div className="mx-4 mt-2 px-3 py-1.5 rounded-xl bg-sky-950/60 border border-sky-800/60 text-xs flex items-center justify-between text-sky-200">
+          <span>
+            🔍 Рейс №{searchTripNumber} (найдено: {searchTrips.length})
+          </span>
+          <button
+            type="button"
+            onClick={() => setTripSearch('')}
+            className="text-[10px] font-bold text-sky-400 hover:underline"
+          >
+            ✕ Сбросить
+          </button>
+        </div>
+      )}
 
       {/* Контент: АВТО vs ГАРАЖ */}
       {isLoading ? (

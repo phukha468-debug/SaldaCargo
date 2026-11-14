@@ -6,6 +6,8 @@ import { NextResponse } from 'next/server';
 /** GET /api/trips — рейсы для ревью или истории */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const tripNumberParam = searchParams.get('trip_number') || searchParams.get('search');
+  const cleanTripNum = tripNumberParam ? tripNumberParam.replace(/[^0-9]/g, '') : null;
   const lifecycle = searchParams.get('lifecycle') ?? 'draft';
   const status = searchParams.get('status');
   const date = searchParams.get('date'); // YYYY-MM-DD
@@ -14,6 +16,40 @@ export async function GET(request: Request) {
   const weekEnd = searchParams.get('weekEnd'); // YYYY-MM-DD
 
   const supabase = createAdminClient();
+
+  // Если указан номер рейса — ищем рейс напрямую без фильтрации по датам
+  if (cleanTripNum) {
+    const { data, error } = await (supabase
+      .from('trips')
+      .select(
+        `
+        id, trip_number, status, lifecycle_status, started_at, ended_at,
+        trip_type, odometer_start, odometer_end, driver_note, admin_note,
+        asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code, name)),
+        driver:users!trips_driver_id_fkey(id, name),
+        loader:users!trips_loader_id_fkey(id, name),
+        trip_orders(
+          id, amount, driver_pay, loader_pay, loader2_pay,
+          loader_id, loader2_id, description,
+          direction, is_driver_loader, driver_car_pay, driver_loader_pay, loaders_data,
+          loader:users!trip_orders_loader_id_fkey(id, name),
+          loader2:users!trip_orders_loader2_id_fkey(id, name),
+          payment_method, settlement_status, lifecycle_status, invoice_paid_at, updated_at,
+          counterparty_id,
+          counterparty:counterparties(name)
+        ),
+        trip_expenses(
+          id, amount, payment_method, description,
+          category:transaction_categories(name)
+        )
+      `,
+      )
+      .eq('trip_number', parseInt(cleanTripNum, 10))
+      .order('started_at', { ascending: false }) as any);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data ?? []);
+  }
 
   let query = supabase
     .from('trips')

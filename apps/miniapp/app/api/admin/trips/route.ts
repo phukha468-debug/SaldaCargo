@@ -7,8 +7,39 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const filter = searchParams.get('filter') ?? 'review';
   const date = searchParams.get('date');
+  const tripNumberParam = searchParams.get('trip_number') || searchParams.get('search');
+  const cleanTripNum = tripNumberParam ? tripNumberParam.replace(/[^0-9]/g, '') : null;
 
   const supabase = createAdminClient();
+
+  if (cleanTripNum) {
+    const query = (supabase as any)
+      .from('trips')
+      .select(
+        `
+        id, trip_number, status, lifecycle_status, started_at, ended_at,
+        trip_type, odometer_start, odometer_end, driver_note,
+        driver:users!trips_driver_id_fkey(id, name),
+        asset:assets(id, short_name, reg_number, notes, asset_type:asset_types(code)),
+        trip_orders(
+          id, amount, driver_pay, loader_pay, loader2_pay, loaders_data,
+          is_driver_loader, driver_loader_pay, driver_car_pay,
+          payment_method, settlement_status, lifecycle_status,
+          counterparty:counterparties(name)
+        ),
+        trip_expenses(
+          id, amount, payment_method, description,
+          category:transaction_categories(name)
+        )
+      `,
+      )
+      .eq('trip_number', parseInt(cleanTripNum, 10))
+      .order('started_at', { ascending: false });
+
+    const { data, error } = await query;
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data ?? []);
+  }
 
   if (filter === 'history') {
     let query = (supabase as any)
