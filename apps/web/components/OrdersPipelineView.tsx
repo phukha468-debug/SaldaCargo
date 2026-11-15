@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DocumentTemplatesModal } from './DocumentTemplatesModal';
 
@@ -66,6 +66,21 @@ export function getDocCounterpartyBadge(name?: string | null): {
     };
   }
   return { label: name, badgeClass: 'bg-slate-100 text-slate-700' };
+}
+
+export interface ClientOrderPart {
+  id: string;
+  client_id: string;
+  client_name: string;
+  client_inn?: string;
+  base_doc_number: string;
+  cargo_name: string;
+  weight_gross_kg: number | '';
+  price_without_vat: number | '';
+  forwarder_id?: string;
+  forwarder_name?: string;
+  payment_method?: 'bank_invoice' | 'cash';
+  payment_terms?: string;
 }
 
 export interface OrderItem {
@@ -145,6 +160,7 @@ export interface OrderItem {
   planned_delivery_at: string | null;
 
   routes_json?: RouteStop[];
+  client_orders?: ClientOrderPart[];
   prevent_salda_auto_finish?: boolean;
   salda_transit_count?: number;
   billing_docs?: BillingDocsWorkflow | null;
@@ -1043,8 +1059,22 @@ export function OrdersPipelineView() {
                         order.raw_parser_payload?.prevent_salda_auto_finish,
                       );
                       const isCash = order.payment_terms?.includes('Наличные');
-                      const clientShort =
+                      const subOrders =
+                        order.client_orders && order.client_orders.length > 0
+                          ? order.client_orders
+                          : order.raw_parser_payload?.client_orders || [];
+                      const isMultiClient = Array.isArray(subOrders) && subOrders.length > 1;
+
+                      let clientShort =
                         order.client?.name?.replace(/ПАО|ООО|«|»/g, '').trim() || 'Клиент';
+                      if (isMultiClient) {
+                        const names = subOrders
+                          .map((s: any) => s.client_name?.replace(/ПАО|ООО|«|»/g, '').trim())
+                          .filter(Boolean);
+                        clientShort =
+                          names.slice(0, 2).join(' + ') +
+                          (names.length > 2 ? ` (+${names.length - 2})` : '');
+                      }
                       const routeText = formatRouteSummary(order);
 
                       return (
@@ -1079,9 +1109,24 @@ export function OrdersPipelineView() {
                                     (№{order.base_doc_number})
                                   </span>
                                 ) : null)}
-                              <span className="text-[10px] text-slate-500 font-semibold truncate max-w-[85px]">
+                              <span
+                                className="text-[10px] text-slate-500 font-semibold truncate max-w-[120px]"
+                                title={
+                                  isMultiClient
+                                    ? `В рейсе ${subOrders.length} клиентов: ${subOrders.map((s: any) => `${s.client_name || 'Клиент'} (${Number(s.price_without_vat || 0).toLocaleString('ru-RU')} ₽)`).join(', ')}`
+                                    : order.client?.name || clientShort
+                                }
+                              >
                                 {clientShort}
                               </span>
+                              {isMultiClient && (
+                                <span
+                                  className="px-1 py-0.2 bg-purple-100 text-purple-900 border border-purple-300 rounded text-[9px] font-bold shrink-0"
+                                  title="Мульти-заказ: несколько клиентов в одном рейсе с раздельными счетами"
+                                >
+                                  👥 {subOrders.length} кл.
+                                </span>
+                              )}
                               {isTransit && (
                                 <span
                                   className="px-1 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[9px] font-bold shrink-0"
@@ -2608,7 +2653,11 @@ function OrderDetailsModal({
               <p className="text-xs text-slate-400">
                 {isRepair
                   ? '🔧 Внутренний выезд: Ремонт автопарка (Гараж / СТО)'
-                  : order.client?.name || 'ПАО «Корпорация ВСМПО-АВИСМА»'}
+                  : order.client?.name || (
+                      <span className="text-amber-400 font-bold">
+                        ⚠️ Заказчик не указан (требуется заполнить)
+                      </span>
+                    )}
               </p>
             </div>
           </div>
@@ -2897,11 +2946,13 @@ function OrderDetailsModal({
                     📍 Пункт погрузки (Откуда):
                   </span>
                   <span className="font-bold text-slate-900 text-xs">
-                    {order.loading_address_json?.raw || 'г. Заречный'}
+                    {order.loading_address_json?.raw || order.loading_address_json?.address || (
+                      <span className="text-amber-600 font-bold">⚠️ Не указан (заполнить)</span>
+                    )}
                   </span>
                   <div className="mt-1 text-[10px] text-slate-500">
                     ЛОП:{' '}
-                    <b>{order.loading_org_name || order.client?.name || 'ООО "Континенталь"'}</b>
+                    <b>{order.loading_org_name || order.client?.name || '— (требуется указать)'}</b>
                   </div>
                 </div>
                 <div>
@@ -2909,10 +2960,12 @@ function OrderDetailsModal({
                     🏁 Пункт выгрузки (Куда):
                   </span>
                   <span className="font-bold text-slate-900 text-xs">
-                    {order.unloading_address_json?.raw || 'г. Верхняя Салда'}
+                    {order.unloading_address_json?.raw || order.unloading_address_json?.address || (
+                      <span className="text-amber-600 font-bold">⚠️ Не указан (заполнить)</span>
+                    )}
                   </span>
                   <div className="mt-1 text-[10px] text-slate-500">
-                    Получатель: <b>{order.client?.name || 'ПАО «Корпорация ВСМПО-АВИСМА»'}</b>
+                    Получатель: <b>{order.client?.name || '— (требуется указать)'}</b>
                   </div>
                 </div>
               </div>
@@ -2926,47 +2979,126 @@ function OrderDetailsModal({
               <span className="font-bold text-slate-900 text-xs block border-b border-slate-100 pb-1">
                 📦 Груз и Финансы
               </span>
-              <div className="space-y-1.5 text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Груз:</span>
-                  <span className="font-bold text-slate-900">{order.cargo_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Масса брутто:</span>
-                  <span className="font-bold text-slate-900">{order.weight_gross_kg} кг</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Ставка (без НДС):</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-black text-slate-900">
-                      {order.price_without_vat
-                        ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
-                        : '—'}
-                    </span>
-                    {onQuickEditRate && (
-                      <button
-                        onClick={() => onQuickEditRate(order)}
-                        className="px-1.5 py-0.5 text-[10px] text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded font-bold cursor-pointer transition"
-                        title="Быстро изменить ставку рейса"
-                      >
-                        ✏️ Изменить
-                      </button>
-                    )}
+              {(() => {
+                const subOrders =
+                  order.client_orders && order.client_orders.length > 0
+                    ? order.client_orders
+                    : order.raw_parser_payload?.client_orders || [];
+                const isMultiClient = Array.isArray(subOrders) && subOrders.length > 1;
+
+                if (isMultiClient) {
+                  return (
+                    <div className="space-y-2 text-[11px]">
+                      <div className="text-[10.5px] font-bold text-indigo-900 flex items-center justify-between border-b border-indigo-100 pb-1">
+                        <span>👥 Раздельные заказы клиентов ({subOrders.length}):</span>
+                        <span className="text-[9.5px] text-indigo-600 font-semibold">
+                          Раздельные счета
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 max-h-44 overflow-y-auto pr-0.5">
+                        {subOrders.map((sub: any, idx: number) => (
+                          <div
+                            key={sub.id || idx}
+                            className="p-1.5 bg-slate-50 border border-slate-200 rounded flex items-center justify-between text-[11px] gap-2"
+                          >
+                            <div className="truncate">
+                              <div className="font-bold text-slate-800 truncate">
+                                #{idx + 1} {sub.client_name || 'Клиент'}
+                                {sub.base_doc_number && (
+                                  <span className="text-slate-400 font-mono text-[10px] ml-1">
+                                    (№{sub.base_doc_number})
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-500 truncate">
+                                {sub.cargo_name || 'Груз'} •{' '}
+                                {sub.weight_gross_kg ? `${sub.weight_gross_kg} кг` : '—'}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-black text-indigo-700">
+                                {sub.price_without_vat
+                                  ? `${Number(sub.price_without_vat).toLocaleString('ru-RU')} ₽`
+                                  : '0 ₽'}
+                              </span>
+                              <span className="block text-[9px] text-slate-400">
+                                отдельный счёт
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-center pt-1.5 border-t border-slate-200">
+                        <span className="font-bold text-slate-700">Итого доход рейса:</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-black text-emerald-600 text-sm">
+                            {order.price_without_vat
+                              ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                              : '0 ₽'}
+                          </span>
+                          {onQuickEditRate && (
+                            <button
+                              onClick={() => onQuickEditRate(order)}
+                              className="px-1.5 py-0.5 text-[10px] text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded font-bold cursor-pointer transition"
+                              title="Быстро изменить ставку рейса"
+                            >
+                              ✏️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Груз:</span>
+                      <span className="font-bold text-slate-900">
+                        {order.cargo_name || (
+                          <span className="text-amber-600 font-bold">⚠️ Требуется заполнить</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Масса брутто:</span>
+                      <span className="font-bold text-slate-900">{order.weight_gross_kg} кг</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Ставка (без НДС):</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-slate-900">
+                          {order.price_without_vat
+                            ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                            : '—'}
+                        </span>
+                        {onQuickEditRate && (
+                          <button
+                            onClick={() => onQuickEditRate(order)}
+                            className="px-1.5 py-0.5 text-[10px] text-indigo-600 hover:bg-indigo-50 border border-indigo-200 rounded font-bold cursor-pointer transition"
+                            title="Быстро изменить ставку рейса"
+                          >
+                            ✏️ Изменить
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Канал оплаты:</span>
+                      <span className="font-bold text-indigo-700">
+                        {isCash ? '💵 В кассу компании' : '🏦 В дебиторку (Р/С)'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Условия:</span>
+                      <span className="text-slate-700 text-right truncate max-w-[180px]">
+                        {order.payment_terms || 'По факту доставки'}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Канал оплаты:</span>
-                  <span className="font-bold text-indigo-700">
-                    {isCash ? '💵 В кассу компании' : '🏦 В дебиторку (Р/С)'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Условия:</span>
-                  <span className="text-slate-700 text-right truncate max-w-[180px]">
-                    {order.payment_terms || 'По факту доставки'}
-                  </span>
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             {/* Автомобиль и Водитель */}
@@ -3101,6 +3233,142 @@ function OrderDetailsModal({
  * - Автозаполнение ВСМПО-АВИСМА, ООО «Геостройиндустрия», ручной ввод
  * ─────────────────────────────────────────────────────────────────────────────
  */
+/**
+ * Выпадающий список выбора контрагента (клиента) с живым поиском и созданием нового
+ */
+function OrderCounterpartySelect({
+  inputValue,
+  counterparties,
+  onChange,
+}: {
+  inputValue: string;
+  counterparties: any[];
+  onChange: (cp: any | null, name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(inputValue);
+  const [prevInputValue, setPrevInputValue] = useState(inputValue);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (inputValue !== prevInputValue) {
+    setPrevInputValue(inputValue);
+    setQuery(inputValue);
+  }
+
+  const filtered = query.trim()
+    ? counterparties.filter((c) => {
+        const q = query.toLowerCase();
+        return c.name?.toLowerCase().includes(q) || (c.inn && c.inn.includes(q));
+      })
+    : counterparties;
+
+  const exactMatch = counterparties.find(
+    (c) => c.name?.toLowerCase().trim() === query.toLowerCase().trim(),
+  );
+
+  const handleSelect = (cp: any) => {
+    setQuery(cp.name);
+    setOpen(false);
+    onChange(cp, cp.name);
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    setOpen(false);
+    onChange(null, '');
+  };
+
+  const handleBlur = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 200);
+  };
+
+  const handleFocus = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
+
+  return (
+    <div className="relative">
+      <div className="relative flex items-center">
+        <input
+          type="text"
+          required
+          className={`w-full border rounded pl-7 pr-7 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-2xs transition ${
+            !query.trim()
+              ? 'border-amber-400 bg-amber-50/50 text-slate-800 placeholder:text-amber-700/60'
+              : 'border-slate-300 bg-white text-slate-800 placeholder:text-slate-400'
+          }`}
+          value={query}
+          placeholder="⚠️ Выберите заказчика из списка или начните ввод..."
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onChange={(e) => {
+            const val = e.target.value;
+            setQuery(val);
+            setOpen(true);
+            if (!val.trim()) {
+              onChange(null, '');
+            } else {
+              const matched = counterparties.find(
+                (c) => c.name?.toLowerCase().trim() === val.toLowerCase().trim(),
+              );
+              onChange(matched || null, val);
+            }
+          }}
+        />
+        <span className="absolute left-2 text-slate-400 pointer-events-none text-xs">🔍</span>
+        {query && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleClear}
+            className="absolute right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 text-[10px] font-bold cursor-pointer transition"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {open && (filtered.length > 0 || (query.trim() && !exactMatch)) && (
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs"
+        >
+          {filtered.map((cp) => (
+            <button
+              key={cp.id}
+              type="button"
+              onClick={() => handleSelect(cp)}
+              className="w-full text-left px-3 py-1.5 hover:bg-indigo-50 hover:text-indigo-900 flex items-center justify-between transition cursor-pointer border-b border-slate-50 last:border-0"
+            >
+              <span className="font-semibold text-slate-800 truncate pr-2">{cp.name}</span>
+              {cp.inn && (
+                <span className="shrink-0 text-[10px] font-mono text-slate-400 bg-slate-100 px-1 py-0.2 rounded">
+                  ИНН {cp.inn}
+                </span>
+              )}
+            </button>
+          ))}
+
+          {query.trim() && !exactMatch && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onChange(null, query.trim());
+              }}
+              className="w-full text-left px-3 py-2 bg-indigo-50/60 hover:bg-indigo-100 text-indigo-700 font-bold flex items-center gap-1.5 transition cursor-pointer border-t border-indigo-100"
+            >
+              <span>➕ Использовать:</span>
+              <span className="italic truncate font-semibold">«{query.trim()}»</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CreateSmartOrderModal({
   initialOrder,
   presets,
@@ -3159,17 +3427,43 @@ function CreateSmartOrderModal({
             : 0,
       }));
     }
+    const isAutoOrder = Boolean(
+      initialOrder?.base_doc_name?.includes('ВЫЕЗД БЕЗ ЗАЯВКИ') ||
+      initialOrder?.base_doc_number?.startsWith('АВТО-') ||
+      initialOrder?.cargo_name?.includes('Выезд без заявки') ||
+      initialOrder?.cargo_name?.includes('⚠️'),
+    );
+
+    const rawLoad =
+      initialOrder?.loading_address_json?.raw || initialOrder?.loading_address_json?.address || '';
+    const cleanLoad =
+      (isAutoOrder && rawLoad === 'База Салда') || rawLoad.includes('⚠️') ? '' : rawLoad;
+
+    const rawUnload =
+      initialOrder?.unloading_address_json?.raw ||
+      initialOrder?.unloading_address_json?.address ||
+      '';
+    const cleanUnload = rawUnload.includes('⚠️') ? '' : rawUnload;
+
+    const rawCargo = initialOrder?.cargo_name || '';
+    const cleanCargo =
+      rawCargo.includes('⚠️') || rawCargo.includes('Выезд без заявки') ? '' : rawCargo;
+
     return [
       {
         id: '1',
-        loading_city: initialOrder?.loading_address_json?.city || '',
-        loading_address: initialOrder?.loading_address_json?.raw || '',
+        loading_city: cleanLoad
+          ? initialOrder?.loading_address_json?.city || cleanLoad.split(',')[0]
+          : '',
+        loading_address: cleanLoad,
         loading_org: initialOrder?.loading_org_name || '',
-        unloading_city: initialOrder?.unloading_address_json?.city || '',
-        unloading_address: initialOrder?.unloading_address_json?.raw || '',
+        unloading_city: cleanUnload
+          ? initialOrder?.unloading_address_json?.city || cleanUnload.split(',')[0]
+          : '',
+        unloading_address: cleanUnload,
         unloading_org: initialOrder?.client?.name || '',
-        cargo_name: initialOrder?.cargo_name || '',
-        weight_kg: initialOrder?.weight_gross_kg || 0,
+        cargo_name: cleanCargo,
+        weight_kg: initialOrder?.weight_gross_kg && !isAutoOrder ? initialOrder.weight_gross_kg : 0,
       },
     ];
   });
@@ -3180,6 +3474,145 @@ function CreateSmartOrderModal({
       initialOrder?.prevent_salda_auto_finish ||
       initialOrder?.raw_parser_payload?.prevent_salda_auto_finish,
     ),
+  );
+  // Мульти-заказы клиентов в рамках одного рейса
+  const [clientOrders, setClientOrders] = useState<ClientOrderPart[]>(() => {
+    const existing = initialOrder?.client_orders || initialOrder?.raw_parser_payload?.client_orders;
+    if (Array.isArray(existing) && existing.length > 0) {
+      return existing.map((co: any, idx: number) => ({
+        id: co.id || String(idx + 1),
+        client_id: co.client_id || '',
+        client_name: co.client_name || '',
+        client_inn: co.client_inn || '',
+        base_doc_number: co.base_doc_number || '',
+        cargo_name: co.cargo_name || '',
+        weight_gross_kg: co.weight_gross_kg !== undefined ? co.weight_gross_kg : '',
+        price_without_vat: co.price_without_vat !== undefined ? co.price_without_vat : '',
+        forwarder_id: co.forwarder_id || '',
+        forwarder_name: co.forwarder_name || '— (Прямой заказчик)',
+        payment_method: co.payment_method || 'bank_invoice',
+        payment_terms: co.payment_terms || 'Безналичный расчет (Дебиторская задолженность)',
+      }));
+    }
+
+    if (initialOrder) {
+      const isAutoOrder = Boolean(
+        initialOrder.base_doc_name?.includes('ВЫЕЗД БЕЗ ЗАЯВКИ') ||
+        initialOrder.base_doc_number?.startsWith('АВТО-') ||
+        initialOrder.cargo_name?.includes('Выезд без заявки') ||
+        initialOrder.cargo_name?.includes('⚠️'),
+      );
+      const rawDoc =
+        initialOrder.base_doc_number ||
+        (initialOrder.trip?.trip_number
+          ? String(initialOrder.trip.trip_number)
+          : String(initialOrder.order_number));
+      const cleanDoc = rawDoc.startsWith('АВТО-')
+        ? initialOrder.trip?.trip_number
+          ? String(initialOrder.trip.trip_number)
+          : ''
+        : rawDoc;
+      const rawCargo = initialOrder.cargo_name || '';
+      const cleanCargo =
+        rawCargo.includes('⚠️') || rawCargo.includes('Выезд без заявки') ? '' : rawCargo;
+
+      return [
+        {
+          id: '1',
+          client_id: initialOrder.client?.id || '',
+          client_name: initialOrder.client?.name || '',
+          client_inn: initialOrder.client?.inn || '',
+          base_doc_number: cleanDoc,
+          cargo_name: cleanCargo,
+          weight_gross_kg:
+            initialOrder.weight_gross_kg && !isAutoOrder ? initialOrder.weight_gross_kg : '',
+          price_without_vat:
+            initialOrder.price_without_vat && !isAutoOrder ? initialOrder.price_without_vat : '',
+          forwarder_id: initialOrder.forwarder?.id || '',
+          forwarder_name: initialOrder.forwarder?.name || '— (Прямой заказчик)',
+          payment_method: initialOrder.payment_terms?.includes('Наличные')
+            ? 'cash'
+            : 'bank_invoice',
+          payment_terms:
+            initialOrder.payment_terms || 'Безналичный расчет (Дебиторская задолженность)',
+        },
+      ];
+    }
+
+    return [
+      {
+        id: '1',
+        client_id: '',
+        client_name: '',
+        client_inn: '',
+        base_doc_number: '',
+        cargo_name: '',
+        weight_gross_kg: '',
+        price_without_vat: '',
+        forwarder_id: '',
+        forwarder_name: '— (Прямой заказчик)',
+        payment_method: 'bank_invoice',
+        payment_terms: 'Безналичный расчет (Дебиторская задолженность)',
+      },
+    ];
+  });
+
+  const handleAddClientOrder = () => {
+    if (clientOrders.length >= 6) {
+      alert('Максимальное количество заказов/клиентов в одном рейсе — 6');
+      return;
+    }
+    const newPart: ClientOrderPart = {
+      id: String(Date.now()),
+      client_id: '',
+      client_name: '',
+      client_inn: '',
+      base_doc_number: '',
+      cargo_name: '',
+      weight_gross_kg: '',
+      price_without_vat: '',
+      forwarder_id: '',
+      forwarder_name: '— (Прямой заказчик)',
+      payment_method: 'bank_invoice',
+      payment_terms: 'Безналичный расчет (Дебиторская задолженность)',
+    };
+    setClientOrders((prev) => [...prev, newPart]);
+  };
+
+  const handleRemoveClientOrder = (idx: number) => {
+    if (clientOrders.length <= 1) return;
+    setClientOrders((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateClientOrder = (idx: number, patch: Partial<ClientOrderPart>) => {
+    setClientOrders((prev) => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], ...patch } as ClientOrderPart;
+
+      // Если обновился 1-й (основной) заказ — синхронизируем form
+      if (idx === 0) {
+        setForm((f: any) => ({
+          ...f,
+          ...(patch.client_id !== undefined ? { client_id: patch.client_id } : {}),
+          ...(patch.client_name !== undefined ? { client_name: patch.client_name } : {}),
+          ...(patch.client_inn !== undefined ? { client_inn: patch.client_inn } : {}),
+          ...(patch.base_doc_number !== undefined
+            ? { base_doc_number: patch.base_doc_number }
+            : {}),
+          ...(patch.cargo_name !== undefined ? { cargo_name: patch.cargo_name } : {}),
+        }));
+      }
+      return updated;
+    });
+  };
+
+  const totalClientsRevenue = clientOrders.reduce(
+    (sum, co) => sum + (Number(co.price_without_vat) || 0),
+    0,
+  );
+  const totalClientsWeight = clientOrders.reduce(
+    (sum, co) => sum + (Number(co.weight_gross_kg) || 0),
+    0,
   );
 
   // Форма заявки
@@ -3293,6 +3726,22 @@ function CreateSmartOrderModal({
     setSelectedClientType(type);
     if (type === 'vsmpo') {
       const vsmpoPreset = presets.find((p: any) => p.title?.includes('ВСМПО')) || presets[0];
+      setClientOrders([
+        {
+          id: '1',
+          client_id: vsmpoPreset?.client_counterparty_id || '',
+          client_name: 'ПАО «Корпорация ВСМПО-АВИСМА»',
+          client_inn: '6607000556',
+          base_doc_number: `794/${new Date().getFullYear()}`,
+          cargo_name: 'Пруток 20мм, труба нерж.сталь',
+          weight_gross_kg: 110,
+          price_without_vat: 15000,
+          forwarder_id: vsmpoPreset?.forwarder_counterparty_id || '',
+          forwarder_name: 'ИП Парфенов Андрей Виталиевич',
+          payment_method: 'bank_invoice',
+          payment_terms: 'Безналичный расчет (Дебиторская задолженность, отсрочка 15 дней)',
+        },
+      ]);
       setForm((prev: any) => ({
         ...prev,
         preset_id: vsmpoPreset?.id || '',
@@ -3394,6 +3843,252 @@ function CreateSmartOrderModal({
         },
       ]);
       setStatusMessage('📝 Очищено: ручной ввод пустой заявки.');
+    }
+  };
+
+  // Опорные населенные пункты (пресеты точек маршрута)
+  const LOCATION_PRESETS = [
+    {
+      key: 'shaytanka',
+      label: 'Шайтанка',
+      city: 'Шайтанка',
+      address: 'пос. Шайтанка, Свердловская обл.',
+      loadingOrg: 'ООО "Геостройиндустрия" (ЛОП)',
+      cargoName: 'Пробы керна',
+      preventSaldaFinish: true,
+    },
+    {
+      key: 'maminskoe',
+      label: 'Маминское',
+      city: 'Маминское',
+      address: 'село Маминское, Свердловская обл.',
+      preventSaldaFinish: true,
+    },
+    {
+      key: 'vorontsovka',
+      label: 'Воронцовка',
+      city: 'Воронцовка',
+      address: 'пос. Воронцовка, Свердловская обл.',
+      preventSaldaFinish: true,
+    },
+    {
+      key: 'ekaterinburg',
+      label: 'Екатеринбург',
+      city: 'Екатеринбург',
+      address: 'г. Екатеринбург',
+    },
+    {
+      key: 'tagil',
+      label: 'Н.Тагил',
+      city: 'Нижний Тагил',
+      address: 'г. Нижний Тагил',
+    },
+    {
+      key: 'perm',
+      label: 'Пермь',
+      city: 'Пермь',
+      address: 'г. Пермь',
+    },
+    {
+      key: 'chelyabinsk',
+      label: 'Челябинск',
+      city: 'Челябинск',
+      address: 'г. Челябинск',
+    },
+    {
+      key: 'salda',
+      label: 'В.Салда',
+      city: 'Верхняя Салда',
+      address: 'г. Верхняя Салда, База',
+      preventSaldaFinish: false,
+    },
+  ];
+
+  // Матрица нормативных расстояний (км) между опорными городами
+  const DISTANCE_MATRIX: Record<string, Record<string, number>> = {
+    шайтанка: {
+      маминское: 275,
+      салда: 15,
+      екатеринбург: 190,
+      тагил: 55,
+      воронцовка: 245,
+      пермь: 395,
+      челябинск: 400,
+    },
+    маминское: {
+      шайтанка: 275,
+      салда: 260,
+      екатеринбург: 85,
+      тагил: 225,
+      воронцовка: 490,
+      пермь: 445,
+      челябинск: 210,
+    },
+    салда: {
+      шайтанка: 15,
+      маминское: 260,
+      екатеринбург: 175,
+      тагил: 45,
+      воронцовка: 230,
+      пермь: 380,
+      челябинск: 385,
+    },
+    екатеринбург: {
+      салда: 175,
+      шайтанка: 190,
+      маминское: 85,
+      тагил: 140,
+      воронцовка: 400,
+      пермь: 360,
+      челябинск: 210,
+    },
+    тагил: {
+      салда: 45,
+      шайтанка: 55,
+      маминское: 225,
+      екатеринбург: 140,
+      воронцовка: 270,
+      пермь: 340,
+      челябинск: 350,
+    },
+    воронцовка: {
+      салда: 230,
+      шайтанка: 245,
+      маминское: 490,
+      екатеринбург: 400,
+      тагил: 270,
+      пермь: 420,
+      челябинск: 610,
+    },
+    пермь: {
+      салда: 380,
+      шайтанка: 395,
+      маминское: 445,
+      екатеринбург: 360,
+      тагил: 340,
+      воронцовка: 420,
+      челябинск: 560,
+    },
+    челябинск: {
+      салда: 385,
+      шайтанка: 400,
+      маминское: 210,
+      екатеринбург: 210,
+      тагил: 350,
+      воронцовка: 610,
+      пермь: 560,
+    },
+  };
+
+  const getEstimatedRouteDistance = (cityA?: string, cityB?: string): number | null => {
+    if (!cityA || !cityB) return null;
+    const a = cityA
+      .toLowerCase()
+      .replace(/^(г.|пос.|село|п.)s*/, '')
+      .trim();
+    const b = cityB
+      .toLowerCase()
+      .replace(/^(г.|пос.|село|п.)s*/, '')
+      .trim();
+
+    const findKey = (text: string) => {
+      for (const k of Object.keys(DISTANCE_MATRIX)) {
+        if (text.includes(k) || k.includes(text)) return k;
+      }
+      return null;
+    };
+
+    const keyA = findKey(a);
+    const keyB = findKey(b);
+    if (keyA && keyB && DISTANCE_MATRIX[keyA] && DISTANCE_MATRIX[keyA][keyB]) {
+      return DISTANCE_MATRIX[keyA][keyB];
+    }
+    return null;
+  };
+
+  const formatTravelTime = (km: number) => {
+    const hours = km / 70; // Средняя скорость 70 км/ч
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    if (h === 0) return `${m} мин`;
+    if (m === 0) return `${h} ч`;
+    return `${h} ч ${m} мин`;
+  };
+
+  // Выбор пресета точки маршрута
+  const applyLocationPreset = (
+    field: 'loading' | 'unloading',
+    presetKey: string,
+    stopIdx?: number,
+  ) => {
+    const loc = LOCATION_PRESETS.find((l) => l.key === presetKey);
+    if (!loc) return;
+
+    if (stopIdx !== undefined && isMultiStop) {
+      handleUpdateRouteStop(stopIdx, {
+        ...(field === 'loading'
+          ? {
+              loading_city: loc.city,
+              loading_address: loc.address,
+              ...(loc.loadingOrg ? { loading_org: loc.loadingOrg } : {}),
+            }
+          : {
+              unloading_city: loc.city,
+              unloading_address: loc.address,
+            }),
+      });
+    } else {
+      setForm((prev: any) => {
+        const updated = {
+          ...prev,
+          ...(field === 'loading'
+            ? {
+                loading_city: loc.city,
+                loading_address: loc.address,
+                ...(loc.loadingOrg ? { loading_org_name: loc.loadingOrg } : {}),
+                ...(loc.cargoName &&
+                (!prev.cargo_name || prev.cargo_name.includes('Выезд без заявки'))
+                  ? { cargo_name: loc.cargoName }
+                  : {}),
+              }
+            : {
+                unloading_city: loc.city,
+                unloading_address: loc.address,
+              }),
+        };
+
+        const loadCity = field === 'loading' ? loc.city : updated.loading_city;
+        const unloadCity = field === 'unloading' ? loc.city : updated.unloading_city;
+
+        if (
+          (loadCity?.toLowerCase().includes('шайтан') &&
+            unloadCity?.toLowerCase().includes('мамин')) ||
+          (loadCity?.toLowerCase().includes('мамин') &&
+            unloadCity?.toLowerCase().includes('шайтан'))
+        ) {
+          updated.price_without_vat = 40000;
+          setStatusMessage('⭐ Применен фиксированный тариф Шайтанка ↔ Маминское: 40 000 ₽');
+        }
+
+        return updated;
+      });
+    }
+
+    const currentLoad = field === 'loading' ? loc.city : form.loading_city;
+    const currentUnload = field === 'unloading' ? loc.city : form.unloading_city;
+
+    if (
+      currentLoad?.toLowerCase().includes('шайтан') &&
+      !currentUnload?.toLowerCase().includes('салда')
+    ) {
+      setPreventSaldaAutoFinish(true);
+      setStatusMessage('🛡️ Защита от закрытия в Салде активна (погрузка: Шайтанка).');
+    } else if (
+      field === 'unloading' &&
+      loc.city === 'Верхняя Салда' &&
+      currentLoad === 'Верхняя Салда'
+    ) {
+      setPreventSaldaAutoFinish(false);
     }
   };
 
@@ -3562,11 +4257,13 @@ function CreateSmartOrderModal({
         loading_point_id: form.loading_point_id || null,
 
         cargo_name: form.cargo_name || 'Груз',
-        weight_gross_kg: totalWeightKg || 0,
-        weight_net_kg: totalWeightKg || 0,
+        weight_gross_kg: totalClientsWeight > 0 ? totalClientsWeight : totalWeightKg || 0,
+        weight_net_kg: totalClientsWeight > 0 ? totalClientsWeight : totalWeightKg || 0,
         places_count: Number(form.places_count) || 1,
         packaging_type: form.packaging_type || 'паллеты',
-        price_without_vat: Number(form.price_without_vat) || 0,
+        price_without_vat:
+          totalClientsRevenue > 0 ? totalClientsRevenue : Number(form.price_without_vat) || 0,
+        client_orders: clientOrders,
         payment_terms:
           form.payment_method === 'cash'
             ? 'Оплата наличными водителю (В кассу)'
@@ -3619,6 +4316,46 @@ function CreateSmartOrderModal({
       alert(`Ошибка: ${err.message}`);
     }
   };
+
+  // Нормативный расчет километража и времени пути (ср. скорость 70 км/ч)
+  const effectiveLoadCity = isMultiStop
+    ? routes[0]?.loading_city || form.loading_city
+    : form.loading_city;
+  const effectiveUnloadCity = isMultiStop
+    ? routes[routes.length - 1]?.unloading_city || form.unloading_city
+    : form.unloading_city;
+  const routeDistKm = getEstimatedRouteDistance(effectiveLoadCity, effectiveUnloadCity);
+  const routeTimeStr = routeDistKm ? formatTravelTime(routeDistKm) : null;
+  const isCurrentShaytankaMaminskoe =
+    (effectiveLoadCity?.toLowerCase().includes('шайтан') &&
+      effectiveUnloadCity?.toLowerCase().includes('мамин')) ||
+    (effectiveLoadCity?.toLowerCase().includes('мамин') &&
+      effectiveUnloadCity?.toLowerCase().includes('шайтан'));
+  const minBillingPrice = routeDistKm ? routeDistKm * 50 : null;
+
+  const handleAutoSetDeliveryTime = () => {
+    if (!routeDistKm || !form.planned_loading_at) return;
+    const loadDate = new Date(form.planned_loading_at);
+    if (isNaN(loadDate.getTime())) return;
+    const travelHours = routeDistKm / 70;
+    const totalMs = (travelHours + 1) * 3600 * 1000;
+    const deliveryDate = new Date(loadDate.getTime() + totalMs);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const formatted = `${deliveryDate.getFullYear()}-${pad(deliveryDate.getMonth() + 1)}-${pad(
+      deliveryDate.getDate(),
+    )}T${pad(deliveryDate.getHours())}:${pad(deliveryDate.getMinutes())}`;
+    setForm((prev: any) => ({ ...prev, planned_delivery_at: formatted }));
+    setStatusMessage(
+      `⏱️ Расчетное время доставки: +${formatTravelTime(routeDistKm)} пути (+1ч на погрузку)`,
+    );
+  };
+
+  const hasEmptyFields =
+    !form.loading_address ||
+    !form.unloading_address ||
+    !form.cargo_name ||
+    !form.price_without_vat ||
+    !form.client_name;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -3714,6 +4451,19 @@ function CreateSmartOrderModal({
           </div>
         )}
 
+        {/* Компактный баннер ожидания заполнения обязательных полей логистом */}
+        {hasEmptyFields && (
+          <div className="flex items-center justify-between px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold">
+            <span className="flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>Требуется заполнить поля рейса: маршрут, груз, ставку и заказчика</span>
+            </span>
+            <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+              Ожидает заполнения
+            </span>
+          </div>
+        )}
+
         {/* ФОРМА ЗАЯВКИ */}
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           {/* Секция 1: Реквизиты и участники */}
@@ -3785,12 +4535,22 @@ function CreateSmartOrderModal({
             </div>
             <div>
               <label className="font-bold text-slate-700 block mb-0.5">Заказчик (Клиент)</label>
-              <input
-                type="text"
-                required
-                value={form.client_name}
-                onChange={(e) => setForm({ ...form, client_name: e.target.value })}
-                className="w-full p-1.5 border border-slate-300 rounded bg-white font-semibold"
+              <OrderCounterpartySelect
+                inputValue={form.client_name}
+                counterparties={counterparties}
+                onChange={(cp, name) => {
+                  setForm((f: any) => ({
+                    ...f,
+                    client_id: cp?.id || '',
+                    client_name: name,
+                    client_inn: cp?.inn || f.client_inn,
+                  }));
+                  handleUpdateClientOrder(0, {
+                    client_id: cp?.id || '',
+                    client_name: name,
+                    client_inn: cp?.inn || '',
+                  });
+                }}
               />
             </div>
             <div>
@@ -3923,9 +4683,27 @@ function CreateSmartOrderModal({
               /* Одиночный рейс */
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-0.5">
-                    📍 Пункт погрузки (Откуда)
-                  </label>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="font-bold text-slate-700 text-xs">
+                      📍 Пункт погрузки (Откуда)
+                    </label>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) applyLocationPreset('loading', e.target.value);
+                      }}
+                      className="text-[11px] py-0.5 px-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-semibold text-slate-700 cursor-pointer transition"
+                    >
+                      <option value="" disabled>
+                        ⚡ Выбрать точку...
+                      </option>
+                      {LOCATION_PRESETS.map((loc) => (
+                        <option key={`load-opt-${loc.key}`} value={loc.key}>
+                          {loc.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <input
                     type="text"
                     required
@@ -3937,7 +4715,12 @@ function CreateSmartOrderModal({
                         loading_city: e.target.value.split(',')[0] || e.target.value,
                       })
                     }
-                    className="w-full p-1.5 border border-slate-300 rounded bg-white"
+                    placeholder="⚠️ Укажите пункт погрузки (или выберите пресет)..."
+                    className={`w-full p-1.5 border rounded text-xs font-medium ${
+                      !form.loading_address
+                        ? 'border-amber-400 bg-amber-50/50 text-slate-800 placeholder:text-amber-700/60'
+                        : 'border-slate-300 bg-white'
+                    }`}
                   />
                   <div className="flex justify-between mt-1 text-[11px] text-slate-500">
                     <span>
@@ -3947,9 +4730,27 @@ function CreateSmartOrderModal({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-0.5">
-                    🏁 Пункт выгрузки (Куда)
-                  </label>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="font-bold text-slate-700 text-xs">
+                      🏁 Пункт выгрузки (Куда)
+                    </label>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) applyLocationPreset('unloading', e.target.value);
+                      }}
+                      className="text-[11px] py-0.5 px-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-semibold text-slate-700 cursor-pointer transition"
+                    >
+                      <option value="" disabled>
+                        ⚡ Выбрать точку...
+                      </option>
+                      {LOCATION_PRESETS.map((loc) => (
+                        <option key={`unload-opt-${loc.key}`} value={loc.key}>
+                          {loc.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <input
                     type="text"
                     required
@@ -3961,7 +4762,12 @@ function CreateSmartOrderModal({
                         unloading_city: e.target.value.split(',')[0] || e.target.value,
                       })
                     }
-                    className="w-full p-1.5 border border-slate-300 rounded bg-white"
+                    placeholder="⚠️ Укажите пункт выгрузки (или выберите пресет)..."
+                    className={`w-full p-1.5 border rounded text-xs font-medium ${
+                      !form.unloading_address
+                        ? 'border-amber-400 bg-amber-50/50 text-slate-800 placeholder:text-amber-700/60'
+                        : 'border-slate-300 bg-white'
+                    }`}
                   />
                   <div className="mt-1 text-[11px] text-slate-500">
                     <span>
@@ -3969,6 +4775,29 @@ function CreateSmartOrderModal({
                     </span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Нормативный километраж и расчётное время пути при 70 км/ч */}
+            {routeDistKm && (
+              <div className="flex items-center justify-between px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <span>
+                    🛣️ Норматив: <b>{routeDistKm} км</b>
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span>
+                    ⏱️ В пути: <b>{routeTimeStr}</b> (при 70 км/ч)
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAutoSetDeliveryTime}
+                  className="text-[11px] text-indigo-600 hover:text-indigo-800 underline font-bold cursor-pointer"
+                  title="Рассчитать время выгрузки на основе времени погрузки и скорости 70 км/ч (+1ч погрузка)"
+                >
+                  ⚡ Подставить в дату доставки
+                </button>
               </div>
             )}
 
@@ -3981,60 +4810,239 @@ function CreateSmartOrderModal({
                 className="mt-0.5 w-4 h-4 text-indigo-600 rounded cursor-pointer"
               />
               <div className="text-xs">
-                <span>
-                  🔄 Составной маршрут (1-й заезд в Салду — транзит, снимает галочку; 2-й заезд —
-                  завершает)
+                <span className="flex items-center gap-1.5">
+                  🔄 Составной маршрут через Верхнюю Салду (транзит / защита от закрытия Wialon)
+                  {preventSaldaAutoFinish && (
+                    <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[10px] font-bold">
+                      🛡️ Защита активна
+                    </span>
+                  )}
                 </span>
-                <span className="block font-normal text-[10.5px] text-amber-800 mt-0.5">
-                  При первом заезде в геозону Салды Wialon фиксирует промежуточную отметку и
-                  автоматически снимает эту галочку. Второй заезд в Салду штатно завершит рейс и
-                  переведет заявку на ревью.
+                <span className="block font-normal text-[10.5px] text-amber-900 mt-0.5">
+                  Если машина проезжает или ночует в Салде перед выгрузкой (например: Шайтанка →
+                  Маминское), рейс останется в статусе «В пути» и не завершится преждевременно.
                 </span>
               </div>
             </label>
           </div>
 
-          {/* Секция 3: Груз, Ставка и Финансовое закрытие */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="col-span-2">
-              <label className="font-bold text-slate-700 block mb-0.5">Наименование груза</label>
-              <input
-                type="text"
-                required
-                value={form.cargo_name}
-                onChange={(e) => setForm({ ...form, cargo_name: e.target.value })}
-                className="w-full p-1.5 border border-slate-300 rounded bg-slate-50"
-              />
+          {/* Секция 3: Клиенты, груз и ставки перевозки (мульти-заказ / догруз) */}
+          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+              <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                <span>📦</span>
+                <span>Груз и клиенты в рейсе</span>
+                {clientOrders.length > 1 && (
+                  <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-800 rounded font-bold text-[10.5px]">
+                    Сборный рейс ({clientOrders.length} кл.)
+                  </span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={handleAddClientOrder}
+                className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[11px] font-bold cursor-pointer transition flex items-center gap-1 active:scale-95"
+              >
+                <span>+ Добавить клиента / догруз ({clientOrders.length}/6)</span>
+              </button>
             </div>
-            <div>
-              <label className="font-bold text-slate-700 block mb-0.5">
-                Масса брутто (кг) {isMultiStop ? '(суммарная)' : ''}
-              </label>
-              <input
-                type="number"
-                required
-                value={
-                  isMultiStop
-                    ? routes.reduce((acc, r) => acc + (Number(r.weight_kg) || 0), 0)
-                    : form.weight_gross_kg
-                }
-                onChange={(e) => setForm({ ...form, weight_gross_kg: Number(e.target.value) })}
-                className="w-full p-1.5 border border-slate-300 rounded bg-slate-50 font-bold"
-              />
-            </div>
-            <div>
-              <label className="font-bold text-slate-700 block mb-0.5">Ставка без НДС (руб.)</label>
-              <input
-                type="number"
-                required
-                value={form.price_without_vat}
-                onChange={(e) => setForm({ ...form, price_without_vat: e.target.value })}
-                className="w-full p-1.5 border border-slate-300 rounded bg-slate-50 font-black text-indigo-700"
-              />
-            </div>
-          </div>
 
-          {/* ФИНАНСОВАЯ ЦЕПОЧКА ЗАКРЫТИЯ */}
+            {clientOrders.length > 1 ? (
+              <div className="space-y-2">
+                {clientOrders.map((co, idx) => (
+                  <div
+                    key={co.id || idx}
+                    className="p-2 bg-white border border-slate-200 rounded-lg space-y-1.5 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 border-b border-slate-100 pb-1">
+                      <span className="text-indigo-900">
+                        {idx === 0 ? '👑 Основной заказчик' : `📦 Догруз / Клиент #${idx + 1}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveClientOrder(idx)}
+                        className="text-rose-500 hover:text-rose-700 text-[10.5px] font-bold cursor-pointer"
+                      >
+                        ✕ Удалить
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-1.5 items-end">
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">
+                          Клиент (Контрагент):
+                        </label>
+                        <OrderCounterpartySelect
+                          inputValue={co.client_name}
+                          counterparties={counterparties}
+                          onChange={(cp, name) =>
+                            handleUpdateClientOrder(idx, {
+                              client_id: cp?.id || '',
+                              client_name: name,
+                              client_inn: cp?.inn || '',
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">
+                          № Заявки / ЭПЭ:
+                        </label>
+                        <input
+                          type="text"
+                          value={co.base_doc_number || ''}
+                          onChange={(e) =>
+                            handleUpdateClientOrder(idx, { base_doc_number: e.target.value })
+                          }
+                          placeholder={form.base_doc_number || '№'}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-xs font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">
+                          Груз и вес:
+                        </label>
+                        <div className="flex gap-1">
+                          <input
+                            type="text"
+                            value={co.cargo_name || ''}
+                            onChange={(e) =>
+                              handleUpdateClientOrder(idx, { cargo_name: e.target.value })
+                            }
+                            placeholder="Груз"
+                            className="w-2/3 p-1.5 border border-slate-300 rounded bg-white text-xs font-semibold"
+                          />
+                          <input
+                            type="number"
+                            value={co.weight_gross_kg || ''}
+                            onChange={(e) =>
+                              handleUpdateClientOrder(idx, {
+                                weight_gross_kg: e.target.value ? Number(e.target.value) : '',
+                              })
+                            }
+                            placeholder="кг"
+                            className="w-1/3 p-1.5 border border-slate-300 rounded bg-white text-xs font-bold"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">
+                          Ставка без НДС (₽):
+                        </label>
+                        <input
+                          type="number"
+                          value={co.price_without_vat || ''}
+                          onChange={(e) =>
+                            handleUpdateClientOrder(idx, {
+                              price_without_vat: Number(e.target.value) || '',
+                            })
+                          }
+                          placeholder="Ставка ₽"
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-xs font-bold text-indigo-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex items-center justify-between p-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-950">
+                  <span>
+                    Итого по рейсу: <b>{totalClientsRevenue.toLocaleString('ru-RU')} ₽</b> • Общий
+                    вес: <b>{totalClientsWeight.toLocaleString('ru-RU')} кг</b>
+                  </span>
+                  <span className="text-[10.5px] text-indigo-700 font-semibold">
+                    ✓ Раздельные счета (trip_orders) на каждого клиента
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* Одиночный груз и ставка */
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-0.5 text-xs">
+                    Наименование груза
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.cargo_name}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setForm({ ...form, cargo_name: v });
+                      handleUpdateClientOrder(0, { cargo_name: v });
+                    }}
+                    placeholder="⚠️ Укажите наименование груза..."
+                    className={`w-full p-1.5 border rounded text-xs font-semibold ${
+                      !form.cargo_name
+                        ? 'border-amber-400 bg-amber-50/50 text-slate-800 placeholder:text-amber-700/60'
+                        : 'border-slate-300 bg-white'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-0.5 text-xs">
+                    Вес груза (брутто, кг)
+                  </label>
+                  <input
+                    type="number"
+                    value={form.weight_gross_kg}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setForm({ ...form, weight_gross_kg: v });
+                      handleUpdateClientOrder(0, {
+                        weight_gross_kg: v ? Number(v) : '',
+                      });
+                    }}
+                    placeholder="Напр. 3000"
+                    className="w-full p-1.5 border border-slate-300 rounded bg-white text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="font-bold text-slate-700 text-xs">Ставка без НДС (₽)</label>
+                    <div className="flex items-center gap-1">
+                      {isCurrentShaytankaMaminskoe && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm((f: any) => ({ ...f, price_without_vat: 40000 }));
+                            handleUpdateClientOrder(0, { price_without_vat: 40000 });
+                          }}
+                          className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-1 py-0.2 rounded font-bold cursor-pointer transition"
+                          title="Фиксированная базовая ставка Шайтанка ↔ Маминское"
+                        >
+                          ⚡ 40 000 ₽
+                        </button>
+                      )}
+                      {minBillingPrice && !isCurrentShaytankaMaminskoe && (
+                        <span
+                          className="text-[10px] text-slate-500 font-semibold"
+                          title="Минимальная расчетная цена из расчета 50 ₽/км"
+                        >
+                          мин. {minBillingPrice.toLocaleString('ru-RU')} ₽
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    type="number"
+                    required
+                    value={form.price_without_vat}
+                    onChange={(e) => {
+                      const v = Number(e.target.value) || '';
+                      setForm({ ...form, price_without_vat: v });
+                      handleUpdateClientOrder(0, { price_without_vat: v });
+                    }}
+                    placeholder="⚠️ Укажите ставку рейса..."
+                    className={`w-full p-1.5 border rounded text-xs font-bold ${
+                      !form.price_without_vat
+                        ? 'border-amber-400 bg-amber-50/50 text-slate-800 placeholder:text-amber-700/60'
+                        : 'border-slate-300 bg-white text-indigo-700'
+                    }`}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           <div className="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/60 flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="font-bold text-slate-900 block text-xs">

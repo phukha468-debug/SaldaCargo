@@ -7,6 +7,13 @@ const SALDA_BASE_LAT = parseFloat(process.env.WIALON_BASE_LAT || '58.053');
 const SALDA_BASE_LON = parseFloat(process.env.WIALON_BASE_LON || '60.552');
 const SALDA_BASE_RADIUS = parseFloat(process.env.WIALON_BASE_RADIUS_METERS || '8000'); // 8 км
 
+// Координаты Шайтанки (погрузка керна/проб Геостройиндустрия) и радиус геозоны
+export const SHAYTANKA_LAT = parseFloat(process.env.WIALON_SHAYTANKA_LAT || '58.0708');
+export const SHAYTANKA_LON = parseFloat(process.env.WIALON_SHAYTANKA_LON || '60.7704');
+export const SHAYTANKA_RADIUS_METERS = parseFloat(
+  process.env.WIALON_SHAYTANKA_RADIUS_METERS || '6000',
+); // 6 км
+
 /**
  * Смещение одометра Wialon для калибровки к реальному спидометру на приборной панели.
  * Для А096МВ196 (Unit 11873): Wialon 195 181 км соответствует реальным 461 685 км на приборке (+266 504 км).
@@ -194,6 +201,28 @@ export async function checkHistoricalBaseVisit(
     console.warn('[Wialon] Ошибка проверки истории сообщений:', e);
   }
   return null;
+}
+
+/**
+ * Проверка посещения геозоны Шайтанки (зона погрузки керна/проб)
+ */
+export async function checkHistoricalShaytankaVisit(
+  cleanHost: string,
+  eid: string,
+  unitId: number,
+  timeFromSec: number,
+  timeToSec: number,
+): Promise<{ visited: boolean; timeSec: number; distanceMeters: number } | null> {
+  return checkHistoricalBaseVisit(
+    cleanHost,
+    eid,
+    unitId,
+    timeFromSec,
+    timeToSec,
+    SHAYTANKA_LAT,
+    SHAYTANKA_LON,
+    SHAYTANKA_RADIUS_METERS,
+  );
 }
 
 /**
@@ -406,6 +435,69 @@ export async function syncValdaiTelematics(
       ) as { id: string; started_at?: string; driver_note?: string | null } | undefined;
 
       if (activeOrder && tripObj?.started_at) {
+        // Проверка: находится ли машина прямо сейчас в Шайтанке (зона погрузки рудника/проб)
+        const distToShaytanka = calculateDistanceMeters(
+          pos.lat,
+          pos.lon,
+          SHAYTANKA_LAT,
+          SHAYTANKA_LON,
+        );
+        const isCurrentlyInShaytanka = distToShaytanka <= SHAYTANKA_RADIUS_METERS;
+
+        if (isCurrentlyInShaytanka && !activeOrder.raw_parser_payload?.visited_shaytanka) {
+          console.log(
+            `[Wialon Tracker] 🌲 Валдай ${pos.regNumber} заехал в Шайтанку (${(distToShaytanka / 1000).toFixed(1)} км от центра)! Активирована авто-защита от закрытия рейса в Салде.`,
+          );
+
+          const isAutoDraft =
+            !activeOrder.raw_parser_payload?.client_name &&
+            (!activeOrder.raw_parser_payload?.routes ||
+              activeOrder.raw_parser_payload.routes.length === 0);
+
+          const updateOrderPayload: any = {
+            raw_parser_payload: {
+              ...(activeOrder.raw_parser_payload || {}),
+              visited_shaytanka: true,
+              prevent_salda_auto_finish: true,
+              shaytanka_arrived_at: new Date().toISOString(),
+            },
+            updated_at: new Date().toISOString(),
+          };
+
+          if (isAutoDraft) {
+            updateOrderPayload.loading_address_json = {
+              raw: 'Шайтанка',
+              city: 'Шайтанка',
+            };
+            updateOrderPayload.unloading_address_json = {
+              raw: 'с. Маминское, склад 2',
+              city: 'Маминское',
+            };
+            updateOrderPayload.cargo_name = 'Пробы керна (Шайтанка)';
+            updateOrderPayload.client_name = 'ООО "Геостройиндустрия"';
+            updateOrderPayload.price_without_vat = 40000;
+          }
+
+          await supabase.from('orders').update(updateOrderPayload).eq('id', activeOrder.id);
+
+          const prevNote = tripObj.driver_note || '';
+          const noteMarker = '[Погрузка Шайтанка';
+          if (!prevNote.includes(noteMarker)) {
+            const nowTimeStr = new Date().toLocaleTimeString('ru-RU', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+            await supabase
+              .from('trips')
+              .update({
+                driver_note:
+                  `${prevNote}\n[Погрузка Шайтанка: ${nowTimeStr}, одометр: ${effectiveOdo} км (авто-защита транзита через Салду активна)]`.trim(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', tripObj.id);
+          }
+        }
+
         const saldaTransitCount = activeOrder.raw_parser_payload?.salda_transit_count || 0;
         const lastTransitTs = activeOrder.raw_parser_payload?.last_transit_checked_at || 0;
         const nowSec = Math.floor(Date.now() / 1000);

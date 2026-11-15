@@ -85,26 +85,18 @@ export async function handleVehicleDeparture(
     }
 
     // При выезде из геозоны Салды после транзита:
-    // фиксируем время выезда и снимаем in_salda_transit / prevent_salda_auto_finish,
-    // чтобы при следующем окончательном возвращении на базу рейс смог штатно перейти на ревью.
-    if (
-      inProgressOrder.prevent_salda_auto_finish ||
-      inProgressOrder.raw_parser_payload?.prevent_salda_auto_finish ||
-      inProgressOrder.raw_parser_payload?.in_salda_transit
-    ) {
-      await supabase
-        .from('orders')
-        .update({
-          raw_parser_payload: {
-            ...(inProgressOrder.raw_parser_payload || {}),
-            prevent_salda_auto_finish: false,
-            in_salda_transit: false,
-            departed_after_transit_at: departureTime,
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', inProgressOrder.id);
-    }
+    // фиксируем время выезда без сброса флага защиты prevent_salda_auto_finish.
+    await supabase
+      .from('orders')
+      .update({
+        raw_parser_payload: {
+          ...(inProgressOrder.raw_parser_payload || {}),
+          in_salda_transit: false,
+          departed_after_transit_at: departureTime,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', inProgressOrder.id);
 
     // Фиксируем выезд после транзита в заметке рейса
     const tripObj = Array.isArray(inProgressOrder.trip)
@@ -190,25 +182,20 @@ export async function handleVehicleDeparture(
       driverId = defaultDriver?.id;
     }
 
-    const autoDocNumber = `АВТО-${Math.floor(1000 + Math.random() * 9000)}`;
-
     const { data: emergencyOrder, error: emergErr } = await supabase
       .from('orders')
       .insert({
         source_type: 'direct_ad',
         status: 'in_progress',
         base_doc_name: '⚠️ ВЫЕЗД БЕЗ ЗАЯВКИ',
-        base_doc_number: autoDocNumber,
+        base_doc_number: '',
         base_doc_date: departureTime.slice(0, 10),
-        cargo_name: '⚠️ Выезд без заявки (Wialon)',
-        cargo_condition: '⚠️ Необходимо заполнить данные груза',
-        loading_address_json: { city: 'Верхняя Салда', address: 'База Салда' },
-        unloading_address_json: {
-          city: '⚠️ Требуется заполнить',
-          address: '⚠️ Требуется заполнить',
-        },
-        price_without_vat: 0,
-        payment_terms: '⚠️ Требуется заполнить условия оплаты',
+        cargo_name: '',
+        cargo_condition: null,
+        loading_address_json: { city: '', raw: '' },
+        unloading_address_json: { city: '', raw: '' },
+        price_without_vat: null,
+        payment_terms: '',
         assigned_vehicle_id: params.vehicleId,
         assigned_driver_id: driverId,
         actual_loading_arrival_at: departureTime,
@@ -225,7 +212,7 @@ export async function handleVehicleDeparture(
 
   const isEmergency = !order;
   const tripNote = isEmergency
-    ? `⚠️ Внимание: Автомашина выехала без заявки по геозоне Wialon! Заявка № ${targetOrder.base_doc_number}. Необходимо заполнить все данные.`
+    ? '⚠️ Внимание: Автомашина выехала без заявки по геозоне Wialon! Поля заявки пустые, требуется заполнение.'
     : `Авто-старт по геозоне Wialon. Заявка № ${targetOrder.base_doc_number || targetOrder.order_number}`;
 
   // Парсим номер рейса из номера заявки, чтобы связать их строго 1:1
@@ -266,10 +253,15 @@ export async function handleVehicleDeparture(
   }
 
   // Обновляем заказ: переводим в статус in_progress и привязываем active_trip_id
+  // Если у авто-заявки не было номера, связываем номер заявки с номером рейса 1:1
+  const finalDocNumber =
+    targetOrder.base_doc_number || (newTrip.trip_number ? String(newTrip.trip_number) : '');
+
   await supabase
     .from('orders')
     .update({
       status: 'in_progress',
+      base_doc_number: finalDocNumber,
       active_trip_id: newTrip.id,
       actual_loading_arrival_at: departureTime,
       updated_at: new Date().toISOString(),
@@ -363,15 +355,41 @@ export async function handleVehicleArrival(
   const arrivalDate = new Date(arrivalTime);
   const diffMinutes = Math.max(1, (arrivalDate.getTime() - startDate.getTime()) / (1000 * 60));
 
-  // Явный запрет автозавершения (выставляется вручную или при первом транзитном заезде)
+  // Текущий фактический пробег рейса
+  const currentOdo = params.odometer || trip.odometer_end || trip.odometer_start || 0;
+  const startOdo = trip.odometer_start || currentOdo;
+  const currentTripMileage = Math.max(0, currentOdo - startOdo);
+
+  // Явный запрет автозавершения (выставляется вручную или при транзите через Салду)
   const isTransitExplicitlyAllowed = Boolean(
     order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
   );
 
+  // Маршрут Шайтанка: посещение геозоны Шайтанки или указание Шайтанки в адресе/маршруте
+  const isShaytankaRoute = Boolean(
+    order.raw_parser_payload?.visited_shaytanka ||
+    order.loading_address_json?.raw?.toLowerCase().includes('шайтан') ||
+    order.loading_address_json?.city?.toLowerCase().includes('шайтан') ||
+    order.cargo_name?.toLowerCase().includes('шайтан') ||
+    (trip.driver_note && trip.driver_note.toLowerCase().includes('шайтан')),
+  );
+
+  // Точка выгрузки Маминское (или рудник/склад ООО «Геостройиндустрия»):
+  const isMaminskoeDestination = Boolean(
+    order.unloading_address_json?.raw?.toLowerCase().includes('мамин') ||
+    order.unloading_address_json?.city?.toLowerCase().includes('мамин') ||
+    order.cargo_name?.toLowerCase().includes('мамин') ||
+    (trip.driver_note && trip.driver_note.toLowerCase().includes('мамин')),
+  );
+
+  // До Маминского и обратно кругорейс более 450-500 км!
+  // Если машина проехала меньше 300 км — она ещё НЕ завершила рейс в Маминском (погрузка на Шайтанке, отстой/ночёвка в Салде).
+  // Автозакрытие СТРОГО БЛОКИРУЕТСЯ, рейс остаётся в пути!
+  const isShaytankaMaminskoePending =
+    (isShaytankaRoute || isMaminskoeDestination) && currentTripMileage < 300;
+
   // Проверка: погрузка НЕ в Салде (например, Шайтанка) — машина могла заехать в Салду транзитом
   // в начале рейса, не завершив его. Только с этим условием блокируем автофиниш.
-  // isExternalDestination (разгрузка не в Салде) — НАМЕРЕННО исключено: это норма для 100% рейсов
-  // и не должно блокировать завершение.
   const isExternalOrigin =
     order.loading_address_json?.raw &&
     !order.loading_address_json.raw.toLowerCase().includes('салда');
@@ -379,15 +397,17 @@ export async function handleVehicleArrival(
   // Если машина в пути менее 45 минут И погрузка была НЕ из Салды — транзитный проезд на старте
   const isEarlyTransit = diffMinutes < 45 && Boolean(isExternalOrigin);
 
-  // hasMultipleLegs убран: наличие нескольких точек в заявке не означает незавершённость рейса
-  // и приводило к тому, что рейс застревал навсегда без ревью.
-
-  if ((isTransitExplicitlyAllowed || isEarlyTransit) && !params.forceFinish) {
+  if (
+    (isTransitExplicitlyAllowed || isEarlyTransit || isShaytankaMaminskoePending) &&
+    !params.forceFinish
+  ) {
     const transitCount =
       ((order.raw_parser_payload?.salda_transit_count ?? order.salda_transit_count) || 0) + 1;
-    const transitReason = isTransitExplicitlyAllowed
-      ? 'явный запрет (prevent_salda_auto_finish)'
-      : `ранний заезд (${Math.round(diffMinutes)} мин, погрузка вне Салды)`;
+    const transitReason = isShaytankaMaminskoePending
+      ? `маршрут Шайтанка ↔ Маминское (пробег ${currentTripMileage} км < 300 км, отстой в Салде перед выгрузкой)`
+      : isTransitExplicitlyAllowed
+        ? 'явный запрет (prevent_salda_auto_finish)'
+        : `ранний заезд (${Math.round(diffMinutes)} мин, погрузка вне Салды)`;
     console.log(
       `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount} (${Math.round(diffMinutes)} мин с начала). Причина: ${transitReason}. Рейс продолжается!`,
     );
@@ -408,9 +428,10 @@ export async function handleVehicleArrival(
 
     const prevNote = trip.driver_note || '';
     const noteMarker = `[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}`;
-    const newNote = prevNote.includes(noteMarker)
-      ? prevNote
-      : `${prevNote}\n[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`.trim();
+    const noteText = isShaytankaMaminskoePending
+      ? `[Отстой в Салде (Шайтанка -> Салда перед выгрузкой в Маминское): ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`
+      : `[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`;
+    const newNote = prevNote.includes(noteMarker) ? prevNote : `${prevNote}\n${noteText}`.trim();
 
     if (newNote !== prevNote) {
       await supabase
@@ -435,6 +456,9 @@ export async function handleVehicleArrival(
           in_salda_transit: true,
           salda_transit_count: transitCount,
           last_transit_checked_at: Math.floor(Date.now() / 1000),
+          visited_shaytanka: Boolean(
+            order.raw_parser_payload?.visited_shaytanka || isShaytankaRoute,
+          ),
         },
         updated_at: new Date().toISOString(),
       })
@@ -676,23 +700,66 @@ export async function handleVehicleArrival(
   const invNumber = billingDocs?.invoice_number?.trim() || null;
   const invDate = invNumber ? billingDocs?.invoice_date || arrivalTime.slice(0, 10) : null;
 
-  const { error: tripOrderErr } = await supabase.from('trip_orders').insert({
-    trip_id: trip.id,
-    counterparty_id: resolvedClientId,
-    description: `Заявка ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Груз'} (${distanceKm} км)`,
-    amount: order.price_without_vat || 0,
-    driver_pay: totalDriverPay,
-    payment_method: 'bank_invoice',
-    settlement_status: 'pending',
-    lifecycle_status: 'draft',
-    invoice_number: invNumber,
-    invoice_date: invDate,
-    invoice_status: invNumber ? 'issued' : 'unbilled',
-    idempotency_key: crypto.randomUUID(),
-  });
+  const subOrders = order.raw_parser_payload?.client_orders;
+  if (Array.isArray(subOrders) && subOrders.length > 1) {
+    // Несколько клиентов в одном рейсе -> создаем отдельные строки trip_orders для раздельного биллинга
+    for (let idx = 0; idx < subOrders.length; idx++) {
+      const sub = subOrders[idx];
+      let subClientId = sub.client_id || null;
+      if (!subClientId && sub.client_name) {
+        const cleanSub = sub.client_name
+          .replace(/\(ЛОП\)|\(ПРР\)|\(ООО\)|\(ИП\)/gi, '')
+          .replace(/["'«»]/g, '')
+          .trim();
+        const { data: matchedSubCp } = await supabase
+          .from('counterparties')
+          .select('id')
+          .eq('is_active', true)
+          .ilike('name', `%${cleanSub}%`)
+          .limit(1)
+          .maybeSingle();
+        if (matchedSubCp) subClientId = matchedSubCp.id;
+      }
 
-  if (tripOrderErr) {
-    console.error('Ошибка добавления trip_order:', tripOrderErr);
+      const subAmount = Number(sub.price_without_vat) || 0;
+      const subCargo = sub.cargo_name || order.cargo_name || 'Груз';
+      const subDoc = sub.base_doc_number ? ` (№ ${sub.base_doc_number})` : '';
+      const subClientLabel = sub.client_name ? ` [${sub.client_name}]` : '';
+
+      await supabase.from('trip_orders').insert({
+        trip_id: trip.id,
+        counterparty_id: subClientId || resolvedClientId,
+        description: `Заказ #${idx + 1}${subDoc}: ${subCargo}${subClientLabel}`,
+        amount: subAmount,
+        driver_pay: idx === 0 ? totalDriverPay : 0,
+        payment_method: sub.payment_method || 'bank_invoice',
+        settlement_status: 'pending',
+        lifecycle_status: 'draft',
+        invoice_number: idx === 0 ? invNumber : null,
+        invoice_date: idx === 0 ? invDate : null,
+        invoice_status: 'unbilled',
+        idempotency_key: crypto.randomUUID(),
+      });
+    }
+  } else {
+    const { error: tripOrderErr } = await supabase.from('trip_orders').insert({
+      trip_id: trip.id,
+      counterparty_id: resolvedClientId,
+      description: `Заявка ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Груз'} (${distanceKm} км)`,
+      amount: order.price_without_vat || 0,
+      driver_pay: totalDriverPay,
+      payment_method: 'bank_invoice',
+      settlement_status: 'pending',
+      lifecycle_status: 'draft',
+      invoice_number: invNumber,
+      invoice_date: invDate,
+      invoice_status: invNumber ? 'issued' : 'unbilled',
+      idempotency_key: crypto.randomUUID(),
+    });
+
+    if (tripOrderErr) {
+      console.error('Ошибка добавления trip_order:', tripOrderErr);
+    }
   }
 
   // 3. Переводим заявку в статус pending_review

@@ -32,6 +32,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const enriched = {
       ...order,
       routes_json: order.routes_json || order.raw_parser_payload?.routes || [],
+      client_orders: order.raw_parser_payload?.client_orders || [],
       prevent_salda_auto_finish: Boolean(
         order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
       ),
@@ -68,14 +69,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     // Удаляем из верхнего уровня поля, которых нет в схеме таблицы orders
     delete updatePayload.routes_json;
+    delete updatePayload.client_orders;
     delete updatePayload.prevent_salda_auto_finish;
     delete updatePayload.salda_transit_count;
 
-    // Сохраняем составные маршруты и флаг транзита внутри jsonb raw_parser_payload
+    // Сохраняем составные маршруты, мульти-заказы клиентов и флаг транзита внутри jsonb raw_parser_payload
     updatePayload.raw_parser_payload = {
       ...existingPayload,
       ...(body.raw_parser_payload || {}),
       ...(body.routes_json !== undefined ? { routes: body.routes_json } : {}),
+      ...(body.client_orders !== undefined ? { client_orders: body.client_orders } : {}),
       ...(body.prevent_salda_auto_finish !== undefined
         ? { prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish) }
         : {}),
@@ -165,6 +168,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const enriched = {
       ...updated,
       routes_json: updated.raw_parser_payload?.routes || [],
+      client_orders: updated.raw_parser_payload?.client_orders || [],
       prevent_salda_auto_finish: Boolean(updated.raw_parser_payload?.prevent_salda_auto_finish),
       salda_transit_count: Number(updated.raw_parser_payload?.salda_transit_count || 0),
       billing_docs: updated.raw_parser_payload?.billing_docs || null,

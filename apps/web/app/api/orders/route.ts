@@ -68,6 +68,7 @@ export async function GET(req: Request) {
         ...o,
         status: currentStatus,
         routes_json: o.routes_json || o.raw_parser_payload?.routes || [],
+        client_orders: o.raw_parser_payload?.client_orders || [],
         prevent_salda_auto_finish: Boolean(
           o.prevent_salda_auto_finish || o.raw_parser_payload?.prevent_salda_auto_finish,
         ),
@@ -166,10 +167,11 @@ export async function POST(req: Request) {
       assigned_vehicle_id: body.assigned_vehicle_id || null,
       assigned_driver_id: body.assigned_driver_id || null,
 
-      // Сохраняем составные маршруты и флаги транзита внутри jsonb raw_parser_payload
+      // Сохраняем составные маршруты, мульти-заказы клиентов и флаги транзита внутри jsonb raw_parser_payload
       raw_parser_payload: {
         ...(body.raw_parser_payload || {}),
         routes: body.routes_json || body.raw_parser_payload?.routes || [],
+        client_orders: body.client_orders || body.raw_parser_payload?.client_orders || [],
         prevent_salda_auto_finish: Boolean(body.prevent_salda_auto_finish),
         salda_transit_count: Number(body.salda_transit_count) || 0,
       },
@@ -200,6 +202,7 @@ export async function POST(req: Request) {
     const enriched = {
       ...created,
       routes_json: created.raw_parser_payload?.routes || [],
+      client_orders: created.raw_parser_payload?.client_orders || [],
       prevent_salda_auto_finish: Boolean(created.raw_parser_payload?.prevent_salda_auto_finish),
       salda_transit_count: Number(created.raw_parser_payload?.salda_transit_count || 0),
     };
