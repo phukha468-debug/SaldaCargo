@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDate, auditTripFuel } from '@saldacargo/shared';
 import { getDirectionLabel } from '@saldacargo/domain-payroll';
@@ -18,6 +18,7 @@ export default function AdminTripDetailPage() {
   const [showRepairModal, setShowRepairModal] = useState(false);
   const [repairDescription, setRepairDescription] = useState('');
   const [actionError, setActionError] = useState('');
+  const [cashNotSurrendered, setCashNotSurrendered] = useState(false);
 
   const { data: trip, isLoading } = useQuery<any>({
     queryKey: ['admin-trip', id],
@@ -105,6 +106,20 @@ export default function AdminTripDetailPage() {
     .filter((e: any) => e.payment_method === 'cash')
     .reduce((s: number, e: any) => s + parseFloat(e.amount || '0'), 0);
   const cashToSurrender = Math.max(0, cashRevenue - cashExpenses);
+
+  const isCashNotSurrenderedInitial = Boolean(
+    (trip?.admin_note ?? '').includes('[CASH_NOT_SURRENDERED]') ||
+    (trip?.driver_note ?? '').includes('[CASH_NOT_COLLECTED]') ||
+    (trip?.driver_note ?? '').includes('[НЕ СДАНО В КАССУ') ||
+    (trip?.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+    (trip?.driver_note ?? '').includes('[CARRYOVER]'),
+  );
+
+  useEffect(() => {
+    if (trip) {
+      setCashNotSurrendered(isCashNotSurrenderedInitial);
+    }
+  }, [trip?.admin_note, trip?.driver_note, isCashNotSurrenderedInitial]);
 
   const carryoverMatch = (trip.driver_note ?? '').match(
     /\[ПЕРЕНОС НАЛИЧНЫХ:\s*([^—\]]+)(?:—\s*([^\]]+))?\]/,
@@ -487,6 +502,47 @@ export default function AdminTripDetailPage() {
           })}
         </section>
 
+        {/* Контроль наличных и статус сдачи в кассу */}
+        {(cashRevenue > 0 || cashNotSurrendered) && (
+          <section className="bg-white rounded-xl border border-zinc-200 p-3 shadow-sm">
+            <div className="flex items-center justify-between text-xs gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-base shrink-0">{cashNotSurrendered ? '⚠️' : '💵'}</span>
+                <div className="min-w-0">
+                  <span className="font-bold text-zinc-900 block truncate">
+                    {cashNotSurrendered ? 'В подотчёте сотрудника: ' : 'Наличные в кассу: '}
+                    <strong>{cashToSurrender.toLocaleString('ru-RU')} ₽</strong>
+                  </span>
+                  <span className="text-[10px] text-zinc-400 block truncate">
+                    {cashNotSurrendered
+                      ? 'Не попадают в сейф компании — числятся за сотрудником'
+                      : 'Оприходованы в сейф/кассу компании'}
+                  </span>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0 px-2.5 py-1.5 rounded-lg border bg-zinc-50 border-zinc-200 text-zinc-700 font-bold active:bg-zinc-100">
+                <input
+                  type="checkbox"
+                  checked={cashNotSurrendered}
+                  disabled={action.isPending}
+                  onChange={(e) => {
+                    const nextVal = e.target.checked;
+                    setCashNotSurrendered(nextVal);
+                    if (isApproved) {
+                      action.mutate({ cash_not_surrendered: nextVal });
+                    }
+                  }}
+                  className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <span className="text-xs font-black">
+                  {cashNotSurrendered ? 'Деньги не сданы' : 'В подотчёт'}
+                </span>
+              </label>
+            </div>
+          </section>
+        )}
+
         {/* Расходы */}
         {(trip.trip_expenses ?? []).length > 0 && (
           <section className="space-y-2">
@@ -520,6 +576,31 @@ export default function AdminTripDetailPage() {
               ❌ {actionError}
             </p>
           )}
+          {/* Сводка наличных и переключатель сдачи в подотчёт перед одобрением */}
+          {(cashRevenue > 0 || cashNotSurrendered) && (
+            <div
+              className={`px-3 py-2 rounded-xl border flex items-center justify-between text-xs ${
+                cashNotSurrendered
+                  ? 'bg-amber-50 border-amber-200 text-amber-950'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+              }`}
+            >
+              <span className="font-bold truncate">
+                {cashNotSurrendered ? '⚠️ В подотчёт: ' : '💵 В кассу: '}
+                <strong>{cashToSurrender.toLocaleString('ru-RU')} ₽</strong>
+              </span>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0 bg-white px-2 py-1 rounded-lg border border-zinc-200 shadow-2xs">
+                <input
+                  type="checkbox"
+                  checked={cashNotSurrendered}
+                  onChange={(e) => setCashNotSurrendered(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <span className="text-xs font-black">Деньги не сданы (в подотчёт)</span>
+              </label>
+            </div>
+          )}
+
           {showReturnForm ? (
             <div className="space-y-3">
               <textarea
@@ -561,7 +642,9 @@ export default function AdminTripDetailPage() {
                 ↩ Вернуть
               </button>
               <button
-                onClick={() => action.mutate({ action: 'approve' })}
+                onClick={() =>
+                  action.mutate({ action: 'approve', cash_not_surrendered: cashNotSurrendered })
+                }
                 disabled={action.isPending}
                 className="h-14 rounded-2xl bg-green-600 text-white font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-md disabled:opacity-50"
               >

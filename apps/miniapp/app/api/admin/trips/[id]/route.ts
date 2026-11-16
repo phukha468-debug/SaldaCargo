@@ -110,13 +110,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const adminId =
     cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id') || null;
   const body = (await request.json()) as {
-    action:
+    action?:
       | 'approve'
       | 'return'
       | 'edit_orders'
       | 'reissue_salary'
       | 'confirm_payroll'
-      | 'convert_to_repair';
+      | 'convert_to_repair'
+      | 'toggle_cash_hold';
+    cash_not_surrendered?: boolean;
     note?: string;
     problem_description?: string;
     driver_pay?: string;
@@ -138,6 +140,54 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     deleted_order_ids?: string[];
   };
   const supabase = createAdminClient();
+
+  // Обработка статуса подотчёта наличных (cash_not_surrendered)
+  if (body.cash_not_surrendered !== undefined) {
+    const { data: tripNoteData } = await (supabase.from('trips') as any)
+      .select('id, admin_note, driver_note, lifecycle_status')
+      .eq('id', id)
+      .single();
+
+    if (tripNoteData) {
+      let currentAdminNote = tripNoteData.admin_note || '';
+      let currentDriverNote = tripNoteData.driver_note || '';
+
+      if (body.cash_not_surrendered) {
+        if (!currentAdminNote.includes('[CASH_NOT_SURRENDERED]')) {
+          currentAdminNote = currentAdminNote.trim()
+            ? `${currentAdminNote.trim()}\n[CASH_NOT_SURRENDERED]`
+            : '[CASH_NOT_SURRENDERED]';
+        }
+      } else {
+        currentAdminNote = currentAdminNote
+          .replace(/\[CASH_NOT_SURRENDERED\]/g, '')
+          .replace(/\n{2,}/g, '\n')
+          .trim();
+
+        currentDriverNote = currentDriverNote
+          .replace(/\[НЕ СДАНО В КАССУ:[^\]]+\]/g, '')
+          .replace(/\[CARRYOVER[^\]]*\]/g, '')
+          .replace(/\[CASH_NOT_COLLECTED\]/g, '')
+          .replace(/\n{2,}/g, '\n')
+          .trim();
+      }
+
+      await (supabase.from('trips') as any)
+        .update({
+          admin_note: currentAdminNote || null,
+          driver_note: currentDriverNote || null,
+        })
+        .eq('id', id);
+
+      if (tripNoteData.lifecycle_status === 'approved') {
+        await syncTripFinancials(supabase, id, adminId);
+      }
+
+      if (body.action === 'toggle_cash_hold' || !body.action) {
+        return NextResponse.json({ ok: true, cash_not_surrendered: body.cash_not_surrendered });
+      }
+    }
+  }
 
   if (body.action === 'edit_orders') {
     // 1. Получаем рейс для статуса и грузчиков

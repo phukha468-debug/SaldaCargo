@@ -332,7 +332,7 @@ export function OrdersPipelineView() {
     queryFn: async () => {
       const res = await fetch('/api/counterparties');
       const json = await res.json();
-      return json.counterparties || [];
+      return Array.isArray(json) ? json : json.counterparties || [];
     },
   });
 
@@ -3234,7 +3234,16 @@ function OrderDetailsModal({
  * ─────────────────────────────────────────────────────────────────────────────
  */
 /**
- * Выпадающий список выбора контрагента (клиента) с живым поиском и созданием нового
+ * Очистка строки для нечувствительного поиска контрагентов
+ * (удаляет пробелы, кавычки, дефисы, знаки препинания и переводит в нижний регистр)
+ */
+function normalizeCounterpartySearch(str?: string | null): string {
+  if (!str) return '';
+  return str.toLowerCase().replace(/[^a-zа-я0-9]/gi, '');
+}
+
+/**
+ * Выпадающий список выбора контрагента (клиента) с живым умным поиском и созданием нового
  */
 function OrderCounterpartySelect({
   inputValue,
@@ -3255,16 +3264,30 @@ function OrderCounterpartySelect({
     setQuery(inputValue);
   }
 
-  const filtered = query.trim()
+  const qTrim = query.trim();
+  const qLower = qTrim.toLowerCase();
+  const qNorm = normalizeCounterpartySearch(qTrim);
+
+  const filtered = qTrim
     ? counterparties.filter((c) => {
-        const q = query.toLowerCase();
-        return c.name?.toLowerCase().includes(q) || (c.inn && c.inn.includes(q));
+        if (!c?.name) return false;
+        const nameLower = c.name.toLowerCase();
+        const nameNorm = normalizeCounterpartySearch(c.name);
+        const innStr = c.inn ? String(c.inn) : '';
+        return (
+          nameLower.includes(qLower) ||
+          (qNorm.length > 1 && nameNorm.includes(qNorm)) ||
+          (innStr && innStr.includes(qTrim))
+        );
       })
     : counterparties;
 
-  const exactMatch = counterparties.find(
-    (c) => c.name?.toLowerCase().trim() === query.toLowerCase().trim(),
-  );
+  const exactMatch = counterparties.find((c) => {
+    if (!c?.name) return false;
+    const nameLower = c.name.toLowerCase().trim();
+    const nameNorm = normalizeCounterpartySearch(c.name);
+    return nameLower === qLower || (qNorm.length > 2 && nameNorm === qNorm);
+  });
 
   const handleSelect = (cp: any) => {
     setQuery(cp.name);
@@ -3306,12 +3329,18 @@ function OrderCounterpartySelect({
             const val = e.target.value;
             setQuery(val);
             setOpen(true);
-            if (!val.trim()) {
+            const valTrim = val.trim();
+            if (!valTrim) {
               onChange(null, '');
             } else {
-              const matched = counterparties.find(
-                (c) => c.name?.toLowerCase().trim() === val.toLowerCase().trim(),
-              );
+              const valLower = valTrim.toLowerCase();
+              const valNorm = normalizeCounterpartySearch(valTrim);
+              const matched = counterparties.find((c) => {
+                if (!c?.name) return false;
+                const nameLower = c.name.toLowerCase().trim();
+                const nameNorm = normalizeCounterpartySearch(c.name);
+                return nameLower === valLower || (valNorm.length > 2 && nameNorm === valNorm);
+              });
               onChange(matched || null, val);
             }
           }}
@@ -3334,7 +3363,7 @@ function OrderCounterpartySelect({
           onMouseDown={(e) => e.preventDefault()}
           className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs"
         >
-          {filtered.map((cp) => (
+          {filtered.slice(0, 50).map((cp) => (
             <button
               key={cp.id}
               type="button"
@@ -4224,8 +4253,10 @@ function CreateSmartOrderModal({
           }),
         });
         const createdCpJson = await createCpRes.json();
-        if (createdCpJson?.counterparty?.id) {
-          finalClientId = createdCpJson.counterparty.id;
+        const foundId =
+          createdCpJson?.id || createdCpJson?.counterparty?.id || createdCpJson?.existing_id;
+        if (foundId) {
+          finalClientId = foundId;
         }
       }
 
@@ -4263,7 +4294,17 @@ function CreateSmartOrderModal({
         packaging_type: form.packaging_type || 'паллеты',
         price_without_vat:
           totalClientsRevenue > 0 ? totalClientsRevenue : Number(form.price_without_vat) || 0,
-        client_orders: clientOrders,
+        client_orders: clientOrders.map((co: any, idx: number) => {
+          if (idx === 0 && (!co.client_id || co.client_id === '')) {
+            return {
+              ...co,
+              client_id: finalClientId || '',
+              client_name: form.client_name || co.client_name,
+              client_inn: form.client_inn || co.client_inn,
+            };
+          }
+          return co;
+        }),
         payment_terms:
           form.payment_method === 'cash'
             ? 'Оплата наличными водителю (В кассу)'

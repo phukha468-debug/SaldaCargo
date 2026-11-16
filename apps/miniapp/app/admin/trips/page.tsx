@@ -1068,6 +1068,14 @@ function EditModal({
       _deleted: false,
     })),
   );
+  const initialCashNotSurrendered = Boolean(
+    (trip.admin_note ?? '').includes('[CASH_NOT_SURRENDERED]') ||
+    (trip.driver_note ?? '').includes('[CASH_NOT_COLLECTED]') ||
+    (trip.driver_note ?? '').includes('[НЕ СДАНО В КАССУ') ||
+    (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+    (trip.driver_note ?? '').includes('[CARRYOVER]'),
+  );
+  const [cashNotSurrendered, setCashNotSurrendered] = useState(initialCashNotSurrendered);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -1172,6 +1180,7 @@ function EditModal({
           action: 'edit_orders',
           orders: payload,
           deleted_order_ids: deletedIds.length > 0 ? deletedIds : undefined,
+          cash_not_surrendered: cashNotSurrendered,
         }),
       });
       const json = await res.json();
@@ -1437,6 +1446,24 @@ function EditModal({
             <span>+ Добавить ещё одну заявку</span>
           </button>
 
+          {/* Статус сдачи наличных */}
+          <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-3 flex items-center justify-between text-xs">
+            <span className="font-bold text-zinc-800">
+              {cashNotSurrendered ? '⚠️ Наличные в подотчёте' : '💵 Наличные сданы в кассу'}
+            </span>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none bg-white px-2.5 py-1.5 rounded-lg border border-zinc-200 shadow-2xs">
+              <input
+                type="checkbox"
+                checked={cashNotSurrendered}
+                onChange={(e) => setCashNotSurrendered(e.target.checked)}
+                className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+              />
+              <span className="text-xs font-black text-amber-900">
+                Деньги не сданы (в подотчёт)
+              </span>
+            </label>
+          </div>
+
           {/* Кнопки */}
           <div className="pt-3 border-t border-zinc-100 space-y-2 pb-4">
             {error && (
@@ -1478,7 +1505,7 @@ function HistoryTripCard({
 }: {
   trip: any;
   onEdit: (t: any) => void;
-  onApprove: (id: string) => void;
+  onApprove: (id: string, cashNotSurrendered?: boolean) => void;
   onReturn: (id: string) => void;
   onDelete: (id: string) => void;
   approving: boolean;
@@ -1486,6 +1513,23 @@ function HistoryTripCard({
   const [expanded, setExpanded] = useState(false);
   const { activeOrders, expenses, revenue, driverPay, loaderPay, mileage, profit } = calcTrip(trip);
   const canReview = trip.status === 'completed' && trip.lifecycle_status === 'draft';
+
+  const cashOrders = activeOrders.filter((o: any) => o.payment_method === 'cash');
+  const cashExpenses = (trip.trip_expenses ?? [])
+    .filter((e: any) => e.payment_method === 'cash')
+    .reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0);
+  const cashRevenue = cashOrders.reduce((s: number, o: any) => s + (parseFloat(o.amount) || 0), 0);
+  const cashToSurrender = Math.max(0, cashRevenue - cashExpenses);
+
+  const initialCashNotSurrendered = Boolean(
+    (trip.admin_note ?? '').includes('[CASH_NOT_SURRENDERED]') ||
+    (trip.driver_note ?? '').includes('[CASH_NOT_COLLECTED]') ||
+    (trip.driver_note ?? '').includes('[НЕ СДАНО В КАССУ') ||
+    (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+    (trip.driver_note ?? '').includes('[CARRYOVER]'),
+  );
+  const [isCashNotSurrendered, setIsCashNotSurrendered] = useState(initialCashNotSurrendered);
+  const [togglingCashHold, setTogglingCashHold] = useState(false);
 
   return (
     <div
@@ -1519,6 +1563,15 @@ function HistoryTripCard({
                     #{trip.trip_number}
                   </span>
                   <LifecycleBadge status={trip.lifecycle_status} />
+                  {isCashNotSurrendered ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                      ⚠️ Подотчёт
+                    </span>
+                  ) : cashRevenue > 0 ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      💵 Нал
+                    </span>
+                  ) : null}
                 </div>
                 <p className="text-[11px] text-zinc-400 font-medium">
                   {trip.driver?.name ?? '—'} · {formatTime(trip.started_at)}
@@ -1720,6 +1773,77 @@ function HistoryTripCard({
             </div>
           )}
 
+          {/* Контроль наличных и статус подотчёта (1-строчный компактный вид) */}
+          {(cashRevenue > 0 || isCashNotSurrendered) && (
+            <div
+              className={cn(
+                'px-4 py-2 border-t flex items-center justify-between text-xs gap-2',
+                isCashNotSurrendered
+                  ? 'bg-amber-50/90 border-amber-200'
+                  : 'bg-emerald-50/80 border-emerald-200',
+              )}
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="shrink-0">{isCashNotSurrendered ? '⚠️' : '💵'}</span>
+                <span
+                  className={cn(
+                    'font-bold truncate text-[11px]',
+                    isCashNotSurrendered ? 'text-amber-950' : 'text-emerald-950',
+                  )}
+                >
+                  {isCashNotSurrendered ? 'Подотчёт: ' : 'Нал в кассу: '}
+                  <strong>{cashToSurrender.toLocaleString('ru-RU')} ₽</strong>
+                  <span className="font-normal text-zinc-500 ml-1 hidden sm:inline">
+                    {isCashNotSurrendered ? '(не сдано)' : '(сдано в сейф)'}
+                  </span>
+                </span>
+              </div>
+
+              <label
+                onClick={(e) => e.stopPropagation()}
+                className={cn(
+                  'flex items-center gap-1.5 cursor-pointer select-none shrink-0 px-2 py-1 rounded-lg border shadow-2xs transition-colors',
+                  isCashNotSurrendered
+                    ? 'bg-amber-100 border-amber-300 text-amber-950 font-black'
+                    : 'bg-white border-zinc-200 text-zinc-700 font-bold hover:bg-zinc-50',
+                  togglingCashHold && 'opacity-60 pointer-events-none',
+                )}
+                title="Если включено: деньги не попадают в кассу, а ложатся в подотчёт сотрудника"
+              >
+                <input
+                  type="checkbox"
+                  checked={isCashNotSurrendered}
+                  disabled={togglingCashHold}
+                  onChange={async (e) => {
+                    const nextVal = e.target.checked;
+                    setIsCashNotSurrendered(nextVal);
+                    setTogglingCashHold(true);
+                    try {
+                      const res = await fetch(`/api/admin/trips/${trip.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cash_not_surrendered: nextVal }),
+                      });
+                      if (!res.ok) {
+                        setIsCashNotSurrendered(!nextVal);
+                        const j = await res.json();
+                        alert(j.error || 'Ошибка изменения статуса подотчёта');
+                      }
+                    } catch {
+                      setIsCashNotSurrendered(!nextVal);
+                    } finally {
+                      setTogglingCashHold(false);
+                    }
+                  }}
+                  className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <span className="text-[11px] whitespace-nowrap">
+                  {isCashNotSurrendered ? '⚠️ Не сдано' : 'Деньги не сданы (в подотчёт)'}
+                </span>
+              </label>
+            </div>
+          )}
+
           {/* Действия */}
           <div className="px-4 pb-4 pt-3 border-t border-zinc-100 flex items-center gap-2">
             <button
@@ -1746,7 +1870,7 @@ function HistoryTripCard({
                   Вернуть
                 </button>
                 <button
-                  onClick={() => onApprove(trip.id)}
+                  onClick={() => onApprove(trip.id, isCashNotSurrendered)}
                   disabled={approving}
                   className="flex-1 text-xs font-black text-white bg-emerald-500 py-2.5 rounded-xl active:bg-emerald-600 text-center disabled:opacity-50 shadow-sm"
                 >
@@ -2677,13 +2801,16 @@ function TripsContent() {
     }
   };
 
-  async function handleApprove(tripId: string) {
+  async function handleApprove(tripId: string, cashNotSurrendered?: boolean) {
     setApprovingId(tripId);
     try {
       const res = await fetch(`/api/admin/trips/${tripId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve' }),
+        body: JSON.stringify({
+          action: 'approve',
+          ...(cashNotSurrendered !== undefined ? { cash_not_surrendered: cashNotSurrendered } : {}),
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Ошибка');
       refresh();
