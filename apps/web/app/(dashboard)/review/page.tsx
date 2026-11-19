@@ -7,7 +7,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
 import {
-  formatDate,
+  formatTripPeriod,
   isNoCashCounterparty,
   isTerritoryCounterparty,
   formatTerritoryDescription,
@@ -182,9 +182,10 @@ const PAYMENT_STYLES: Record<string, string> = {
 };
 
 const PAYMENT_EDIT_OPTIONS = [
-  { value: 'qr', label: 'QR-код' },
-  { value: 'cash', label: 'Наличный' },
-  { value: 'debt_cash', label: 'Долг' },
+  { value: 'bank_invoice', label: '🏛️ Безнал (Р/С)' },
+  { value: 'debt_cash', label: '⏳ Долг' },
+  { value: 'qr', label: '⚡ QR-код' },
+  { value: 'cash', label: '💵 Наличный' },
 ];
 
 // ── Helpers ────────────────────────────────────────────────
@@ -941,7 +942,9 @@ function EditModal({
         const cp = counterparties.find((c) => c.id === cpId) || cpName;
         const isNoCash = isNoCashCounterparty(cp);
         const newPaymentMethod =
-          isNoCash && o.payment_method === 'cash' ? 'debt_cash' : o.payment_method;
+          isNoCash && (o.payment_method === 'cash' || o.payment_method === 'qr')
+            ? 'bank_invoice'
+            : o.payment_method;
         return {
           ...o,
           _selectedId: cpId,
@@ -1084,10 +1087,10 @@ function EditModal({
         return;
       }
       const cp = counterparties.find((c) => c.id === o._selectedId) || o._inputValue;
-      if (isNoCashCounterparty(cp) && o.payment_method === 'cash') {
+      if (isNoCashCounterparty(cp) && (o.payment_method === 'cash' || o.payment_method === 'qr')) {
         const cpTitle = typeof cp === 'object' && cp?.name ? cp.name : o._inputValue || 'Клиент';
         setError(
-          `Для контрагента «${cpTitle}» (заявка ${i + 1}) оплата наличными запрещена. Выберите «Долг» или «Безнал по счёту».`,
+          `Для юридического лица / безналичного контрагента «${cpTitle}» (заявка ${i + 1}) оплата наличными и через QR запрещена. Установите «Безнал (Р/С)» или «Долг», чтобы заказ гарантированно попал в дебиторку!`,
         );
         return;
       }
@@ -1829,20 +1832,20 @@ function EditModal({
                           counterparties.find((c) => c.id === order._selectedId) ||
                           order._inputValue;
                         const isNoCash = isNoCashCounterparty(currentCp);
-                        const isCashDisabled = value === 'cash' && isNoCash;
+                        const isMethodDisabled = isNoCash && (value === 'cash' || value === 'qr');
                         const isSelected = order.payment_method === value;
                         return (
                           <button
                             key={value}
                             type="button"
-                            disabled={isCashDisabled}
+                            disabled={isMethodDisabled}
                             onClick={() => {
-                              if (isCashDisabled) return;
+                              if (isMethodDisabled) return;
                               update(order.id, 'payment_method', value);
                             }}
                             className={cn(
                               'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-center flex items-center justify-center gap-1.5',
-                              isCashDisabled
+                              isMethodDisabled
                                 ? 'opacity-35 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200 line-through select-none'
                                 : isSelected
                                   ? 'bg-slate-900 text-white border-slate-900 shadow-xs cursor-pointer'
@@ -1853,16 +1856,17 @@ function EditModal({
                               className={cn(
                                 'w-2 h-2 rounded-full',
                                 value === 'cash' &&
-                                  (isCashDisabled ? 'bg-slate-300' : 'bg-amber-400'),
-                                value === 'qr' && 'bg-purple-400',
+                                  (isMethodDisabled ? 'bg-slate-300' : 'bg-amber-400'),
+                                value === 'qr' &&
+                                  (isMethodDisabled ? 'bg-slate-300' : 'bg-purple-400'),
                                 value === 'card_driver' && 'bg-blue-400',
                                 value === 'debt_cash' && 'bg-rose-400',
-                                value === 'bank_invoice' && 'bg-slate-400',
+                                value === 'bank_invoice' && 'bg-blue-500',
                               )}
                             />
                             <span>
                               {label}
-                              {isCashDisabled ? ' (Запрещено)' : ''}
+                              {isMethodDisabled ? ' (Запрещено)' : ''}
                             </span>
                           </button>
                         );
@@ -2167,6 +2171,7 @@ function TripCard({
   const { activeOrders, expenses, revenue, driverPay, loaderPay, totalExpenses, mileage, profit } =
     calcTrip(trip);
   const totalCosts = driverPay + loaderPay + totalExpenses;
+  const period = formatTripPeriod(trip.started_at, trip.ended_at);
 
   const cashRevenue = activeOrders
     .filter((o) => o.payment_method === 'cash')
@@ -2414,8 +2419,22 @@ function TripCard({
                 </button>
               )}
             </div>
-            <span className="text-[10px] text-slate-400 font-medium shrink-0 hidden sm:block">
-              {formatDate(trip.started_at)}
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 cursor-help transition-colors border',
+                !period.isSameDay
+                  ? 'bg-amber-50 text-amber-900 border-amber-200'
+                  : 'bg-slate-50 text-slate-700 border-slate-200',
+              )}
+              title={period.fullPeriodText}
+            >
+              <span className="text-[9px] text-slate-400">📅</span>
+              <span>{period.shortText}</span>
+              {!period.isSameDay && (
+                <span className="text-[9px] px-1 py-0.2 rounded bg-amber-200/80 text-amber-950 font-black ml-0.5">
+                  {period.badgeText}
+                </span>
+              )}
             </span>
           </div>
 
@@ -2841,6 +2860,40 @@ function TripCard({
               </label>
             </div>
           )}
+
+          {/* Период рейса: дата/время выезда ➔ возврат на базу / Ревью */}
+          <div className="px-5 py-2 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between text-xs text-slate-700">
+            <div className="flex items-center gap-2 truncate">
+              <span className="font-bold text-slate-700 flex items-center gap-1 shrink-0">
+                <span>🕒</span>
+                <span>Период рейса:</span>
+              </span>
+              <span className="truncate">
+                <span className="font-semibold text-slate-900">Выезд из геозоны:</span>{' '}
+                {period.startTime ? `${period.startDayNum} в ${period.startTime}` : '—'}
+                <span className="mx-1.5 text-slate-300">➔</span>
+                <span className="font-semibold text-slate-900">Возврат на базу (Ревью):</span>{' '}
+                {trip.ended_at ? `${period.endDayNum} в ${period.endTime}` : 'В пути'}
+              </span>
+              {period.durationText && (
+                <>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-slate-500 font-medium">
+                    в пути: <strong>{period.durationText}</strong>
+                  </span>
+                </>
+              )}
+            </div>
+            {!period.isSameDay ? (
+              <span className="text-[10px] text-amber-900 font-black bg-amber-100 border border-amber-300 px-2 py-0.5 rounded shrink-0">
+                Кругорейс ({period.badgeText})
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded shrink-0">
+                1 день
+              </span>
+            )}
+          </div>
 
           {/* Предупреждение о расхождении одометра с Wialon */}
           {wialonAudit.hasDiscrepancy && (

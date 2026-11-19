@@ -9,6 +9,8 @@ import {
   isGeostroyCounterparty,
   isGeostroyOrderValid,
   isInternalCounterparty,
+  isDebtPaymentMethod,
+  isStrictDocCounterparty,
 } from '@saldacargo/shared';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       counterparty_id?: string;
       amount: number | string;
-      payment_method?: 'cash' | 'qr' | 'debt_cash';
+      payment_method?: 'cash' | 'qr' | 'debt_cash' | 'bank_invoice' | string;
       loaders: Array<{ id: string; name?: string; pay?: string | number }>;
       description?: string;
       creator_note?: string;
@@ -58,8 +60,11 @@ export async function POST(request: Request) {
       isInternal = isInternalCounterparty(cp?.name);
       if (isInternal) {
         paymentMethod = 'cash';
-      } else if (isNoCashCounterparty(cp?.name) && paymentMethod === 'cash') {
-        paymentMethod = 'debt_cash';
+      } else {
+        const isNoCash = isNoCashCounterparty(cp?.name) || isStrictDocCounterparty(cp?.name);
+        if (isNoCash && (paymentMethod === 'cash' || paymentMethod === 'qr')) {
+          paymentMethod = 'bank_invoice';
+        }
       }
       if (isTerritoryCounterparty(cp?.name)) {
         if (!body.description?.trim()) {
@@ -159,7 +164,8 @@ export async function POST(request: Request) {
           : String(payroll.loaderPayEach),
     }));
 
-    const settlementStatus = isInternal || paymentMethod !== 'debt_cash' ? 'completed' : 'pending';
+    const settlementStatus =
+      !isInternal && isDebtPaymentMethod(paymentMethod) ? 'pending' : 'completed';
 
     const orderDescription = body.description?.trim() || 'Погрузо-разгрузочные работы (без авто)';
     const tripNote = body.creator_note?.trim() || orderDescription;

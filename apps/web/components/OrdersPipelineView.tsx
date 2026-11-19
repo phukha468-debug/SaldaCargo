@@ -41,6 +41,15 @@ export function isStrictDocCounterparty(name?: string | null): boolean {
   return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
 }
 
+export function getOrderEffectiveClientName(o: OrderItem): string {
+  return (
+    o.client?.name ||
+    o.loading_org_name ||
+    (o as any).trip?.trip_orders?.[0]?.counterparty?.name ||
+    ''
+  );
+}
+
 export function getDocCounterpartyBadge(name?: string | null): {
   label: string;
   badgeClass: string;
@@ -789,7 +798,7 @@ export function OrdersPipelineView() {
 
   // Все рейсы 3-х контрагентов (ВСМПО, Ависма, Геострой), которые в пути, на ревью, сборе документов или завершены
   const strictCounterpartyOrders = orders.filter((o) => {
-    if (!isStrictDocCounterparty(o.client?.name)) return false;
+    if (!isStrictDocCounterparty(getOrderEffectiveClientName(o))) return false;
     return ['in_progress', 'pending_review', 'docs_collection', 'completed'].includes(o.status);
   });
 
@@ -802,7 +811,7 @@ export function OrdersPipelineView() {
 
   const filteredDocOrders = strictCounterpartyOrders.filter((o) => {
     if (docClientFilter !== 'all') {
-      const name = o.client?.name?.toLowerCase() || '';
+      const name = getOrderEffectiveClientName(o).toLowerCase();
       if (docClientFilter === 'vsmpo' && !name.includes('всмпо')) return false;
       if (docClientFilter === 'avisma' && !name.includes('ависма')) return false;
       if (docClientFilter === 'geostroy' && !name.includes('геострой')) return false;
@@ -1580,7 +1589,7 @@ export function OrdersPipelineView() {
                 🏢 ВСМПО-АВИСМА (
                 {
                   strictCounterpartyOrders.filter((o) =>
-                    o.client?.name?.toLowerCase().includes('всмпо'),
+                    getOrderEffectiveClientName(o).toLowerCase().includes('всмпо'),
                   ).length
                 }
                 )
@@ -1596,7 +1605,7 @@ export function OrdersPipelineView() {
                 🏢 ООО Ависма (
                 {
                   strictCounterpartyOrders.filter((o) =>
-                    o.client?.name?.toLowerCase().includes('ависма'),
+                    getOrderEffectiveClientName(o).toLowerCase().includes('ависма'),
                   ).length
                 }
                 )
@@ -1612,7 +1621,7 @@ export function OrdersPipelineView() {
                 🏗️ Геостройиндустрия (
                 {
                   strictCounterpartyOrders.filter((o) =>
-                    o.client?.name?.toLowerCase().includes('геострой'),
+                    getOrderEffectiveClientName(o).toLowerCase().includes('геострой'),
                   ).length
                 }
                 )
@@ -1669,7 +1678,8 @@ export function OrdersPipelineView() {
               {filteredDocOrders.map((order) => {
                 const docs = order.billing_docs || {};
                 const isAccepted = Boolean(docs.client_accepted_edo || docs.status === 'accepted');
-                const badge = getDocCounterpartyBadge(order.client?.name);
+                const effectiveCpName = getOrderEffectiveClientName(order);
+                const badge = getDocCounterpartyBadge(effectiveCpName);
                 const isAssigned = Boolean(order.assigned_vehicle_id && order.assigned_driver_id);
                 const tripDate = order.base_doc_date
                   ? order.base_doc_date.slice(5)
@@ -1745,7 +1755,7 @@ export function OrdersPipelineView() {
                     <div className="w-[150px] shrink-0 truncate">
                       <span
                         className={`px-2 py-0.5 rounded font-bold text-[10.5px] truncate inline-block max-w-[145px] ${badge.badgeClass}`}
-                        title={order.client?.name || ''}
+                        title={effectiveCpName || ''}
                       >
                         {badge.label}
                       </span>

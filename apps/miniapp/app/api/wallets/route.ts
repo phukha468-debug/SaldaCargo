@@ -8,6 +8,7 @@ const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 const GARAGE_ID = '10000000-0000-0000-0000-000000000005';
 const FUEL_CUBE_ID = '10000000-0000-0000-0000-000000000006';
+const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 const TBANK_API_HOSTS = ['business.tbank.ru', 'business.tinkoff.ru'];
 const TARGET_ACCOUNT_NUMBER = '40802810500001961654';
 const TBANK_FALLBACK_TOKEN =
@@ -164,6 +165,7 @@ export async function GET(request: Request) {
         .eq('to_wallet_id', CASH_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed')
+        .neq('category_id', CASH_COLLECT_CAT)
         .gt('created_at', auditCutoff),
 
       (supabase.from('transactions') as any)

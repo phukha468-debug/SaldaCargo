@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { resolveKnownMasterCounterpartyId, cleanCounterpartySearchName } from '@saldacargo/shared';
 
 /** GET /api/admin/counterparties?search= — поиск клиентов для привязки к машине */
 export async function GET(request: Request) {
@@ -38,14 +39,45 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Имя клиента обязательно' }, { status: 400 });
   }
 
+  const cleanName = name.trim();
   const supabase = createAdminClient();
+
+  // 1. Проверка мастер-контрагентов
+  const masterId = resolveKnownMasterCounterpartyId(cleanName);
+  if (masterId) {
+    const { data: masterCp } = await (supabase.from('counterparties') as any)
+      .select('id, name, phone')
+      .eq('id', masterId)
+      .maybeSingle();
+    if (masterCp) return NextResponse.json(masterCp, { status: 200 });
+  }
+
+  // 2. Поиск существующих активных контрагентов
+  const simplifiedName = cleanCounterpartySearchName(cleanName);
+  const { data: existingList } = await (supabase.from('counterparties') as any)
+    .select('id, name, phone')
+    .eq('is_active', true)
+    .or(`name.ilike.%${cleanName}%,name.ilike.%${simplifiedName || cleanName}%`)
+    .limit(5);
+
+  const existingMatch = (existingList || []).find((cp: any) => {
+    const existingClean = cleanCounterpartySearchName(cp.name);
+    return existingClean === simplifiedName || cp.name.toLowerCase() === cleanName.toLowerCase();
+  });
+
+  if (existingMatch) {
+    return NextResponse.json(existingMatch, { status: 200 });
+  }
+
+  const isLegal = /\b(ооо|пао|зао|ао)\b/i.test(cleanName);
   const { data, error } = await (supabase.from('counterparties') as any)
     .insert({
-      name: name.trim(),
+      name: cleanName,
       phone: phone?.trim() || null,
       type: 'client',
       is_active: true,
       is_regular: true,
+      is_legal_entity: isLegal,
     })
     .select('id, name, phone')
     .single();

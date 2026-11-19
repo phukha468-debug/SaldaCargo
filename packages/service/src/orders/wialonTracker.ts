@@ -7,12 +7,173 @@ const SALDA_BASE_LAT = parseFloat(process.env.WIALON_BASE_LAT || '58.053');
 const SALDA_BASE_LON = parseFloat(process.env.WIALON_BASE_LON || '60.552');
 const SALDA_BASE_RADIUS = parseFloat(process.env.WIALON_BASE_RADIUS_METERS || '8000'); // 8 км
 
-// Координаты Шайтанки (погрузка керна/проб Геостройиндустрия) и радиус геозоны
-export const SHAYTANKA_LAT = parseFloat(process.env.WIALON_SHAYTANKA_LAT || '58.0708');
-export const SHAYTANKA_LON = parseFloat(process.env.WIALON_SHAYTANKA_LON || '60.7704');
+// Точные координаты Шайтанки (карьер / погрузка проб керна Геостройиндустрия) и радиус геозоны
+export const SHAYTANKA_LAT = parseFloat(process.env.WIALON_SHAYTANKA_LAT || '58.0361');
+export const SHAYTANKA_LON = parseFloat(process.env.WIALON_SHAYTANKA_LON || '60.9110');
 export const SHAYTANKA_RADIUS_METERS = parseFloat(
-  process.env.WIALON_SHAYTANKA_RADIUS_METERS || '6000',
-); // 6 км
+  process.env.WIALON_SHAYTANKA_RADIUS_METERS || '10000',
+); // 10 км
+
+// Точные координаты с. Маминское (склад 2, разгрузка Геостройиндустрия) и радиус геозоны
+export const MAMINSKOE_LAT = parseFloat(process.env.WIALON_MAMINSKOE_LAT || '56.4334');
+export const MAMINSKOE_LON = parseFloat(process.env.WIALON_MAMINSKOE_LON || '61.4088');
+export const MAMINSKOE_RADIUS_METERS = parseFloat(
+  process.env.WIALON_MAMINSKOE_RADIUS_METERS || '20000',
+); // 20 км
+
+export const GEOSTROY_CLIENT_ID = '83db41b2-c050-4013-a878-bda2ab5c226e';
+
+export interface KnownRoutePoint {
+  id: string;
+  name: string;
+  city: string;
+  rawAddress: string;
+  lat: number;
+  lon: number;
+  radiusMeters: number;
+  isShaytankaLoading?: boolean;
+}
+
+/**
+ * Каталог постоянных точек на ключевых маршрутах:
+ * 1. Шайтанка (погрузка рудника)
+ * 2. Маминское (склад 2, выгрузка)
+ * 3. Реж
+ * 4. Карпинск
+ * 5. Воронцовка (рудник)
+ */
+export const KNOWN_ROUTE_POINTS: KnownRoutePoint[] = [
+  {
+    id: 'shaytanka',
+    name: 'Шайтанка (Рудник)',
+    city: 'Шайтанка',
+    rawAddress: 'Шайтанка',
+    lat: SHAYTANKA_LAT,
+    lon: SHAYTANKA_LON,
+    radiusMeters: 10000,
+    isShaytankaLoading: true,
+  },
+  {
+    id: 'maminskoe',
+    name: 'с. Маминское (склад 2)',
+    city: 'Маминское',
+    rawAddress: 'с. Маминское, склад 2',
+    lat: MAMINSKOE_LAT,
+    lon: MAMINSKOE_LON,
+    radiusMeters: 20000,
+  },
+  {
+    id: 'rezh',
+    name: 'г. Реж',
+    city: 'Реж',
+    rawAddress: 'г. Реж',
+    lat: 57.419,
+    lon: 61.4818,
+    radiusMeters: 15000,
+  },
+  {
+    id: 'karpinsk',
+    name: 'г. Карпинск',
+    city: 'Карпинск',
+    rawAddress: 'г. Карпинск',
+    lat: 59.7681,
+    lon: 60.0235,
+    radiusMeters: 20000,
+  },
+  {
+    id: 'vorontsovka',
+    name: 'Воронцовка (Рудник)',
+    city: 'Воронцовка',
+    rawAddress: 'пос. Воронцовка',
+    lat: 59.654,
+    lon: 60.231,
+    radiusMeters: 20000,
+  },
+];
+
+/**
+ * Определение географического пункта стоянки:
+ * Если точка входит в каталог известных геозон — берем красивое официальное название.
+ * Если это новый / не учтенный маршрут — автоматически геокодируем через OpenStreetMap Nominatim.
+ */
+export async function reverseGeocodePoint(
+  lat: number,
+  lon: number,
+): Promise<{
+  city: string;
+  raw: string;
+  name: string;
+  isKnown: boolean;
+  isServiceOrRestStop?: boolean;
+}> {
+  for (const kp of KNOWN_ROUTE_POINTS) {
+    if (calculateDistanceMeters(lat, lon, kp.lat, kp.lon) <= kp.radiusMeters) {
+      return {
+        city: kp.city,
+        raw: kp.rawAddress,
+        name: kp.name,
+        isKnown: true,
+        isServiceOrRestStop: false,
+      };
+    }
+  }
+
+  // Для неизвестных точек за пределами каталога — онлайн геокодирование OSM
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=16&addressdetails=1`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'SaldaCargoFleet/1.0 (contact@saldacargo.ru)' },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const addr = json.address || {};
+      const amen = String(addr.amenity || json.type || json.category || '').toLowerCase();
+      const disp = String(json.display_name || '').toLowerCase();
+
+      // Проверка на АЗС, общепит, придорожный сервис, парковку на трассе
+      const isFuel =
+        amen === 'fuel' ||
+        disp.includes('азс') ||
+        disp.includes('заправка') ||
+        disp.includes('газпромнефть') ||
+        disp.includes('лукойл') ||
+        disp.includes('роснефть') ||
+        disp.includes('татнефть') ||
+        disp.includes('башнефть');
+      const isFood =
+        amen === 'cafe' ||
+        amen === 'fast_food' ||
+        amen === 'restaurant' ||
+        disp.includes('кафе') ||
+        disp.includes('столовая') ||
+        disp.includes('пит-стоп') ||
+        disp.includes('вкусно — и точка') ||
+        disp.includes('шаурма');
+      const isHighwayRest =
+        amen === 'parking' ||
+        json.type === 'rest_area' ||
+        json.type === 'services' ||
+        disp.includes('стоянка дальнобой') ||
+        disp.includes('место отдыха');
+
+      const isServiceOrRestStop = isFuel || isFood || isHighwayRest;
+
+      const city =
+        addr.city || addr.town || addr.village || addr.hamlet || addr.county || 'Неизвестно';
+      const raw = json.display_name?.split(',').slice(0, 3).join(',').trim() || city;
+      return { city, raw, name: city, isKnown: false, isServiceOrRestStop };
+    }
+  } catch {}
+
+  return {
+    city: `GPS ${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+    raw: `GPS координаты: ${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+    name: `Точка (${lat.toFixed(4)}, ${lon.toFixed(4)})`,
+    isKnown: false,
+    isServiceOrRestStop: false,
+  };
+}
 
 /**
  * Смещение одометра Wialon для калибровки к реальному спидометру на приборной панели.
@@ -225,6 +386,242 @@ export async function checkHistoricalShaytankaVisit(
   );
 }
 
+export interface RoutePointMatch {
+  id: string;
+  name: string;
+  city: string;
+  raw: string;
+  isKnown: boolean;
+  lat: number;
+  lon: number;
+  startT: number;
+  endT: number;
+  durMin: number;
+  distBaseKm: number;
+}
+
+export interface DetectedTripRoute {
+  visitedShaytanka: boolean;
+  visitedMaminskoe: boolean;
+  visitedRezh: boolean;
+  visitedKarpinsk: boolean;
+  visitedVorontsovka: boolean;
+  hasUnloaded: boolean;
+  loadingAddress: { city: string; raw: string } | null;
+  unloadingAddress: { city: string; raw: string } | null;
+  clientId: string | null;
+  clientName: string | null;
+  cargoName: string | null;
+  priceWithoutVat: number | null;
+  distinctLocationsCount: number;
+  points: RoutePointMatch[];
+  routeSummary: string;
+}
+
+/**
+ * Автономный анализ трека Wialon и остановок автомобиля:
+ * Если 1-я внешняя остановка вне Салды была в Шайтанке (карьер/керн):
+ *   -> Автоматически задается погрузка: Шайтанка, Клиент: ООО "Геостройиндустрия", груз: Пробы керна (Шайтанка), ставка: 40 000 ₽.
+ *   -> Любой промежуточный заезд на базу в Верхнюю Салду НЕ закрывает рейс, а считается отстоем/ночёвкой перед выгрузкой.
+ * 2-я внешняя остановка (после заезда в Салду) автоматически становится местом разгрузки (с. Маминское, склад 2).
+ */
+export async function detectTripStopsAndRoute(
+  cleanHost: string,
+  eid: string,
+  unitId: number,
+  startTimeIso: string,
+  endTimeIso?: string | null,
+  baseLat = SALDA_BASE_LAT,
+  baseLon = SALDA_BASE_LON,
+  baseRadius = SALDA_BASE_RADIUS,
+): Promise<DetectedTripRoute | null> {
+  try {
+    const timeFromSec = Math.floor(new Date(startTimeIso).getTime() / 1000) - 900;
+    const timeToSec = endTimeIso
+      ? Math.floor(new Date(endTimeIso).getTime() / 1000) + 900
+      : Math.floor(Date.now() / 1000);
+
+    const msgUrl = `${cleanHost}/wialon/ajax.html?svc=messages/load_interval&params=${encodeURIComponent(
+      JSON.stringify({
+        itemId: unitId,
+        timeFrom: timeFromSec,
+        timeTo: timeToSec,
+        flags: 0,
+        flagsMask: 0,
+        loadCount: 15000,
+      }),
+    )}&sid=${eid}`;
+
+    const res = await fetch(msgUrl, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const msgs = data.messages || [];
+    if (msgs.length === 0) return null;
+
+    const rawStops: Array<{
+      startT: number;
+      endT: number;
+      durMin: number;
+      lat: number;
+      lon: number;
+      isBase: boolean;
+      distBaseKm: number;
+    }> = [];
+
+    let curStop: { startT: number; endT: number; pos: any } | null = null;
+    for (const m of msgs) {
+      if (!m.pos) continue;
+      const speed = m.pos.s || 0;
+      if (speed < 5) {
+        if (!curStop) curStop = { startT: m.t, endT: m.t, pos: m.pos };
+        else {
+          curStop.endT = m.t;
+          curStop.pos = m.pos;
+        }
+      } else {
+        if (curStop) {
+          const durMin = (curStop.endT - curStop.startT) / 60;
+          if (durMin >= 15) {
+            const lat = Number(curStop.pos.y);
+            const lon = Number(curStop.pos.x);
+            const distBase = calculateDistanceMeters(lat, lon, baseLat, baseLon);
+            const isBase = distBase <= baseRadius;
+            rawStops.push({
+              startT: curStop.startT,
+              endT: curStop.endT,
+              durMin: Math.round(durMin),
+              lat,
+              lon,
+              isBase,
+              distBaseKm: Number((distBase / 1000).toFixed(1)),
+            });
+          }
+          curStop = null;
+        }
+      }
+    }
+
+    // Кластеризуем внешние остановки в отдельные пункты маршрута
+    const distinctLocations: Array<{
+      lat: number;
+      lon: number;
+      startT: number;
+      endT: number;
+      totalDurMin: number;
+      distBaseKm: number;
+    }> = [];
+
+    for (const s of rawStops) {
+      if (s.isBase) continue; // Игнорируем базу в Салде
+      if (s.durMin < 15 && s.distBaseKm < 50) continue; // Игнорируем короткие придорожные паузы около Салды
+
+      const lastLoc = distinctLocations[distinctLocations.length - 1];
+      if (lastLoc && calculateDistanceMeters(s.lat, s.lon, lastLoc.lat, lastLoc.lon) < 15000) {
+        lastLoc.totalDurMin += s.durMin;
+        lastLoc.endT = s.endT;
+      } else {
+        distinctLocations.push({
+          lat: s.lat,
+          lon: s.lon,
+          startT: s.startT,
+          endT: s.endT,
+          totalDurMin: s.durMin,
+          distBaseKm: s.distBaseKm,
+        });
+      }
+    }
+
+    const matchedPoints: RoutePointMatch[] = [];
+    for (const loc of distinctLocations) {
+      const match = await reverseGeocodePoint(loc.lat, loc.lon);
+
+      // Исключаем бытовые остановки на кофе/заправку/отдых:
+      // 1) Если точка распознана как АЗС, кафе или придорожный карман — отсекаем.
+      // 2) Если точка НЕ из каталога и длительность стоянки менее 35 минут — отсекаем (короткий кофе/перекур на трассе).
+      if (!match.isKnown) {
+        if (match.isServiceOrRestStop) {
+          continue;
+        }
+        if (loc.totalDurMin < 35) {
+          continue;
+        }
+      }
+
+      matchedPoints.push({
+        id: match.isKnown
+          ? KNOWN_ROUTE_POINTS.find((p) => p.name === match.name)?.id || 'known'
+          : 'osm',
+        name: match.name,
+        city: match.city,
+        raw: match.raw,
+        isKnown: match.isKnown,
+        lat: loc.lat,
+        lon: loc.lon,
+        startT: loc.startT,
+        endT: loc.endT,
+        durMin: loc.totalDurMin,
+        distBaseKm: loc.distBaseKm,
+      });
+    }
+
+    const routeSummary = matchedPoints.map((p) => p.name).join(' ➔ ');
+
+    const result: DetectedTripRoute = {
+      visitedShaytanka: false,
+      visitedMaminskoe: false,
+      visitedRezh: false,
+      visitedKarpinsk: false,
+      visitedVorontsovka: false,
+      hasUnloaded: false,
+      loadingAddress: null,
+      unloadingAddress: null,
+      clientId: null,
+      clientName: null,
+      cargoName: null,
+      priceWithoutVat: null,
+      distinctLocationsCount: distinctLocations.length,
+      points: matchedPoints,
+      routeSummary,
+    };
+
+    if (matchedPoints.length > 0) {
+      const firstLoc = matchedPoints[0]!;
+      const isShaytanka =
+        firstLoc.city.toLowerCase().includes('шайтан') ||
+        calculateDistanceMeters(firstLoc.lat, firstLoc.lon, SHAYTANKA_LAT, SHAYTANKA_LON) <=
+          SHAYTANKA_RADIUS_METERS;
+
+      if (isShaytanka) {
+        result.visitedShaytanka = true;
+        result.loadingAddress = { city: 'Шайтанка', raw: 'Шайтанка' };
+        result.clientId = GEOSTROY_CLIENT_ID;
+        result.clientName = 'ООО "Геостройиндустрия"';
+        result.cargoName = 'Пробы керна (Шайтанка)';
+        // 2 точки (Шайтанка-Маминское/Карпинск) = 40к, 3 точки = 50к, 4+ точки = 60к
+        result.priceWithoutVat =
+          matchedPoints.length >= 4 ? 60000 : matchedPoints.length >= 3 ? 50000 : 40000;
+      } else {
+        result.loadingAddress = { city: firstLoc.city, raw: firstLoc.raw };
+      }
+
+      if (matchedPoints.length > 1) {
+        const lastLoc = matchedPoints[matchedPoints.length - 1]!;
+        result.hasUnloaded = true;
+        result.unloadingAddress = { city: lastLoc.city, raw: lastLoc.raw };
+        result.visitedMaminskoe = matchedPoints.some((p) => p.city === 'Маминское');
+        result.visitedRezh = matchedPoints.some((p) => p.city === 'Реж');
+        result.visitedKarpinsk = matchedPoints.some((p) => p.city === 'Карпинск');
+        result.visitedVorontsovka = matchedPoints.some((p) => p.city === 'Воронцовка');
+      }
+    }
+
+    return result;
+  } catch (err) {
+    console.warn('[Wialon] Ошибка авто-детекции маршрута и остановок:', err);
+    return null;
+  }
+}
+
 /**
  * 2. Опрос 4 Валдаев и получение их текущих координат и одометров
  */
@@ -402,6 +799,64 @@ export async function syncValdaiTelematics(
       console.log(
         `[Wialon Tracker] 🏁 Валдай ${pos.regNumber} ВЕРНУЛСЯ в Салду (${pos.distanceFromBaseKm} км от центра)`,
       );
+
+      // Защитная авто-детекция перед закрытием: проверяем, не был ли рейс погрузкой в Шайтанке
+      const { data: arrivingOrder } = await supabase
+        .from('orders')
+        .select('id, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at)')
+        .eq('assigned_vehicle_id', asset.id)
+        .eq('status', 'in_progress')
+        .maybeSingle();
+
+      const arrivingTrip = (
+        Array.isArray(arrivingOrder?.trip) ? arrivingOrder.trip[0] : arrivingOrder?.trip
+      ) as { id: string; started_at?: string } | undefined;
+
+      if (
+        arrivingOrder &&
+        arrivingTrip?.started_at &&
+        !arrivingOrder.raw_parser_payload?.visited_shaytanka
+      ) {
+        const route = await detectTripStopsAndRoute(
+          cleanHost,
+          eid,
+          pos.id,
+          arrivingTrip.started_at,
+          null,
+          baseLat,
+          baseLon,
+          baseRadius,
+        );
+        if (route?.visitedShaytanka) {
+          await supabase
+            .from('orders')
+            .update({
+              raw_parser_payload: {
+                ...(arrivingOrder.raw_parser_payload || {}),
+                visited_shaytanka: true,
+                visited_maminskoe: Boolean(route.visitedMaminskoe),
+                has_unloaded: Boolean(route.hasUnloaded),
+                prevent_salda_auto_finish: !route.hasUnloaded,
+              },
+              client_id: GEOSTROY_CLIENT_ID,
+              client_name: 'ООО "Геостройиндустрия"',
+              cargo_name: 'Пробы керна (Шайтанка)',
+              price_without_vat: 40000,
+              base_doc_name: 'Заявка ООО "Геостройиндустрия"',
+              loading_address_json: route.loadingAddress || {
+                raw: 'Шайтанка',
+                city: 'Шайтанка',
+              },
+              unloading_address_json: route.unloadingAddress || {
+                raw: 'с. Маминское, склад 2',
+                city: 'Маминское',
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', arrivingOrder.id);
+        }
+      }
+
       const res = await handleVehicleArrival(supabase, {
         vehicleId: asset.id,
         odometer: effectiveOdo,
@@ -424,7 +879,7 @@ export async function syncValdaiTelematics(
       const { data: activeOrder } = await supabase
         .from('orders')
         .select(
-          'id, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at, driver_note)',
+          'id, client_id, client_name, cargo_name, price_without_vat, loading_address_json, unloading_address_json, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at, driver_note)',
         )
         .eq('assigned_vehicle_id', asset.id)
         .eq('status', 'in_progress')
@@ -435,7 +890,19 @@ export async function syncValdaiTelematics(
       ) as { id: string; started_at?: string; driver_note?: string | null } | undefined;
 
       if (activeOrder && tripObj?.started_at) {
-        // Проверка: находится ли машина прямо сейчас в Шайтанке (зона погрузки рудника/проб)
+        // Автоматический опрос остановок трека Wialon за всё время с начала рейса:
+        const routeInfo = await detectTripStopsAndRoute(
+          cleanHost,
+          eid,
+          pos.id,
+          tripObj.started_at,
+          null,
+          baseLat,
+          baseLon,
+          baseRadius,
+        );
+
+        // Проверка: находится ли машина прямо сейчас в Шайтанке (быстрый fallback)
         const distToShaytanka = calculateDistanceMeters(
           pos.lat,
           pos.lon,
@@ -443,58 +910,65 @@ export async function syncValdaiTelematics(
           SHAYTANKA_LON,
         );
         const isCurrentlyInShaytanka = distToShaytanka <= SHAYTANKA_RADIUS_METERS;
+        const isShaytankaDetected = Boolean(routeInfo?.visitedShaytanka || isCurrentlyInShaytanka);
 
-        if (isCurrentlyInShaytanka && !activeOrder.raw_parser_payload?.visited_shaytanka) {
-          console.log(
-            `[Wialon Tracker] 🌲 Валдай ${pos.regNumber} заехал в Шайтанку (${(distToShaytanka / 1000).toFixed(1)} км от центра)! Активирована авто-защита от закрытия рейса в Салде.`,
-          );
+        if (isShaytankaDetected) {
+          const wasVisited = Boolean(activeOrder.raw_parser_payload?.visited_shaytanka);
+          const needsOrderUpdate =
+            !wasVisited ||
+            !activeOrder.client_id ||
+            !activeOrder.price_without_vat ||
+            !activeOrder.loading_address_json?.raw ||
+            (routeInfo?.hasUnloaded && !activeOrder.raw_parser_payload?.has_unloaded);
 
-          const isAutoDraft =
-            !activeOrder.raw_parser_payload?.client_name &&
-            (!activeOrder.raw_parser_payload?.routes ||
-              activeOrder.raw_parser_payload.routes.length === 0);
+          if (needsOrderUpdate) {
+            console.log(
+              `[Wialon Tracker] 🌲 Валдай ${pos.regNumber}: подтверждена погрузка в Шайтанке (ООО "Геостройиндустрия", 40 000 ₽)${routeInfo?.hasUnloaded ? ', разгрузка: ' + (routeInfo.unloadingAddress?.raw || '') : ''}`,
+            );
 
-          const updateOrderPayload: any = {
-            raw_parser_payload: {
-              ...(activeOrder.raw_parser_payload || {}),
-              visited_shaytanka: true,
-              prevent_salda_auto_finish: true,
-              shaytanka_arrived_at: new Date().toISOString(),
-            },
-            updated_at: new Date().toISOString(),
-          };
-
-          if (isAutoDraft) {
-            updateOrderPayload.loading_address_json = {
-              raw: 'Шайтанка',
-              city: 'Шайтанка',
+            const updateOrderPayload: any = {
+              raw_parser_payload: {
+                ...(activeOrder.raw_parser_payload || {}),
+                visited_shaytanka: true,
+                visited_maminskoe: Boolean(
+                  activeOrder.raw_parser_payload?.visited_maminskoe || routeInfo?.visitedMaminskoe,
+                ),
+                has_unloaded: Boolean(
+                  activeOrder.raw_parser_payload?.has_unloaded || routeInfo?.hasUnloaded,
+                ),
+                prevent_salda_auto_finish: !routeInfo?.hasUnloaded,
+                shaytanka_detected_at: new Date().toISOString(),
+              },
+              client_id: GEOSTROY_CLIENT_ID,
+              client_name: 'ООО "Геостройиндустрия"',
+              cargo_name: 'Пробы керна (Шайтанка)',
+              price_without_vat: 40000,
+              base_doc_name: 'Заявка ООО "Геостройиндустрия"',
+              loading_address_json: routeInfo?.loadingAddress || {
+                raw: 'Шайтанка',
+                city: 'Шайтанка',
+              },
+              updated_at: new Date().toISOString(),
             };
-            updateOrderPayload.unloading_address_json = {
-              raw: 'с. Маминское, склад 2',
-              city: 'Маминское',
-            };
-            updateOrderPayload.cargo_name = 'Пробы керна (Шайтанка)';
-            updateOrderPayload.client_name = 'ООО "Геостройиндустрия"';
-            updateOrderPayload.price_without_vat = 40000;
-          }
 
-          await supabase.from('orders').update(updateOrderPayload).eq('id', activeOrder.id);
+            if (routeInfo?.unloadingAddress) {
+              updateOrderPayload.unloading_address_json = routeInfo.unloadingAddress;
+            }
 
-          const prevNote = tripObj.driver_note || '';
-          const noteMarker = '[Погрузка Шайтанка';
-          if (!prevNote.includes(noteMarker)) {
-            const nowTimeStr = new Date().toLocaleTimeString('ru-RU', {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
-            await supabase
-              .from('trips')
-              .update({
-                driver_note:
-                  `${prevNote}\n[Погрузка Шайтанка: ${nowTimeStr}, одометр: ${effectiveOdo} км (авто-защита транзита через Салду активна)]`.trim(),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', tripObj.id);
+            await supabase.from('orders').update(updateOrderPayload).eq('id', activeOrder.id);
+
+            const prevNote = tripObj.driver_note || '';
+            const noteMarker = '[Шайтанка';
+            if (!prevNote.includes(noteMarker)) {
+              await supabase
+                .from('trips')
+                .update({
+                  driver_note:
+                    `${prevNote}\n[Шайтанка (погрузка керна Геостройиндустрия 40 000 ₽) -> ${routeInfo?.unloadingAddress?.raw || 'с. Маминское, склад 2'}]`.trim(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', tripObj.id);
+            }
           }
         }
 

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { resolveKnownMasterCounterpartyId, cleanCounterpartySearchName } from '@saldacargo/shared';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const FUEL_CATEGORY_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
@@ -508,36 +509,42 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Защита от дублей ВСМПО-АВИСМА
-    if (/всмпо|ависма|vsmpo|avisma/i.test(cleanName)) {
-      const { data: vsmpoMaster } = await (supabase.from('counterparties') as any)
+    // 2. Защита от дублей мастер-контрагентов (ВСМПО-АВИСМА, ООО АВИСМА, ООО "Геостройиндустрия")
+    const knownMasterId = resolveKnownMasterCounterpartyId(cleanName, cleanInn);
+    if (knownMasterId) {
+      const { data: masterCp } = await (supabase.from('counterparties') as any)
         .select('id, name')
-        .eq('inn', '6607000556')
-        .eq('is_active', true)
+        .eq('id', knownMasterId)
         .maybeSingle();
-      if (vsmpoMaster) {
+      if (masterCp) {
         return NextResponse.json(
           {
-            error: `Попытка создать дубликат ВСМПО-АВИСМА! В системе уже есть основной контрагент «${vsmpoMaster.name}» (ID: ${vsmpoMaster.id}). Используйте существующего контрагента.`,
-            existing_id: vsmpoMaster.id,
+            error: `Попытка создать дубликат ключевого контрагента! В системе уже есть основной контрагент «${masterCp.name}» (ID: ${masterCp.id}). Создание дубликатов запрещено.`,
+            existing_id: masterCp.id,
           },
           { status: 409 },
         );
       }
     }
 
-    // 3. Защита от дублей по точному наименованию среди активных
-    const { data: existingByName } = await (supabase.from('counterparties') as any)
+    // 3. Защита от дублей по очищенному наименованию среди активных контрагентов
+    const simplifiedName = cleanCounterpartySearchName(cleanName);
+    const { data: existingList } = await (supabase.from('counterparties') as any)
       .select('id, name, is_active')
-      .ilike('name', cleanName)
       .eq('is_active', true)
-      .maybeSingle();
+      .or(`name.ilike.%${cleanName}%,name.ilike.%${simplifiedName || cleanName}%`)
+      .limit(5);
 
-    if (existingByName) {
+    const existingMatch = (existingList || []).find((cp: any) => {
+      const existingClean = cleanCounterpartySearchName(cp.name);
+      return existingClean === simplifiedName || cp.name.toLowerCase() === cleanName.toLowerCase();
+    });
+
+    if (existingMatch) {
       return NextResponse.json(
         {
-          error: `Контрагент с названием «${existingByName.name}» уже существует (ID: ${existingByName.id}).`,
-          existing_id: existingByName.id,
+          error: `Контрагент с аналогичным названием уже существует: «${existingMatch.name}» (ID: ${existingMatch.id}).`,
+          existing_id: existingMatch.id,
         },
         { status: 409 },
       );

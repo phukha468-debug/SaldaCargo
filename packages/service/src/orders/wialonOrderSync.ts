@@ -215,9 +215,8 @@ export async function handleVehicleDeparture(
     ? '⚠️ Внимание: Автомашина выехала без заявки по геозоне Wialon! Поля заявки пустые, требуется заполнение.'
     : `Авто-старт по геозоне Wialon. Заявка № ${targetOrder.base_doc_number || targetOrder.order_number}`;
 
-  // Парсим номер рейса из номера заявки, чтобы связать их строго 1:1
-  const rawOrderNum =
-    targetOrder.base_doc_number || targetOrder.internal_order_number || targetOrder.order_number;
+  // Парсим номер рейса из номера заявки, если рейс создавался по заранее заведенной заявке
+  const rawOrderNum = targetOrder.base_doc_number || targetOrder.internal_order_number;
   const cleanNumStr = String(rawOrderNum || '')
     .replace(/^№\s*/, '')
     .replace(/^Заявка\s*№?\s*/i, '');
@@ -226,9 +225,27 @@ export async function handleVehicleDeparture(
     ? parseInt((cleanNumStr.split('/')[0] || '').trim(), 10)
     : NaN;
 
+  // Определение сквозного номера рейса:
+  // Если рейс по заявке и номер валидный — используем его.
+  // Иначе (выезд без заявки Wialon) — СТРОГО берем max(trip_number) + 1 из сквозного счетчика автопарка (>1050),
+  // чтобы номера всегда шли непрерывной чередой 1056, 1057... и не брали локальный id из таблицы orders!
+  let finalTripNumber: number;
+  if (!isEmergency && !isNaN(parsedTripNum) && parsedTripNum > 0 && parsedTripNum < 100000) {
+    finalTripNumber = parsedTripNum;
+  } else {
+    const { data: maxTrip } = await supabase
+      .from('trips')
+      .select('trip_number')
+      .order('trip_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    finalTripNumber = Math.max(1000, Number(maxTrip?.trip_number || 0)) + 1;
+  }
+
   const tripInsertPayload: Record<string, any> = {
     asset_id: params.vehicleId,
     driver_id: driverId,
+    trip_number: finalTripNumber,
     trip_type: 'intercity',
     status: 'in_progress',
     lifecycle_status: 'draft',
@@ -236,10 +253,6 @@ export async function handleVehicleDeparture(
     started_at: departureTime,
     driver_note: tripNote,
   };
-
-  if (!isNaN(parsedTripNum) && parsedTripNum > 0 && parsedTripNum < 100000) {
-    tripInsertPayload.trip_number = parsedTripNum;
-  }
 
   // Создаем связанный рейс в таблице trips
   const { data: newTrip, error: tripErr } = await supabase
@@ -360,11 +373,6 @@ export async function handleVehicleArrival(
   const startOdo = trip.odometer_start || currentOdo;
   const currentTripMileage = Math.max(0, currentOdo - startOdo);
 
-  // Явный запрет автозавершения (выставляется вручную или при транзите через Салду)
-  const isTransitExplicitlyAllowed = Boolean(
-    order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
-  );
-
   // Маршрут Шайтанка: посещение геозоны Шайтанки или указание Шайтанки в адресе/маршруте
   const isShaytankaRoute = Boolean(
     order.raw_parser_payload?.visited_shaytanka ||
@@ -382,32 +390,64 @@ export async function handleVehicleArrival(
     (trip.driver_note && trip.driver_note.toLowerCase().includes('мамин')),
   );
 
+  const minRequiredMileage = order.raw_parser_payload?.min_return_distance_km || 300;
+
+  const hasUnloaded = Boolean(
+    order.raw_parser_payload?.has_unloaded ||
+    order.raw_parser_payload?.unloaded ||
+    (order.raw_parser_payload?.visited_maminskoe && currentTripMileage >= minRequiredMileage),
+  );
+
   // До Маминского и обратно кругорейс более 450-500 км!
-  // Если машина проехала меньше 300 км — она ещё НЕ завершила рейс в Маминском (погрузка на Шайтанке, отстой/ночёвка в Салде).
+  // Если машина проехала меньше 300 км или ещё не выгрузилась во второй точке — она ещё НЕ завершила рейс (погрузка на Шайтанке, отстой/ночёвка в Салде).
   // Автозакрытие СТРОГО БЛОКИРУЕТСЯ, рейс остаётся в пути!
   const isShaytankaMaminskoePending =
-    (isShaytankaRoute || isMaminskoeDestination) && currentTripMileage < 300;
+    isShaytankaRoute && (!hasUnloaded || currentTripMileage < minRequiredMileage);
 
-  // Проверка: погрузка НЕ в Салде (например, Шайтанка) — машина могла заехать в Салду транзитом
-  // в начале рейса, не завершив его. Только с этим условием блокируем автофиниш.
+  // Проверка: погрузка НЕ в Салде (например, Шайтанка или внешний склад)
   const isExternalOrigin =
     order.loading_address_json?.raw &&
     !order.loading_address_json.raw.toLowerCase().includes('салда');
+
+  // Вечерняя погрузка с утренней выгрузкой:
+  // Машина уже погрузилась вечером (Шайтанка или склад), но ещё НЕ была на разгрузке (hasUnloaded === false).
+  // Автозавершение СТРОГО БЛОКИРУЕТСЯ, рейс ожидает выезда на выгрузку следующим утром!
+  const isLoadedPendingUnload =
+    Boolean(
+      order.raw_parser_payload?.visited_shaytanka ||
+      order.raw_parser_payload?.has_loaded ||
+      isShaytankaRoute ||
+      isExternalOrigin,
+    ) && !hasUnloaded;
+
+  // Явный запрет автозавершения (выставляется вручную или при транзите через Салду).
+  // ВАЖНО: для маршрутов Шайтанка / Маминское после достижения минимального кругового пробега (>=300 км)
+  // флаг транзита снимается, так как кругорейс полностью выполнен и машина прибыла на финиш.
+  const isTransitExplicitlyAllowed =
+    Boolean(
+      order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
+    ) &&
+    ((!isShaytankaRoute && !isMaminskoeDestination) || currentTripMileage < minRequiredMileage);
 
   // Если машина в пути менее 45 минут И погрузка была НЕ из Салды — транзитный проезд на старте
   const isEarlyTransit = diffMinutes < 45 && Boolean(isExternalOrigin);
 
   if (
-    (isTransitExplicitlyAllowed || isEarlyTransit || isShaytankaMaminskoePending) &&
+    (isTransitExplicitlyAllowed ||
+      isEarlyTransit ||
+      isShaytankaMaminskoePending ||
+      isLoadedPendingUnload) &&
     !params.forceFinish
   ) {
     const transitCount =
       ((order.raw_parser_payload?.salda_transit_count ?? order.salda_transit_count) || 0) + 1;
     const transitReason = isShaytankaMaminskoePending
       ? `маршрут Шайтанка ↔ Маминское (пробег ${currentTripMileage} км < 300 км, отстой в Салде перед выгрузкой)`
-      : isTransitExplicitlyAllowed
-        ? 'явный запрет (prevent_salda_auto_finish)'
-        : `ранний заезд (${Math.round(diffMinutes)} мин, погрузка вне Салды)`;
+      : isLoadedPendingUnload
+        ? `вечерняя погрузка (груз на борту, отстой в Салде перед утренней выгрузкой)`
+        : isTransitExplicitlyAllowed
+          ? 'явный запрет (prevent_salda_auto_finish)'
+          : `ранний заезд (${Math.round(diffMinutes)} мин, погрузка вне Салды)`;
     console.log(
       `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount} (${Math.round(diffMinutes)} мин с начала). Причина: ${transitReason}. Рейс продолжается!`,
     );
@@ -430,7 +470,9 @@ export async function handleVehicleArrival(
     const noteMarker = `[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}`;
     const noteText = isShaytankaMaminskoePending
       ? `[Отстой в Салде (Шайтанка -> Салда перед выгрузкой в Маминское): ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`
-      : `[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`;
+      : isLoadedPendingUnload
+        ? `[Отстой в Салде (вечерняя погрузка -> ночёвка перед выгрузкой): ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`
+        : `[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`;
     const newNote = prevNote.includes(noteMarker) ? prevNote : `${prevNote}\n${noteText}`.trim();
 
     if (newNote !== prevNote) {
@@ -478,11 +520,22 @@ export async function handleVehicleArrival(
   const odoEnd = Math.max(odoStart, params.odometer);
   const distanceKm = Math.max(1, odoEnd - odoStart);
 
-  // Расчет продолжительности в днях для суточных
+  // Расчет продолжительности в днях для суточных:
+  // 1. Если пробег меньше 100 км — суточных НЕТ (0 дн / 0 ₽).
+  // 2. Ночные / вечерние погрузки с отстоем/ночевкой в Салде не считаются в суточные (водитель ночует дома).
+  //    Время ночного отстоя на базе (~10-12 ч) вычитается из дорожного времени.
   const diffHours = Math.max(1, (arrivalDate.getTime() - startDate.getTime()) / (1000 * 3600));
-  const daysCount = Math.max(1, Math.ceil(diffHours / 24));
+  const hadSaldaOvernight = Boolean(
+    order.raw_parser_payload?.in_salda_transit !== undefined ||
+    (order.raw_parser_payload?.salda_transit_count || 0) > 0 ||
+    (trip.driver_note && trip.driver_note.includes('Отстой в Салде')) ||
+    (trip.driver_note && trip.driver_note.includes('Промежуточный заезд')) ||
+    (isShaytankaRoute && diffHours >= 12),
+  );
+  const roadHours = hadSaldaOvernight ? Math.max(1, diffHours - 10) : diffHours;
+  const daysCount = distanceKm < 100 ? 0 : Math.max(1, Math.ceil(roadHours / 24));
 
-  // Тариф водителя: 10 руб/км + 1000 руб/сутки
+  // Тариф водителя: 10 руб/км + 1000 руб/сутки (только при пробеге >= 100 км)
   const kmPay = distanceKm * 10;
   const perDiemPay = daysCount * 1000;
   // Округление ЗП до 100 ₽ в меньшую сторону (например 7 070 ₽ -> 7 000 ₽)
@@ -524,15 +577,17 @@ export async function handleVehicleArrival(
       .eq('id', trip.id);
 
     // 1.1 Добавляем нормативный расход на ГСМ
-    const CAT_FUEL_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
-    await supabase.from('trip_expenses').insert({
-      trip_id: trip.id,
-      category_id: CAT_FUEL_ID,
-      amount: defaultFuelCost,
-      payment_method: 'fuel_card',
-      description: `Топливо по нормативу (Валдай, рейс на ремонт): ${fuelLiters} л (18л/100км @ ${FUEL_PRICE_TK}₽/л)`,
-      idempotency_key: crypto.randomUUID(),
-    });
+    if (defaultFuelCost > 0) {
+      const CAT_FUEL_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+      await supabase.from('trip_expenses').insert({
+        trip_id: trip.id,
+        category_id: CAT_FUEL_ID,
+        amount: defaultFuelCost,
+        payment_method: 'fuel_card',
+        description: `Топливо по нормативу (Валдай, рейс на ремонт): ${fuelLiters} л (18л/100км @ ${FUEL_PRICE_TK}₽/л)`,
+        idempotency_key: crypto.randomUUID(),
+      });
+    }
 
     // 2. Завершаем заявку без выставления коммерческого счета клиенту
     await supabase
@@ -655,18 +710,20 @@ export async function handleVehicleArrival(
     .eq('id', trip.id);
 
   // 1.1 Добавляем нормативный расход на ГСМ в trip_expenses (по умолчанию через ТК)
-  const CAT_FUEL_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
-  const { error: fuelExpErr } = await supabase.from('trip_expenses').insert({
-    trip_id: trip.id,
-    category_id: CAT_FUEL_ID,
-    amount: defaultFuelCost,
-    payment_method: 'fuel_card',
-    description: `Топливо по нормативу (Валдай): ${fuelLiters} л (18л/100км @ ${FUEL_PRICE_TK}₽/л)`,
-    idempotency_key: crypto.randomUUID(),
-  });
+  if (defaultFuelCost > 0) {
+    const CAT_FUEL_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+    const { error: fuelExpErr } = await supabase.from('trip_expenses').insert({
+      trip_id: trip.id,
+      category_id: CAT_FUEL_ID,
+      amount: defaultFuelCost,
+      payment_method: 'fuel_card',
+      description: `Топливо по нормативу (Валдай): ${fuelLiters} л (18л/100км @ ${FUEL_PRICE_TK}₽/л)`,
+      idempotency_key: crypto.randomUUID(),
+    });
 
-  if (fuelExpErr) {
-    console.error('Ошибка создания записи ГСМ trip_expenses:', fuelExpErr);
+    if (fuelExpErr) {
+      console.error('Ошибка создания записи ГСМ trip_expenses:', fuelExpErr);
+    }
   }
 
   // 2. Определяем контрагента и добавляем заказ в trip_orders для связки с финансовой системой
@@ -768,6 +825,11 @@ export async function handleVehicleArrival(
     .update({
       status: 'pending_review',
       actual_loading_departure_at: arrivalTime,
+      raw_parser_payload: {
+        ...(order.raw_parser_payload || {}),
+        prevent_salda_auto_finish: false,
+        in_salda_transit: false,
+      },
       updated_at: new Date().toISOString(),
     })
     .eq('id', order.id);

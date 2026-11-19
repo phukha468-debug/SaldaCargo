@@ -3,7 +3,15 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { generateDeterministicUuid, auditTripFuel } from '@saldacargo/shared';
+import {
+  generateDeterministicUuid,
+  auditTripFuel,
+  isDebtPaymentMethod,
+  isNoCashCounterparty,
+  isStrictDocCounterparty,
+  resolveKnownMasterCounterpartyId,
+  cleanCounterpartySearchName,
+} from '@saldacargo/shared';
 
 async function updateAssetFuelAfterApproval(supabase: any, tripId: string) {
   try {
@@ -201,29 +209,42 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     async function resolveCounterpartyId(cpId?: string | null, cpName?: string) {
-      if (cpId) return cpId;
+      if (cpId) {
+        // Проверяем, не передан ли старый дубль мастер-контрагента
+        const { data: cpObj } = await (supabase.from('counterparties') as any)
+          .select('id, name')
+          .eq('id', cpId)
+          .maybeSingle();
+        const masterId = resolveKnownMasterCounterpartyId(cpObj?.name);
+        if (masterId) return masterId;
+        return cpId;
+      }
       const name = cpName?.trim();
       if (!name) return null;
 
-      // Защита от дублей ВСМПО-АВИСМА
-      const lower = name.toLowerCase();
-      if (lower.includes('всмпо') || lower.includes('ависма')) {
-        const { data: vsmpo } = await (supabase.from('counterparties') as any)
-          .select('id')
-          .or('id.eq.6024c9f4-5d67-4b8c-93ae-e4e66ce21441,inn.eq.6607000556')
-          .eq('is_active', true)
-          .limit(1);
-        if (vsmpo && vsmpo.length > 0) return vsmpo[0].id;
-      }
+      // 1. Защита от дублей мастер-контрагентов (ВСМПО, АВИСМА, Геостройиндустрия)
+      const masterId = resolveKnownMasterCounterpartyId(name);
+      if (masterId) return masterId;
 
+      // 2. Поиск среди существующих активных контрагентов (с учётом форм собственности и кавычек)
+      const simplifiedName = cleanCounterpartySearchName(name);
       const { data: foundList } = await (supabase.from('counterparties') as any)
-        .select('id')
-        .ilike('name', name)
+        .select('id, name')
         .eq('is_active', true)
-        .limit(1);
-      if (foundList && foundList.length > 0) return foundList[0].id;
+        .or(`name.ilike.%${name}%,name.ilike.%${simplifiedName || name}%`)
+        .limit(5);
+
+      const matched = (foundList || []).find((c: any) => {
+        const cClean = cleanCounterpartySearchName(c.name);
+        return cClean === simplifiedName || c.name.toLowerCase() === name.toLowerCase();
+      });
+
+      if (matched) return matched.id;
+
+      // Если контрагент новый, помечаем юр. лицом, если в названии есть ООО/АО/ПАО/ЗАО
+      const isLegal = /\b(ооо|пао|зао|ао)\b/i.test(name);
       const { data: created, error: createErr } = await (supabase.from('counterparties') as any)
-        .insert({ name, type: 'client', is_active: true })
+        .insert({ name, type: 'client', is_active: true, is_legal_entity: isLegal })
         .select('id')
         .single();
       if (createErr) throw createErr;
@@ -253,11 +274,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           order.counterparty_name,
         );
 
-        const paymentMethod = order.payment_method || 'debt_cash';
-        const isDebt =
-          paymentMethod === 'debt_cash' ||
-          paymentMethod === 'debt' ||
-          paymentMethod === 'debt_bank';
+        let paymentMethod = order.payment_method || 'debt_cash';
+        const isNoCash =
+          isNoCashCounterparty(order.counterparty_name) ||
+          isStrictDocCounterparty(order.counterparty_name);
+        if (isNoCash && (paymentMethod === 'cash' || paymentMethod === 'qr')) {
+          paymentMethod = 'bank_invoice';
+        }
+        const isDebt = isDebtPaymentMethod(paymentMethod);
         const settlementStatus = isDebt ? 'pending' : 'completed';
 
         if (isNew) {

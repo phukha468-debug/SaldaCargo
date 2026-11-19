@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { resolveKnownMasterCounterpartyId, cleanCounterpartySearchName } from '@saldacargo/shared';
 
 /** GET /api/counterparties/search?q=&sto_only=1 — лёгкий поиск клиентов для форм привязки */
 export async function GET(request: Request) {
@@ -44,26 +45,31 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  // 1. Защита от дублирования ВСМПО-АВИСМА
-  const lowerName = cleanName.toLowerCase();
-  if (lowerName.includes('всмпо') || lowerName.includes('ависма')) {
-    const { data: vsmpoMaster } = await (supabase.from('counterparties') as any)
+  // 1. Защита от дублирования мастер-контрагентов (ВСМПО, АВИСМА, Геостройиндустрия)
+  const masterId = resolveKnownMasterCounterpartyId(cleanName);
+  if (masterId) {
+    const { data: masterCp } = await (supabase.from('counterparties') as any)
       .select('id, name, phone')
-      .or('id.eq.6024c9f4-5d67-4b8c-93ae-e4e66ce21441,inn.eq.6607000556')
-      .eq('is_active', true)
+      .eq('id', masterId)
       .maybeSingle();
 
-    if (vsmpoMaster) {
-      return NextResponse.json(vsmpoMaster, { status: 200 });
+    if (masterCp) {
+      return NextResponse.json(masterCp, { status: 200 });
     }
   }
 
-  // 2. Поиск существующего по точному наименованию среди активных
-  const { data: existingByName } = await (supabase.from('counterparties') as any)
+  // 2. Поиск существующего по наименованию (с учётом очистки от кавычек и форм собственности)
+  const simplifiedName = cleanCounterpartySearchName(cleanName);
+  const { data: existingList } = await (supabase.from('counterparties') as any)
     .select('id, name, phone')
-    .ilike('name', cleanName)
     .eq('is_active', true)
-    .maybeSingle();
+    .or(`name.ilike.%${cleanName}%,name.ilike.%${simplifiedName || cleanName}%`)
+    .limit(5);
+
+  const existingByName = (existingList || []).find((cp: any) => {
+    const existingClean = cleanCounterpartySearchName(cp.name);
+    return existingClean === simplifiedName || cp.name.toLowerCase() === cleanName.toLowerCase();
+  });
 
   if (existingByName) {
     return NextResponse.json(existingByName, { status: 200 });

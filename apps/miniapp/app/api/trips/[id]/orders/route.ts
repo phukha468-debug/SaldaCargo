@@ -7,6 +7,8 @@ import {
   isGeostroyCounterparty,
   isGeostroyOrderValid,
   isInternalCounterparty,
+  isDebtPaymentMethod,
+  isStrictDocCounterparty,
 } from '@saldacargo/shared';
 
 /** POST /api/trips/:id/orders — добавить заказ */
@@ -42,8 +44,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     isInternal = isInternalCounterparty(cp?.name);
     if (isInternal) {
       paymentMethod = 'cash';
-    } else if (isNoCashCounterparty(cp?.name) && paymentMethod === 'cash') {
-      paymentMethod = 'debt_cash';
+    } else {
+      const isNoCash = isNoCashCounterparty(cp?.name) || isStrictDocCounterparty(cp?.name);
+      if (isNoCash && (paymentMethod === 'cash' || paymentMethod === 'qr')) {
+        paymentMethod = 'bank_invoice';
+      }
     }
     if (isTerritoryCounterparty(cp?.name)) {
       if (!body.description?.trim()) {
@@ -69,12 +74,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  // settlement_status: только долг = pending; наличка и QR — деньги получены сразу; для внутренних заказов — completed
+  // settlement_status: только долг / безнал по счёту = pending; для внутренних заказов = completed
   const settlementStatus =
-    !isInternal &&
-    (paymentMethod === 'debt_cash' || paymentMethod === 'debt' || paymentMethod === 'debt_bank')
-      ? 'pending'
-      : 'completed';
+    !isInternal && isDebtPaymentMethod(paymentMethod) ? 'pending' : 'completed';
 
   const loaders = Array.isArray(body.loaders_data) ? body.loaders_data : [];
   const loader1 =

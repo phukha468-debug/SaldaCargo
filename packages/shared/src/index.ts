@@ -84,6 +84,111 @@ export function formatDuration(minutes: number): string {
   return `${h}ч ${m}м`;
 }
 
+export interface TripPeriodFormat {
+  shortText: string;
+  badgeText: string;
+  startDayNum: string;
+  endDayNum: string;
+  startTime: string;
+  endTime: string;
+  isSameDay: boolean;
+  fullPeriodText: string;
+  durationText: string;
+}
+
+/**
+ * Форматирует период рейса: выезд из геозоны -> возврат на базу / попадание на Ревью
+ * С соблюдением правила компактности 1 строки (1-Row Priority).
+ */
+export function formatTripPeriod(
+  startedAt?: string | null,
+  endedAt?: string | null,
+): TripPeriodFormat {
+  const tz = 'Asia/Yekaterinburg';
+  if (!startedAt) {
+    return {
+      shortText: '—',
+      badgeText: '',
+      startDayNum: '—',
+      endDayNum: '—',
+      startTime: '',
+      endTime: '',
+      isSameDay: true,
+      fullPeriodText: 'Дата не указана',
+      durationText: '',
+    };
+  }
+
+  const dStart = new Date(startedAt);
+  const dEnd = endedAt ? new Date(endedAt) : null;
+
+  const startDay = dStart.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: tz,
+  });
+  const startDayNum = dStart.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: tz,
+  });
+  const startTime = dStart.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: tz,
+  });
+
+  if (!dEnd) {
+    return {
+      shortText: `Выезд: ${startDay} ${startTime}`,
+      badgeText: 'В пути',
+      startDayNum,
+      endDayNum: 'В пути',
+      startTime,
+      endTime: '',
+      isSameDay: true,
+      fullPeriodText: `Выезд из геозоны: ${startDayNum}.${dStart.getFullYear()} ${startTime} (рейс ещё в пути)`,
+      durationText: 'В пути',
+    };
+  }
+
+  const endDayNum = dEnd.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: tz,
+  });
+  const endTime = dEnd.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: tz,
+  });
+
+  const isSameDay = startDayNum === endDayNum;
+  const diffMinutes = Math.max(1, Math.round((dEnd.getTime() - dStart.getTime()) / (1000 * 60)));
+  const durationText = formatDuration(diffMinutes);
+  const diffHours = diffMinutes / 60;
+  const daysCount = Math.max(1, Math.ceil(diffHours / 24));
+  const badgeText = isSameDay ? '1 дн' : `${daysCount} дн`;
+
+  const shortText = isSameDay
+    ? `${startDay} (${startTime} ➔ ${endTime})`
+    : `${startDayNum} (${startTime}) ➔ ${endDayNum} (${endTime})`;
+
+  const fullPeriodText = `🚀 Выезд из геозоны: ${startDayNum}.${dStart.getFullYear()} в ${startTime}\n🏁 Возврат / На ревью: ${endDayNum}.${dEnd.getFullYear()} в ${endTime}\n⏱ В пути: ${durationText} (${badgeText})`;
+
+  return {
+    shortText,
+    badgeText,
+    startDayNum,
+    endDayNum,
+    startTime,
+    endTime,
+    isSameDay,
+    fullPeriodText,
+    durationText,
+  };
+}
+
 /**
  * Форматирует российский номер телефона для отображения.
  * "+79991234567" → "+7 (999) 123-45-67"
@@ -542,11 +647,89 @@ export function isNoCashCounterparty(
   cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
 ): boolean {
   if (!cp) return false;
+  if (typeof cp === 'object' && cp?.is_legal_entity) return true;
   const name = typeof cp === 'string' ? cp : cp.name || '';
   if (!name || typeof name !== 'string') return false;
   const trimmed = name.trim();
   if (!trimmed) return false;
   return NO_CASH_COUNTERPARTY_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+/**
+ * Идентификаторы основных (мастер) контрагентов системы, дублирование которых строго запрещено.
+ */
+export const MASTER_COUNTERPARTY_IDS = {
+  VSMPO: '6024c9f4-5d67-4b8c-93ae-e4e66ce21441',
+  AVISMA: '88966c8a-4a0d-44c1-a24d-18a51e0ba00f',
+  GEOSTROY: '83db41b2-c050-4013-a878-bda2ab5c226e',
+} as const;
+
+/**
+ * Очищает название контрагента от организационно-правовых форм, кавычек и пометок в скобках.
+ */
+export function cleanCounterpartySearchName(name: string): string {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/\(лоп\)|\(прр\)|\(ооо\)|\(ип\)|\(пао\)|\(зао\)/gi, '')
+    .replace(/["'«»]/g, '')
+    .replace(/\b(ооо|пао|зао|ао|ип)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Проверяет, относится ли название или ИНН к одному из ключевых мастер-контрагентов,
+ * и возвращает его фиксированный ID во избежание создания дублей.
+ */
+export function resolveKnownMasterCounterpartyId(
+  name?: string | null,
+  inn?: string | null,
+): string | null {
+  if (inn) {
+    const cleanInn = inn.replace(/\D/g, '');
+    if (cleanInn === '6607000556') return MASTER_COUNTERPARTY_IDS.VSMPO;
+    if (cleanInn === '6623101234') return MASTER_COUNTERPARTY_IDS.GEOSTROY;
+  }
+  if (!name) return null;
+  const n = name.toLowerCase();
+  if (n.includes('геострой')) {
+    return MASTER_COUNTERPARTY_IDS.GEOSTROY;
+  }
+  if (n.includes('ависма')) {
+    if (n.includes('ооо') || n.includes('филиал')) {
+      return MASTER_COUNTERPARTY_IDS.AVISMA;
+    }
+    return MASTER_COUNTERPARTY_IDS.VSMPO;
+  }
+  if (n.includes('всмпо')) {
+    return MASTER_COUNTERPARTY_IDS.VSMPO;
+  }
+  return null;
+}
+
+/**
+ * Проверяет, является ли контрагент одним из строгих документооборотных заказчиков (ВСМПО, Ависма, Геостройиндустрия).
+ * Для них после завершения рейса всегда обязателен этап сбора документов (docs_collection).
+ */
+export function isStrictDocCounterparty(name?: string | null): boolean {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
+}
+
+/**
+ * Проверяет, является ли способ оплаты долговым / безналичным по счёту
+ * (все такие заказы ОБЯЗАТЕЛЬНО должны попадать в дебиторскую задолженность с settlement_status = 'pending').
+ */
+export function isDebtPaymentMethod(paymentMethod?: string | null): boolean {
+  if (!paymentMethod) return false;
+  return (
+    paymentMethod === 'debt_cash' ||
+    paymentMethod === 'debt' ||
+    paymentMethod === 'debt_bank' ||
+    paymentMethod === 'bank_invoice'
+  );
 }
 
 /**
@@ -1248,12 +1431,46 @@ export function extractFuelLitersFromExpense(exp: {
 }
 
 /**
+ * Расчет количества дней суточных водителя:
+ * 1. Если общий пробег рейса меньше 100 км — суточных НЕТ (0 дн / 0 ₽).
+ * 2. Ночные / вечерние погрузки с отстоем/ночевкой на базе в Салде не считаются в суточные (водитель ночует дома).
+ *    Время ночного отстоя на базе вычитается из дорожного времени.
+ * 3. Суточные начисляются за фактические дни в междугороднем рейсе (на каждые 24 часа чистой дороги вне базы).
+ */
+export function calculateTripPerDiemDays(
+  distanceKm: number,
+  startedAt?: string | null,
+  endedAt?: string | null,
+  hadSaldaOvernight: boolean = false,
+): number {
+  if (distanceKm < 100) {
+    return 0; // До 100 км суточных нет
+  }
+
+  if (!startedAt || !endedAt) {
+    return 1;
+  }
+
+  const dStart = new Date(startedAt);
+  const dEnd = new Date(endedAt);
+  const totalHours = Math.max(1, (dEnd.getTime() - dStart.getTime()) / (1000 * 3600));
+
+  // Если была ночная/вечерняя погрузка с отстоем в Салде:
+  // водитель спал дома на базе, вычитаем время ночевки (~10-12 часов)
+  const roadHours = hadSaldaOvernight ? Math.max(1, totalHours - 10) : totalHours;
+
+  return Math.max(1, Math.ceil(roadHours / 24));
+}
+
+/**
  * Расчет зарплаты водителя за рейс с округлением в меньшую сторону до сотен рублей
  * (например, 7 070 ₽ округляется до 7 000 ₽)
+ * Правило: при пробеге < 100 км суточные всегда 0 ₽.
  */
-export function calculateDriverTripPay(distanceKm: number, daysCount: number = 1): number {
+export function calculateDriverTripPay(distanceKm: number, daysCount?: number): number {
   const kmPay = distanceKm * DRIVER_RATE_PER_KM;
-  const perDiemPay = daysCount * DRIVER_PER_DIEM_PER_DAY;
+  const effectiveDays = distanceKm < 100 ? 0 : daysCount !== undefined ? daysCount : 1;
+  const perDiemPay = effectiveDays * DRIVER_PER_DIEM_PER_DAY;
   const rawTotal = kmPay + perDiemPay;
   return Math.floor(rawTotal / 100) * 100;
 }

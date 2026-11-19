@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
-const CASH_WALLET_ID = '10000000-0000-0000-0000-000000000002';
 
 /**
  * GET /api/admin/driver-cash-holds
@@ -128,7 +127,7 @@ export async function POST(request: Request) {
         amount: numAmount.toFixed(2),
         category_id: CASH_COLLECT_CAT,
         from_wallet_id: driverWallet?.id ?? null,
-        to_wallet_id: CASH_WALLET_ID,
+        to_wallet_id: null,
         lifecycle_status: 'approved',
         settlement_status: 'pending',
         related_user_id: body.driver_id,
@@ -266,7 +265,7 @@ export async function PATCH(request: Request) {
             amount: remainingToSettle.toFixed(2),
             category_id: CASH_COLLECT_CAT,
             from_wallet_id: h.from_wallet_id,
-            to_wallet_id: CASH_WALLET_ID,
+            to_wallet_id: null,
             lifecycle_status: 'approved',
             settlement_status: 'completed',
             related_user_id: h.related_user_id,
@@ -341,7 +340,7 @@ export async function PATCH(request: Request) {
         amount: collectAmount.toFixed(2),
         category_id: CASH_COLLECT_CAT,
         from_wallet_id: holdTx.from_wallet_id,
-        to_wallet_id: CASH_WALLET_ID,
+        to_wallet_id: null,
         lifecycle_status: 'approved',
         settlement_status: 'completed',
         related_user_id: holdTx.related_user_id,

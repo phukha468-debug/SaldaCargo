@@ -1,7 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTripFinancials } from '@/lib/tripFinancials';
-import { auditTripFuel, calculateDriverTripPay, calculateTripFuelNorm } from '@saldacargo/shared';
+import { syncStrictOrdersForTrip } from '@/lib/orderTripSync';
+import {
+  auditTripFuel,
+  calculateDriverTripPay,
+  calculateTripFuelNorm,
+  isStrictDocCounterparty,
+  isNoCashCounterparty,
+} from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
@@ -71,7 +78,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       id, lifecycle_status, trip_number, asset_id, odometer_start, odometer_end, started_at, ended_at, driver_id,
       asset:assets(id, reg_number, short_name, odometer_current),
       driver:users!trips_driver_id_fkey(id, name),
-      trip_orders(id, driver_pay, lifecycle_status),
+      trip_orders(id, counterparty_id, amount, payment_method, settlement_status, driver_pay, lifecycle_status, counterparty:counterparties(id, name, is_legal_entity)),
       trip_expenses(id, category_id, description, amount)
     `,
     )
@@ -178,41 +185,71 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .eq('trip_id', id)
     .neq('lifecycle_status', 'cancelled');
 
-  // Синхронизируем статус связанных заявок в orders:
-  // Если это одна из 3-х фирм (ВСМПО, Ависма, Геострой) -> docs_collection (Сбор документов)
-  // Иначе -> completed (Завершен)
-  const isStrictDocCounterparty = (name?: string | null) => {
-    if (!name) return false;
-    const n = name.toLowerCase();
-    return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
-  };
+  // 1. Защита дебиторки: для юридических лиц и строгих контрагентов (ВСМПО, Ависма, Геострой)
+  // оплата наличными или моментальный settlement недопустимы — способ оплаты строго bank_invoice (или debt_cash)
+  // с settlement_status: 'pending', чтобы рейс гарантированно попадал в дебиторскую задолженность!
+  const tripOrdersList = (trip.trip_orders as any[]) ?? [];
+  const primaryOrder =
+    tripOrdersList.find((o: any) => o.lifecycle_status !== 'cancelled' && o.counterparty_id) ||
+    tripOrdersList[0];
+  const primaryCpName = primaryOrder?.counterparty?.name || null;
 
-  // Связываем только заявки, явно привязанные к этому рейсу (active_trip_id) или с тем же номером.
-  // Категорически запрещено искать просто по assigned_vehicle_id, иначе закрываются будущие запланированные заявки!
+  for (const to of tripOrdersList) {
+    if (to.lifecycle_status === 'cancelled') continue;
+    const cpName = to.counterparty?.name || primaryCpName;
+    const isLegal =
+      Boolean(to.counterparty?.is_legal_entity) ||
+      isNoCashCounterparty(cpName) ||
+      isStrictDocCounterparty(cpName);
+
+    if (
+      isLegal &&
+      (to.payment_method === 'cash' ||
+        to.payment_method === 'qr' ||
+        to.settlement_status !== 'pending')
+    ) {
+      const pm = to.payment_method === 'debt_cash' ? 'debt_cash' : 'bank_invoice';
+      await (supabase.from('trip_orders') as any)
+        .update({
+          payment_method: pm,
+          settlement_status: 'pending',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', to.id);
+      to.payment_method = pm;
+      to.settlement_status = 'pending';
+    }
+  }
+
+  // 2. Синхронизируем статус связанных заявок в orders:
+  // Если в рейсе есть заказы компаний со строгим сбором документов (Геостройиндустрия, ВСМПО, ООО АВИСМА)
+  // — гарантированно создаем/переводим их в статус 'docs_collection' (Сбор документов).
+  await syncStrictOrdersForTrip(supabase, id);
+
+  // Для остальных (не строгих) связанных заявок завершаем статус
   const orConditions = [`active_trip_id.eq.${id}`];
   if (trip.trip_number) orConditions.push(`order_number.eq.${trip.trip_number}`);
 
   const { data: linkedOrders } = await (supabase.from('orders') as any)
-    .select('id, status, client:counterparties!orders_client_id_fkey(name)')
+    .select(
+      'id, status, client_id, loading_org_name, price_without_vat, client:counterparties!orders_client_id_fkey(id, name)',
+    )
     .or(orConditions.join(','))
     .in('status', ['in_progress', 'pending_review']);
 
   if (linkedOrders && linkedOrders.length > 0) {
     for (const ord of linkedOrders) {
-      const is3Firms = isStrictDocCounterparty(ord.client?.name);
-      const targetStatus = is3Firms ? 'docs_collection' : 'completed';
-      await (supabase.from('orders') as any)
-        .update({
-          status: targetStatus,
-          active_trip_id: id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', ord.id);
+      const effectiveName = ord.client?.name || primaryCpName || ord.loading_org_name;
+      const is3Firms = isStrictDocCounterparty(effectiveName);
+      if (!is3Firms) {
+        await (supabase.from('orders') as any)
+          .update({
+            status: 'completed',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', ord.id);
+      }
     }
-  } else {
-    await (supabase.from('orders') as any)
-      .update({ status: 'docs_collection', updated_at: new Date().toISOString() })
-      .eq('active_trip_id', id);
   }
 
   await syncTripFinancials(supabase, id, adminId);

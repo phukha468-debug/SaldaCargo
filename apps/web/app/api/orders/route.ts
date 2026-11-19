@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isStrictDocCounterparty } from '@saldacargo/shared';
 
 export async function GET(req: Request) {
   try {
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
         vehicle:assets(*),
         driver:users!orders_assigned_driver_id_fkey(*),
         loading_point:loading_points_directory(*),
-        trip:trips(*)
+        trip:trips(*, trip_orders(*, counterparty:counterparties(*)))
       `,
       )
       .order('created_at', { ascending: false });
@@ -33,32 +34,76 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const isStrictDocCounterparty = (name?: string | null) => {
-      if (!name) return false;
-      const n = name.toLowerCase();
-      return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
-    };
-
     const enriched = (data || []).map((o: any) => {
       let currentStatus = o.status;
 
+      // Авто-восстановление привязки контрагента из связанного рейса (trip_orders)
+      const targetTripOrderId = o.raw_parser_payload?.trip_order_id;
+      const matchedTripOrder = targetTripOrderId
+        ? (o.trip?.trip_orders as any[])?.find((to: any) => to.id === targetTripOrderId)
+        : null;
+
+      const primaryTripOrder =
+        matchedTripOrder ||
+        (o.trip?.trip_orders as any[])?.find(
+          (to: any) => to.lifecycle_status !== 'cancelled' && to.counterparty_id,
+        ) ||
+        (o.trip?.trip_orders as any[])?.[0];
+
+      if (!o.client && primaryTripOrder?.counterparty) {
+        o.client = primaryTripOrder.counterparty;
+        o.client_id = primaryTripOrder.counterparty_id;
+        (supabase.from('orders') as any)
+          .update({
+            client_id: primaryTripOrder.counterparty_id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', o.id)
+          .then();
+      }
+
+      const effectiveName = o.client?.name || o.loading_org_name || '';
+
       // Автоматическая фоновая синхронизация со связанным рейсом (trips)
       if (o.trip) {
-        if (o.trip.lifecycle_status === 'approved') {
-          const targetStatus = isStrictDocCounterparty(o.client?.name)
-            ? 'docs_collection'
-            : 'completed';
-          if (currentStatus === 'in_progress' || currentStatus === 'pending_review') {
+        if (o.trip.lifecycle_status === 'cancelled') {
+          if (currentStatus !== 'cancelled') {
+            currentStatus = 'cancelled';
+            (supabase.from('orders') as any)
+              .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+              .eq('id', o.id)
+              .then();
+          }
+        } else if (o.trip.lifecycle_status === 'approved') {
+          const isStrict = isStrictDocCounterparty(effectiveName);
+          const targetStatus = isStrict ? 'docs_collection' : 'completed';
+          const isEdoAccepted = Boolean(o.raw_parser_payload?.billing_docs?.client_accepted_edo);
+
+          if (
+            currentStatus === 'in_progress' ||
+            currentStatus === 'pending_review' ||
+            (currentStatus === 'completed' && isStrict && !isEdoAccepted)
+          ) {
             currentStatus = targetStatus;
             (supabase.from('orders') as any)
               .update({ status: targetStatus, updated_at: new Date().toISOString() })
               .eq('id', o.id)
               .then();
           }
-        } else if (o.trip.status === 'completed' && currentStatus === 'in_progress') {
-          currentStatus = 'pending_review';
+        } else if (o.trip.status === 'completed' && o.trip.lifecycle_status === 'draft') {
+          if (currentStatus !== 'pending_review') {
+            currentStatus = 'pending_review';
+            (supabase.from('orders') as any)
+              .update({ status: 'pending_review', updated_at: new Date().toISOString() })
+              .eq('id', o.id)
+              .then();
+          }
+        }
+      } else if (!o.active_trip_id && o.base_doc_name?.includes('ВЫЕЗД БЕЗ ЗАЯВКИ')) {
+        if (currentStatus === 'pending_review') {
+          currentStatus = 'cancelled';
           (supabase.from('orders') as any)
-            .update({ status: 'pending_review', updated_at: new Date().toISOString() })
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
             .eq('id', o.id)
             .then();
         }

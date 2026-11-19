@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
+const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -259,6 +260,7 @@ export async function GET(request: Request) {
       .eq('to_wallet_id', CASH_ID)
       .eq('lifecycle_status', 'approved')
       .eq('settlement_status', 'completed')
+      .neq('category_id', CASH_COLLECT_CAT)
       .lt('created_at', rangeStart);
     if (priorAudit) priorCashInQuery = priorCashInQuery.gt('created_at', auditCutoff);
 
@@ -400,7 +402,8 @@ export async function GET(request: Request) {
       const amt = parseFloat(tx.amount ?? '0');
       if (tx.direction === 'income') {
         if (tx.to_wallet_id === BANK_ID) bankDayIn += amt;
-        else if (tx.to_wallet_id === CASH_ID) cashDayIn += amt;
+        else if (tx.to_wallet_id === CASH_ID && tx.category_id !== CASH_COLLECT_CAT)
+          cashDayIn += amt;
         else if (tx.to_wallet_id === FUEL_CARD_ID) fuelDayIn += amt;
       } else if (tx.direction === 'expense') {
         if (tx.from_wallet_id === BANK_ID) bankDayOut += amt;
@@ -412,7 +415,8 @@ export async function GET(request: Request) {
         else if (tx.from_wallet_id === FUEL_CARD_ID) fuelDayOut += amt;
 
         if (tx.to_wallet_id === BANK_ID) bankDayIn += amt;
-        else if (tx.to_wallet_id === CASH_ID) cashDayIn += amt;
+        else if (tx.to_wallet_id === CASH_ID && tx.category_id !== CASH_COLLECT_CAT)
+          cashDayIn += amt;
         else if (tx.to_wallet_id === FUEL_CARD_ID) fuelDayIn += amt;
       }
     }

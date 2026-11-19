@@ -7,6 +7,8 @@ import {
   isGeostroyCounterparty,
   isGeostroyOrderValid,
   isInternalCounterparty,
+  isDebtPaymentMethod,
+  isStrictDocCounterparty,
 } from '@saldacargo/shared';
 
 /** PATCH /api/trips/:id/orders/:orderId — отменить или отредактировать заказ */
@@ -46,7 +48,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Рейс уже одобрен администратором' }, { status: 403 });
     }
 
-    const pendingMethods = ['debt_cash', 'debt', 'debt_bank'];
     let paymentMethod = body.payment_method === 'card_driver' ? 'qr' : body.payment_method;
     let isInternal = false;
     if (body.counterparty_id) {
@@ -57,8 +58,11 @@ export async function PATCH(
       isInternal = isInternalCounterparty(cp?.name);
       if (isInternal) {
         paymentMethod = 'cash';
-      } else if (isNoCashCounterparty(cp?.name) && paymentMethod === 'cash') {
-        paymentMethod = 'debt_cash';
+      } else {
+        const isNoCash = isNoCashCounterparty(cp?.name) || isStrictDocCounterparty(cp?.name);
+        if (isNoCash && (paymentMethod === 'cash' || paymentMethod === 'qr')) {
+          paymentMethod = 'bank_invoice';
+        }
       }
       if (isTerritoryCounterparty(cp?.name)) {
         if (!body.description?.trim()) {
@@ -84,7 +88,7 @@ export async function PATCH(
       }
     }
     const settlementStatus =
-      !isInternal && pendingMethods.includes(paymentMethod) ? 'pending' : 'completed';
+      !isInternal && isDebtPaymentMethod(paymentMethod) ? 'pending' : 'completed';
 
     const loaders = Array.isArray(body.loaders_data) ? body.loaders_data : [];
     const loader1 =

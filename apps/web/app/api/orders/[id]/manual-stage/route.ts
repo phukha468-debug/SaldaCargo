@@ -129,7 +129,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               1,
               (new Date(now).getTime() - startDate.getTime()) / (1000 * 3600),
             );
-            const daysCount = Math.max(1, Math.ceil(diffHours / 24));
+            const hadSaldaOvernight = Boolean(
+              (existingTrip.driver_note && existingTrip.driver_note.includes('Отстой в Салде')) ||
+              (existingTrip.driver_note &&
+                existingTrip.driver_note.includes('Промежуточный заезд')) ||
+              diffHours >= 12,
+            );
+            const roadHours = hadSaldaOvernight ? Math.max(1, diffHours - 10) : diffHours;
+            const daysCount = computedDistanceKm < 100 ? 0 : Math.max(1, Math.ceil(roadHours / 24));
             const kmPay = computedDistanceKm * 10;
             const perDiemPay = daysCount * 1000;
             computedDriverPay = Math.floor((kmPay + perDiemPay) / 100) * 100;
