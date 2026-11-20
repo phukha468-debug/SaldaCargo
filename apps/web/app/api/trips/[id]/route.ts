@@ -100,6 +100,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       deleted_expense_ids?: string[];
       odometer_start?: number;
       odometer_end?: number;
+      driver_id?: string | null;
       admin_note?: string;
       driver_note?: string;
       cash_not_surrendered?: boolean;
@@ -117,12 +118,40 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: tripError?.message ?? 'Рейс не найден' }, { status: 404 });
     }
 
-    // 1.1 Обновление данных самого рейса (одометр, заметки, подотчёт наличных)
+    // 1.1 Обновление данных самого рейса (одометр, заметки, подотчёт наличных, водитель)
     const tripUpdates: Record<string, any> = {};
     if (body.odometer_start !== undefined) tripUpdates.odometer_start = body.odometer_start;
     if (body.odometer_end !== undefined) tripUpdates.odometer_end = body.odometer_end;
     if (body.admin_note !== undefined) tripUpdates.admin_note = body.admin_note;
     if (body.driver_note !== undefined) tripUpdates.driver_note = body.driver_note;
+
+    if (body.driver_id !== undefined && body.driver_id !== null) {
+      tripUpdates.driver_id = body.driver_id;
+
+      // Если была метка [УТОЧНИТЬ_ВОДИТЕЛЯ], снимаем её при сохранении водителя
+      let currentAdminNote =
+        (tripUpdates.admin_note !== undefined ? tripUpdates.admin_note : (trip.admin_note ?? '')) ||
+        '';
+      if (currentAdminNote.includes('[УТОЧНИТЬ_ВОДИТЕЛЯ]')) {
+        currentAdminNote = currentAdminNote
+          .replace(/\[УТОЧНИТЬ_ВОДИТЕЛЯ\]/g, '')
+          .replace(/\n{2,}/g, '\n')
+          .trim();
+        tripUpdates.admin_note = currentAdminNote || null;
+      }
+
+      let currentDriverNote =
+        (tripUpdates.driver_note !== undefined
+          ? tripUpdates.driver_note
+          : (trip.driver_note ?? '')) || '';
+      if (currentDriverNote.includes('ТРЕБУЕТСЯ УТОЧНИТЬ ВОДИТЕЛЯ')) {
+        currentDriverNote = currentDriverNote
+          .replace(/⚠️\s*ТРЕБУЕТСЯ УТОЧНИТЬ ВОДИТЕЛЯ[^\n]*\n?/g, '')
+          .replace(/\n{2,}/g, '\n')
+          .trim();
+        tripUpdates.driver_note = currentDriverNote || null;
+      }
+    }
 
     if (body.cash_not_surrendered !== undefined) {
       let currentAdminNote =
@@ -159,6 +188,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (Object.keys(tripUpdates).length > 0) {
       tripUpdates.updated_at = new Date().toISOString();
       await (supabase.from('trips') as any).update(tripUpdates).eq('id', id);
+    }
+
+    if (body.driver_id) {
+      await (supabase.from('orders') as any)
+        .update({
+          assigned_driver_id: body.driver_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('active_trip_id', id);
     }
 
     // 2. Вспомогательная функция для резолвинга/создания контрагента

@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { Money } from '@saldacargo/ui';
 import {
   formatTripPeriod,
+  isWialonGpsAsset,
   isNoCashCounterparty,
   isTerritoryCounterparty,
   formatTerritoryDescription,
@@ -60,6 +61,7 @@ interface TripForReview {
   id: string;
   trip_number: number;
   lifecycle_status: string;
+  created_at?: string;
   started_at: string;
   ended_at: string | null;
   trip_type: string;
@@ -2173,7 +2175,10 @@ function TripCard({
   const { activeOrders, expenses, revenue, driverPay, loaderPay, totalExpenses, mileage, profit } =
     calcTrip(trip);
   const totalCosts = driverPay + loaderPay + totalExpenses;
-  const period = formatTripPeriod(trip.started_at, trip.ended_at);
+  const period = formatTripPeriod(trip.started_at, trip.ended_at, {
+    createdAt: trip.created_at,
+    asset: trip.asset,
+  });
 
   const cashRevenue = activeOrders
     .filter((o) => o.payment_method === 'cash')
@@ -2313,7 +2318,7 @@ function TripCard({
       >
         <div className="flex items-center gap-3">
           {/* Left: identity — flex-1 so it takes remaining space after fixed metrics */}
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
             <span className="font-black text-slate-900 text-sm whitespace-nowrap">
               {trip.asset?.reg_number === 'БЕЗ АВТО' ? '👷 ПРР' : `🚚 ${trip.asset.short_name}`}
             </span>
@@ -2336,9 +2341,28 @@ function TripCard({
               #{trip.trip_number}
             </span>
             {trip.lifecycle_status === 'returned' && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs shrink-0 flex items-center gap-0.5">
-                ⚠️ На доработке
+              <span
+                className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs shrink-0 flex items-center gap-0.5"
+                title="На доработке"
+              >
+                <span>⚠️</span>
+                <span className="hidden sm:inline">Доработка</span>
               </span>
+            )}
+            {(trip.admin_note?.includes('[УТОЧНИТЬ_ВОДИТЕЛЯ]') ||
+              trip.driver_note?.includes('ТРЕБУЕТСЯ УТОЧНИТЬ ВОДИТЕЛЯ')) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 hover:bg-amber-600 text-white shadow-xs shrink-0 flex items-center gap-0.5 cursor-pointer"
+                title="На автомобиле нет закрепленного водителя. Нажмите для выбора водителя"
+              >
+                <span>⚠️</span>
+                <span className="hidden md:inline">Уточнить водителя</span>
+              </button>
             )}
             {/* Яркие бейджи типов заказов рейса (ППР / Авто) */}
             {(() => {
@@ -2446,7 +2470,7 @@ function TripCard({
           </div>
 
           {/* Center: metrics — shrink-0 with pixel-fixed widths → true vertical alignment */}
-          <div className="shrink-0 flex items-center">
+          <div className="shrink-0 flex items-center ml-auto">
             <div className="w-[100px] text-center">
               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">
                 Выручка
@@ -2868,38 +2892,55 @@ function TripCard({
             </div>
           )}
 
-          {/* Период рейса: дата/время выезда ➔ возврат на базу / Ревью */}
+          {/* Период рейса: дата/время выезда ➔ возврат на базу / Ревью (только для ТС с Wialon GPS) */}
           <div className="px-5 py-2 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between text-xs text-slate-700">
-            <div className="flex items-center gap-2 truncate">
-              <span className="font-bold text-slate-700 flex items-center gap-1 shrink-0">
-                <span>🕒</span>
-                <span>Период рейса:</span>
-              </span>
-              <span className="truncate">
-                <span className="font-semibold text-slate-900">Выезд из геозоны:</span>{' '}
-                {period.startTime ? `${period.startDayNum} в ${period.startTime}` : '—'}
-                <span className="mx-1.5 text-slate-300">➔</span>
-                <span className="font-semibold text-slate-900">Возврат на базу (Ревью):</span>{' '}
-                {trip.ended_at ? `${period.endDayNum} в ${period.endTime}` : 'В пути'}
-              </span>
-              {period.durationText && (
-                <>
-                  <span className="text-slate-300">·</span>
-                  <span className="text-slate-500 font-medium">
-                    в пути: <strong>{period.durationText}</strong>
-                  </span>
-                </>
-              )}
-            </div>
-            {!period.isSameDay ? (
-              <span className="text-[10px] text-amber-900 font-black bg-amber-100 border border-amber-300 px-2 py-0.5 rounded shrink-0">
-                Кругорейс ({period.badgeText})
-              </span>
+            {isWialonGpsAsset(trip.asset) ? (
+              <div className="flex items-center gap-2 truncate">
+                <span className="font-bold text-slate-700 flex items-center gap-1 shrink-0">
+                  <span>🕒</span>
+                  <span>Период рейса:</span>
+                </span>
+                <span className="truncate">
+                  <span className="font-semibold text-slate-900">Выезд из геозоны:</span>{' '}
+                  {period.startTime ? `${period.startDayNum} в ${period.startTime}` : '—'}
+                  <span className="mx-1.5 text-slate-300">➔</span>
+                  <span className="font-semibold text-slate-900">
+                    Возврат на базу (Ревью):
+                  </span>{' '}
+                  {trip.ended_at ? `${period.endDayNum} в ${period.endTime}` : 'В пути'}
+                </span>
+                {period.durationText && (
+                  <>
+                    <span className="text-slate-300">·</span>
+                    <span className="text-slate-500 font-medium">
+                      в пути: <strong>{period.durationText}</strong>
+                    </span>
+                  </>
+                )}
+              </div>
             ) : (
-              <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded shrink-0">
-                1 день
-              </span>
+              <div className="flex items-center gap-2 truncate">
+                <span className="font-bold text-slate-700 flex items-center gap-1 shrink-0">
+                  <span>📅</span>
+                  <span>Дата отчёта:</span>
+                </span>
+                <span className="truncate font-semibold text-slate-900">{period.shortText}</span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  (без Wialon GPS — дата написания отчёта)
+                </span>
+              </div>
             )}
+            {isWialonGpsAsset(trip.asset) ? (
+              !period.isSameDay ? (
+                <span className="text-[10px] text-amber-900 font-black bg-amber-100 border border-amber-300 px-2 py-0.5 rounded shrink-0">
+                  Кругорейс ({period.badgeText})
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded shrink-0">
+                  1 день
+                </span>
+              )
+            ) : null}
           </div>
 
           {/* Предупреждение о расхождении одометра с Wialon */}

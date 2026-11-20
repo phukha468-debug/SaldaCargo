@@ -145,20 +145,26 @@ export async function handleVehicleDeparture(
   let targetOrder = order;
   let driverId = order?.assigned_driver_id;
 
+  // Получаем карточку автомобиля для проверки закрепленного водителя
+  const { data: assetData } = await supabase
+    .from('assets')
+    .select('id, reg_number, short_name, assigned_driver_id')
+    .eq('id', params.vehicleId)
+    .maybeSingle();
+
+  const isValdai446 =
+    assetData?.reg_number?.includes('446') || assetData?.short_name?.includes('446') || false;
+  // Валдай 446 или любой автомобиль без закрепленного водителя требует обязательного уточнения
+  const isDriverUncertain = isValdai446 || !assetData?.assigned_driver_id;
+
   // Если заявка не была создана заранее — создаем экстренную заявку со знаком внимания ⚠️
   if (!targetOrder) {
-    // Приоритет 1: Закрепленный за автомобилем постоянный водитель из карточки ТС (assets.assigned_driver_id)
-    if (!driverId) {
-      const { data: assetData } = await supabase
-        .from('assets')
-        .select('assigned_driver_id')
-        .eq('id', params.vehicleId)
-        .maybeSingle();
-
-      driverId = assetData?.assigned_driver_id;
+    // Приоритет 1: Закрепленный за автомобилем постоянный водитель из карточки ТС (если водитель определен)
+    if (!driverId && !isDriverUncertain && assetData?.assigned_driver_id) {
+      driverId = assetData.assigned_driver_id;
     }
 
-    // Приоритет 2: Ищем последнего водителя этого автомобиля из прошлых рейсов
+    // Приоритет 2: Ищем последнего водителя этого автомобиля из прошлых рейсов (как временный fallback из-за NOT NULL)
     if (!driverId) {
       const { data: lastTrip } = await supabase
         .from('trips')
@@ -182,12 +188,16 @@ export async function handleVehicleDeparture(
       driverId = defaultDriver?.id;
     }
 
+    const docName = isValdai446
+      ? '⚠️ ВЫЕЗД БЕЗ ЗАЯВКИ (Валдай 446 - УТОЧНИТЬ ВОДИТЕЛЯ)'
+      : '⚠️ ВЫЕЗД БЕЗ ЗАЯВКИ';
+
     const { data: emergencyOrder, error: emergErr } = await supabase
       .from('orders')
       .insert({
         source_type: 'direct_ad',
         status: 'in_progress',
-        base_doc_name: '⚠️ ВЫЕЗД БЕЗ ЗАЯВКИ',
+        base_doc_name: docName,
         base_doc_number: '',
         base_doc_date: departureTime.slice(0, 10),
         cargo_name: '',
@@ -199,6 +209,7 @@ export async function handleVehicleDeparture(
         assigned_vehicle_id: params.vehicleId,
         assigned_driver_id: driverId,
         actual_loading_arrival_at: departureTime,
+        raw_parser_payload: isDriverUncertain ? { needs_driver_clarification: true } : {},
       })
       .select()
       .single();
@@ -211,9 +222,13 @@ export async function handleVehicleDeparture(
   }
 
   const isEmergency = !order;
-  const tripNote = isEmergency
+  let tripNote = isEmergency
     ? '⚠️ Внимание: Автомашина выехала без заявки по геозоне Wialon! Поля заявки пустые, требуется заполнение.'
     : `Авто-старт по геозоне Wialon. Заявка № ${targetOrder.base_doc_number || targetOrder.order_number}`;
+
+  if (isDriverUncertain) {
+    tripNote = `⚠️ ТРЕБУЕТСЯ УТОЧНИТЬ ВОДИТЕЛЯ! На автомобиле нет закрепленного водителя.\n${tripNote}`;
+  }
 
   // Парсим номер рейса из номера заявки, если рейс создавался по заранее заведенной заявке
   const rawOrderNum = targetOrder.base_doc_number || targetOrder.internal_order_number;
@@ -252,6 +267,7 @@ export async function handleVehicleDeparture(
     odometer_start: params.odometer,
     started_at: departureTime,
     driver_note: tripNote,
+    ...(isDriverUncertain ? { admin_note: '[УТОЧНИТЬ_ВОДИТЕЛЯ]' } : {}),
   };
 
   // Создаем связанный рейс в таблице trips

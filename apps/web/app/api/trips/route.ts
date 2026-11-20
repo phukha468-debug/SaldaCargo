@@ -79,8 +79,13 @@ export async function GET(request: Request) {
     .order('started_at', { ascending: false });
 
   // Если запрашиваем черновики для ревью — показываем завершённые в статусах draft и returned (на доработке)
+  // Защита от всплывания старых майских/архивных хвостов: на ревью выводятся только свежие рейсы (за последние 60 дней)
   if (lifecycle === 'draft' && !status) {
     query = query.in('lifecycle_status', ['draft', 'returned']).eq('status', 'completed');
+    if (!date && !month && !weekStart) {
+      const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
+      query = query.gte('created_at', sixtyDaysAgo);
+    }
   } else if (lifecycle) {
     query = query.eq('lifecycle_status', lifecycle);
     if (status) {

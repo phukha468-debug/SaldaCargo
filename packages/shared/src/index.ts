@@ -97,14 +97,89 @@ export interface TripPeriodFormat {
 }
 
 /**
+ * Проверяет, имеет ли автомобиль GPS-модуль Wialon.
+ * На данный момент GPS-модули установлены строго на 4 Валдаях:
+ * 1. А096МВ196 (Unit 11873)
+ * 2. О188ТА196 (Unit 11876)
+ * 3. У446ВН96 (Unit 11875)
+ * 4. У883АР96 (Unit 11874)
+ * Только для этих 4 машин фиксируются точные даты и время выезда/возврата по геозонам.
+ * Для всех остальных машин дата рейса строго равна дате написания/создания отчёта (created_at).
+ */
+export function isWialonGpsAsset(
+  asset?: { reg_number?: string | null; short_name?: string | null } | string | null,
+): boolean {
+  if (!asset) return false;
+  const reg = typeof asset === 'string' ? asset : asset.reg_number || asset.short_name || '';
+  const clean = reg.replace(/[\s\-_]/g, '').toUpperCase();
+  return (
+    clean.includes('096') || clean.includes('188') || clean.includes('446') || clean.includes('883')
+  );
+}
+
+/**
  * Форматирует период рейса: выезд из геозоны -> возврат на базу / попадание на Ревью
  * С соблюдением правила компактности 1 строки (1-Row Priority).
+ * Для автомобилей без Wialon GPS дата рейса = дате написания/создания отчёта (created_at) без фальшивых часов/минут выезда.
  */
 export function formatTripPeriod(
   startedAt?: string | null,
   endedAt?: string | null,
+  options?: {
+    createdAt?: string | null;
+    asset?: { reg_number?: string | null; short_name?: string | null } | string | null;
+    isWialonGps?: boolean;
+  },
 ): TripPeriodFormat {
   const tz = 'Asia/Yekaterinburg';
+  const hasGps =
+    options?.isWialonGps !== undefined
+      ? options.isWialonGps
+      : options?.asset !== undefined
+        ? isWialonGpsAsset(options.asset)
+        : true; // fallback для обратной совместимости
+
+  // Для автомобилей БЕЗ GPS модуля:
+  // Дата рейса строго = дате создания отчёта (created_at) без вымышленных временных меток геозоны
+  if (!hasGps) {
+    const dateSource = options?.createdAt || startedAt;
+    if (!dateSource) {
+      return {
+        shortText: '—',
+        badgeText: '',
+        startDayNum: '—',
+        endDayNum: '—',
+        startTime: '',
+        endTime: '',
+        isSameDay: true,
+        fullPeriodText: 'Дата отчёта не указана (без GPS)',
+        durationText: '',
+      };
+    }
+    const d = new Date(dateSource);
+    const startDay = d.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      timeZone: tz,
+    });
+    const startDayNum = d.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      timeZone: tz,
+    });
+    return {
+      shortText: startDay,
+      badgeText: '',
+      startDayNum,
+      endDayNum: startDayNum,
+      startTime: '',
+      endTime: '',
+      isSameDay: true,
+      fullPeriodText: `Дата создания отчёта: ${startDayNum}.${d.getFullYear()} (автомобиль без GPS-модуля)`,
+      durationText: '',
+    };
+  }
+
   if (!startedAt) {
     return {
       shortText: '—',
