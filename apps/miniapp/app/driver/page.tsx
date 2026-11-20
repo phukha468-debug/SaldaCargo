@@ -597,20 +597,34 @@ function ReviewTripCard({ trip, onClick }: { trip: TripCard; onClick: () => void
     .filter((o) => o?.lifecycle_status !== 'cancelled')
     .reduce((s, o) => s + (parseFloat(o?.driver_pay || '0') || 0), 0);
 
+  const isReturned = trip.lifecycle_status === 'returned';
+
   return (
     <div
       onClick={onClick}
-      className="bg-amber-50/60 border border-amber-300 rounded-xl px-3 py-2 active:bg-amber-100 transition-colors relative overflow-hidden flex items-center justify-between cursor-pointer"
+      className={`${
+        isReturned
+          ? 'bg-rose-50/70 border border-rose-300 active:bg-rose-100'
+          : 'bg-amber-50/60 border border-amber-300 active:bg-amber-100'
+      } rounded-xl px-3 py-2 transition-colors relative overflow-hidden flex items-center justify-between cursor-pointer`}
     >
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+      <div
+        className={`absolute left-0 top-0 bottom-0 w-1 ${
+          isReturned ? 'bg-rose-500' : 'bg-amber-400'
+        }`}
+      ></div>
       <div className="pl-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-black text-zinc-900 text-xs">Рейс №{trip.trip_number}</span>
           <span className="text-[11px] text-zinc-600 font-medium truncate">
             · {trip.asset?.short_name ?? 'Без авто'}
           </span>
-          <span className="text-[9px] text-amber-700 font-bold bg-amber-100 px-1 rounded">
-            Ждёт проверки
+          <span
+            className={`text-[9px] font-bold px-1 rounded ${
+              isReturned ? 'text-rose-800 bg-rose-100 font-black' : 'text-amber-700 bg-amber-100'
+            }`}
+          >
+            {isReturned ? '⚠️ На доработке' : 'Ждёт проверки'}
           </span>
         </div>
       </div>

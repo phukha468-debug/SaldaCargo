@@ -4430,70 +4430,66 @@ function CreateSmartOrderModal({
           </button>
         </div>
 
-        {/* Быстрые шаблоны клиентов или чистая заявка */}
-        {!isEditing && (
-          <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => selectClientPreset('manual')}
-              className={`py-1.5 rounded-lg transition cursor-pointer ${
-                selectedClientType === 'manual'
-                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
-                  : 'text-slate-600'
-              }`}
-            >
-              📝 Чистая заявка
-            </button>
-            <button
-              type="button"
-              onClick={() => selectClientPreset('vsmpo')}
-              className={`py-1.5 rounded-lg transition cursor-pointer ${
-                selectedClientType === 'vsmpo'
-                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
-                  : 'text-slate-600'
-              }`}
-            >
-              🏢 Шаблон ВСМПО (Парфенов)
-            </button>
-            <button
-              type="button"
-              onClick={() => selectClientPreset('geostroy')}
-              className={`py-1.5 rounded-lg transition cursor-pointer ${
-                selectedClientType === 'geostroy'
-                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
-                  : 'text-slate-600'
-              }`}
-            >
-              🏗️ Шаблон Геострой
-            </button>
-          </div>
-        )}
+        {/* Быстрые шаблоны клиентов (доступны всегда: и для новых, и при редактировании) */}
+        <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => selectClientPreset('manual')}
+            className={`py-1.5 rounded-lg transition cursor-pointer ${
+              selectedClientType === 'manual'
+                ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                : 'text-slate-600'
+            }`}
+          >
+            📝 Чистая заявка
+          </button>
+          <button
+            type="button"
+            onClick={() => selectClientPreset('vsmpo')}
+            className={`py-1.5 rounded-lg transition cursor-pointer ${
+              selectedClientType === 'vsmpo'
+                ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                : 'text-slate-600'
+            }`}
+          >
+            🏢 Шаблон ВСМПО (Парфенов)
+          </button>
+          <button
+            type="button"
+            onClick={() => selectClientPreset('geostroy')}
+            className={`py-1.5 rounded-lg transition cursor-pointer ${
+              selectedClientType === 'geostroy'
+                ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                : 'text-slate-600'
+            }`}
+          >
+            🏗️ Шаблон Геострой
+          </button>
+        </div>
 
         {/* Зона Drag and Drop PDF */}
-        {!isEditing && (
-          <div className="border border-dashed border-indigo-200 bg-indigo-50/40 rounded-xl p-2.5 text-center flex items-center justify-between gap-3 text-xs">
-            <div className="text-left">
-              <span className="font-bold text-slate-900 block">
-                📄 Загрузить скан / PDF Поручения экспедитору
-              </span>
-              <span className="text-[11px] text-slate-500">
-                Авто-извлечение ИНН, дат, груза, веса и ставки в 1 клик
-              </span>
-            </div>
-            <label className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold cursor-pointer transition shadow-2xs">
-              <span>{isParsing ? 'Распознавание...' : 'Загрузить PDF'}</span>
-              <input
-                type="file"
-                accept=".pdf"
-                disabled={isParsing}
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) handlePdfUpload(e.target.files[0]);
-                }}
-                className="hidden"
-              />
-            </label>
+        <div className="border border-dashed border-indigo-200 bg-indigo-50/40 rounded-xl p-2.5 text-center flex items-center justify-between gap-3 text-xs">
+          <div className="text-left">
+            <span className="font-bold text-slate-900 block">
+              📄 Загрузить скан / PDF Поручения экспедитору
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Авто-извлечение ИНН, дат, груза, веса и ставки в 1 клик
+            </span>
           </div>
-        )}
+          <label className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold cursor-pointer transition shadow-2xs">
+            <span>{isParsing ? 'Распознавание...' : 'Загрузить PDF'}</span>
+            <input
+              type="file"
+              accept=".pdf"
+              disabled={isParsing}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) handlePdfUpload(e.target.files[0]);
+              }}
+              className="hidden"
+            />
+          </label>
+        </div>
 
         {statusMessage && (
           <div className="p-2 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold flex items-center justify-between">

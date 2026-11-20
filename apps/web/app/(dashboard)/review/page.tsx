@@ -24,6 +24,7 @@ import {
   TripWialonAudit,
 } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
+import { SmartOrderModal } from '@/components/SmartOrderModal';
 
 interface Counterparty {
   id: string;
@@ -858,6 +859,7 @@ function CounterpartySelect({
   );
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-unused-vars */
 function EditModal({
   trip,
   onClose,
@@ -2333,6 +2335,11 @@ function TripCard({
             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-bold shrink-0">
               #{trip.trip_number}
             </span>
+            {trip.lifecycle_status === 'returned' && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs shrink-0 flex items-center gap-0.5">
+                ⚠️ На доработке
+              </span>
+            )}
             {/* Яркие бейджи типов заказов рейса (ППР / Авто) */}
             {(() => {
               const pprCount = activeOrders.filter(
@@ -5213,6 +5220,31 @@ export default function ReviewPage() {
   const [openOrdersSpoilers, setOpenOrdersSpoilers] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
+  const { data: fleetVehicles = [] } = useQuery({
+    queryKey: ['fleet-assets-review'],
+    queryFn: () =>
+      fetch('/api/fleet')
+        .then((r) => r.json())
+        .catch(() => []),
+    staleTime: 120000,
+  });
+  const { data: staffDrivers = [] } = useQuery({
+    queryKey: ['drivers-review'],
+    queryFn: () =>
+      fetch('/api/staff')
+        .then((r) => r.json())
+        .catch(() => []),
+    staleTime: 120000,
+  });
+  const { data: counterpartiesList = [] } = useQuery({
+    queryKey: ['counterparties-active-review'],
+    queryFn: () =>
+      fetch('/api/counterparties?active=1')
+        .then((r) => r.json())
+        .catch(() => []),
+    staleTime: 120000,
+  });
+
   // Поиск рейса по номеру напрямую в базе (без фильтрации по датам)
   const { data: searchTrips = [], isLoading: isSearchLoading } = useQuery<TripForReview[]>({
     queryKey: ['trips-search', searchTripNumber],
@@ -7150,14 +7182,18 @@ export default function ReviewPage() {
         />
       )}
 
-      {/* Edit modal (Auto) */}
+      {/* Edit modal (Auto) — Единый смарт-редактор рейса как при создании нового */}
       {editTrip && (
-        <EditModal
-          trip={editTrip}
+        <SmartOrderModal
+          initialTrip={editTrip}
+          counterparties={counterpartiesList}
+          vehicles={fleetVehicles}
+          drivers={staffDrivers}
           onClose={() => setEditTrip(null)}
-          onSaved={async () => {
+          onSuccess={async () => {
             setEditTrip(null);
             await refresh();
+            queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
           }}
         />
       )}

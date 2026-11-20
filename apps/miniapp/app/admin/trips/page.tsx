@@ -8,6 +8,7 @@ import { Suspense, useState, useEffect, useMemo } from 'react';
 import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
 import { formatDate, formatTime, isInternalCounterparty, isTruckAsset } from '@saldacargo/shared';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
+import { SmartTripOrderModal } from '@/components/SmartTripOrderModal';
 
 // ── Константы ────────────────────────────────────────────────
 
@@ -1049,6 +1050,7 @@ function VehicleDetailSheet({
 
 // ── Модал редактирования (мобильный bottom-sheet) ────────────
 
+/* eslint-disable-next-line @typescript-eslint/no-unused-vars */
 function EditModal({
   trip,
   onClose,
@@ -3199,10 +3201,11 @@ function TripsContent() {
         />
       )}
 
-      {/* Модал редактирования рейса */}
+      {/* Модал редактирования рейса (Единый со смарт-редактором веб-версии) */}
       {editTrip && (
-        <EditModal
+        <SmartTripOrderModal
           trip={editTrip}
+          isOpen={Boolean(editTrip)}
           onClose={() => setEditTrip(null)}
           onSaved={() => {
             setEditTrip(null);

@@ -30,13 +30,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       : []),
   ]);
 
+  // Ставим статус returned, но сохраняем фактически зафиксированный пробег и время завершения,
+  // чтобы не ломать цепочку одометров и не создавать конфликт нескольких активных рейсов у водителя.
   const { error } = await (supabase.from('trips') as any)
     .update({
-      status: 'in_progress',
+      status: 'completed',
       lifecycle_status: 'returned',
-      odometer_end: null,
-      ended_at: null,
-      driver_note: null,
     })
     .eq('id', id);
 
@@ -48,9 +47,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     .eq('trip_id', id)
     .neq('lifecycle_status', 'cancelled');
 
-  // Возвращаем связанную заявку в orders -> in_progress
+  // Связанную заявку в orders держим в pending_review (с пометкой о возврате)
   await (supabase.from('orders') as any)
-    .update({ status: 'in_progress', updated_at: new Date().toISOString() })
+    .update({ status: 'pending_review', updated_at: new Date().toISOString() })
     .eq('active_trip_id', id);
 
   return NextResponse.json({ success: true });

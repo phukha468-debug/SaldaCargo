@@ -90,7 +90,10 @@ export async function GET(req: Request) {
               .eq('id', o.id)
               .then();
           }
-        } else if (o.trip.status === 'completed' && o.trip.lifecycle_status === 'draft') {
+        } else if (
+          o.trip.status === 'completed' &&
+          ['draft', 'returned'].includes(o.trip.lifecycle_status)
+        ) {
           if (currentStatus !== 'pending_review') {
             currentStatus = 'pending_review';
             (supabase.from('orders') as any)

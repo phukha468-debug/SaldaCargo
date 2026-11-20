@@ -76,12 +76,16 @@ export async function GET(request: Request) {
       )
     `,
     )
-    .eq('lifecycle_status', lifecycle)
     .order('started_at', { ascending: false });
 
-  // Если запрашиваем черновики для ревью — показываем только завершённые
+  // Если запрашиваем черновики для ревью — показываем завершённые в статусах draft и returned (на доработке)
   if (lifecycle === 'draft' && !status) {
-    query = query.eq('status', 'completed');
+    query = query.in('lifecycle_status', ['draft', 'returned']).eq('status', 'completed');
+  } else if (lifecycle) {
+    query = query.eq('lifecycle_status', lifecycle);
+    if (status) {
+      query = query.eq('status', status);
+    }
   } else if (status) {
     query = query.eq('status', status);
   }

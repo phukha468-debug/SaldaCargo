@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     pendingPayrollCountRes,
     holdsRes,
   ] = await Promise.all([
-    // 1. Активный рейс (только in_progress и не отменённые)
+    // 1. Активный рейс (только in_progress и не отменённые, строго 1 самый свежий)
     supabase
       .from('trips')
       .select(
@@ -45,9 +45,11 @@ export async function GET(request: Request) {
       .eq('driver_id', driverId)
       .eq('status', 'in_progress')
       .neq('lifecycle_status', 'cancelled')
+      .order('started_at', { ascending: false })
+      .limit(1)
       .maybeSingle() as any,
 
-    // 2. Рейсы на ревью (завершены водителем, ожидают апрува админа)
+    // 2. Рейсы на ревью (завершены водителем или возвращены на исправление директором)
     supabase
       .from('trips')
       .select(
@@ -59,7 +61,7 @@ export async function GET(request: Request) {
       )
       .eq('driver_id', driverId)
       .eq('status', 'completed')
-      .eq('lifecycle_status', 'draft')
+      .in('lifecycle_status', ['draft', 'returned'])
       .order('started_at', { ascending: false }) as any,
 
     // 3. Последние 3 рейса (не активные)

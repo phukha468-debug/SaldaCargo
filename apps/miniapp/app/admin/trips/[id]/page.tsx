@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Money, LifecycleBadge } from '@saldacargo/ui';
 import { formatDate, auditTripFuel } from '@saldacargo/shared';
 import { getDirectionLabel } from '@saldacargo/domain-payroll';
+import { SmartTripOrderModal } from '@/components/SmartTripOrderModal';
 
 export default function AdminTripDetailPage() {
   const { id } = useParams() as { id: string };
@@ -19,6 +20,7 @@ export default function AdminTripDetailPage() {
   const [repairDescription, setRepairDescription] = useState('');
   const [actionError, setActionError] = useState('');
   const [cashNotSurrendered, setCashNotSurrendered] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const { data: trip, isLoading } = useQuery<any>({
     queryKey: ['admin-trip', id],
@@ -210,7 +212,15 @@ export default function AdminTripDetailPage() {
           ←
         </button>
         <span className="font-black text-zinc-900 text-lg uppercase">Рейс №{trip.trip_number}</span>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowEditModal(true)}
+            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center gap-1 active:scale-95 shadow-xs"
+          >
+            <span>✏️</span>
+            <span>Изменить</span>
+          </button>
           <LifecycleBadge status={trip.lifecycle_status} />
         </div>
       </header>
@@ -422,9 +432,18 @@ export default function AdminTripDetailPage() {
 
         {/* Заказы */}
         <section className="space-y-2">
-          <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-            Заказы ({activeOrders.length})
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+              Заказы ({activeOrders.length})
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowEditModal(true)}
+              className="text-[11px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg active:scale-95"
+            >
+              ✏️ Редактировать рейс / точки
+            </button>
+          </div>
           {activeOrders.length === 0 && (
             <p className="text-center text-zinc-400 font-bold text-xs py-4">Заказов нет</p>
           )}
@@ -748,6 +767,20 @@ export default function AdminTripDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Модал редактирования рейса (Единый со смарт-редактором веб-версии) */}
+      {showEditModal && (
+        <SmartTripOrderModal
+          trip={trip}
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          onSaved={() => {
+            setShowEditModal(false);
+            queryClient.invalidateQueries({ queryKey: ['admin-trip', id] });
+            queryClient.invalidateQueries({ queryKey: ['admin-trips'] });
+          }}
+        />
       )}
     </div>
   );
