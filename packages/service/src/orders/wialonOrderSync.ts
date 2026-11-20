@@ -815,23 +815,55 @@ export async function handleVehicleArrival(
       });
     }
   } else {
-    const { error: tripOrderErr } = await supabase.from('trip_orders').insert({
-      trip_id: trip.id,
-      counterparty_id: resolvedClientId,
-      description: `Заявка ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Груз'} (${distanceKm} км)`,
-      amount: order.price_without_vat || 0,
-      driver_pay: totalDriverPay,
-      payment_method: 'bank_invoice',
-      settlement_status: 'pending',
-      lifecycle_status: 'draft',
-      invoice_number: invNumber,
-      invoice_date: invDate,
-      invoice_status: invNumber ? 'issued' : 'unbilled',
-      idempotency_key: crypto.randomUUID(),
-    });
+    // Проверяем, существует ли уже созданный trip_order для данного рейса (например, предварительно созданный при авто-детекции)
+    const { data: existingTo } = await supabase
+      .from('trip_orders')
+      .select('id, amount, description')
+      .eq('trip_id', trip.id)
+      .filter('lifecycle_status', 'neq', 'cancelled')
+      .maybeSingle();
 
-    if (tripOrderErr) {
-      console.error('Ошибка добавления trip_order:', tripOrderErr);
+    if (existingTo) {
+      const finalRouteDesc = order.raw_parser_payload?.detected_route_summary
+        ? `Маршрут: ${order.raw_parser_payload.detected_route_summary} | Керн Геостройиндустрия`
+        : existingTo.description;
+
+      await supabase
+        .from('trip_orders')
+        .update({
+          counterparty_id: resolvedClientId || undefined,
+          amount: order.price_without_vat || existingTo.amount || 0,
+          driver_pay: totalDriverPay,
+          description: finalRouteDesc || existingTo.description,
+          invoice_number: invNumber || undefined,
+          invoice_date: invDate || undefined,
+          invoice_status: invNumber ? 'issued' : 'unbilled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingTo.id);
+    } else {
+      const defaultDesc = order.raw_parser_payload?.detected_route_summary
+        ? `Маршрут: ${order.raw_parser_payload.detected_route_summary} | Керн Геостройиндустрия`
+        : `Заявка ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Груз'} (${distanceKm} км)`;
+
+      const { error: tripOrderErr } = await supabase.from('trip_orders').insert({
+        trip_id: trip.id,
+        counterparty_id: resolvedClientId,
+        description: defaultDesc,
+        amount: order.price_without_vat || 0,
+        driver_pay: totalDriverPay,
+        payment_method: 'bank_invoice',
+        settlement_status: 'pending',
+        lifecycle_status: 'draft',
+        invoice_number: invNumber,
+        invoice_date: invDate,
+        invoice_status: invNumber ? 'issued' : 'unbilled',
+        idempotency_key: crypto.randomUUID(),
+      });
+
+      if (tripOrderErr) {
+        console.error('Ошибка добавления trip_order:', tripOrderErr);
+      }
     }
   }
 

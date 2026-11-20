@@ -800,10 +800,12 @@ export async function syncValdaiTelematics(
         `[Wialon Tracker] 🏁 Валдай ${pos.regNumber} ВЕРНУЛСЯ в Салду (${pos.distanceFromBaseKm} км от центра)`,
       );
 
-      // Защитная авто-детекция перед закрытием: проверяем, не был ли рейс погрузкой в Шайтанке
+      // Защитная авто-детекция перед закрытием: проверяем фактический маршрут трека Wialon и количество точек
       const { data: arrivingOrder } = await supabase
         .from('orders')
-        .select('id, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at)')
+        .select(
+          'id, base_doc_number, price_without_vat, loading_address_json, unloading_address_json, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at)',
+        )
         .eq('assigned_vehicle_id', asset.id)
         .eq('status', 'in_progress')
         .maybeSingle();
@@ -812,11 +814,7 @@ export async function syncValdaiTelematics(
         Array.isArray(arrivingOrder?.trip) ? arrivingOrder.trip[0] : arrivingOrder?.trip
       ) as { id: string; started_at?: string } | undefined;
 
-      if (
-        arrivingOrder &&
-        arrivingTrip?.started_at &&
-        !arrivingOrder.raw_parser_payload?.visited_shaytanka
-      ) {
+      if (arrivingOrder && arrivingTrip?.started_at) {
         const route = await detectTripStopsAndRoute(
           cleanHost,
           eid,
@@ -827,32 +825,74 @@ export async function syncValdaiTelematics(
           baseLon,
           baseRadius,
         );
-        if (route?.visitedShaytanka) {
+        const isShaytanka =
+          Boolean(route?.visitedShaytanka) ||
+          Boolean(arrivingOrder.raw_parser_payload?.visited_shaytanka);
+
+        if (isShaytanka) {
+          const finalPointsCount =
+            route?.points?.length || (arrivingOrder.raw_parser_payload?.detected_points_count ?? 2);
+          const finalPrice =
+            route?.priceWithoutVat ||
+            (finalPointsCount >= 4 ? 60000 : finalPointsCount >= 3 ? 50000 : 40000);
+          const finalRouteDesc =
+            route?.routeSummary ||
+            (route?.unloadingAddress?.raw
+              ? `Шайтанка ➔ ${route.unloadingAddress.raw}`
+              : arrivingOrder.unloading_address_json?.raw
+                ? `Шайтанка ➔ ${arrivingOrder.unloading_address_json.raw}`
+                : 'Шайтанка ➔ с. Маминское, склад 2');
+
           await supabase
             .from('orders')
             .update({
               raw_parser_payload: {
                 ...(arrivingOrder.raw_parser_payload || {}),
                 visited_shaytanka: true,
-                visited_maminskoe: Boolean(route.visitedMaminskoe),
-                has_unloaded: Boolean(route.hasUnloaded),
-                prevent_salda_auto_finish: !route.hasUnloaded,
+                visited_maminskoe: Boolean(
+                  arrivingOrder.raw_parser_payload?.visited_maminskoe || route?.visitedMaminskoe,
+                ),
+                has_unloaded: true,
+                prevent_salda_auto_finish: false,
+                detected_route_summary: finalRouteDesc,
+                detected_points_count: finalPointsCount,
               },
               client_id: GEOSTROY_CLIENT_ID,
               cargo_name: 'Пробы керна (Шайтанка)',
-              price_without_vat: 40000,
+              price_without_vat: finalPrice,
               base_doc_name: 'Заявка ООО "Геостройиндустрия"',
-              loading_address_json: route.loadingAddress || {
-                raw: 'Шайтанка',
-                city: 'Шайтанка',
-              },
-              unloading_address_json: route.unloadingAddress || {
-                raw: 'с. Маминское, склад 2',
-                city: 'Маминское',
-              },
+              loading_address_json: route?.loadingAddress ||
+                arrivingOrder.loading_address_json || {
+                  raw: 'Шайтанка',
+                  city: 'Шайтанка',
+                },
+              unloading_address_json: route?.unloadingAddress ||
+                arrivingOrder.unloading_address_json || {
+                  raw: 'с. Маминское, склад 2',
+                  city: 'Маминское',
+                },
               updated_at: new Date().toISOString(),
             })
             .eq('id', arrivingOrder.id);
+
+          // Синхронизируем существующий или новый trip_orders перед финишем
+          const { data: curTo } = await supabase
+            .from('trip_orders')
+            .select('id, amount, description')
+            .eq('trip_id', arrivingTrip.id)
+            .filter('lifecycle_status', 'neq', 'cancelled')
+            .maybeSingle();
+
+          if (curTo) {
+            await supabase
+              .from('trip_orders')
+              .update({
+                amount: finalPrice,
+                description: `Маршрут: ${finalRouteDesc} | Керн Геостройиндустрия (Рейс №${arrivingOrder.base_doc_number || ''})`,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', curTo.id);
+          }
         }
       }
 
@@ -878,7 +918,7 @@ export async function syncValdaiTelematics(
       const { data: activeOrder } = await supabase
         .from('orders')
         .select(
-          'id, client_id, cargo_name, price_without_vat, loading_address_json, unloading_address_json, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at, driver_note)',
+          'id, base_doc_number, client_id, cargo_name, price_without_vat, loading_address_json, unloading_address_json, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at, driver_note)',
         )
         .eq('assigned_vehicle_id', asset.id)
         .eq('status', 'in_progress')
@@ -931,17 +971,35 @@ export async function syncValdaiTelematics(
 
         if (isShaytankaDetected) {
           const wasVisited = Boolean(activeOrder.raw_parser_payload?.visited_shaytanka);
+          const currentPointsCount = routeInfo?.points?.length || 2;
+          const prevPointsCount = activeOrder.raw_parser_payload?.detected_points_count ?? 2;
+          const dynamicPrice =
+            routeInfo?.priceWithoutVat ||
+            (currentPointsCount >= 4 ? 60000 : currentPointsCount >= 3 ? 50000 : 40000);
+          const priceOrRouteChanged =
+            currentPointsCount > prevPointsCount ||
+            (activeOrder.price_without_vat && dynamicPrice !== activeOrder.price_without_vat);
+
           const needsOrderUpdate =
             !wasVisited ||
             !activeOrder.client_id ||
             !activeOrder.price_without_vat ||
             !activeOrder.loading_address_json?.raw ||
+            priceOrRouteChanged ||
             ((routeInfo?.hasUnloaded || isCurrentlyInMaminskoe) &&
               !activeOrder.raw_parser_payload?.has_unloaded);
 
           if (needsOrderUpdate) {
+            const finalRouteSummary =
+              routeInfo?.routeSummary ||
+              (routeInfo?.unloadingAddress?.raw
+                ? `Шайтанка ➔ ${routeInfo.unloadingAddress.raw}`
+                : isCurrentlyInMaminskoe
+                  ? 'Шайтанка ➔ с. Маминское, склад 2'
+                  : 'Шайтанка ➔ с. Маминское, склад 2');
+
             console.log(
-              `[Wialon Tracker] 🌲 Валдай ${pos.regNumber}: подтверждена погрузка в Шайтанке (ООО "Геостройиндустрия", 40 000 ₽)${routeInfo?.hasUnloaded || isCurrentlyInMaminskoe ? ', разгрузка: ' + (routeInfo?.unloadingAddress?.raw || 'с. Маминское, склад 2') : ''}`,
+              `[Wialon Tracker] 🌲 Валдай ${pos.regNumber}: подтверждена погрузка в Шайтанке (ООО "Геостройиндустрия", ${dynamicPrice} ₽, точек: ${currentPointsCount})${routeInfo?.hasUnloaded || isCurrentlyInMaminskoe ? ', маршрут: ' + finalRouteSummary : ''}`,
             );
 
             const updateOrderPayload: any = {
@@ -957,12 +1015,14 @@ export async function syncValdaiTelematics(
                   activeOrder.raw_parser_payload?.has_unloaded || routeInfo?.hasUnloaded,
                 ),
                 prevent_salda_auto_finish: !routeInfo?.hasUnloaded,
+                detected_route_summary: finalRouteSummary,
+                detected_points_count: currentPointsCount,
                 shaytanka_detected_at:
                   activeOrder.raw_parser_payload?.shaytanka_detected_at || new Date().toISOString(),
               },
               client_id: GEOSTROY_CLIENT_ID,
               cargo_name: 'Пробы керна (Шайтанка)',
-              price_without_vat: 40000,
+              price_without_vat: dynamicPrice,
               base_doc_name: 'Заявка ООО "Геостройиндустрия"',
               loading_address_json: routeInfo?.loadingAddress ||
                 activeOrder.loading_address_json || {
@@ -982,22 +1042,31 @@ export async function syncValdaiTelematics(
 
             await supabase.from('orders').update(updateOrderPayload).eq('id', activeOrder.id);
 
-            // Синхронизируем заказ внутри рейса (trip_orders), чтобы рейс не был пустым в списке активных рейсов
+            // Синхронизируем заказ внутри рейса (trip_orders)
             const { data: existingTo } = await supabase
               .from('trip_orders')
-              .select('id')
+              .select('id, amount, description')
               .eq('trip_id', tripObj.id)
               .filter('lifecycle_status', 'neq', 'cancelled')
               .maybeSingle();
 
-            if (!existingTo) {
+            if (existingTo) {
+              await supabase
+                .from('trip_orders')
+                .update({
+                  amount: dynamicPrice,
+                  description: `Маршрут: ${finalRouteSummary} | Керн Геостройиндустрия (Рейс №${activeOrder.base_doc_number || ''})`,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingTo.id);
+            } else {
               const { data: createdTo } = await supabase
                 .from('trip_orders')
                 .insert({
                   trip_id: tripObj.id,
                   counterparty_id: GEOSTROY_CLIENT_ID,
-                  description: `Маршрут: Шайтанка ➔ ${updateOrderPayload.unloading_address_json?.raw || 'с. Маминское, склад 2'} | Керн Геостройиндустрия`,
-                  amount: 40000,
+                  description: `Маршрут: ${finalRouteSummary} | Керн Геостройиндустрия (Рейс №${activeOrder.base_doc_number || ''})`,
+                  amount: dynamicPrice,
                   driver_pay: 7900,
                   driver_car_pay: 0,
                   driver_loader_pay: 0,
@@ -1026,13 +1095,12 @@ export async function syncValdaiTelematics(
             }
 
             const prevNote = tripObj.driver_note || '';
-            const noteMarker = '[Шайтанка';
-            if (!prevNote.includes(noteMarker)) {
+            const newNoteEntry = `[Шайтанка (Геостройиндустрия ${dynamicPrice} ₽) ➔ ${finalRouteSummary}]`;
+            if (!prevNote.includes(newNoteEntry)) {
               await supabase
                 .from('trips')
                 .update({
-                  driver_note:
-                    `${prevNote}\n[Шайтанка (погрузка керна Геостройиндустрия 40 000 ₽) -> ${routeInfo?.unloadingAddress?.raw || (isCurrentlyInMaminskoe ? 'с. Маминское, склад 2' : 'с. Маминское, склад 2')}]`.trim(),
+                  driver_note: prevNote ? `${prevNote}\n${newNoteEntry}` : newNoteEntry,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', tripObj.id);
