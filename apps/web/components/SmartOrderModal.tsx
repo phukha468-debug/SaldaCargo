@@ -165,6 +165,14 @@ export function SmartOrderModal({
 }: SmartOrderModalProps) {
   const isEditing = Boolean(initialOrder || initialTrip);
 
+  const safeVehicles = Array.isArray(vehicles)
+    ? vehicles
+    : Array.isArray((vehicles as any)?.assets)
+      ? (vehicles as any).assets
+      : [];
+  const safeDrivers = Array.isArray(drivers) ? drivers : [];
+  const safeCounterparties = Array.isArray(counterparties) ? counterparties : [];
+
   const [selectedClientType, setSelectedClientType] = useState<'vsmpo' | 'geostroy' | 'manual'>(
     'manual',
   );
@@ -561,7 +569,7 @@ export function SmartOrderModal({
   const selectClientPreset = (type: 'vsmpo' | 'geostroy' | 'manual') => {
     setSelectedClientType(type);
     if (type === 'geostroy') {
-      const geoCp = counterparties.find((c: any) => c.name?.toLowerCase().includes('геострой'));
+      const geoCp = safeCounterparties.find((c: any) => c.name?.toLowerCase().includes('геострой'));
       const geoName = geoCp?.name || 'ООО "Геостройиндустрия"';
       const geoId = geoCp?.id || '';
 
@@ -830,8 +838,21 @@ export function SmartOrderModal({
       };
 
       // 1. Сохраняем в orders
-      if (initialOrder) {
-        await fetch(`/api/orders/${initialOrder.id}`, {
+      let targetOrderId = initialOrder?.id;
+      if (!targetOrderId && initialTrip?.id) {
+        try {
+          const res = await fetch(`/api/orders?active_trip_id=${initialTrip.id}`);
+          if (res.ok) {
+            const list = await res.json();
+            if (Array.isArray(list) && list.length > 0) {
+              targetOrderId = list[0].id;
+            }
+          }
+        } catch {}
+      }
+
+      if (targetOrderId) {
+        await fetch(`/api/orders/${targetOrderId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderPayload),
@@ -996,7 +1017,7 @@ export function SmartOrderModal({
               </label>
               <OrderCounterpartySelect
                 inputValue={form.client_name}
-                counterparties={counterparties}
+                counterparties={safeCounterparties}
                 onChange={(cp, name) => {
                   setForm((f: any) => ({
                     ...f,
@@ -1200,7 +1221,7 @@ export function SmartOrderModal({
                       </label>
                       <OrderCounterpartySelect
                         inputValue={co.client_name}
-                        counterparties={counterparties}
+                        counterparties={safeCounterparties}
                         onChange={(cp, name) =>
                           handleUpdateClientOrder(idx, {
                             client_id: cp?.id || '',
@@ -1265,7 +1286,7 @@ export function SmartOrderModal({
                 className="w-full p-1.5 border border-slate-300 rounded bg-white font-bold"
               >
                 <option value="">-- Выбрать авто --</option>
-                {vehicles.map((v: any) => (
+                {safeVehicles.map((v: any) => (
                   <option key={v.id} value={v.id}>
                     {v.brand_name || v.short_name || 'Авто'} ({v.reg_number})
                   </option>
@@ -1291,7 +1312,7 @@ export function SmartOrderModal({
                 className="w-full p-1.5 border border-slate-300 rounded bg-white font-bold"
               >
                 <option value="">-- Выбрать водителя --</option>
-                {drivers.map((d: any) => (
+                {safeDrivers.map((d: any) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
                   </option>

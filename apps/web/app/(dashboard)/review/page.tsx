@@ -5266,14 +5266,16 @@ export default function ReviewPage() {
     queryFn: () =>
       fetch('/api/fleet')
         .then((r) => r.json())
+        .then((data) => (Array.isArray(data) ? data : data?.assets || []))
         .catch(() => []),
     staleTime: 120000,
   });
   const { data: staffDrivers = [] } = useQuery({
     queryKey: ['drivers-review'],
     queryFn: () =>
-      fetch('/api/staff')
+      fetch('/api/users?role=driver')
         .then((r) => r.json())
+        .then((data) => (Array.isArray(data) ? data : []))
         .catch(() => []),
     staleTime: 120000,
   });
@@ -5282,6 +5284,7 @@ export default function ReviewPage() {
     queryFn: () =>
       fetch('/api/counterparties?active=1')
         .then((r) => r.json())
+        .then((data) => (Array.isArray(data) ? data : []))
         .catch(() => []),
     staleTime: 120000,
   });
