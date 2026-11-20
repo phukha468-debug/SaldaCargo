@@ -142,7 +142,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     if (body.client_accepted_edo === true) {
-      updateFields.status = 'completed';
+      // Проверяем статус связанного рейса: если машина ещё на маршруте (in_progress),
+      // заявка остаётся «В пути» до физического завершения рейса
+      let tripIsRunning = false;
+      if (currentOrder.active_trip_id) {
+        const { data: activeTrip } = await (supabase.from('trips') as any)
+          .select('status')
+          .eq('id', currentOrder.active_trip_id)
+          .maybeSingle();
+        if (activeTrip?.status === 'in_progress') {
+          tripIsRunning = true;
+        }
+      }
+
+      if (!tripIsRunning) {
+        updateFields.status = 'completed';
+      }
     } else if (body.client_accepted_edo === false && currentOrder.status === 'completed') {
       updateFields.status = 'docs_collection';
     }

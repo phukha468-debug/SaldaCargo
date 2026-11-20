@@ -101,6 +101,15 @@ export async function GET(req: Request) {
               .eq('id', o.id)
               .then();
           }
+        } else if (o.trip.status === 'in_progress' && o.trip.lifecycle_status !== 'cancelled') {
+          // Если рейс физически ещё выполняется, заказ обязан быть «В пути»
+          if (currentStatus !== 'in_progress') {
+            currentStatus = 'in_progress';
+            (supabase.from('orders') as any)
+              .update({ status: 'in_progress', updated_at: new Date().toISOString() })
+              .eq('id', o.id)
+              .then();
+          }
         }
       } else if (!o.active_trip_id && o.base_doc_name?.includes('ВЫЕЗД БЕЗ ЗАЯВКИ')) {
         if (currentStatus === 'pending_review') {
