@@ -378,7 +378,7 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
     setRoutes((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleSave = async () => {
+  const handleSave = async (andApprove = false) => {
     setSaving(true);
     setError('');
     try {
@@ -418,6 +418,18 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
         throw new Error(d.error || 'Ошибка сохранения рейса');
       }
 
+      if (andApprove) {
+        const approveRes = await fetch(`/api/admin/trips/${trip.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'approve' }),
+        });
+        if (!approveRes.ok) {
+          const ad = await approveRes.json();
+          throw new Error(ad.error || 'Ошибка одобрения рейса');
+        }
+      }
+
       setSaving(false);
       onSaved();
     } catch (e: any) {
@@ -435,14 +447,17 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl p-4 w-full max-w-lg max-h-[92vh] overflow-y-auto space-y-3.5 shadow-2xl border border-zinc-200 animate-in slide-in-from-bottom duration-150">
-        <div className="w-10 h-1 bg-zinc-300 rounded-full mx-auto sm:hidden" />
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl border border-zinc-200 animate-in slide-in-from-bottom duration-150 overflow-hidden">
+        {/* Хэндл для свайпа на мобильных */}
+        <div className="pt-2 pb-1 sm:hidden flex justify-center bg-white shrink-0">
+          <div className="w-10 h-1 bg-zinc-300 rounded-full" />
+        </div>
 
-        {/* Заголовок */}
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+        {/* Заголовок (зафиксирован вверху) */}
+        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2.5 bg-white shrink-0">
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900">
@@ -458,354 +473,375 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold"
+            className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold active:scale-95 transition-transform"
           >
             ✕
           </button>
         </div>
 
-        {/* 1. БЫСТРЫЕ ШАБЛОНЫ (ВСМПО / ГЕОСТРОЙ / РУЧНОЙ) */}
-        <div className="space-y-1">
-          <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block">
-            Шаблон рейса (в 1 клик):
-          </label>
-          <div className="grid grid-cols-3 gap-1.5 bg-zinc-100 p-1 rounded-xl text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => selectClientPreset('manual')}
-              className={`py-1.5 rounded-lg transition ${
-                selectedClientType === 'manual'
-                  ? 'bg-white text-indigo-700 shadow-xs font-black'
-                  : 'text-zinc-600'
-              }`}
-            >
-              📝 Ручной
-            </button>
-            <button
-              type="button"
-              onClick={() => selectClientPreset('geostroy')}
-              className={`py-1.5 rounded-lg transition ${
-                selectedClientType === 'geostroy'
-                  ? 'bg-white text-indigo-700 shadow-xs font-black'
-                  : 'text-zinc-600'
-              }`}
-            >
-              🏗️ Геострой
-            </button>
-            <button
-              type="button"
-              onClick={() => selectClientPreset('vsmpo')}
-              className={`py-1.5 rounded-lg transition ${
-                selectedClientType === 'vsmpo'
-                  ? 'bg-white text-indigo-700 shadow-xs font-black'
-                  : 'text-zinc-600'
-              }`}
-            >
-              🏢 ВСМПО
-            </button>
-          </div>
-        </div>
-
-        {statusMessage && (
-          <div className="p-2 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-900">
-            {statusMessage}
-          </div>
-        )}
-
-        {error && (
-          <div className="p-2 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-900">
-            ❌ {error}
-          </div>
-        )}
-
-        {/* 2. ТОЧКИ МАРШРУТА (МУЛЬТИ-СТОП) */}
-        <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3 space-y-2.5">
-          <div className="flex items-center justify-between border-b border-zinc-200 pb-1.5">
-            <span className="text-xs font-black text-zinc-900 flex items-center gap-1">
-              <span>📍</span>
-              <span>Точки маршрута ({routes.length})</span>
-            </span>
-            <button
-              type="button"
-              onClick={handleAddRouteStop}
-              className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-0.5"
-            >
-              + Точка
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {routes.map((stop, idx) => (
-              <div
-                key={stop.id}
-                className="bg-white border border-zinc-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs"
-              >
-                <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
-                  <span>
-                    {idx === 0
-                      ? '📍 Погрузка (Откуда)'
-                      : idx === routes.length - 1
-                        ? '🏁 Выгрузка (Куда)'
-                        : `Точка #${idx + 1}`}
-                  </span>
-                  {routes.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRouteStop(idx)}
-                      className="text-rose-600 text-[10px] font-bold"
-                    >
-                      ✕ Удалить
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[10px] text-zinc-500 font-bold">Откуда:</span>
-                      <div className="flex gap-1 overflow-x-auto">
-                        {LOCATION_PRESETS.slice(0, 3).map((loc) => (
-                          <button
-                            key={`load-pre-${loc.key}-${idx}`}
-                            type="button"
-                            onClick={() => applyLocationPreset('loading', loc.key, idx)}
-                            className="text-[9px] bg-zinc-100 hover:bg-zinc-200 px-1 py-0.2 rounded font-semibold text-zinc-700 shrink-0"
-                          >
-                            {loc.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <input
-                      type="text"
-                      value={stop.loading_address}
-                      onChange={(e) => {
-                        const updated = [...routes];
-                        if (updated[idx]) {
-                          updated[idx] = {
-                            ...updated[idx],
-                            loading_address: e.target.value,
-                            loading_city: e.target.value.split(',')[0] || e.target.value,
-                          };
-                          setRoutes(updated);
-                        }
-                      }}
-                      className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[10px] text-zinc-500 font-bold">Куда:</span>
-                      <div className="flex gap-1 overflow-x-auto">
-                        {LOCATION_PRESETS.slice(1, 4).map((loc) => (
-                          <button
-                            key={`unload-pre-${loc.key}-${idx}`}
-                            type="button"
-                            onClick={() => applyLocationPreset('unloading', loc.key, idx)}
-                            className="text-[9px] bg-zinc-100 hover:bg-zinc-200 px-1 py-0.2 rounded font-semibold text-zinc-700 shrink-0"
-                          >
-                            {loc.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <input
-                      type="text"
-                      value={stop.unloading_address}
-                      onChange={(e) => {
-                        const updated = [...routes];
-                        if (updated[idx]) {
-                          updated[idx] = {
-                            ...updated[idx],
-                            unloading_address: e.target.value,
-                            unloading_city: e.target.value.split(',')[0] || e.target.value,
-                          };
-                          setRoutes(updated);
-                        }
-                      }}
-                      className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Защита от автозавершения через Салду */}
-          <label className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-300 rounded-xl text-amber-950 font-bold text-xs select-none">
-            <input
-              type="checkbox"
-              checked={preventSaldaAutoFinish}
-              onChange={(e) => setPreventSaldaAutoFinish(e.target.checked)}
-              className="mt-0.5 rounded"
-            />
-            <div>
-              <span>🔄 Составной маршрут через Салду (защита Wialon)</span>
-              <span className="block text-[10px] font-normal text-amber-800">
-                Рейс не закроется при заезде на базу перед выгрузкой.
-              </span>
-            </div>
-          </label>
-        </div>
-
-        {/* 3. КЛИЕНТЫ И ЗАКАЗЫ В РЕЙСЕ */}
-        <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3 space-y-2">
-          <div className="flex items-center justify-between border-b border-zinc-200 pb-1.5">
-            <span className="text-xs font-black text-zinc-900 flex items-center gap-1">
-              <span>💼</span>
-              <span>Заказчики в рейсе ({clientOrders.length})</span>
-            </span>
-            <button
-              type="button"
-              onClick={handleAddClientOrder}
-              className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-0.5"
-            >
-              + Клиент
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {clientOrders.map((co, idx) => (
-              <div
-                key={co.id}
-                className="bg-white border border-zinc-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs"
-              >
-                <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
-                  <span>{idx === 0 ? '👑 Основной заказ' : `📦 Догруз #${idx + 1}`}</span>
-                  {clientOrders.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveClientOrder(idx)}
-                      className="text-rose-600 text-[10px] font-bold"
-                    >
-                      ✕ Удалить
-                    </button>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
-                    Клиент:
-                  </label>
-                  <input
-                    type="text"
-                    value={co.client_name}
-                    onChange={(e) => handleUpdateClientOrder(idx, { client_name: e.target.value })}
-                    placeholder="ООО Геостройиндустрия"
-                    className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
-                      Груз:
-                    </label>
-                    <input
-                      type="text"
-                      value={co.cargo_name}
-                      onChange={(e) => handleUpdateClientOrder(idx, { cargo_name: e.target.value })}
-                      placeholder="Пробы керна"
-                      className="w-full border border-zinc-200 rounded-lg px-2 py-1 text-xs font-semibold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
-                      Ставка (₽):
-                    </label>
-                    <input
-                      type="number"
-                      value={co.price_without_vat}
-                      onChange={(e) =>
-                        handleUpdateClientOrder(idx, {
-                          price_without_vat: Number(e.target.value) || '',
-                        })
-                      }
-                      placeholder="40 000"
-                      className="w-full border border-zinc-200 rounded-lg px-2 py-1 text-xs font-black text-indigo-700"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between p-2 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-black text-indigo-950">
-            <span>Итого выручка:</span>
-            <span>{totalRevenue.toLocaleString('ru-RU')} ₽</span>
-          </div>
-        </div>
-
-        {/* 4. АВТОМОБИЛЬ, ВОДИТЕЛЬ И ЗП */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-zinc-50 border border-zinc-200 rounded-2xl p-3">
-          <div>
-            <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">Автомобиль:</label>
-            <select
-              value={form.assigned_vehicle_id}
-              onChange={(e) => setForm({ ...form, assigned_vehicle_id: e.target.value })}
-              className="w-full border border-zinc-200 rounded-lg p-1.5 text-xs font-bold bg-white"
-            >
-              <option value="">-- Авто --</option>
-              {vehicles.map((v: any) => (
-                <option key={v.id} value={v.id}>
-                  {v.short_name || v.brand_name || 'Авто'} ({v.reg_number})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">Водитель:</label>
-            <select
-              value={form.assigned_driver_id}
-              onChange={(e) => setForm({ ...form, assigned_driver_id: e.target.value })}
-              className="w-full border border-zinc-200 rounded-lg p-1.5 text-xs font-bold bg-white"
-            >
-              <option value="">-- Водитель --</option>
-              {drivers.map((d: any) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-0.5">
-              <label className="text-[10px] font-bold text-zinc-500">ЗП водителя:</label>
+        {/* Скроллящееся содержимое формы */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 overscroll-contain">
+          {/* 1. БЫСТРЫЕ ШАБЛОНЫ (ВСМПО / ГЕОСТРОЙ / РУЧНОЙ) */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block">
+              Шаблон рейса (в 1 клик):
+            </label>
+            <div className="grid grid-cols-3 gap-1.5 bg-zinc-100 p-1 rounded-xl text-xs font-bold">
               <button
                 type="button"
-                onClick={() => setForm((f: any) => ({ ...f, driver_pay: 7900 }))}
-                className="text-[9px] text-emerald-700 font-bold"
+                onClick={() => selectClientPreset('manual')}
+                className={`py-1.5 rounded-lg transition ${
+                  selectedClientType === 'manual'
+                    ? 'bg-white text-indigo-700 shadow-xs font-black'
+                    : 'text-zinc-600'
+                }`}
               >
-                ⚡ 7 900 ₽
+                📝 Ручной
+              </button>
+              <button
+                type="button"
+                onClick={() => selectClientPreset('geostroy')}
+                className={`py-1.5 rounded-lg transition ${
+                  selectedClientType === 'geostroy'
+                    ? 'bg-white text-indigo-700 shadow-xs font-black'
+                    : 'text-zinc-600'
+                }`}
+              >
+                🏗️ Геострой
+              </button>
+              <button
+                type="button"
+                onClick={() => selectClientPreset('vsmpo')}
+                className={`py-1.5 rounded-lg transition ${
+                  selectedClientType === 'vsmpo'
+                    ? 'bg-white text-indigo-700 shadow-xs font-black'
+                    : 'text-zinc-600'
+                }`}
+              >
+                🏢 ВСМПО
               </button>
             </div>
-            <input
-              type="number"
-              value={form.driver_pay}
-              onChange={(e) => setForm({ ...form, driver_pay: Number(e.target.value) || 0 })}
-              className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-emerald-700 bg-white"
-            />
+          </div>
+
+          {statusMessage && (
+            <div className="p-2 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-900">
+              {statusMessage}
+            </div>
+          )}
+
+          {error && (
+            <div className="p-2 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-900">
+              ❌ {error}
+            </div>
+          )}
+
+          {/* 2. ТОЧКИ МАРШРУТА (МУЛЬТИ-СТОП) */}
+          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-zinc-200 pb-1.5">
+              <span className="text-xs font-black text-zinc-900 flex items-center gap-1">
+                <span>📍</span>
+                <span>Точки маршрута ({routes.length})</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleAddRouteStop}
+                className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-0.5"
+              >
+                + Точка
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {routes.map((stop, idx) => (
+                <div
+                  key={stop.id}
+                  className="bg-white border border-zinc-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs"
+                >
+                  <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
+                    <span>
+                      {idx === 0
+                        ? '📍 Погрузка (Откуда)'
+                        : idx === routes.length - 1
+                          ? '🏁 Выгрузка (Куда)'
+                          : `Точка #${idx + 1}`}
+                    </span>
+                    {routes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRouteStop(idx)}
+                        className="text-rose-600 text-[10px] font-bold"
+                      >
+                        ✕ Удалить
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[10px] text-zinc-500 font-bold">Откуда:</span>
+                        <div className="flex gap-1 overflow-x-auto">
+                          {LOCATION_PRESETS.slice(0, 3).map((loc) => (
+                            <button
+                              key={`load-pre-${loc.key}-${idx}`}
+                              type="button"
+                              onClick={() => applyLocationPreset('loading', loc.key, idx)}
+                              className="text-[9px] bg-zinc-100 hover:bg-zinc-200 px-1 py-0.2 rounded font-semibold text-zinc-700 shrink-0"
+                            >
+                              {loc.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={stop.loading_address}
+                        onChange={(e) => {
+                          const updated = [...routes];
+                          if (updated[idx]) {
+                            updated[idx] = {
+                              ...updated[idx],
+                              loading_address: e.target.value,
+                              loading_city: e.target.value.split(',')[0] || e.target.value,
+                            };
+                            setRoutes(updated);
+                          }
+                        }}
+                        className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[10px] text-zinc-500 font-bold">Куда:</span>
+                        <div className="flex gap-1 overflow-x-auto">
+                          {LOCATION_PRESETS.slice(1, 4).map((loc) => (
+                            <button
+                              key={`unload-pre-${loc.key}-${idx}`}
+                              type="button"
+                              onClick={() => applyLocationPreset('unloading', loc.key, idx)}
+                              className="text-[9px] bg-zinc-100 hover:bg-zinc-200 px-1 py-0.2 rounded font-semibold text-zinc-700 shrink-0"
+                            >
+                              {loc.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={stop.unloading_address}
+                        onChange={(e) => {
+                          const updated = [...routes];
+                          if (updated[idx]) {
+                            updated[idx] = {
+                              ...updated[idx],
+                              unloading_address: e.target.value,
+                              unloading_city: e.target.value.split(',')[0] || e.target.value,
+                            };
+                            setRoutes(updated);
+                          }
+                        }}
+                        className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Защита от автозавершения через Салду */}
+            <label className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-300 rounded-xl text-amber-950 font-bold text-xs select-none">
+              <input
+                type="checkbox"
+                checked={preventSaldaAutoFinish}
+                onChange={(e) => setPreventSaldaAutoFinish(e.target.checked)}
+                className="mt-0.5 rounded"
+              />
+              <div>
+                <span>🔄 Составной маршрут через Салду (защита Wialon)</span>
+                <span className="block text-[10px] font-normal text-amber-800">
+                  Рейс не закроется при заезде на базу перед выгрузкой.
+                </span>
+              </div>
+            </label>
+          </div>
+
+          {/* 3. КЛИЕНТЫ И ЗАКАЗЫ В РЕЙСЕ */}
+          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3 space-y-2">
+            <div className="flex items-center justify-between border-b border-zinc-200 pb-1.5">
+              <span className="text-xs font-black text-zinc-900 flex items-center gap-1">
+                <span>💼</span>
+                <span>Заказчики в рейсе ({clientOrders.length})</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleAddClientOrder}
+                className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-0.5"
+              >
+                + Клиент
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {clientOrders.map((co, idx) => (
+                <div
+                  key={co.id}
+                  className="bg-white border border-zinc-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs"
+                >
+                  <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
+                    <span>{idx === 0 ? '👑 Основной заказ' : `📦 Догруз #${idx + 1}`}</span>
+                    {clientOrders.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveClientOrder(idx)}
+                        className="text-rose-600 text-[10px] font-bold"
+                      >
+                        ✕ Удалить
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
+                      Клиент:
+                    </label>
+                    <input
+                      type="text"
+                      value={co.client_name}
+                      onChange={(e) =>
+                        handleUpdateClientOrder(idx, { client_name: e.target.value })
+                      }
+                      placeholder="ООО Геостройиндустрия"
+                      className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
+                        Груз:
+                      </label>
+                      <input
+                        type="text"
+                        value={co.cargo_name}
+                        onChange={(e) =>
+                          handleUpdateClientOrder(idx, { cargo_name: e.target.value })
+                        }
+                        placeholder="Пробы керна"
+                        className="w-full border border-zinc-200 rounded-lg px-2 py-1 text-xs font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
+                        Ставка (₽):
+                      </label>
+                      <input
+                        type="number"
+                        value={co.price_without_vat}
+                        onChange={(e) =>
+                          handleUpdateClientOrder(idx, {
+                            price_without_vat: Number(e.target.value) || '',
+                          })
+                        }
+                        placeholder="40 000"
+                        className="w-full border border-zinc-200 rounded-lg px-2 py-1 text-xs font-black text-indigo-700"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between p-2 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-black text-indigo-950">
+              <span>Итого выручка:</span>
+              <span>{totalRevenue.toLocaleString('ru-RU')} ₽</span>
+            </div>
+          </div>
+
+          {/* 4. АВТОМОБИЛЬ, ВОДИТЕЛЬ И ЗП */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-zinc-50 border border-zinc-200 rounded-2xl p-3">
+            <div>
+              <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
+                Автомобиль:
+              </label>
+              <select
+                value={form.assigned_vehicle_id}
+                onChange={(e) => setForm({ ...form, assigned_vehicle_id: e.target.value })}
+                className="w-full border border-zinc-200 rounded-lg p-1.5 text-xs font-bold bg-white"
+              >
+                <option value="">-- Авто --</option>
+                {vehicles.map((v: any) => (
+                  <option key={v.id} value={v.id}>
+                    {v.short_name || v.brand_name || 'Авто'} ({v.reg_number})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">Водитель:</label>
+              <select
+                value={form.assigned_driver_id}
+                onChange={(e) => setForm({ ...form, assigned_driver_id: e.target.value })}
+                className="w-full border border-zinc-200 rounded-lg p-1.5 text-xs font-bold bg-white"
+              >
+                <option value="">-- Водитель --</option>
+                {drivers.map((d: any) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="text-[10px] font-bold text-zinc-500">ЗП водителя:</label>
+                <button
+                  type="button"
+                  onClick={() => setForm((f: any) => ({ ...f, driver_pay: 7900 }))}
+                  className="text-[9px] text-emerald-700 font-bold"
+                >
+                  ⚡ 7 900 ₽
+                </button>
+              </div>
+              <input
+                type="number"
+                value={form.driver_pay}
+                onChange={(e) => setForm({ ...form, driver_pay: Number(e.target.value) || 0 })}
+                className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-emerald-700 bg-white"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Кнопки действий */}
-        <div className="flex gap-2 pt-1">
+        {/* Кнопки действий (Sticky Footer - ВСЕГДА зафиксированы внизу, не теряются) */}
+        <div className="p-3 bg-white border-t border-zinc-200 flex items-center gap-2 shrink-0 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] shadow-lg">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-3 bg-zinc-100 rounded-xl text-zinc-700 font-bold text-xs uppercase"
+            className="px-4 py-3 bg-zinc-100 rounded-xl text-zinc-700 font-bold text-xs uppercase active:scale-95 transition"
           >
             Отмена
           </button>
           <button
             type="button"
-            onClick={handleSave}
+            onClick={() => handleSave(false)}
             disabled={saving}
-            className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-md active:scale-95 transition disabled:opacity-50"
+            className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase shadow-md active:scale-95 transition disabled:opacity-50"
           >
             {saving ? 'Сохранение...' : 'Сохранить рейс'}
           </button>
+          {trip?.lifecycle_status === 'draft' && (
+            <button
+              type="button"
+              onClick={() => handleSave(true)}
+              disabled={saving}
+              className="py-3 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase shadow-md active:scale-95 transition disabled:opacity-50 flex items-center gap-1 shrink-0"
+              title="Сохранить изменения и сразу одобрить рейс"
+            >
+              <span>✓</span>
+              <span>Одобрить</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

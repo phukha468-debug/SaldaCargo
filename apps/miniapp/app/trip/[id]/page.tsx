@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +17,7 @@ import {
 } from '@saldacargo/shared';
 import { getDirectionLabel } from '@saldacargo/domain-payroll';
 import { useState, useEffect, useRef } from 'react';
+import { SmartTripOrderModal } from '@/components/SmartTripOrderModal';
 
 interface TripOrder {
   id: string;
@@ -47,6 +49,8 @@ interface TripDetail {
   trip_type: string;
   odometer_start?: number | null;
   odometer_end?: number | null;
+  driver_note?: string | null;
+  admin_note?: string | null;
   asset: {
     id?: string;
     short_name: string;
@@ -168,6 +172,82 @@ export default function TripDetailPage() {
     },
   });
 
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [returnNote, setReturnNote] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [cashNotSurrendered, setCashNotSurrendered] = useState(false);
+
+  useEffect(() => {
+    if (trip) {
+      const isCarryover = Boolean(
+        (trip.admin_note ?? '').includes('[CASH_NOT_SURRENDERED]') ||
+        (trip.driver_note ?? '').includes('[CASH_NOT_COLLECTED]') ||
+        (trip.driver_note ?? '').includes('[НЕ СДАНО В КАССУ') ||
+        (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+        (trip.driver_note ?? '').includes('[CARRYOVER]'),
+      );
+      setCashNotSurrendered(isCarryover);
+    }
+  }, [trip]);
+
+  const adminAction = useMutation({
+    mutationFn: async (body: any) => {
+      const r = await fetch(`/api/admin/trips/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Ошибка сервера');
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      setActionError('');
+      queryClient.invalidateQueries({ queryKey: ['trip', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin-trip', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin-trips'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-trips'] });
+      if (variables.action === 'approve') {
+        const savedRole =
+          typeof window !== 'undefined' ? localStorage.getItem('selected_role') : null;
+        if (savedRole === 'admin' || savedRole === 'owner') {
+          router.push('/admin/trips?filter=review');
+        }
+      } else if (variables.action === 'return') {
+        setShowReturnForm(false);
+        const savedRole =
+          typeof window !== 'undefined' ? localStorage.getItem('selected_role') : null;
+        if (savedRole === 'admin' || savedRole === 'owner') {
+          router.push('/admin/trips?filter=review');
+        }
+      }
+    },
+    onError: (e: Error) => setActionError(e.message),
+  });
+
+  const resubmitTrip = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`/api/trips/${id}/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Ошибка отправки на ревью');
+      return data;
+    },
+    onSuccess: () => {
+      setActionError('');
+      queryClient.invalidateQueries({ queryKey: ['trip', id] });
+      queryClient.invalidateQueries({ queryKey: ['driver-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-trips'] });
+    },
+    onError: (e: Error) => setActionError(e.message),
+  });
+
   function handleDeleteTripClick() {
     if (!confirmDeleteTrip) {
       setConfirmDeleteTrip(true);
@@ -207,6 +287,8 @@ export default function TripDetailPage() {
   }
 
   const isActive = trip.status === 'in_progress';
+  const isPendingReview = trip.status === 'completed' && trip.lifecycle_status === 'draft';
+  const isReturned = trip.lifecycle_status === 'returned';
   const canEdit = trip.lifecycle_status !== 'approved';
   const isPrrTrip =
     trip.asset?.reg_number === 'БЕЗ АВТО' ||
@@ -218,6 +300,13 @@ export default function TripDetailPage() {
     (o) => isGeostroyCounterparty(o.counterparty?.name) && !isGeostroyOrderValid(o.description),
   );
   const hasGeostroyValidationError = invalidGeostroyOrders.length > 0;
+
+  const cashOrders = activeOrders.filter((o: any) => o.payment_method === 'cash');
+  const cashRevenue = cashOrders.reduce((s: number, o: any) => s + (parseFloat(o.amount) || 0), 0);
+  const cashExpenses = (trip.trip_expenses ?? [])
+    .filter((e: any) => e.payment_method === 'cash')
+    .reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0);
+  const cashToSurrender = Math.max(0, cashRevenue - cashExpenses);
 
   const totalExternalLoadersPay = activeOrders.reduce((sum, o) => {
     if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
@@ -273,13 +362,15 @@ export default function TripDetailPage() {
           <span className="text-xl font-black text-zinc-900 uppercase tracking-tight">
             Рейс №{trip.trip_number}
           </span>
-          {canEdit && !isActive && (
-            <Link
-              href={`/trip/${id}/edit`}
-              className="text-[10px] font-black text-orange-600 uppercase tracking-wide bg-orange-50 border border-orange-200 rounded-lg px-2 py-1 active:bg-orange-100 transition-colors"
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setShowEditModal(true)}
+              className="text-[10px] font-black text-indigo-700 uppercase tracking-wide bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1 active:scale-95 transition-all shadow-2xs flex items-center gap-1"
             >
-              ✏️ Изменить
-            </Link>
+              <span>✏️</span>
+              <span>Изменить</span>
+            </button>
           )}
         </div>
         <LifecycleBadge
@@ -287,7 +378,39 @@ export default function TripDetailPage() {
         />
       </header>
 
-      <main className="p-4 space-y-6 max-w-4xl mx-auto">
+      <main className="p-4 space-y-4 max-w-4xl mx-auto">
+        {/* Карточка возврата на доработку */}
+        {isReturned && (
+          <div className="bg-rose-50 border-2 border-rose-300 rounded-2xl p-3.5 space-y-1.5 shadow-xs">
+            <div className="flex items-center gap-2 text-rose-900 font-black text-xs uppercase tracking-wide">
+              <span className="text-base">⚠️</span>
+              <span>Рейс возвращён администратором на доработку</span>
+            </div>
+            {trip.driver_note && (
+              <p className="text-xs text-rose-800 font-medium pl-6">
+                <strong>Причина:</strong> {trip.driver_note}
+              </p>
+            )}
+            <p className="text-[11px] text-rose-700 pl-6">
+              Внесите необходимые изменения в заказы или маршрут и отправьте рейс обратно на
+              проверку.
+            </p>
+          </div>
+        )}
+
+        {/* Плашка ревью (ожидает согласования) */}
+        {isPendingReview && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 flex items-center justify-between text-xs font-bold text-amber-900 shadow-2xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-base">⏳</span>
+              <span className="truncate">Рейс на проверке у администратора</span>
+            </div>
+            <span className="text-[10px] uppercase tracking-wider bg-amber-200 text-amber-950 px-2 py-0.5 rounded-full shrink-0 font-black">
+              На ревью
+            </span>
+          </div>
+        )}
+
         {/* Status Card */}
         <section className="bg-white border-2 border-zinc-200 rounded-lg p-4 shadow-sm relative overflow-hidden">
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500"></div>
@@ -780,6 +903,145 @@ export default function TripDetailPage() {
         </div>
       )}
 
+      {/* Action Buttons: Рейс на ревью (ожидает проверки администратором) */}
+      {isPendingReview && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 p-4 space-y-3 z-50 max-w-lg mx-auto shadow-xl pb-[calc(env(safe-area-inset-bottom,0px)+16px)]">
+          {actionError && (
+            <p className="text-red-600 text-xs font-black uppercase text-center bg-red-50 rounded-lg py-2 px-3 border border-red-200">
+              ❌ {actionError}
+            </p>
+          )}
+
+          {/* Контроль наличных и статус сдачи в кассу (1-строчный компактный вид) */}
+          {(cashRevenue > 0 || cashNotSurrendered) && (
+            <div
+              className={`p-2.5 rounded-xl border flex items-center justify-between text-xs gap-2 ${
+                cashNotSurrendered
+                  ? 'bg-amber-50 border-amber-200 text-amber-950'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-base shrink-0">{cashNotSurrendered ? '⚠️' : '💵'}</span>
+                <span className="font-bold truncate text-[11px]">
+                  {cashNotSurrendered ? 'Подотчёт: ' : 'В кассу: '}
+                  <strong>{cashToSurrender.toLocaleString('ru-RU')} ₽</strong>
+                </span>
+              </div>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0 bg-white px-2.5 py-1 rounded-lg border border-zinc-200 shadow-2xs">
+                <input
+                  type="checkbox"
+                  checked={cashNotSurrendered}
+                  disabled={adminAction.isPending}
+                  onChange={(e) => setCashNotSurrendered(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <span className="text-xs font-black">
+                  {cashNotSurrendered ? 'Деньги не сданы' : 'В подотчёт'}
+                </span>
+              </label>
+            </div>
+          )}
+
+          {showReturnForm ? (
+            <div className="space-y-3">
+              <textarea
+                value={returnNote}
+                onChange={(e) => setReturnNote(e.target.value)}
+                placeholder="Причина возврата (необязательно)"
+                rows={2}
+                className="w-full rounded-xl border-2 border-zinc-200 px-3 py-2 text-sm font-bold focus:border-orange-500 focus:outline-none resize-none"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReturnForm(false);
+                    setActionError('');
+                  }}
+                  className="h-12 rounded-xl border-2 border-zinc-200 font-black text-xs uppercase text-zinc-600 active:scale-95 transition-all"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adminAction.mutate({ action: 'return', note: returnNote })}
+                  disabled={adminAction.isPending}
+                  className="h-12 rounded-xl bg-amber-500 text-white font-black text-xs uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {adminAction.isPending ? 'Возврат...' : '↩ Вернуть'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowEditModal(true)}
+                className="flex-1 h-14 rounded-2xl border-2 border-indigo-200 bg-indigo-50 text-indigo-700 font-black text-xs uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1 shadow-xs"
+              >
+                <span>✏️</span>
+                <span>Изменить</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowReturnForm(true);
+                  setActionError('');
+                }}
+                disabled={adminAction.isPending}
+                className="flex-1 h-14 rounded-2xl border-2 border-amber-300 bg-amber-50 text-amber-700 font-black text-xs uppercase tracking-wider active:scale-95 transition-all"
+              >
+                ↩ Вернуть
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  adminAction.mutate({
+                    action: 'approve',
+                    cash_not_surrendered: cashNotSurrendered,
+                  })
+                }
+                disabled={adminAction.isPending}
+                className="flex-1 h-14 rounded-2xl bg-green-600 text-white font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow-md disabled:opacity-50"
+              >
+                {adminAction.isPending ? '⏳...' : '✓ Одобрить'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Action Buttons: Рейс возвращен водителю (на доработке, но не активен) */}
+      {isReturned && !isActive && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 p-4 space-y-3 z-50 max-w-lg mx-auto shadow-xl pb-[calc(env(safe-area-inset-bottom,0px)+16px)]">
+          {actionError && (
+            <p className="text-red-600 text-xs font-black uppercase text-center bg-red-50 rounded-lg py-2 px-3 border border-red-200">
+              ❌ {actionError}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEditModal(true)}
+              className="flex-1 h-14 rounded-2xl border-2 border-indigo-200 bg-indigo-50 text-indigo-700 font-black text-xs uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1 shadow-xs"
+            >
+              <span>✏️</span>
+              <span>Изменить рейс</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => resubmitTrip.mutate()}
+              disabled={resubmitTrip.isPending}
+              className="flex-1 h-14 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow-md flex items-center justify-center gap-1 disabled:opacity-50"
+            >
+              <span>📤</span>
+              <span>{resubmitTrip.isPending ? 'Отправка...' : 'Отправить на ревью'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {showOdometerModal && trip && (
         <div
           className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
@@ -934,6 +1196,21 @@ export default function TripDetailPage() {
             })()}
           </div>
         </div>
+      )}
+
+      {/* Модал редактирования рейса (Единый со смарт-редактором) */}
+      {showEditModal && (
+        <SmartTripOrderModal
+          trip={trip}
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          onSaved={() => {
+            setShowEditModal(false);
+            queryClient.invalidateQueries({ queryKey: ['trip', id] });
+            queryClient.invalidateQueries({ queryKey: ['admin-trip', id] });
+            queryClient.invalidateQueries({ queryKey: ['admin-trips'] });
+          }}
+        />
       )}
     </div>
   );

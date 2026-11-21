@@ -586,7 +586,7 @@ export default function AdminTripDetailPage() {
 
       {/* Кнопки действий (только для рейсов на ревью) */}
       {isPendingReview && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 p-4 space-y-3 z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 p-4 space-y-3 z-50 max-w-lg mx-auto shadow-xl pb-[calc(env(safe-area-inset-bottom,0px)+16px)]">
           {actionError && (
             <p className="text-red-600 text-xs font-black uppercase text-center bg-red-50 rounded-lg py-2 px-3">
               ❌ {actionError}
@@ -628,6 +628,7 @@ export default function AdminTripDetailPage() {
               />
               <div className="grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={() => {
                     setShowReturnForm(false);
                     setActionError('');
@@ -637,6 +638,7 @@ export default function AdminTripDetailPage() {
                   Отмена
                 </button>
                 <button
+                  type="button"
                   onClick={() => action.mutate({ action: 'return', note: returnNote })}
                   disabled={action.isPending}
                   className="h-12 rounded-lg bg-amber-500 text-white font-black text-xs uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
@@ -646,25 +648,35 @@ export default function AdminTripDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="flex gap-2">
               <button
+                type="button"
+                onClick={() => setShowEditModal(true)}
+                className="flex-1 h-14 rounded-2xl border-2 border-indigo-200 bg-indigo-50 text-indigo-700 font-black text-xs uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1 shadow-xs"
+              >
+                <span>✏️</span>
+                <span>Изменить</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setShowReturnForm(true);
                   setActionError('');
                 }}
                 disabled={action.isPending}
-                className="h-14 rounded-2xl border-2 border-amber-300 bg-amber-50 text-amber-700 font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
+                className="flex-1 h-14 rounded-2xl border-2 border-amber-300 bg-amber-50 text-amber-700 font-black text-xs uppercase tracking-wider active:scale-95 transition-all"
               >
                 ↩ Вернуть
               </button>
               <button
+                type="button"
                 onClick={() =>
                   action.mutate({ action: 'approve', cash_not_surrendered: cashNotSurrendered })
                 }
                 disabled={action.isPending}
-                className="h-14 rounded-2xl bg-green-600 text-white font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-md disabled:opacity-50"
+                className="flex-1 h-14 rounded-2xl bg-green-600 text-white font-black text-xs uppercase tracking-wider active:scale-95 transition-all shadow-md disabled:opacity-50"
               >
-                {action.isPending ? '⏳ Сохраняем...' : '✓ Одобрить'}
+                {action.isPending ? '⏳...' : '✓ Одобрить'}
               </button>
             </div>
           )}
