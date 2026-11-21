@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Money } from '@saldacargo/ui';
+import { Money, TripRouteSheet } from '@saldacargo/ui';
 import {
   formatTripPeriod,
   isWialonGpsAsset,
@@ -3018,12 +3018,10 @@ function TripCard({
             </div>
           )}
 
-          {/* Driver note */}
+          {/* Маршрутный лист и заметка водителя (Dense 1-Row Priority) */}
           {trip.driver_note && (
-            <div className="px-5 py-3 border-t border-amber-100 bg-amber-50/60">
-              <p className="text-sm text-amber-800 font-medium">
-                <span className="font-bold">Заметка водителя:</span> {trip.driver_note}
-              </p>
+            <div className="px-5 py-2 border-t border-slate-100">
+              <TripRouteSheet driverNote={trip.driver_note} />
             </div>
           )}
 

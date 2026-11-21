@@ -115,6 +115,18 @@ export async function syncTripFinancials(
       o.payment_method === 'cash' && !isInternalCounterparty((o.counterparty as any)?.name),
   );
   const cashTotal = cashOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+
+  // Вычитаем расходы наличными (например, заправка за наличные), оплаченные водителем из выручки рейса
+  const { data: tripCashExpensesData } = await (supabase.from('trip_expenses') as any)
+    .select('amount')
+    .eq('trip_id', tripId)
+    .eq('payment_method', 'cash');
+  const cashExpensesTotal = (tripCashExpensesData ?? []).reduce(
+    (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
+    0,
+  );
+  const netCashHold = Math.max(0, cashTotal - cashExpensesTotal);
+
   const cashIdempotency = generateDeterministicUuid(`trip-income-cash-${tripId}`);
   const holdIdempotency = generateDeterministicUuid(`trip-cash-hold-${tripId}`);
 
@@ -169,7 +181,7 @@ export async function syncTripFinancials(
       if (existingHoldTx) {
         await (supabase.from('transactions') as any)
           .update({
-            amount: cashTotal.toFixed(2),
+            amount: netCashHold.toFixed(2),
             direction: 'transfer',
             category_id: CASH_COLLECT_CAT,
             from_wallet_id: userWallet?.id ?? null,
@@ -185,7 +197,7 @@ export async function syncTripFinancials(
         await (supabase.from('transactions') as any).insert({
           direction: 'transfer',
           category_id: CASH_COLLECT_CAT,
-          amount: cashTotal.toFixed(2),
+          amount: netCashHold.toFixed(2),
           from_wallet_id: userWallet?.id ?? null,
           to_wallet_id: CASH_ID,
           trip_id: tripId,

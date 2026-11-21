@@ -3,7 +3,11 @@
   "compilerOptions": {
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@saldacargo/shared": ["../../packages/shared/src/index.ts"],
+      "@saldacargo/shared-types": ["../../packages/shared-types/src/index.ts"],
+      "@saldacargo/ui": ["../../packages/ui/src/index.ts"],
+      "@saldacargo/domain-service": ["../../packages/service/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],

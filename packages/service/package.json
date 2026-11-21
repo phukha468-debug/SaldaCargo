@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@saldacargo/shared": "workspace:*",
     "@saldacargo/shared-types": "workspace:*",
     "@types/pdf-parse": "^1.1.5",
     "pdf-parse": "1.1.1"

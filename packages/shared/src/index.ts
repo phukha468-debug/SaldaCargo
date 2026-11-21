@@ -1942,3 +1942,127 @@ export function buildStandardWorkName(
   if (!comp) return act;
   return pos ? `${act} ${comp} (${pos})` : `${act} ${comp}`;
 }
+
+export interface TripRouteLeg {
+  n: number;
+  from: string;
+  to: string;
+  route: string;
+  dep: string;
+  dur: string;
+  arr: string;
+  date: string;
+  km: number;
+  startOdo?: number;
+  endOdo?: number;
+}
+
+export interface ParsedTripRouteSheet {
+  isAutoDeparture: boolean;
+  hasRouteSheet: boolean;
+  legs: TripRouteLeg[];
+  totalKm: number;
+  startOdo?: number;
+  endOdo?: number;
+  routeSummary: string;
+  cleanNote: string;
+}
+
+/**
+ * Парсер маршрутного листа из заметки рейса (driver_note).
+ * Извлекает структурированные плечи/рейсы [ROUTE_LEGS:...],
+ * признак автовыезда и формирует ультра-компактный вид по стандартам AGENTS.md.
+ */
+export function parseTripRouteSheet(note: string | null | undefined): ParsedTripRouteSheet {
+  const raw = String(note || '').trim();
+  const isAutoDeparture =
+    raw.includes('Автомашина выехала без заявки') ||
+    raw.includes('⚡ Автовыезд') ||
+    raw.includes('[АВТОВЫЕЗД]') ||
+    raw.includes('Авто-старт по геозоне Wialon');
+
+  let legs: TripRouteLeg[] = [];
+  let totalKm = 0;
+  let startOdo: number | undefined;
+  let endOdo: number | undefined;
+  let routeSummary = '';
+
+  const legsMatch = raw.match(/\[ROUTE_LEGS:(\[.*?\])\]/s);
+  if (legsMatch && legsMatch[1]) {
+    try {
+      legs = JSON.parse(legsMatch[1]);
+      if (Array.isArray(legs) && legs.length > 0) {
+        totalKm = legs.reduce((sum, l) => sum + (Number(l.km) || 0), 0);
+        startOdo = legs[0]?.startOdo;
+        endOdo = legs[legs.length - 1]?.endOdo;
+
+        const locs: string[] = [];
+        for (const l of legs) {
+          if (!locs.includes(l.from)) locs.push(l.from);
+          if (!locs.includes(l.to)) locs.push(l.to);
+        }
+        routeSummary = locs.join(' ➔ ');
+      }
+    } catch {}
+  }
+
+  // Очистка заметки от технического JSON и старых многословных предупреждений
+  let cleanNote = raw
+    .replace(/\[ROUTE_LEGS:\[.*?\]\]/s, '')
+    .replace(
+      /⚠️\s*Внимание:\s*Автомашина выехала без заявки по геозоне Wialon! Поля заявки пустые, требуется заполнение\.?/gi,
+      '',
+    )
+    .replace(/\[CARRYOVER:.*?\]/g, '')
+    .replace(/\[CASH_NOT_COLLECTED.*?\]/g, '')
+    .replace(/\[НЕ СДАНО В КАССУ.*?\]/g, '')
+    .replace(/\[ПЕРЕНОС НАЛИЧНЫХ.*?\]/g, '')
+    .replace(/\[WIALON_STATE:.*?\]/g, '')
+    .replace(/\[WIALON_AUDIT:.*?\]/g, '')
+    .trim();
+
+  // Удаляем дублирующиеся пробелы и переносы
+  cleanNote = cleanNote.replace(/\n{2,}/g, '\n').trim();
+
+  return {
+    isAutoDeparture,
+    hasRouteSheet: legs.length > 0,
+    legs,
+    totalKm,
+    startOdo,
+    endOdo,
+    routeSummary,
+    cleanNote,
+  };
+}
+
+/**
+ * Формирует строку заметки с вложенным JSON маршрутного листа [ROUTE_LEGS:...]
+ */
+export function encodeTripRouteSheet(
+  legs: TripRouteLeg[],
+  existingNote?: string | null,
+  isAuto = true,
+): string {
+  const prevClean = String(existingNote || '')
+    .replace(/\[ROUTE_LEGS:\[.*?\]\]/s, '')
+    .replace(
+      /⚠️\s*Внимание:\s*Автомашина выехала без заявки по геозоне Wialon! Поля заявки пустые, требуется заполнение\.?/gi,
+      '',
+    )
+    .trim();
+
+  const autoPrefix = isAuto ? '⚡ Автовыезд' : '';
+  const legsPayload = `[ROUTE_LEGS:${JSON.stringify(legs)}]`;
+
+  const parts: string[] = [];
+  if (autoPrefix && !prevClean.includes(autoPrefix)) {
+    parts.push(autoPrefix);
+  }
+  if (prevClean) {
+    parts.push(prevClean);
+  }
+  parts.push(legsPayload);
+
+  return parts.join('\n').trim();
+}

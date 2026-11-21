@@ -46,14 +46,34 @@ export async function assignVehicleAndDriver(
   return updatedOrder;
 }
 
+export interface VehicleDepartureParams {
+  vehicleId: string;
+  timestamp?: string;
+  odometer: number;
+  lat?: number;
+  lon?: number;
+  direction?: 'east' | 'west';
+}
+
 /**
  * 2. Авто-старт заявки и создание рейса при выезде грузовика из геозоны гаража/города
+ * Реализует правила геозон и направлений:
+ * 1. Транзитный статус активен только при старте на восток (Шайтанка, Н.Салда, Басьяновский).
+ * 2. Снятие транзитного флага при выходе на Тагил (на запад).
  */
 export async function handleVehicleDeparture(
   supabase: SupabaseClient<any, any, any>,
-  params: { vehicleId: string; timestamp?: string; odometer: number },
+  params: VehicleDepartureParams,
 ) {
   const departureTime = params.timestamp || new Date().toISOString();
+
+  // Определение направления выезда:
+  // Долгота центра Салды 60.552. Выезд на восток (Н.Салда, Шайтанка) > 60.55, на запад (Н.Тагил) <= 60.55.
+  const direction: 'east' | 'west' =
+    params.direction ||
+    (params.lon !== undefined ? (params.lon > 60.55 ? 'east' : 'west') : 'east');
+  const isExitingWest = direction === 'west';
+  const isEastStart = direction === 'east';
 
   // 0. Проверяем, есть ли уже активная заявка в статусе in_progress (выезд после промежуточного транзита через Салду)
   const { data: inProgressOrder } = await supabase
@@ -67,7 +87,7 @@ export async function handleVehicleDeparture(
 
   if (inProgressOrder) {
     console.log(
-      `[Wialon] 🚚 Автомобиль ${params.vehicleId} выехал из Салды, продолжая текущий рейс (заявка ${inProgressOrder.base_doc_number || inProgressOrder.order_number}). Новая заявка НЕ создается.`,
+      `[Wialon] 🚚 Автомобиль ${params.vehicleId} выехал из Салды в направлении ${direction.toUpperCase()} (${isExitingWest ? 'на Нижний Тагил / трассу' : 'на восток'}), продолжая текущий рейс.`,
     );
 
     // Обновляем одометр актива (только если новый одометр больше текущего)
@@ -84,8 +104,9 @@ export async function handleVehicleDeparture(
         .eq('id', params.vehicleId);
     }
 
-    // При выезде из геозоны Салды после транзита:
-    // фиксируем время выезда без сброса флага защиты prevent_salda_auto_finish.
+    // Снятие транзитного флага при выходе на Тагил:
+    // Как только машина покидает геозону Верхней Салды в западном направлении (на Нижний Тагил),
+    // признак транзита ПОЛНОСТЬЮ отключается (transit_allowed: false, prevent_salda_auto_finish: false).
     await supabase
       .from('orders')
       .update({
@@ -93,38 +114,31 @@ export async function handleVehicleDeparture(
           ...(inProgressOrder.raw_parser_payload || {}),
           in_salda_transit: false,
           departed_after_transit_at: departureTime,
+          ...(isExitingWest
+            ? {
+                has_departed_west: true,
+                transit_allowed: false,
+                prevent_salda_auto_finish: false,
+                departed_west_at: departureTime,
+              }
+            : {}),
         },
         updated_at: new Date().toISOString(),
       })
       .eq('id', inProgressOrder.id);
 
-    // Фиксируем выезд после транзита в заметке рейса
-    const tripObj = Array.isArray(inProgressOrder.trip)
-      ? inProgressOrder.trip[0]
-      : inProgressOrder.trip;
-    if (tripObj?.id) {
-      const prevNote = tripObj.driver_note || '';
-      const departNote = `[Выезд из Салды (продолжение рейса): ${departureTime.slice(11, 16)}, одометр: ${params.odometer} км]`;
-      if (!prevNote.includes(departNote)) {
-        await supabase
-          .from('trips')
-          .update({
-            driver_note: `${prevNote}\n${departNote}`.trim(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', tripObj.id);
-      }
-    }
-
     return {
       success: true,
       isEmergency: false,
       isTransitContinuation: true,
+      direction,
       orderId: inProgressOrder.id,
       tripId: inProgressOrder.active_trip_id,
       departureTime,
       status: 'in_progress',
-      message: 'Продолжение активного рейса после выезда из Салды (транзит)',
+      message: isExitingWest
+        ? 'Выезд на Нижний Тагил: транзитный статус снят, рейс продолжается по межгороду'
+        : 'Продолжение активного рейса после выезда из Салды (восток)',
     };
   }
 
@@ -192,6 +206,8 @@ export async function handleVehicleDeparture(
       ? '⚠️ ВЫЕЗД БЕЗ ЗАЯВКИ (Валдай 446 - УТОЧНИТЬ ВОДИТЕЛЯ)'
       : '⚠️ ВЫЕЗД БЕЗ ЗАЯВКИ';
 
+    const isEastStart = direction === 'east';
+
     const { data: emergencyOrder, error: emergErr } = await supabase
       .from('orders')
       .insert({
@@ -209,7 +225,13 @@ export async function handleVehicleDeparture(
         assigned_vehicle_id: params.vehicleId,
         assigned_driver_id: driverId,
         actual_loading_arrival_at: departureTime,
-        raw_parser_payload: isDriverUncertain ? { needs_driver_clarification: true } : {},
+        raw_parser_payload: {
+          ...(isDriverUncertain ? { needs_driver_clarification: true } : {}),
+          departure_direction: isEastStart ? 'east' : 'west',
+          transit_allowed: isEastStart,
+          prevent_salda_auto_finish: isEastStart,
+          has_departed_west: !isEastStart,
+        },
       })
       .select()
       .single();
@@ -223,11 +245,11 @@ export async function handleVehicleDeparture(
 
   const isEmergency = !order;
   let tripNote = isEmergency
-    ? '⚠️ Внимание: Автомашина выехала без заявки по геозоне Wialon! Поля заявки пустые, требуется заполнение.'
+    ? '⚡ Автовыезд'
     : `Авто-старт по геозоне Wialon. Заявка № ${targetOrder.base_doc_number || targetOrder.order_number}`;
 
   if (isDriverUncertain) {
-    tripNote = `⚠️ ТРЕБУЕТСЯ УТОЧНИТЬ ВОДИТЕЛЯ! На автомобиле нет закрепленного водителя.\n${tripNote}`;
+    tripNote = `⚠️ УТОЧНИТЬ ВОДИТЕЛЯ! На автомобиле нет закрепленного водителя.\n${tripNote}`;
   }
 
   // Парсим номер рейса из номера заявки, если рейс создавался по заранее заведенной заявке
@@ -293,6 +315,13 @@ export async function handleVehicleDeparture(
       base_doc_number: finalDocNumber,
       active_trip_id: newTrip.id,
       actual_loading_arrival_at: departureTime,
+      raw_parser_payload: {
+        ...(targetOrder.raw_parser_payload || {}),
+        departure_direction: isEastStart ? 'east' : 'west',
+        transit_allowed: isEastStart,
+        prevent_salda_auto_finish: isEastStart,
+        has_departed_west: !isEastStart,
+      },
       updated_at: new Date().toISOString(),
     })
     .eq('id', targetOrder.id);
@@ -331,6 +360,8 @@ export interface VehicleArrivalParams {
   forceFinish?: boolean;
   isInsideBase?: boolean;
   distanceFromBaseKm?: number;
+  lat?: number;
+  lon?: number;
 }
 
 /**
@@ -398,14 +429,6 @@ export async function handleVehicleArrival(
     (trip.driver_note && trip.driver_note.toLowerCase().includes('шайтан')),
   );
 
-  // Точка выгрузки Маминское (или рудник/склад ООО «Геостройиндустрия»):
-  const isMaminskoeDestination = Boolean(
-    order.unloading_address_json?.raw?.toLowerCase().includes('мамин') ||
-    order.unloading_address_json?.city?.toLowerCase().includes('мамин') ||
-    order.cargo_name?.toLowerCase().includes('мамин') ||
-    (trip.driver_note && trip.driver_note.toLowerCase().includes('мамин')),
-  );
-
   const minRequiredMileage = order.raw_parser_payload?.min_return_distance_km || 300;
 
   const hasUnloaded = Boolean(
@@ -417,58 +440,46 @@ export async function handleVehicleArrival(
   // До Маминского и обратно кругорейс более 450-500 км!
   // Если машина проехала меньше 300 км или ещё не выгрузилась во второй точке — она ещё НЕ завершила рейс (погрузка на Шайтанке, отстой/ночёвка в Салде).
   // Автозакрытие СТРОГО БЛОКИРУЕТСЯ, рейс остаётся в пути!
-  const isShaytankaMaminskoePending =
-    isShaytankaRoute && (!hasUnloaded || currentTripMileage < minRequiredMileage);
+  // 1. БЕЗУСЛОВНЫЙ ФИНИШ ПРИ ВОЗВРАТЕ С ТАГИЛА:
+  // Любой следующий въезд в Верхнюю Салду со стороны Тагила (с запада) или после выезда на запад
+  // сразу и окончательно завершает рейс (status: 'completed'), фиксирует конечный одометр с Wialon и выставляет рейс на Ревью!
+  const hasDepartedWest = Boolean(
+    order.raw_parser_payload?.has_departed_west ||
+    order.raw_parser_payload?.departure_direction === 'west' ||
+    (params.lon !== undefined && params.lon < 60.45) ||
+    order.raw_parser_payload?.visited_maminskoe ||
+    order.raw_parser_payload?.visited_karpinsk ||
+    order.raw_parser_payload?.visited_vorontsovka,
+  );
 
   // Проверка: погрузка НЕ в Салде (например, Шайтанка или внешний склад)
-  const isExternalOrigin =
+  const isExternalOrigin = Boolean(
     order.loading_address_json?.raw &&
-    !order.loading_address_json.raw.toLowerCase().includes('салда');
+    !order.loading_address_json.raw.toLowerCase().includes('салда'),
+  );
 
-  // Вечерняя погрузка с утренней выгрузкой:
-  // Машина уже погрузилась вечером (Шайтанка или склад), но ещё НЕ была на разгрузке (hasUnloaded === false).
-  // Автозавершение СТРОГО БЛОКИРУЕТСЯ, рейс ожидает выезда на выгрузку следующим утром!
-  const isLoadedPendingUnload =
-    Boolean(
+  // 2. ТРАНЗИТНЫЙ СТАТУС АКТИВЕН ТОЛЬКО ПРИ СТАРТЕ НА ВОСТОК:
+  // Если первый выезд зафиксирован в сторону Шайтанки / Н. Салды / Басьяновского,
+  // заезд обратно в Верхнюю Салду фиксируется как «Отстой / транзит перед выездом на трассу» (рейс остаётся in_progress).
+  // При возврате с Тагила транзит СТРОГО ЗАПРЕЩЕН (hasDepartedWest === false).
+  const isTransitEligible =
+    !hasDepartedWest &&
+    !params.forceFinish &&
+    (Boolean(order.raw_parser_payload?.transit_allowed) ||
+      order.raw_parser_payload?.departure_direction === 'east' ||
       order.raw_parser_payload?.visited_shaytanka ||
-      order.raw_parser_payload?.has_loaded ||
       isShaytankaRoute ||
-      isExternalOrigin,
-    ) && !hasUnloaded;
+      isExternalOrigin) &&
+    !hasUnloaded;
 
-  // Явный запрет автозавершения (выставляется вручную или при транзите через Салду).
-  // ВАЖНО: для маршрутов Шайтанка / Маминское после достижения минимального кругового пробега (>=300 км)
-  // флаг транзита снимается, так как кругорейс полностью выполнен и машина прибыла на финиш.
-  const isTransitExplicitlyAllowed =
-    Boolean(
-      order.prevent_salda_auto_finish || order.raw_parser_payload?.prevent_salda_auto_finish,
-    ) &&
-    ((!isShaytankaRoute && !isMaminskoeDestination) || currentTripMileage < minRequiredMileage);
-
-  // Если машина в пути менее 45 минут И погрузка была НЕ из Салды — транзитный проезд на старте
-  const isEarlyTransit = diffMinutes < 45 && Boolean(isExternalOrigin);
-
-  if (
-    (isTransitExplicitlyAllowed ||
-      isEarlyTransit ||
-      isShaytankaMaminskoePending ||
-      isLoadedPendingUnload) &&
-    !params.forceFinish
-  ) {
+  if (isTransitEligible) {
     const transitCount =
       ((order.raw_parser_payload?.salda_transit_count ?? order.salda_transit_count) || 0) + 1;
-    const transitReason = isShaytankaMaminskoePending
-      ? `маршрут Шайтанка ↔ Маминское (пробег ${currentTripMileage} км < 300 км, отстой в Салде перед выгрузкой)`
-      : isLoadedPendingUnload
-        ? `вечерняя погрузка (груз на борту, отстой в Салде перед утренней выгрузкой)`
-        : isTransitExplicitlyAllowed
-          ? 'явный запрет (prevent_salda_auto_finish)'
-          : `ранний заезд (${Math.round(diffMinutes)} мин, погрузка вне Салды)`;
     console.log(
-      `[Wialon] 🔄 Промежуточный транзит через Салду для ТС ${params.vehicleId}. Заезд #${transitCount} (${Math.round(diffMinutes)} мин с начала). Причина: ${transitReason}. Рейс продолжается!`,
+      `[Wialon] 🔄 Отстой / транзит перед выездом на трассу для ТС ${params.vehicleId}. Заезд #${transitCount} (${Math.round(diffMinutes)} мин с начала). Рейс продолжается (in_progress)!`,
     );
 
-    // Обновляем одометр актива (только если новый одометр больше текущего) и фиксируем отметку в рейсе
+    // Обновляем одометр актива (только если новый одометр больше текущего)
     const { data: curAssetTransit } = await supabase
       .from('assets')
       .select('odometer_current')
@@ -482,29 +493,7 @@ export async function handleVehicleArrival(
         .eq('id', params.vehicleId);
     }
 
-    const prevNote = trip.driver_note || '';
-    const noteMarker = `[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}`;
-    const noteText = isShaytankaMaminskoePending
-      ? `[Отстой в Салде (Шайтанка -> Салда перед выгрузкой в Маминское): ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`
-      : isLoadedPendingUnload
-        ? `[Отстой в Салде (вечерняя погрузка -> ночёвка перед выгрузкой): ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`
-        : `[Промежуточный заезд в Салду: ${arrivalTime.slice(11, 16)}, одометр: ${params.odometer} км]`;
-    const newNote = prevNote.includes(noteMarker) ? prevNote : `${prevNote}\n${noteText}`.trim();
-
-    if (newNote !== prevNote) {
-      await supabase
-        .from('trips')
-        .update({
-          driver_note: newNote,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', trip.id);
-    }
-
-    // При промежуточном заезде в Салду: сохраняем флаг транзита (prevent_salda_auto_finish: true)
-    // и помечаем in_salda_transit: true, чтобы повторные опросы телематики, пока машина находится внутри Салды,
-    // ни в коем случае НЕ закрывали рейс!
-    // Флаг снимется только при фактическом ВЫЕЗДЕ из геозоны Салды (handleVehicleDeparture).
+    // Сохраняем флаг транзита в order
     await supabase
       .from('orders')
       .update({
@@ -528,7 +517,7 @@ export async function handleVehicleArrival(
       salda_transit_count: transitCount,
       orderId: order.id,
       tripId: trip.id,
-      message: `Промежуточный заезд в Салду (заезд #${transitCount}). Заявка продолжается в пути.`,
+      message: 'Отстой / транзит перед выездом на трассу. Рейс продолжается (in_progress).',
     };
   }
 

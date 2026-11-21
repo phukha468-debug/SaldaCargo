@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense, useState, useEffect, useMemo } from 'react';
-import { Money, LifecycleBadge, cn } from '@saldacargo/ui';
+import { Money, LifecycleBadge, TripRouteSheet, cn } from '@saldacargo/ui';
 import { formatDate, formatTime, isInternalCounterparty, isTruckAsset } from '@saldacargo/shared';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
 import { SmartTripOrderModal } from '@/components/SmartTripOrderModal';
@@ -1752,26 +1752,26 @@ function HistoryTripCard({
             );
           })()}
 
-          {/* Пробег + заметка водителя */}
-          {(mileage || trip.driver_note || trip.odometer_end) && (
-            <div className="px-4 py-2.5 border-t border-zinc-100 flex items-center justify-between gap-3">
-              {((mileage !== null && mileage > 0) || trip.odometer_end != null) && (
-                <span className="text-xs text-zinc-500 flex items-center gap-1.5 flex-wrap">
-                  <span>
-                    🛣 <span className="font-bold">{mileage ?? 0} км</span>
+          {/* Пробег и одометр (1-Row Priority) */}
+          {((mileage !== null && mileage > 0) || trip.odometer_end != null) && (
+            <div className="px-4 py-2 border-t border-zinc-100 flex items-center justify-between text-xs text-zinc-500">
+              <span className="flex items-center gap-1.5">
+                <span>
+                  🛣 <span className="font-bold">{mileage ?? 0} км</span>
+                </span>
+                {trip.odometer_end != null && (
+                  <span className="text-[11px] text-zinc-400 font-normal">
+                    (на одометре: {trip.odometer_end.toLocaleString('ru-RU')} км)
                   </span>
-                  {trip.odometer_end != null && (
-                    <span className="text-[11px] text-zinc-400 font-normal">
-                      (на одометре: {trip.odometer_end.toLocaleString('ru-RU')} км)
-                    </span>
-                  )}
-                </span>
-              )}
-              {trip.driver_note && (
-                <span className="text-xs text-amber-700 flex-1 text-right">
-                  💬 <span className="font-medium">{trip.driver_note}</span>
-                </span>
-              )}
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* Маршрутный лист и заметка водителя (Dense 1-Row Priority) */}
+          {trip.driver_note && (
+            <div className="px-4 py-1.5 border-t border-zinc-100">
+              <TripRouteSheet driverNote={trip.driver_note} />
             </div>
           )}
 

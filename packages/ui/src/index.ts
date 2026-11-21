@@ -5,6 +5,8 @@ export { Badge, badgeVariants, LifecycleBadge, SettlementBadge } from './compone
 export type { BadgeProps } from './components/badge';
 export { Money } from './components/money';
 export { NetworkIndicator } from './components/network-indicator';
+export { TripRouteSheet } from './components/trip-route-sheet';
+export type { TripRouteSheetProps } from './components/trip-route-sheet';
 
 // Utils
 export { cn } from './lib/utils';

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { handleVehicleDeparture, handleVehicleArrival } from './wialonOrderSync';
+import { TripRouteLeg, encodeTripRouteSheet } from '@saldacargo/shared';
 
 // Координаты центра Верхней Салды и радиус границы города (в метрах)
 const SALDA_BASE_LAT = parseFloat(process.env.WIALON_BASE_LAT || '58.053');
@@ -407,6 +408,7 @@ export interface DetectedTripRoute {
   visitedKarpinsk: boolean;
   visitedVorontsovka: boolean;
   hasUnloaded: boolean;
+  hasDepartedWest: boolean;
   loadingAddress: { city: string; raw: string } | null;
   unloadingAddress: { city: string; raw: string } | null;
   clientId: string | null;
@@ -415,6 +417,10 @@ export interface DetectedTripRoute {
   priceWithoutVat: number | null;
   distinctLocationsCount: number;
   points: RoutePointMatch[];
+  legs: TripRouteLeg[];
+  totalMileageKm: number;
+  startOdometer?: number;
+  endOdometer?: number;
   routeSummary: string;
 }
 
@@ -424,6 +430,7 @@ export interface DetectedTripRoute {
  *   -> Автоматически задается погрузка: Шайтанка, Клиент: ООО "Геостройиндустрия", груз: Пробы керна (Шайтанка), ставка: 40 000 ₽.
  *   -> Любой промежуточный заезд на базу в Верхнюю Салду НЕ закрывает рейс, а считается отстоем/ночёвкой перед выгрузкой.
  * 2-я внешняя остановка (после заезда в Салду) автоматически становится местом разгрузки (с. Маминское, склад 2).
+ * Рассчитывает структурированные рейсы (плечи) по стандартам Варианта 3 (№, Рейс, Выезд, В пути, Прибытие, Дата, Км).
  */
 export async function detectTripStopsAndRoute(
   cleanHost: string,
@@ -434,6 +441,7 @@ export async function detectTripStopsAndRoute(
   baseLat = SALDA_BASE_LAT,
   baseLon = SALDA_BASE_LON,
   baseRadius = SALDA_BASE_RADIUS,
+  regNumber = '',
 ): Promise<DetectedTripRoute | null> {
   try {
     const timeFromSec = Math.floor(new Date(startTimeIso).getTime() / 1000) - 900;
@@ -458,7 +466,25 @@ export async function detectTripStopsAndRoute(
     const msgs = data.messages || [];
     if (msgs.length === 0) return null;
 
-    const rawStops: Array<{
+    // Проверка движения в сторону Нижнего Тагила / Серовского тракта (на запад, lon < 60.35)
+    let hasDepartedWest = false;
+    let initialStartOdo: number | null = null;
+    let finalEndOdo: number | null = null;
+
+    for (const m of msgs) {
+      if (m.pos?.x && m.pos.x < 60.35) {
+        hasDepartedWest = true;
+      }
+      const rawOdo = m.p?.mileage ?? m.p?.can_mileage ?? m.cnm;
+      if (rawOdo !== undefined && rawOdo !== null && Number(rawOdo) > 0) {
+        const cal = calibrateWialonOdometer(regNumber, Number(rawOdo));
+        if (initialStartOdo === null) initialStartOdo = cal;
+        finalEndOdo = cal;
+      }
+    }
+
+    // Собираем все стоянки (скорость < 5 км/ч не менее 15 минут)
+    const allStops: Array<{
       startT: number;
       endT: number;
       durMin: number;
@@ -466,17 +492,26 @@ export async function detectTripStopsAndRoute(
       lon: number;
       isBase: boolean;
       distBaseKm: number;
+      odo: number;
     }> = [];
 
-    let curStop: { startT: number; endT: number; pos: any } | null = null;
+    let curStop: { startT: number; endT: number; pos: any; odo: number } | null = null;
     for (const m of msgs) {
       if (!m.pos) continue;
       const speed = m.pos.s || 0;
+      const rawOdo = m.p?.mileage ?? m.p?.can_mileage ?? m.cnm;
+      const curOdo =
+        rawOdo !== undefined && rawOdo !== null && Number(rawOdo) > 0
+          ? calibrateWialonOdometer(regNumber, Number(rawOdo))
+          : 0;
+
       if (speed < 5) {
-        if (!curStop) curStop = { startT: m.t, endT: m.t, pos: m.pos };
-        else {
+        if (!curStop) {
+          curStop = { startT: m.t, endT: m.t, pos: m.pos, odo: curOdo };
+        } else {
           curStop.endT = m.t;
           curStop.pos = m.pos;
+          if (curOdo > 0) curStop.odo = curOdo;
         }
       } else {
         if (curStop) {
@@ -486,7 +521,7 @@ export async function detectTripStopsAndRoute(
             const lon = Number(curStop.pos.x);
             const distBase = calculateDistanceMeters(lat, lon, baseLat, baseLon);
             const isBase = distBase <= baseRadius;
-            rawStops.push({
+            allStops.push({
               startT: curStop.startT,
               endT: curStop.endT,
               durMin: Math.round(durMin),
@@ -494,6 +529,7 @@ export async function detectTripStopsAndRoute(
               lon,
               isBase,
               distBaseKm: Number((distBase / 1000).toFixed(1)),
+              odo: curStop.odo || initialStartOdo || 0,
             });
           }
           curStop = null;
@@ -501,70 +537,179 @@ export async function detectTripStopsAndRoute(
       }
     }
 
-    // Кластеризуем внешние остановки в отдельные пункты маршрута
-    const distinctLocations: Array<{
-      lat: number;
-      lon: number;
-      startT: number;
-      endT: number;
-      totalDurMin: number;
-      distBaseKm: number;
-    }> = [];
-
-    for (const s of rawStops) {
-      if (s.isBase) continue; // Игнорируем базу в Салде
-      if (s.durMin < 15 && s.distBaseKm < 50) continue; // Игнорируем короткие придорожные паузы около Салды
-
-      const lastLoc = distinctLocations[distinctLocations.length - 1];
-      if (lastLoc && calculateDistanceMeters(s.lat, s.lon, lastLoc.lat, lastLoc.lon) < 15000) {
-        lastLoc.totalDurMin += s.durMin;
-        lastLoc.endT = s.endT;
-      } else {
-        distinctLocations.push({
-          lat: s.lat,
-          lon: s.lon,
-          startT: s.startT,
-          endT: s.endT,
-          totalDurMin: s.durMin,
-          distBaseKm: s.distBaseKm,
+    // Если рейс еще стоит на последней точке
+    if (curStop) {
+      const durMin = (curStop.endT - curStop.startT) / 60;
+      if (durMin >= 15) {
+        const lat = Number(curStop.pos.y);
+        const lon = Number(curStop.pos.x);
+        const distBase = calculateDistanceMeters(lat, lon, baseLat, baseLon);
+        const isBase = distBase <= baseRadius;
+        allStops.push({
+          startT: curStop.startT,
+          endT: curStop.endT,
+          durMin: Math.round(durMin),
+          lat,
+          lon,
+          isBase,
+          distBaseKm: Number((distBase / 1000).toFixed(1)),
+          odo: curStop.odo || finalEndOdo || 0,
         });
       }
     }
 
-    const matchedPoints: RoutePointMatch[] = [];
-    for (const loc of distinctLocations) {
-      const match = await reverseGeocodePoint(loc.lat, loc.lon);
+    // Геокодируем каждую стоянку и сопоставляем с каталогом геозон
+    const namedStops: Array<{
+      name: string;
+      city: string;
+      raw: string;
+      isKnown: boolean;
+      startT: number;
+      endT: number;
+      durMin: number;
+      lat: number;
+      lon: number;
+      isBase: boolean;
+      distBaseKm: number;
+      odo: number;
+    }> = [];
 
-      // Исключаем бытовые остановки на кофе/заправку/отдых:
-      // 1) Если точка распознана как АЗС, кафе или придорожный карман — отсекаем.
-      // 2) Если точка НЕ из каталога и длительность стоянки менее 35 минут — отсекаем (короткий кофе/перекур на трассе).
-      if (!match.isKnown) {
-        if (match.isServiceOrRestStop) {
+    for (const s of allStops) {
+      if (s.isBase) {
+        namedStops.push({
+          name: 'В.Салда',
+          city: 'Верхняя Салда',
+          raw: 'г. Верхняя Салда',
+          isKnown: true,
+          startT: s.startT,
+          endT: s.endT,
+          durMin: s.durMin,
+          lat: s.lat,
+          lon: s.lon,
+          isBase: true,
+          distBaseKm: s.distBaseKm,
+          odo: s.odo,
+        });
+      } else {
+        const match = await reverseGeocodePoint(s.lat, s.lon);
+        // Отсекаем мелкие дорожные паузы (< 25 мин вне каталога)
+        if (!match.isKnown && (match.isServiceOrRestStop || s.durMin < 25)) {
           continue;
         }
-        if (loc.totalDurMin < 35) {
-          continue;
-        }
+        namedStops.push({
+          name: match.name,
+          city: match.city,
+          raw: match.raw,
+          isKnown: match.isKnown,
+          startT: s.startT,
+          endT: s.endT,
+          durMin: s.durMin,
+          lat: s.lat,
+          lon: s.lon,
+          isBase: false,
+          distBaseKm: s.distBaseKm,
+          odo: s.odo,
+        });
       }
+    }
 
-      matchedPoints.push({
-        id: match.isKnown
-          ? KNOWN_ROUTE_POINTS.find((p) => p.name === match.name)?.id || 'known'
-          : 'osm',
-        name: match.name,
-        city: match.city,
-        raw: match.raw,
-        isKnown: match.isKnown,
-        lat: loc.lat,
-        lon: loc.lon,
-        startT: loc.startT,
-        endT: loc.endT,
-        durMin: loc.totalDurMin,
-        distBaseKm: loc.distBaseKm,
+    // Склеиваем последовательные стоянки в одном и том же населенном пункте
+    const mergedStops: typeof namedStops = [];
+    for (const s of namedStops) {
+      const prev = mergedStops[mergedStops.length - 1];
+      if (prev && prev.name === s.name) {
+        prev.endT = s.endT;
+        prev.durMin += s.durMin;
+        if (s.odo > 0) prev.odo = s.odo;
+      } else {
+        mergedStops.push({ ...s });
+      }
+    }
+
+    // Формируем плечи (рейсы) для Варианта 3
+    const legs: TripRouteLeg[] = [];
+    for (let i = 0; i < mergedStops.length - 1; i++) {
+      const stFrom = mergedStops[i];
+      const stTo = mergedStops[i + 1];
+      if (!stFrom || !stTo) continue;
+
+      const depT = stFrom.endT;
+      const arrT = stTo.startT;
+      const durSec = Math.max(60, arrT - depT);
+      const durH = Math.floor(durSec / 3600);
+      const durM = Math.floor((durSec % 3600) / 60);
+      const durStr = durH > 0 ? `${durH}ч ${durM}м` : `${durM}м`;
+
+      const depDate = new Date(depT * 1000);
+      const arrDate = new Date(arrT * 1000);
+      const depStr = depDate.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Yekaterinburg',
+      });
+      const arrStr = arrDate.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Yekaterinburg',
+      });
+      const dateStr = arrDate.toLocaleDateString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        timeZone: 'Asia/Yekaterinburg',
+      });
+
+      const legKm =
+        stTo.odo > 0 && stFrom.odo > 0
+          ? Math.max(0, Math.round(stTo.odo - stFrom.odo))
+          : Math.max(
+              1,
+              Math.round(
+                calculateDistanceMeters(stFrom.lat, stFrom.lon, stTo.lat, stTo.lon) / 1000,
+              ),
+            );
+
+      legs.push({
+        n: i + 1,
+        from: stFrom.name,
+        to: stTo.name,
+        route: `${stFrom.name} ➔ ${stTo.name}`,
+        dep: depStr,
+        dur: durStr,
+        arr: arrStr,
+        date: dateStr,
+        km: legKm,
+        startOdo: Math.round(stFrom.odo),
+        endOdo: Math.round(stTo.odo),
       });
     }
 
-    const routeSummary = matchedPoints.map((p) => p.name).join(' ➔ ');
+    // Внешние точки для сводки заказа
+    const matchedPoints: RoutePointMatch[] = mergedStops
+      .filter((s) => !s.isBase)
+      .map((s) => ({
+        id: s.isKnown ? KNOWN_ROUTE_POINTS.find((p) => p.name === s.name)?.id || 'known' : 'osm',
+        name: s.name,
+        city: s.city,
+        raw: s.raw,
+        isKnown: s.isKnown,
+        lat: s.lat,
+        lon: s.lon,
+        startT: s.startT,
+        endT: s.endT,
+        durMin: s.durMin,
+        distBaseKm: s.distBaseKm,
+      }));
+
+    const locNames = mergedStops.map((s) => s.name);
+    const routeSummary =
+      locNames.length > 0 ? locNames.join(' ➔ ') : matchedPoints.map((p) => p.name).join(' ➔ ');
+
+    const totalMileageKm =
+      legs.length > 0
+        ? legs.reduce((sum, l) => sum + l.km, 0)
+        : initialStartOdo && finalEndOdo
+          ? Math.max(0, Math.round(finalEndOdo - initialStartOdo))
+          : 0;
 
     const result: DetectedTripRoute = {
       visitedShaytanka: false,
@@ -573,14 +718,19 @@ export async function detectTripStopsAndRoute(
       visitedKarpinsk: false,
       visitedVorontsovka: false,
       hasUnloaded: false,
+      hasDepartedWest,
       loadingAddress: null,
       unloadingAddress: null,
       clientId: null,
       clientName: null,
       cargoName: null,
       priceWithoutVat: null,
-      distinctLocationsCount: distinctLocations.length,
+      distinctLocationsCount: matchedPoints.length,
       points: matchedPoints,
+      legs,
+      totalMileageKm,
+      startOdometer: initialStartOdo || undefined,
+      endOdometer: finalEndOdo || undefined,
       routeSummary,
     };
 
@@ -785,6 +935,8 @@ export async function syncValdaiTelematics(
         vehicleId: asset.id,
         odometer: effectiveOdo,
         timestamp: new Date().toISOString(),
+        lat: pos.lat,
+        lon: pos.lon,
       });
       eventsTriggered.push({
         event: 'departure',
@@ -824,6 +976,7 @@ export async function syncValdaiTelematics(
           baseLat,
           baseLon,
           baseRadius,
+          pos.regNumber,
         );
         const isShaytanka =
           Boolean(route?.visitedShaytanka) ||
@@ -843,6 +996,10 @@ export async function syncValdaiTelematics(
                 ? `Шайтанка ➔ ${arrivingOrder.unloading_address_json.raw}`
                 : 'Шайтанка ➔ с. Маминское, склад 2');
 
+          const isUnloaded = Boolean(route?.hasUnloaded);
+          const hasDepartedWest = Boolean(route?.hasDepartedWest);
+          const isTransitArrival = !isUnloaded && !hasDepartedWest;
+
           await supabase
             .from('orders')
             .update({
@@ -852,8 +1009,9 @@ export async function syncValdaiTelematics(
                 visited_maminskoe: Boolean(
                   arrivingOrder.raw_parser_payload?.visited_maminskoe || route?.visitedMaminskoe,
                 ),
-                has_unloaded: true,
-                prevent_salda_auto_finish: false,
+                has_unloaded: isUnloaded,
+                has_departed_west: hasDepartedWest,
+                prevent_salda_auto_finish: isTransitArrival,
                 detected_route_summary: finalRouteDesc,
                 detected_points_count: finalPointsCount,
               },
@@ -874,6 +1032,16 @@ export async function syncValdaiTelematics(
               updated_at: new Date().toISOString(),
             })
             .eq('id', arrivingOrder.id);
+
+          // Обновляем структурированный маршрутный лист в заметке рейса
+          if (route?.legs && route.legs.length > 0) {
+            const curNote = (arrivingTrip as any).driver_note || '';
+            const updatedNote = encodeTripRouteSheet(route.legs, curNote, true);
+            await supabase
+              .from('trips')
+              .update({ driver_note: updatedNote })
+              .eq('id', arrivingTrip.id);
+          }
 
           // Синхронизируем существующий или новый trip_orders перед финишем
           const { data: curTo } = await supabase
@@ -902,6 +1070,8 @@ export async function syncValdaiTelematics(
         timestamp: new Date().toISOString(),
         isInsideBase: true,
         distanceFromBaseKm: pos.distanceFromBaseKm,
+        lat: stateData.last_lat ?? pos.lat,
+        lon: stateData.last_lon ?? pos.lon,
       });
       eventsTriggered.push({
         event: 'arrival',
@@ -929,6 +1099,26 @@ export async function syncValdaiTelematics(
       ) as { id: string; started_at?: string; driver_note?: string | null } | undefined;
 
       if (activeOrder && tripObj?.started_at) {
+        // Снятие транзитного флага при выходе на Тагил (на запад, lon < 60.35):
+        if (pos.lon < 60.35 && !activeOrder.raw_parser_payload?.has_departed_west) {
+          console.log(
+            `[Wialon Tracker] 🧭 Валдай ${pos.regNumber} вышел на трассу в сторону Нижнего Тагила (lon=${pos.lon}). Транзитный статус СНЯТ.`,
+          );
+          await supabase
+            .from('orders')
+            .update({
+              raw_parser_payload: {
+                ...(activeOrder.raw_parser_payload || {}),
+                has_departed_west: true,
+                transit_allowed: false,
+                prevent_salda_auto_finish: false,
+                departed_west_at: new Date().toISOString(),
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', activeOrder.id);
+        }
+
         // Автоматический опрос остановок трека Wialon:
         // Смотрим историю до 36 часов назад, чтобы не потерять вечернюю погрузку в Шайтанке перед ночёвкой на базе!
         const tripStartTs = new Date(tripObj.started_at).getTime();
@@ -946,6 +1136,7 @@ export async function syncValdaiTelematics(
           baseLat,
           baseLon,
           baseRadius,
+          pos.regNumber,
         );
 
         // Проверка: находится ли машина прямо сейчас в Шайтанке или Маминском
@@ -1014,7 +1205,10 @@ export async function syncValdaiTelematics(
                 has_unloaded: Boolean(
                   activeOrder.raw_parser_payload?.has_unloaded || routeInfo?.hasUnloaded,
                 ),
-                prevent_salda_auto_finish: !routeInfo?.hasUnloaded,
+                has_departed_west: Boolean(
+                  activeOrder.raw_parser_payload?.has_departed_west || routeInfo?.hasDepartedWest,
+                ),
+                prevent_salda_auto_finish: !routeInfo?.hasUnloaded && !routeInfo?.hasDepartedWest,
                 detected_route_summary: finalRouteSummary,
                 detected_points_count: currentPointsCount,
                 shaytanka_detected_at:
@@ -1094,13 +1288,13 @@ export async function syncValdaiTelematics(
               }
             }
 
-            const prevNote = tripObj.driver_note || '';
-            const newNoteEntry = `[Шайтанка (Геостройиндустрия ${dynamicPrice} ₽) ➔ ${finalRouteSummary}]`;
-            if (!prevNote.includes(newNoteEntry)) {
+            if (routeInfo?.legs && routeInfo.legs.length > 0) {
+              const curNote = tripObj.driver_note || '';
+              const updatedNote = encodeTripRouteSheet(routeInfo.legs, curNote, true);
               await supabase
                 .from('trips')
                 .update({
-                  driver_note: prevNote ? `${prevNote}\n${newNoteEntry}` : newNoteEntry,
+                  driver_note: updatedNote,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', tripObj.id);
@@ -1134,35 +1328,23 @@ export async function syncValdaiTelematics(
               console.log(
                 `[Wialon Tracker] 🔄 Обнаружен промежуточный транзит через Салду для ${pos.regNumber} в ${transitTimeStr} (${(visit.distanceMeters / 1000).toFixed(2)} км от базы)`,
               );
-              const prevNote = tripObj.driver_note || '';
-              const noteEntry = `[Промежуточный транзит Салда: ${transitTimeStr}, одометр: ${effectiveOdo} км]`;
-              if (!prevNote.includes(noteEntry)) {
-                await supabase
-                  .from('trips')
-                  .update({
-                    driver_note: `${prevNote}\n${noteEntry}`.trim(),
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', tripObj.id);
+              await supabase
+                .from('orders')
+                .update({
+                  raw_parser_payload: {
+                    ...(activeOrder.raw_parser_payload || {}),
+                    salda_transit_count: saldaTransitCount + 1,
+                    last_transit_checked_at: nowSec,
+                  },
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', activeOrder.id);
 
-                await supabase
-                  .from('orders')
-                  .update({
-                    raw_parser_payload: {
-                      ...(activeOrder.raw_parser_payload || {}),
-                      salda_transit_count: saldaTransitCount + 1,
-                      last_transit_checked_at: nowSec,
-                    },
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', activeOrder.id);
-
-                eventsTriggered.push({
-                  event: 'transit_logged',
-                  regNumber: pos.regNumber,
-                  transitTimeStr,
-                });
-              }
+              eventsTriggered.push({
+                event: 'transit_logged',
+                regNumber: pos.regNumber,
+                transitTimeStr,
+              });
             }
           }
         }
