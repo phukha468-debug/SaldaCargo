@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isMeaningfulDriverComment } from '@saldacargo/shared';
 
 export interface AssignVehicleParams {
   orderId: string;
@@ -813,9 +814,9 @@ export async function handleVehicleArrival(
       .maybeSingle();
 
     if (existingTo) {
-      const finalRouteDesc = order.raw_parser_payload?.detected_route_summary
-        ? 'Керн Геостройиндустрия'
-        : existingTo.description;
+      const cleanDesc = isMeaningfulDriverComment(existingTo.description)
+        ? existingTo.description
+        : null;
 
       await supabase
         .from('trip_orders')
@@ -823,7 +824,7 @@ export async function handleVehicleArrival(
           counterparty_id: resolvedClientId || undefined,
           amount: order.price_without_vat || existingTo.amount || 0,
           driver_pay: totalDriverPay,
-          description: finalRouteDesc || existingTo.description,
+          description: cleanDesc,
           invoice_number: invNumber || undefined,
           invoice_date: invDate || undefined,
           invoice_status: invNumber ? 'issued' : 'unbilled',
@@ -831,14 +832,10 @@ export async function handleVehicleArrival(
         })
         .eq('id', existingTo.id);
     } else {
-      const defaultDesc = order.raw_parser_payload?.detected_route_summary
-        ? 'Керн Геостройиндустрия'
-        : `Заявка ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Груз'} (${distanceKm} км)`;
-
       const { error: tripOrderErr } = await supabase.from('trip_orders').insert({
         trip_id: trip.id,
         counterparty_id: resolvedClientId,
-        description: defaultDesc,
+        description: null,
         amount: order.price_without_vat || 0,
         driver_pay: totalDriverPay,
         payment_method: 'bank_invoice',

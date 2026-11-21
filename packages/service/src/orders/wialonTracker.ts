@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { handleVehicleDeparture, handleVehicleArrival } from './wialonOrderSync';
-import { TripRouteLeg, encodeTripRouteSheet } from '@saldacargo/shared';
+import { TripRouteLeg, encodeTripRouteSheet, isMeaningfulDriverComment } from '@saldacargo/shared';
 
 // Координаты центра Верхней Салды и радиус границы города (в метрах)
 const SALDA_BASE_LAT = parseFloat(process.env.WIALON_BASE_LAT || '58.053');
@@ -1049,11 +1049,14 @@ export async function syncValdaiTelematics(
             .maybeSingle();
 
           if (curTo) {
+            const cleanDesc = isMeaningfulDriverComment(curTo.description)
+              ? curTo.description
+              : null;
             await supabase
               .from('trip_orders')
               .update({
                 amount: finalPrice,
-                description: `Керн Геостройиндустрия${arrivingOrder.base_doc_number ? ` (Рейс №${arrivingOrder.base_doc_number})` : ''}`,
+                description: cleanDesc,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', curTo.id);
@@ -1240,11 +1243,14 @@ export async function syncValdaiTelematics(
               .maybeSingle();
 
             if (existingTo) {
+              const cleanDesc = isMeaningfulDriverComment(existingTo.description)
+                ? existingTo.description
+                : null;
               await supabase
                 .from('trip_orders')
                 .update({
                   amount: dynamicPrice,
-                  description: `Керн Геостройиндустрия${activeOrder.base_doc_number ? ` (Рейс №${activeOrder.base_doc_number})` : ''}`,
+                  description: cleanDesc,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', existingTo.id);
@@ -1254,7 +1260,7 @@ export async function syncValdaiTelematics(
                 .insert({
                   trip_id: tripObj.id,
                   counterparty_id: GEOSTROY_CLIENT_ID,
-                  description: `Керн Геостройиндустрия${activeOrder.base_doc_number ? ` (Рейс №${activeOrder.base_doc_number})` : ''}`,
+                  description: null,
                   amount: dynamicPrice,
                   driver_pay: 7900,
                   driver_car_pay: 0,

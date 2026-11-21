@@ -3,9 +3,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { Money } from '@saldacargo/ui';
+import { Money, TripRouteSheet, cn } from '@saldacargo/ui';
 import { formatPhone } from '@saldacargo/shared';
-import { cn } from '@saldacargo/ui';
 import { DriverDocuments } from '@/components/DriverDocuments';
 import { PayslipModal } from './payslip-modal';
 import { AccountableSection } from './accountable-section';
@@ -2379,16 +2378,10 @@ function TripViewModal({
                 </div>
               </div>
 
-              {/* Примечание водителя */}
+              {/* Примечание водителя / Маршрутный лист */}
               {trip.driver_note && (
-                <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 space-y-1">
-                  <div className="text-[10px] font-black uppercase tracking-wider text-indigo-800 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">edit_note</span>
-                    Примечание водителя по рейсу
-                  </div>
-                  <p className="text-xs font-semibold text-indigo-950 leading-relaxed whitespace-pre-line">
-                    {trip.driver_note}
-                  </p>
+                <div className="mb-2">
+                  <TripRouteSheet driverNote={trip.driver_note} />
                 </div>
               )}
 

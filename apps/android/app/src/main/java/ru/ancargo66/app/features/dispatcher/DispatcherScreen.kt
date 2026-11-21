@@ -36,6 +36,7 @@ import ru.ancargo66.app.core.model.*
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.components.BottomNavItem
 import ru.ancargo66.app.ui.components.SaldaBottomNav
+import ru.ancargo66.app.ui.components.TripRouteSheetView
 import ru.ancargo66.app.ui.theme.swipeToBack
 import androidx.activity.compose.BackHandler
 import ru.ancargo66.app.features.auth.PinScreen
@@ -1257,7 +1258,7 @@ fun DispatcherScreen(
                                                                 fontWeight = FontWeight.Bold,
                                                                 color = Zinc900
                                                             )
-                                                            if (!ord.description.isNullOrBlank()) {
+                                                            if (!ord.description.isNullOrBlank() && isMeaningfulDriverComment(ord.description)) {
                                                                 Spacer(modifier = Modifier.height(3.dp))
                                                                 Surface(
                                                                     color = Color(0xFFFEF3C7),
@@ -1345,12 +1346,8 @@ fun DispatcherScreen(
                                         )
                                     }
                                     if (!trip.driverNote.isNullOrBlank()) {
-                                        Text(
-                                            text = "💬 ${trip.driverNote}",
-                                            fontSize = 11.sp,
-                                            color = Color(0xFFB45309),
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        TripRouteSheetView(driverNote = trip.driverNote, initialExpanded = false)
                                     }
 
                                     Spacer(modifier = Modifier.height(12.dp))

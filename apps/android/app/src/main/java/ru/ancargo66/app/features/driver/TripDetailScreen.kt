@@ -28,6 +28,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import ru.ancargo66.app.core.model.*
+import ru.ancargo66.app.ui.components.TripRouteSheetView
 import ru.ancargo66.app.core.network.SaldaApiClient
 import ru.ancargo66.app.ui.theme.*
 import ru.ancargo66.app.ui.theme.bouncyClick
@@ -656,7 +657,7 @@ fun TripDetailScreen(
 
                                 // 2-я строчка максимум: примечание или грузчики если есть
                                 val extraInfo = buildList {
-                                    if (!ord.description.isNullOrBlank() && ord.counterparty?.name != null) add(ord.description)
+                                    if (!ord.description.isNullOrBlank() && ord.counterparty?.name != null && isMeaningfulDriverComment(ord.description)) add(ord.description)
                                     if (ord.loadersData.isNotEmpty()) {
                                         val lStr = ord.loadersData.joinToString { "${it.name ?: "Грузчик"}: ${it.pay} ₽" }
                                         add("👷 $lStr")
@@ -758,26 +759,7 @@ fun TripDetailScreen(
 
                 if (!trip.driverNote.isNullOrBlank()) {
                     item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
-                            shape = RoundedCornerShape(10.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A))
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("💬", fontSize = 18.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text("Заметка водителя:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB45309))
-                                    Text(trip.driverNote, fontSize = 13.sp, color = Zinc900)
-                                }
-                            }
-                        }
+                        TripRouteSheetView(driverNote = trip.driverNote)
                     }
                 }
 

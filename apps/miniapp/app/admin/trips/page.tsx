@@ -6,7 +6,13 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { Money, LifecycleBadge, TripRouteSheet, cn } from '@saldacargo/ui';
-import { formatDate, formatTime, isInternalCounterparty, isTruckAsset } from '@saldacargo/shared';
+import {
+  formatDate,
+  formatTime,
+  isInternalCounterparty,
+  isTruckAsset,
+  isMeaningfulDriverComment,
+} from '@saldacargo/shared';
 import { CreatePrrModal } from '@/components/CreatePrrModal';
 import { SmartTripOrderModal } from '@/components/SmartTripOrderModal';
 
@@ -1637,7 +1643,7 @@ function HistoryTripCard({
                       <p className="text-sm font-semibold text-zinc-900 truncate">
                         {order.counterparty?.name ?? `Заявка ${i + 1}`}
                       </p>
-                      {order.description && (
+                      {isMeaningfulDriverComment(order.description) && (
                         <div className="mt-0.5 p-1.5 bg-amber-50 border border-amber-200/90 rounded text-[11px] text-amber-950 font-medium line-clamp-2">
                           <span className="font-bold text-amber-900">💬 Водитель:</span>{' '}
                           {order.description}

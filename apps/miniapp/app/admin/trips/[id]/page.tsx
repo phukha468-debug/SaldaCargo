@@ -4,8 +4,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { Money, LifecycleBadge } from '@saldacargo/ui';
-import { formatDate, auditTripFuel } from '@saldacargo/shared';
+import { Money, LifecycleBadge, TripRouteSheet } from '@saldacargo/ui';
+import { formatDate, auditTripFuel, isMeaningfulDriverComment } from '@saldacargo/shared';
 import { getDirectionLabel } from '@saldacargo/domain-payroll';
 import { SmartTripOrderModal } from '@/components/SmartTripOrderModal';
 
@@ -287,11 +287,8 @@ export default function AdminTripDetailPage() {
             </details>
           )}
           {trip.driver_note && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
-              <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">
-                Заметка водителя
-              </p>
-              <p className="text-sm text-amber-900 mt-1">{trip.driver_note}</p>
+            <div className="mt-2">
+              <TripRouteSheet driverNote={trip.driver_note} defaultExpanded={true} />
             </div>
           )}
         </section>
@@ -473,7 +470,7 @@ export default function AdminTripDetailPage() {
                       </span>
                     )}
                   </div>
-                  {order.description && (
+                  {isMeaningfulDriverComment(order.description) && (
                     <div className="mt-1 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-950 flex items-start gap-1.5">
                       <span className="shrink-0 text-sm">💬</span>
                       <div>

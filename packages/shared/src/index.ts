@@ -1987,7 +1987,7 @@ export function parseTripRouteSheet(note: string | null | undefined): ParsedTrip
   let endOdo: number | undefined;
   let routeSummary = '';
 
-  const legsMatch = raw.match(/\[ROUTE_LEGS:(\[.*?\])\]/s);
+  const legsMatch = raw.match(/\[ROUTE_LEGS:(\[.*?\])\]/s) || raw.match(/\[ROUTE_LEGS:(.+?)\]\]/s);
   if (legsMatch && legsMatch[1]) {
     try {
       legs = JSON.parse(legsMatch[1]);
@@ -2009,6 +2009,8 @@ export function parseTripRouteSheet(note: string | null | undefined): ParsedTrip
   // Очистка заметки от технического JSON и старых многословных предупреждений
   let cleanNote = raw
     .replace(/\[ROUTE_LEGS:\[.*?\]\]/s, '')
+    .replace(/\[ROUTE_LEGS:.*?\]\]/s, '')
+    .replace(/\[ROUTE_LEGS:.*?\]/s, '')
     .replace(
       /⚠️\s*Внимание:\s*Автомашина выехала без заявки по геозоне Wialon! Поля заявки пустые, требуется заполнение\.?/gi,
       '',
@@ -2073,4 +2075,22 @@ export function encodeTripRouteSheet(
   parts.push(legsPayload);
 
   return parts.join('\n').trim();
+}
+
+/**
+ * Проверяет, является ли комментарий/замечание водителя к заказу содержательным.
+ * Отсеивает технические авто-заглушки Wialon/системы (например, 'Керн Геостройиндустрия', 'Заявка ...').
+ */
+export function isMeaningfulDriverComment(comment: string | null | undefined): boolean {
+  if (!comment) return false;
+  const trimmed = comment.trim();
+  if (!trimmed) return false;
+
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('керн геостройиндустрия')) return false;
+  if (lower.startsWith('заявка ооо "геостройиндустрия"')) return false;
+  if (lower.startsWith('заявка ооо «геостройиндустрия»')) return false;
+  if (/^заявка\s+.*?:\s+.*?\(.*?км\)$/i.test(trimmed)) return false;
+
+  return true;
 }
