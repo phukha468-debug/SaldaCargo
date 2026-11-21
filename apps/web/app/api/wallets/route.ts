@@ -7,6 +7,7 @@ const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
 const FUEL_CARD_ID = '10000000-0000-0000-0000-000000000004';
 const GARAGE_ID = '10000000-0000-0000-0000-000000000005';
+const FUEL_CUBE_ID = '10000000-0000-0000-0000-000000000006';
 const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 
 const sum = (rows: any[]) =>
@@ -149,6 +150,18 @@ export async function GET(request?: Request) {
         .eq('from_wallet_id', GARAGE_ID)
         .eq('lifecycle_status', 'approved')
         .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('to_wallet_id', FUEL_CUBE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
+
+      (supabase.from('transactions') as any)
+        .select('amount')
+        .eq('from_wallet_id', FUEL_CUBE_ID)
+        .eq('lifecycle_status', 'approved')
+        .eq('settlement_status', 'completed'),
     ]);
 
     const bankInWithoutOrders = (bankIn ?? [])
@@ -176,6 +189,11 @@ export async function GET(request?: Request) {
 
     const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 
+    // Кубик 1000л (дизель): закупка 60 ₽/л
+    const totalCubeIn = sum(cubeIn ?? []);
+    const cubeBalance = Math.max(0, totalCubeIn - sum(cubeOut ?? []));
+    const cubeLiters = Math.round(cubeBalance / 60);
+
     const result = {
       bank: {
         name: 'Расчётный счёт',
@@ -188,6 +206,13 @@ export async function GET(request?: Request) {
       },
       cash: { name: 'Сейф (Наличные ТК)', balance: cashBalance.toFixed(2) },
       fuel_card: { name: 'Топливные карты (ГСМ)', balance: fuelBalance.toFixed(2) },
+      fuel_cube: {
+        id: FUEL_CUBE_ID,
+        name: 'Кубик (Дизель База)',
+        balance: cubeBalance.toFixed(2),
+        liters: cubeLiters,
+        price_per_liter: 60,
+      },
       garage: {
         id: GARAGE_ID,
         name: 'Касса Гаража (СТО)',

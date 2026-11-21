@@ -236,10 +236,8 @@ export async function GET(request: Request) {
 
     const garageBalance = sum(garageIn ?? []) - sum(garageOut ?? []);
 
-    // Кубик 1000л (дизель): начальная закупка 60 000 ₽ (1000л по 60 ₽/л) плюс пополнения минус списания
-    const baseCubePurchased = 60000;
-    const recordedCubeIn = sum(cubeIn ?? []);
-    const totalCubeIn = recordedCubeIn > 0 ? recordedCubeIn : baseCubePurchased;
+    // Кубик 1000л (дизель): закупка 60 ₽/л
+    const totalCubeIn = sum(cubeIn ?? []);
     const cubeBalance = Math.max(0, totalCubeIn - sum(cubeOut ?? []));
     const cubeLiters = Math.round(cubeBalance / 60);
 
