@@ -814,7 +814,7 @@ export async function handleVehicleArrival(
 
     if (existingTo) {
       const finalRouteDesc = order.raw_parser_payload?.detected_route_summary
-        ? `Маршрут: ${order.raw_parser_payload.detected_route_summary} | Керн Геостройиндустрия`
+        ? 'Керн Геостройиндустрия'
         : existingTo.description;
 
       await supabase
@@ -832,7 +832,7 @@ export async function handleVehicleArrival(
         .eq('id', existingTo.id);
     } else {
       const defaultDesc = order.raw_parser_payload?.detected_route_summary
-        ? `Маршрут: ${order.raw_parser_payload.detected_route_summary} | Керн Геостройиндустрия`
+        ? 'Керн Геостройиндустрия'
         : `Заявка ${order.base_doc_number || order.order_number}: ${order.cargo_name || 'Груз'} (${distanceKm} км)`;
 
       const { error: tripOrderErr } = await supabase.from('trip_orders').insert({

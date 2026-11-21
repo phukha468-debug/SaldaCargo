@@ -747,9 +747,8 @@ export async function detectTripStopsAndRoute(
         result.clientId = GEOSTROY_CLIENT_ID;
         result.clientName = 'ООО "Геостройиндустрия"';
         result.cargoName = 'Пробы керна (Шайтанка)';
-        // 2 точки (Шайтанка-Маминское/Карпинск) = 40к, 3 точки = 50к, 4+ точки = 60к
-        result.priceWithoutVat =
-          matchedPoints.length >= 4 ? 60000 : matchedPoints.length >= 3 ? 50000 : 40000;
+        // Фиксированная базовая ставка Шайтанка ↔ Маминское: 40 000 ₽ (без динамических накруток)
+        result.priceWithoutVat = 40000;
       } else {
         result.loadingAddress = { city: firstLoc.city, raw: firstLoc.raw };
       }
@@ -985,9 +984,7 @@ export async function syncValdaiTelematics(
         if (isShaytanka) {
           const finalPointsCount =
             route?.points?.length || (arrivingOrder.raw_parser_payload?.detected_points_count ?? 2);
-          const finalPrice =
-            route?.priceWithoutVat ||
-            (finalPointsCount >= 4 ? 60000 : finalPointsCount >= 3 ? 50000 : 40000);
+          const finalPrice = route?.priceWithoutVat || 40000;
           const finalRouteDesc =
             route?.routeSummary ||
             (route?.unloadingAddress?.raw
@@ -1056,7 +1053,7 @@ export async function syncValdaiTelematics(
               .from('trip_orders')
               .update({
                 amount: finalPrice,
-                description: `Маршрут: ${finalRouteDesc} | Керн Геостройиндустрия (Рейс №${arrivingOrder.base_doc_number || ''})`,
+                description: `Керн Геостройиндустрия${arrivingOrder.base_doc_number ? ` (Рейс №${arrivingOrder.base_doc_number})` : ''}`,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', curTo.id);
@@ -1164,9 +1161,7 @@ export async function syncValdaiTelematics(
           const wasVisited = Boolean(activeOrder.raw_parser_payload?.visited_shaytanka);
           const currentPointsCount = routeInfo?.points?.length || 2;
           const prevPointsCount = activeOrder.raw_parser_payload?.detected_points_count ?? 2;
-          const dynamicPrice =
-            routeInfo?.priceWithoutVat ||
-            (currentPointsCount >= 4 ? 60000 : currentPointsCount >= 3 ? 50000 : 40000);
+          const dynamicPrice = routeInfo?.priceWithoutVat || 40000;
           const priceOrRouteChanged =
             currentPointsCount > prevPointsCount ||
             (activeOrder.price_without_vat && dynamicPrice !== activeOrder.price_without_vat);
@@ -1249,7 +1244,7 @@ export async function syncValdaiTelematics(
                 .from('trip_orders')
                 .update({
                   amount: dynamicPrice,
-                  description: `Маршрут: ${finalRouteSummary} | Керн Геостройиндустрия (Рейс №${activeOrder.base_doc_number || ''})`,
+                  description: `Керн Геостройиндустрия${activeOrder.base_doc_number ? ` (Рейс №${activeOrder.base_doc_number})` : ''}`,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', existingTo.id);
@@ -1259,7 +1254,7 @@ export async function syncValdaiTelematics(
                 .insert({
                   trip_id: tripObj.id,
                   counterparty_id: GEOSTROY_CLIENT_ID,
-                  description: `Маршрут: ${finalRouteSummary} | Керн Геостройиндустрия (Рейс №${activeOrder.base_doc_number || ''})`,
+                  description: `Керн Геостройиндустрия${activeOrder.base_doc_number ? ` (Рейс №${activeOrder.base_doc_number})` : ''}`,
                   amount: dynamicPrice,
                   driver_pay: 7900,
                   driver_car_pay: 0,

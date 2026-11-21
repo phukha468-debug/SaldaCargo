@@ -1771,7 +1771,7 @@ function HistoryTripCard({
           {/* Маршрутный лист и заметка водителя (Dense 1-Row Priority) */}
           {trip.driver_note && (
             <div className="px-4 py-1.5 border-t border-zinc-100">
-              <TripRouteSheet driverNote={trip.driver_note} />
+              <TripRouteSheet driverNote={trip.driver_note} defaultExpanded={false} />
             </div>
           )}
 

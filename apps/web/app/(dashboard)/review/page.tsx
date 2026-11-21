@@ -2594,17 +2594,26 @@ function TripCard({
                             </span>
                           )}
                         </div>
-                        {order.description && (
-                          <div className="mt-1 text-xs font-semibold text-amber-950 bg-amber-50 border border-amber-300 rounded-lg p-2 max-w-sm shadow-2xs">
-                            <div className="flex items-center gap-1 text-[10px] font-black text-amber-900 uppercase tracking-tight mb-0.5">
-                              <span>💬</span>
-                              <span>Замечание / комментарий водителя:</span>
+                        {(() => {
+                          const rawDesc = String(order.description || '').trim();
+                          // Отсекаем повторы маршрутов, т.к. маршрутный лист отображается в отдельной таблице
+                          const cleanDesc = rawDesc
+                            .replace(/^Маршрут:.*?\|\s*/i, '')
+                            .replace(/^\[.*?➔.*?\]\s*/, '')
+                            .trim();
+                          if (!cleanDesc) return null;
+                          return (
+                            <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-600 max-w-sm">
+                              <span
+                                className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 bg-slate-100 hover:bg-slate-200/80 px-2 py-0.5 rounded border border-slate-200 transition-colors truncate"
+                                title={cleanDesc}
+                              >
+                                <span className="text-slate-400">📦</span>
+                                <span className="truncate">{cleanDesc}</span>
+                              </span>
                             </div>
-                            <div className="text-slate-800 font-medium whitespace-pre-wrap text-xs">
-                              {order.description}
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </td>
                       <td className="px-5 py-3 text-sm font-bold text-slate-800">
                         <Money amount={order.amount} />

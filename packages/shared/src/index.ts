@@ -2019,6 +2019,10 @@ export function parseTripRouteSheet(note: string | null | undefined): ParsedTrip
     .replace(/\[ПЕРЕНОС НАЛИЧНЫХ.*?\]/g, '')
     .replace(/\[WIALON_STATE:.*?\]/g, '')
     .replace(/\[WIALON_AUDIT:.*?\]/g, '')
+    .replace(/\[Шайтанка.*?\]/g, '')
+    .replace(/\[.*?➔.*?\]/g, '')
+    .replace(/⚡\s*Автовыезд/g, '')
+    .replace(/\[АВТОВЫЕЗД\]/g, '')
     .trim();
 
   // Удаляем дублирующиеся пробелы и переносы
@@ -2050,6 +2054,10 @@ export function encodeTripRouteSheet(
       /⚠️\s*Внимание:\s*Автомашина выехала без заявки по геозоне Wialon! Поля заявки пустые, требуется заполнение\.?/gi,
       '',
     )
+    .replace(/\[Шайтанка.*?\]/g, '')
+    .replace(/\[.*?➔.*?\]/g, '')
+    .replace(/⚡\s*Автовыезд/g, '')
+    .replace(/\[АВТОВЫЕЗД\]/g, '')
     .trim();
 
   const autoPrefix = isAuto ? '⚡ Автовыезд' : '';

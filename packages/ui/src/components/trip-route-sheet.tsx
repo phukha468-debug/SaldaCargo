@@ -13,7 +13,7 @@ export interface TripRouteSheetProps {
 export function TripRouteSheet({
   driverNote,
   className,
-  defaultExpanded = false,
+  defaultExpanded = true,
 }: TripRouteSheetProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
