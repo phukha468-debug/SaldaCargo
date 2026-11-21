@@ -89,6 +89,8 @@ export async function GET(request?: Request) {
       { data: fuelOutAfterAudit },
       { data: garageIn },
       { data: garageOut },
+      { data: cubeIn },
+      { data: cubeOut },
     ] = await Promise.all([
       (supabase.from('trip_orders') as any)
         .select('amount')
