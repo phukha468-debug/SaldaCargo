@@ -183,6 +183,10 @@ export async function reverseGeocodePoint(
 export const WIALON_ODOMETER_OFFSETS: Record<string, number> = {
   А096МВ196: 266504,
   '11873': 266504,
+  О188ТА196: 434,
+  '11876': 434,
+  У446ВН96: 184202,
+  '11875': 184202,
 };
 
 export function calibrateWialonOdometer(regOrUnit: string, rawKm: number): number {
@@ -203,7 +207,7 @@ export function calibrateWialonOdometer(regOrUnit: string, rawKm: number): numbe
     .replace(/Y/g, 'У')
     .replace(/X/g, 'Х');
   const offset = WIALON_ODOMETER_OFFSETS[clean] || WIALON_ODOMETER_OFFSETS[regOrUnit] || 0;
-  if (offset > 0 && rawKm < 300000) {
+  if (offset > 0 && rawKm < 600000) {
     return rawKm + offset;
   }
   return rawKm;
@@ -965,6 +969,8 @@ export async function syncValdaiTelematics(
         Array.isArray(arrivingOrder?.trip) ? arrivingOrder.trip[0] : arrivingOrder?.trip
       ) as { id: string; started_at?: string } | undefined;
 
+      let detectedRoute: DetectedTripRoute | null = null;
+
       if (arrivingOrder && arrivingTrip?.started_at) {
         const route = await detectTripStopsAndRoute(
           cleanHost,
@@ -977,6 +983,7 @@ export async function syncValdaiTelematics(
           baseRadius,
           pos.regNumber,
         );
+        detectedRoute = route;
         const isShaytanka =
           Boolean(route?.visitedShaytanka) ||
           Boolean(arrivingOrder.raw_parser_payload?.visited_shaytanka);
@@ -1072,6 +1079,10 @@ export async function syncValdaiTelematics(
         distanceFromBaseKm: pos.distanceFromBaseKm,
         lat: stateData.last_lat ?? pos.lat,
         lon: stateData.last_lon ?? pos.lon,
+        tripDistanceKm:
+          detectedRoute?.totalMileageKm && detectedRoute.totalMileageKm > 20
+            ? detectedRoute.totalMileageKm
+            : undefined,
       });
       eventsTriggered.push({
         event: 'arrival',

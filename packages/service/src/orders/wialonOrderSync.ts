@@ -363,6 +363,7 @@ export interface VehicleArrivalParams {
   distanceFromBaseKm?: number;
   lat?: number;
   lon?: number;
+  tripDistanceKm?: number;
 }
 
 /**
@@ -523,14 +524,44 @@ export async function handleVehicleArrival(
   }
 
   const odoStart = trip.odometer_start || params.odometer;
-  const odoEnd = Math.max(odoStart, params.odometer);
-  const distanceKm = Math.max(1, odoEnd - odoStart);
+  let odoEnd = Math.max(odoStart, params.odometer);
+  let distanceKm = Math.max(1, odoEnd - odoStart);
+
+  // Защита от смешения шкал одометров Wialon и спидометра ТС:
+  // 1. Если трекер Wialon вычислил фактический пробег по путевым точкам/сообщениям (tripDistanceKm),
+  // и разница одометров получилась существенно меньше (например, из-за рассинхрона шкал),
+  // отдаем приоритет реальному треку Wialon.
+  if (params.tripDistanceKm && params.tripDistanceKm > distanceKm) {
+    console.log(
+      `[Wialon] ⚠️ Корректировка пробега: одометры дают ${distanceKm} км, а реальный трек рейса Wialon = ${params.tripDistanceKm} км. Применяем фактический пробег трека.`,
+    );
+    distanceKm = params.tripDistanceKm;
+    odoEnd = odoStart + distanceKm;
+  }
+
+  // Расчет продолжительности рейса в часах
+  const diffHours = Math.max(1, (arrivalDate.getTime() - startDate.getTime()) / (1000 * 3600));
+
+  // 2. Защитный санити-чек для рейсов Шайтанка-Маминское и дальних рейсов:
+  // Кругорейс Шайтанка-Маминское превышает 500-650 км. Если рассчитанный пробег оказался аномально мал (< 300 км),
+  // а рейс длился более 10 часов или зафиксирована выгрузка в Маминском — подтягиваем нормативный пробег.
+  if (
+    (isShaytankaRoute || order.raw_parser_payload?.visited_maminskoe) &&
+    distanceKm < 300 &&
+    (diffHours >= 10 || order.raw_parser_payload?.has_unloaded)
+  ) {
+    const fallbackKm = order.raw_parser_payload?.min_return_distance_km || 600;
+    console.warn(
+      `[Wialon] ⚠️ Зафиксирован рейс Шайтанка-Маминское с аномально низким пробегом (${distanceKm} км). Корректируем до ${fallbackKm} км.`,
+    );
+    distanceKm = fallbackKm;
+    odoEnd = odoStart + distanceKm;
+  }
 
   // Расчет продолжительности в днях для суточных:
   // 1. Если пробег меньше 100 км — суточных НЕТ (0 дн / 0 ₽).
   // 2. Ночные / вечерние погрузки с отстоем/ночевкой в Салде не считаются в суточные (водитель ночует дома).
   //    Время ночного отстоя на базе (~10-12 ч) вычитается из дорожного времени.
-  const diffHours = Math.max(1, (arrivalDate.getTime() - startDate.getTime()) / (1000 * 3600));
   const hadSaldaOvernight = Boolean(
     order.raw_parser_payload?.in_salda_transit !== undefined ||
     (order.raw_parser_payload?.salda_transit_count || 0) > 0 ||
