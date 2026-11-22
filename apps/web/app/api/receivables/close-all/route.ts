@@ -2,11 +2,8 @@
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createWebApiHandler } from '@/lib/api';
-import { invalidateWalletsCache } from '@saldacargo/domain-service';
+import { invalidateWalletsCache, resolveOrganizationFinanceIds } from '@saldacargo/domain-service';
 import { NextResponse } from 'next/server';
-
-const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
-const BANK_ID = '10000000-0000-0000-0000-000000000001';
 
 const closeAllSchema = z.object({
   orders: z
@@ -30,10 +27,12 @@ export const POST = createWebApiHandler(
   {
     routeName: 'web:/api/receivables/close-all',
     roles: ['admin', 'owner'],
+    requiredModule: 'finance',
     bodySchema: closeAllSchema,
   },
   async ({ body, auth }) => {
-    const toWalletId = body.to_wallet_id ?? BANK_ID;
+    const ids = resolveOrganizationFinanceIds(auth.orgSettings);
+    const toWalletId = body.to_wallet_id ?? ids.bankId;
     const cpName = body.counterparty_name ?? 'Должник';
     const supabase = createAdminClient();
     const adminId = auth.userId;
@@ -54,6 +53,7 @@ export const POST = createWebApiHandler(
             invoice_paid_at: nowIso,
             updated_at: nowIso,
           })
+          .eq('organization_id', auth.organizationId)
           .in(
             'id',
             tripOrders.map((o) => o.id),
@@ -67,6 +67,7 @@ export const POST = createWebApiHandler(
         (supabase as any)
           .from('manual_receivables')
           .update({ settled: true, settled_at: nowIso })
+          .eq('organization_id', auth.organizationId)
           .in(
             'id',
             manuals.map((o) => o.id),
@@ -81,6 +82,7 @@ export const POST = createWebApiHandler(
       const { data: ord } = await (supabase as any)
         .from('trip_orders')
         .select('counterparty_id')
+        .eq('organization_id', auth.organizationId)
         .eq('id', tripOrders[0].id)
         .single();
       if (ord?.counterparty_id) cpId = ord.counterparty_id;
@@ -89,6 +91,7 @@ export const POST = createWebApiHandler(
       const { data: man } = await (supabase as any)
         .from('manual_receivables')
         .select('counterparty_id')
+        .eq('organization_id', auth.organizationId)
         .eq('id', manuals[0].id)
         .single();
       if (man?.counterparty_id) cpId = man.counterparty_id;
@@ -104,8 +107,9 @@ export const POST = createWebApiHandler(
     });
 
     const { error: txErr } = await (supabase as any).from('transactions').insert({
+      organization_id: auth.organizationId,
       direction: 'income',
-      category_id: TRIP_REVENUE_CATEGORY,
+      category_id: ids.tripRevenueCat,
       amount: totalAmount,
       to_wallet_id: toWalletId,
       counterparty_id: cpId,
@@ -119,7 +123,7 @@ export const POST = createWebApiHandler(
 
     if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
 
-    invalidateWalletsCache();
+    invalidateWalletsCache(auth.organizationId);
     return NextResponse.json({ ok: true, paid: totalAmount, count: body.orders.length });
   },
 );

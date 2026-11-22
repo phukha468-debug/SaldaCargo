@@ -2,6 +2,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
+import { matchesAnyOrgPattern, type OrganizationSettings } from './orgSettings';
 
 /**
  * Генерирует детерминированный UUID на основе сида (строки).
@@ -108,10 +109,19 @@ export interface TripPeriodFormat {
  */
 export function isWialonGpsAsset(
   asset?: { reg_number?: string | null; short_name?: string | null } | string | null,
+  orgSettings?: OrganizationSettings,
 ): boolean {
   if (!asset) return false;
   const reg = typeof asset === 'string' ? asset : asset.reg_number || asset.short_name || '';
   const clean = reg.replace(/[\s\-_]/g, '').toUpperCase();
+  if (orgSettings) {
+    const plates = orgSettings.fleet_rules.wialon_gps_plates;
+    if (plates.length === 0) return false;
+    return plates.some((plate) => {
+      const normalizedPlate = plate.replace(/[\s\-_]/g, '').toUpperCase();
+      return normalizedPlate.length > 0 && clean.includes(normalizedPlate);
+    });
+  }
   return (
     clean.includes('096') || clean.includes('188') || clean.includes('446') || clean.includes('883')
   );
@@ -720,6 +730,7 @@ export const NO_CASH_COUNTERPARTY_PATTERNS: RegExp[] = [
  */
 export function isNoCashCounterparty(
   cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
+  orgSettings?: OrganizationSettings,
 ): boolean {
   if (!cp) return false;
   if (typeof cp === 'object' && cp?.is_legal_entity) return true;
@@ -727,6 +738,9 @@ export function isNoCashCounterparty(
   if (!name || typeof name !== 'string') return false;
   const trimmed = name.trim();
   if (!trimmed) return false;
+  if (orgSettings) {
+    return matchesAnyOrgPattern(trimmed, orgSettings.counterparty_rules.no_cash_patterns);
+  }
   return NO_CASH_COUNTERPARTY_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
@@ -787,8 +801,14 @@ export function resolveKnownMasterCounterpartyId(
  * Проверяет, является ли контрагент одним из строгих документооборотных заказчиков (ВСМПО, Ависма, Геостройиндустрия).
  * Для них после завершения рейса всегда обязателен этап сбора документов (docs_collection).
  */
-export function isStrictDocCounterparty(name?: string | null): boolean {
+export function isStrictDocCounterparty(
+  name?: string | null,
+  orgSettings?: OrganizationSettings,
+): boolean {
   if (!name) return false;
+  if (orgSettings) {
+    return matchesAnyOrgPattern(name, orgSettings.counterparty_rules.strict_doc_patterns);
+  }
   const n = name.toLowerCase();
   return n.includes('всмпо') || n.includes('ависма') || n.includes('геострой');
 }
@@ -814,12 +834,16 @@ export function isDebtPaymentMethod(paymentMethod?: string | null): boolean {
  */
 export function isTerritoryCounterparty(
   cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
+  orgSettings?: OrganizationSettings,
 ): boolean {
   if (!cp) return false;
   const name = typeof cp === 'string' ? cp : cp.name || '';
   if (!name || typeof name !== 'string') return false;
   const trimmed = name.trim();
   if (!trimmed) return false;
+  if (orgSettings) {
+    return matchesAnyOrgPattern(trimmed, orgSettings.counterparty_rules.territory_patterns);
+  }
   return /территори/i.test(trimmed);
 }
 
@@ -874,12 +898,16 @@ export function parseTerritoryDescription(desc: string | null | undefined): {
  */
 export function isGeostroyCounterparty(
   cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
+  orgSettings?: OrganizationSettings,
 ): boolean {
   if (!cp) return false;
   const name = typeof cp === 'string' ? cp : cp.name || '';
   if (!name || typeof name !== 'string') return false;
   const trimmed = name.trim();
   if (!trimmed) return false;
+  if (orgSettings) {
+    return matchesAnyOrgPattern(trimmed, orgSettings.counterparty_rules.geostroy_patterns);
+  }
   return /геострой/i.test(trimmed);
 }
 
@@ -900,12 +928,16 @@ export const INTERNAL_COMPANY_COUNTERPARTY_PATTERNS = [
  */
 export function isInternalCounterparty(
   cp: { name?: string | null; is_legal_entity?: boolean } | string | null | undefined,
+  orgSettings?: OrganizationSettings,
 ): boolean {
   if (!cp) return false;
   const name = typeof cp === 'string' ? cp : cp.name || '';
   if (!name || typeof name !== 'string') return false;
   const trimmed = name.trim();
   if (!trimmed) return false;
+  if (orgSettings) {
+    return matchesAnyOrgPattern(trimmed, orgSettings.counterparty_rules.internal_patterns);
+  }
   return INTERNAL_COMPANY_COUNTERPARTY_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
@@ -2105,3 +2137,4 @@ export * from './postgrest';
 export * from './apiHandler';
 export * from './crypto';
 export * from './modules';
+export * from './orgSettings';

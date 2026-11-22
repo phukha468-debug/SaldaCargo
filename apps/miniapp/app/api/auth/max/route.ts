@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import {
+  DEFAULT_ORGANIZATION_ID,
   SESSION_COOKIE_MINIAPP,
   signSessionToken,
   getMaxBotEnv,
@@ -133,7 +134,7 @@ export async function POST(request: Request) {
   const supabaseAdmin = createAdminClient();
   const { data: user, error } = await supabaseAdmin
     .from('users')
-    .select('id, name, roles, is_active')
+    .select('id, name, roles, is_active, default_organization_id')
     .eq('max_user_id', maxUserId)
     .single();
 
@@ -152,9 +153,13 @@ export async function POST(request: Request) {
   }
 
   const roles = Array.isArray(user.roles) ? user.roles : [];
+  const oid =
+    (user as { default_organization_id?: string | null }).default_organization_id ||
+    DEFAULT_ORGANIZATION_ID;
   const token = await signSessionToken({
     uid: user.id,
     roles,
+    oid,
     ttlSeconds: 60 * 60 * 24 * 30,
   });
 

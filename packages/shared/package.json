@@ -15,7 +15,8 @@
     "./postgrest": "./src/postgrest.ts",
     "./api-handler": "./src/apiHandler.ts",
     "./crypto": "./src/crypto.ts",
-    "./modules": "./src/modules.ts"
+    "./modules": "./src/modules.ts",
+    "./org-settings": "./src/orgSettings.ts"
   },
   "scripts": {
     "lint": "eslint src/",

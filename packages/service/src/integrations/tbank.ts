@@ -57,13 +57,29 @@ export interface TBankBalanceResult {
 
 const TBANK_HOSTS = ['business.tbank.ru', 'business.tinkoff.ru'] as const;
 
-let balanceCache: { data: TBankBalanceResult; timestamp: number } | null = null;
+const balanceCache = new Map<string, { data: TBankBalanceResult; timestamp: number }>();
 const BALANCE_CACHE_TTL = 25000;
-let inFlightBalancePromise: Promise<TBankBalanceResult> | null = null;
+const inFlightBalancePromises = new Map<string, Promise<TBankBalanceResult>>();
 
 const statementCache = new Map<string, { data: TBankOperation[]; timestamp: number }>();
 const STATEMENT_CACHE_TTL = 25000;
 const inFlightStatementPromises = new Map<string, Promise<TBankOperation[]>>();
+
+export interface TBankCredentialsOptions {
+  token?: string;
+  accountNumber?: string;
+  cacheKey?: string;
+  /** По умолчанию true (обратная совместимость для Тенанта №1). Для других тенантов передавать false. */
+  allowEnvFallback?: boolean;
+}
+
+export function invalidateTBankCache(cacheKey?: string): void {
+  if (cacheKey) {
+    balanceCache.delete(cacheKey);
+  } else {
+    balanceCache.clear();
+  }
+}
 
 /**
  * Запрос к Open API Т-Банка со строгой TLS-верификацией (НУЦ Минцифры РФ + стандартные CA).
@@ -213,17 +229,25 @@ export async function fetchTBankStatement(
 /**
  * Синхронизировать баланс Р/С с реальными данными из Т-Банка.
  */
-export async function syncTBankBalance(forceRefresh = false): Promise<TBankBalanceResult> {
-  if (!forceRefresh && balanceCache && Date.now() - balanceCache.timestamp < BALANCE_CACHE_TTL) {
-    return balanceCache.data;
+export async function syncTBankBalance(
+  forceRefresh = false,
+  credentials?: TBankCredentialsOptions,
+): Promise<TBankBalanceResult> {
+  const allowEnvFallback = credentials?.allowEnvFallback !== false;
+  const tbankEnv = allowEnvFallback ? getTBankEnv() : null;
+  const token = credentials?.token || tbankEnv?.token;
+  const targetAccountNumber = credentials?.accountNumber || tbankEnv?.accountNumber;
+  const cacheKey = credentials?.cacheKey || targetAccountNumber || 'default';
+
+  const cached = balanceCache.get(cacheKey);
+  if (!forceRefresh && cached && Date.now() - cached.timestamp < BALANCE_CACHE_TTL) {
+    return cached.data;
   }
 
-  if (inFlightBalancePromise) {
-    return inFlightBalancePromise;
+  const inFlight = inFlightBalancePromises.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
   }
-
-  const tbankEnv = getTBankEnv();
-  const token = tbankEnv?.token;
 
   if (!token) {
     return {
@@ -233,12 +257,12 @@ export async function syncTBankBalance(forceRefresh = false): Promise<TBankBalan
     };
   }
 
-  inFlightBalancePromise = (async (): Promise<TBankBalanceResult> => {
+  const promise = (async (): Promise<TBankBalanceResult> => {
     try {
       const accounts = await fetchTBankAccounts(token);
       const targetAccount =
-        (tbankEnv?.accountNumber
-          ? accounts.find((a) => a.accountNumber === tbankEnv.accountNumber)
+        (targetAccountNumber
+          ? accounts.find((a) => a.accountNumber === targetAccountNumber)
           : undefined) || accounts[0];
 
       if (!targetAccount) {
@@ -262,11 +286,12 @@ export async function syncTBankBalance(forceRefresh = false): Promise<TBankBalan
         adjustment: '0.00',
       };
 
-      balanceCache = { data: result, timestamp: Date.now() };
+      balanceCache.set(cacheKey, { data: result, timestamp: Date.now() });
       return result;
     } catch (err: unknown) {
-      if (balanceCache) {
-        return balanceCache.data;
+      const stale = balanceCache.get(cacheKey);
+      if (stale) {
+        return stale.data;
       }
       return {
         success: false,
@@ -274,8 +299,9 @@ export async function syncTBankBalance(forceRefresh = false): Promise<TBankBalan
       };
     }
   })().finally(() => {
-    inFlightBalancePromise = null;
+    inFlightBalancePromises.delete(cacheKey);
   });
 
-  return inFlightBalancePromise;
+  inFlightBalancePromises.set(cacheKey, promise);
+  return promise;
 }

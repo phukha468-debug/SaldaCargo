@@ -1,32 +1,41 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  DEFAULT_ORGANIZATION_ID,
   generateDeterministicUuid,
-  FINANCIAL_WALLETS,
-  FINANCIAL_CATEGORIES,
   isInternalCounterparty,
+  type OrganizationSettings,
 } from '@saldacargo/shared';
+import { resolveOrganizationFinanceIds } from '../organization';
 
-const TRIP_REVENUE_CATEGORY = FINANCIAL_CATEGORIES.TRIP_REVENUE;
-const CASH_ID = FINANCIAL_WALLETS.CASH;
-const BANK_ID = FINANCIAL_WALLETS.BANK;
-const FUEL_CARD_ID = FINANCIAL_WALLETS.FUEL_CARD;
-const FUEL_CUBE_ID = FINANCIAL_WALLETS.FUEL_CUBE;
-const PAYROLL_DRIVER_CAT = FINANCIAL_CATEGORIES.PAYROLL_DRIVER;
-const PAYROLL_LOADER_CAT = FINANCIAL_CATEGORIES.PAYROLL_LOADER;
-const CAT_FUEL = FINANCIAL_CATEGORIES.FUEL;
-const CAT_OTHER = FINANCIAL_CATEGORIES.OTHER;
-const CASH_COLLECT_CAT = FINANCIAL_CATEGORIES.CASH_COLLECT;
+export interface SyncTripFinancialsOptions {
+  organizationId?: string;
+  orgSettings?: OrganizationSettings;
+}
 
 export async function syncTripFinancials(
   supabase: any,
   tripId: string,
   adminId: string | null = null,
+  options?: SyncTripFinancialsOptions,
 ) {
+  const orgSettings = options?.orgSettings;
+  const ids = resolveOrganizationFinanceIds(orgSettings);
+  const TRIP_REVENUE_CATEGORY = ids.tripRevenueCat;
+  const CASH_ID = ids.cashId;
+  const BANK_ID = ids.bankId;
+  const FUEL_CARD_ID = ids.fuelCardId;
+  const FUEL_CUBE_ID = ids.fuelCubeId;
+  const PAYROLL_DRIVER_CAT = ids.payrollDriverCat;
+  const PAYROLL_LOADER_CAT = ids.payrollLoaderCat;
+  const CAT_FUEL = ids.fuelCat;
+  const CAT_OTHER = ids.otherCat;
+  const CASH_COLLECT_CAT = ids.cashCollectCat;
+
   // 1. Fetch trip and all active orders
-  const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
+  let tripQuery = (supabase.from('trips') as any)
     .select(
       `
-      id, trip_number, driver_id, loader_id, admin_note, driver_note, started_at, created_at, lifecycle_status,
+      id, organization_id, trip_number, driver_id, loader_id, admin_note, driver_note, started_at, created_at, lifecycle_status,
       driver:users!trips_driver_id_fkey(id, name),
       trip_orders(
         id, amount, payment_method, settlement_status, lifecycle_status, description,
@@ -38,10 +47,26 @@ export async function syncTripFinancials(
       )
       `,
     )
-    .eq('id', tripId)
-    .single();
+    .eq('id', tripId);
+
+  if (options?.organizationId) {
+    tripQuery = tripQuery.eq('organization_id', options.organizationId);
+  }
+
+  const { data: trip, error: fetchErr } = await tripQuery.single();
 
   if (fetchErr || !trip) return;
+
+  // Кросс-тенантная защита: если передан organizationId, он должен совпадать с рейсом
+  if (
+    options?.organizationId &&
+    trip.organization_id &&
+    trip.organization_id !== options.organizationId
+  ) {
+    return;
+  }
+
+  const orgId: string = options?.organizationId || trip.organization_id || DEFAULT_ORGANIZATION_ID;
 
   if (trip.lifecycle_status === 'cancelled') {
     // Рейс отменён — аннулируем все связанные транзакции рейса
@@ -52,6 +77,7 @@ export async function syncTripFinancials(
         updated_at: new Date().toISOString(),
       })
       .eq('trip_id', tripId)
+      .eq('organization_id', orgId)
       .neq('lifecycle_status', 'cancelled');
     return;
   }
@@ -66,7 +92,7 @@ export async function syncTripFinancials(
   // 2. Synchronize settlement_status of each order based on payment_method
   for (const o of orders) {
     let expectedSettlement: 'pending' | 'completed' = 'completed';
-    const isInternal = isInternalCounterparty((o.counterparty as any)?.name);
+    const isInternal = isInternalCounterparty((o.counterparty as any)?.name, orgSettings);
     if (isInternal) {
       expectedSettlement = 'completed';
     } else if (
@@ -86,7 +112,8 @@ export async function syncTripFinancials(
     if (o.settlement_status !== expectedSettlement) {
       await (supabase.from('trip_orders') as any)
         .update({ settlement_status: expectedSettlement })
-        .eq('id', o.id);
+        .eq('id', o.id)
+        .eq('organization_id', orgId);
       o.settlement_status = expectedSettlement;
     }
   }
@@ -112,7 +139,8 @@ export async function syncTripFinancials(
   // 3. Sync Cash Income (strictly cash, excluding internal company orders)
   const cashOrders = orders.filter(
     (o: any) =>
-      o.payment_method === 'cash' && !isInternalCounterparty((o.counterparty as any)?.name),
+      o.payment_method === 'cash' &&
+      !isInternalCounterparty((o.counterparty as any)?.name, orgSettings),
   );
   const cashTotal = cashOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
 
@@ -120,6 +148,7 @@ export async function syncTripFinancials(
   const { data: tripCashExpensesData } = await (supabase.from('trip_expenses') as any)
     .select('amount')
     .eq('trip_id', tripId)
+    .eq('organization_id', orgId)
     .eq('payment_method', 'cash');
   const cashExpensesTotal = (tripCashExpensesData ?? []).reduce(
     (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
@@ -139,6 +168,7 @@ export async function syncTripFinancials(
 
   const { data: existingCashTx } = await (supabase.from('transactions') as any)
     .select('id')
+    .eq('organization_id', orgId)
     .eq('trip_id', tripId)
     .eq('category_id', TRIP_REVENUE_CATEGORY)
     .eq('to_wallet_id', CASH_ID)
@@ -146,6 +176,7 @@ export async function syncTripFinancials(
 
   const { data: existingHoldTx } = await (supabase.from('transactions') as any)
     .select('id')
+    .eq('organization_id', orgId)
     .eq('trip_id', tripId)
     .eq('category_id', CASH_COLLECT_CAT)
     .maybeSingle();
@@ -156,7 +187,10 @@ export async function syncTripFinancials(
     if (isCashNotSurrendered) {
       // Наличные НЕ сданы в кассу/сейф: удаляем доход сейфа, если он был
       if (existingCashTx) {
-        await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
+        await (supabase.from('transactions') as any)
+          .delete()
+          .eq('id', existingCashTx.id)
+          .eq('organization_id', orgId);
       }
 
       // Создаём или обновляем подотчёт сотрудника (водителя или грузчика)
@@ -170,6 +204,7 @@ export async function syncTripFinancials(
       const { data: userWallet } = responsibleUserId
         ? await (supabase.from('wallets') as any)
             .select('id')
+            .eq('organization_id', orgId)
             .eq('owner_user_id', responsibleUserId)
             .in('type', ['driver_accountable', 'staff_accountable', 'employee'])
             .limit(1)
@@ -192,9 +227,11 @@ export async function syncTripFinancials(
             settlement_status: 'pending',
             transaction_date: tripDate,
           })
-          .eq('id', existingHoldTx.id);
+          .eq('id', existingHoldTx.id)
+          .eq('organization_id', orgId);
       } else {
         await (supabase.from('transactions') as any).insert({
+          organization_id: orgId,
           direction: 'transfer',
           category_id: CASH_COLLECT_CAT,
           amount: netCashHold.toFixed(2),
@@ -214,7 +251,10 @@ export async function syncTripFinancials(
     } else {
       // Наличные сданы: удаляем подотчёт рейса, если он был
       if (existingHoldTx) {
-        await (supabase.from('transactions') as any).delete().eq('id', existingHoldTx.id);
+        await (supabase.from('transactions') as any)
+          .delete()
+          .eq('id', existingHoldTx.id)
+          .eq('organization_id', orgId);
       }
 
       // Создаём или обновляем доход в сейф
@@ -228,9 +268,11 @@ export async function syncTripFinancials(
             transaction_date: tripDate,
             created_at: tripDate,
           })
-          .eq('id', existingCashTx.id);
+          .eq('id', existingCashTx.id)
+          .eq('organization_id', orgId);
       } else {
         await (supabase.from('transactions') as any).insert({
+          organization_id: orgId,
           direction: 'income',
           category_id: TRIP_REVENUE_CATEGORY,
           amount: cashTotal.toFixed(2),
@@ -248,10 +290,16 @@ export async function syncTripFinancials(
     }
   } else {
     if (existingCashTx) {
-      await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
+      await (supabase.from('transactions') as any)
+        .delete()
+        .eq('id', existingCashTx.id)
+        .eq('organization_id', orgId);
     }
     if (existingHoldTx) {
-      await (supabase.from('transactions') as any).delete().eq('id', existingHoldTx.id);
+      await (supabase.from('transactions') as any)
+        .delete()
+        .eq('id', existingHoldTx.id)
+        .eq('organization_id', orgId);
     }
   }
 
@@ -259,20 +307,21 @@ export async function syncTripFinancials(
   const qrOrders = orders.filter(
     (o: any) =>
       (o.payment_method === 'qr' || o.payment_method === 'card_driver') &&
-      !isInternalCounterparty((o.counterparty as any)?.name),
+      !isInternalCounterparty((o.counterparty as any)?.name, orgSettings),
   );
   const qrTotal = qrOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
   const qrIdempotency = generateDeterministicUuid(`trip-income-qr-${tripId}`);
 
   const { data: existingQrTx } = await (supabase.from('transactions') as any)
     .select('id')
+    .eq('organization_id', orgId)
     .eq('trip_id', tripId)
     .eq('category_id', TRIP_REVENUE_CATEGORY)
     .eq('to_wallet_id', BANK_ID)
     .maybeSingle();
 
   if (qrTotal > 0) {
-    const tripDate = trip.started_at || trip.created_at;
+    const qrTripDate = trip.started_at || trip.created_at;
     if (existingQrTx) {
       await (supabase.from('transactions') as any)
         .update({
@@ -280,12 +329,14 @@ export async function syncTripFinancials(
           description: buildOrderDescription(qrOrders, 'QR/Безнал'),
           lifecycle_status: 'approved',
           settlement_status: 'completed',
-          transaction_date: tripDate,
-          created_at: tripDate,
+          transaction_date: qrTripDate,
+          created_at: qrTripDate,
         })
-        .eq('id', existingQrTx.id);
+        .eq('id', existingQrTx.id)
+        .eq('organization_id', orgId);
     } else {
       await (supabase.from('transactions') as any).insert({
+        organization_id: orgId,
         direction: 'income',
         category_id: TRIP_REVENUE_CATEGORY,
         amount: qrTotal.toFixed(2),
@@ -294,14 +345,17 @@ export async function syncTripFinancials(
         description: buildOrderDescription(qrOrders, 'QR/Безнал'),
         lifecycle_status: 'approved',
         settlement_status: 'completed',
-        transaction_date: tripDate,
-        created_at: tripDate,
+        transaction_date: qrTripDate,
+        created_at: qrTripDate,
         created_by: adminId,
         idempotency_key: qrIdempotency,
       });
     }
   } else if (existingQrTx) {
-    await (supabase.from('transactions') as any).delete().eq('id', existingQrTx.id);
+    await (supabase.from('transactions') as any)
+      .delete()
+      .eq('id', existingQrTx.id)
+      .eq('organization_id', orgId);
   }
 
   // 5. Sync Driver Payroll
@@ -309,6 +363,7 @@ export async function syncTripFinancials(
     const driverPay = orders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'), 0);
     const { data: existingDriverTx } = await (supabase.from('transactions') as any)
       .select('id')
+      .eq('organization_id', orgId)
       .eq('trip_id', tripId)
       .eq('category_id', PAYROLL_DRIVER_CAT)
       .eq('related_user_id', trip.driver_id)
@@ -322,9 +377,11 @@ export async function syncTripFinancials(
             lifecycle_status: 'approved',
             transaction_date: trip.started_at,
           })
-          .eq('id', existingDriverTx.id);
+          .eq('id', existingDriverTx.id)
+          .eq('organization_id', orgId);
       } else {
         await (supabase.from('transactions') as any).insert({
+          organization_id: orgId,
           direction: 'expense',
           category_id: PAYROLL_DRIVER_CAT,
           amount: driverPay.toFixed(2),
@@ -342,7 +399,10 @@ export async function syncTripFinancials(
         });
       }
     } else if (existingDriverTx) {
-      await (supabase.from('transactions') as any).delete().eq('id', existingDriverTx.id);
+      await (supabase.from('transactions') as any)
+        .delete()
+        .eq('id', existingDriverTx.id)
+        .eq('organization_id', orgId);
     }
   }
 
@@ -374,6 +434,7 @@ export async function syncTripFinancials(
   // Получаем все существующие транзакции грузчиков для рейса
   const { data: existingLoaderTxs } = await (supabase.from('transactions') as any)
     .select('id, related_user_id')
+    .eq('organization_id', orgId)
     .eq('trip_id', tripId)
     .eq('category_id', PAYROLL_LOADER_CAT);
 
@@ -393,9 +454,11 @@ export async function syncTripFinancials(
             lifecycle_status: 'approved',
             transaction_date: trip.started_at,
           })
-          .eq('id', existingLoaderTx.id);
+          .eq('id', existingLoaderTx.id)
+          .eq('organization_id', orgId);
       } else {
         await (supabase.from('transactions') as any).insert({
+          organization_id: orgId,
           direction: 'expense',
           category_id: PAYROLL_LOADER_CAT,
           amount: pay.toFixed(2),
@@ -416,13 +479,17 @@ export async function syncTripFinancials(
   // Удаляем транзакции грузчиков, которые были удалены из заказа
   for (const tx of existingLoaderTxs ?? []) {
     if (!processedUserIds.has(tx.related_user_id)) {
-      await (supabase.from('transactions') as any).delete().eq('id', tx.id);
+      await (supabase.from('transactions') as any)
+        .delete()
+        .eq('id', tx.id)
+        .eq('organization_id', orgId);
     }
   }
 
   // 7. Sync Trip Expenses (Fuel Card, Cash, etc.)
   const { data: tripExpenses } = await (supabase.from('trip_expenses') as any)
     .select('id, amount, payment_method, category_id, description, linked_expense_tx_id')
+    .eq('organization_id', orgId)
     .eq('trip_id', tripId);
 
   const activeTxIds = new Set<string>();
@@ -455,6 +522,7 @@ export async function syncTripFinancials(
     if (exp.linked_expense_tx_id) {
       const { data } = await (supabase.from('transactions') as any)
         .select('id')
+        .eq('organization_id', orgId)
         .eq('id', exp.linked_expense_tx_id)
         .maybeSingle();
       existingExpTx = data;
@@ -462,6 +530,7 @@ export async function syncTripFinancials(
     if (!existingExpTx) {
       const { data } = await (supabase.from('transactions') as any)
         .select('id')
+        .eq('organization_id', orgId)
         .eq('idempotency_key', txIdemp)
         .maybeSingle();
       existingExpTx = data;
@@ -479,14 +548,17 @@ export async function syncTripFinancials(
           lifecycle_status: 'approved',
           settlement_status: 'completed',
         })
-        .eq('id', existingExpTx.id);
+        .eq('id', existingExpTx.id)
+        .eq('organization_id', orgId);
 
       await (supabase.from('trip_expenses') as any)
         .update({ linked_expense_tx_id: existingExpTx.id })
-        .eq('id', exp.id);
+        .eq('id', exp.id)
+        .eq('organization_id', orgId);
     } else {
       const { data: insertedTx } = await (supabase.from('transactions') as any)
         .insert({
+          organization_id: orgId,
           direction: 'expense',
           category_id: catId,
           amount: amountNum.toFixed(2),
@@ -506,7 +578,8 @@ export async function syncTripFinancials(
         activeTxIds.add(txIdemp);
         await (supabase.from('trip_expenses') as any)
           .update({ linked_expense_tx_id: insertedTx.id })
-          .eq('id', exp.id);
+          .eq('id', exp.id)
+          .eq('organization_id', orgId);
       }
     }
   }
@@ -514,13 +587,17 @@ export async function syncTripFinancials(
   // Cleanup orphaned expense transactions for this trip
   const { data: allTripExpenseTxs } = await (supabase.from('transactions') as any)
     .select('id, idempotency_key')
+    .eq('organization_id', orgId)
     .eq('trip_id', tripId)
     .eq('direction', 'expense')
     .in('category_id', [CAT_FUEL, CAT_OTHER]);
 
   for (const tx of allTripExpenseTxs ?? []) {
     if (!activeTxIds.has(tx.id) && !activeTxIds.has(tx.idempotency_key)) {
-      await (supabase.from('transactions') as any).delete().eq('id', tx.id);
+      await (supabase.from('transactions') as any)
+        .delete()
+        .eq('id', tx.id)
+        .eq('organization_id', orgId);
     }
   }
 }

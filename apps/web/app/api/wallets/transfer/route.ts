@@ -2,14 +2,7 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { createWebApiHandler } from '@/lib/api';
-import { invalidateWalletsCache } from '@saldacargo/domain-service';
-
-const WALLET_IDS: Record<string, string> = {
-  bank: '10000000-0000-0000-0000-000000000001',
-  cash: '10000000-0000-0000-0000-000000000002',
-  fuel_card: '10000000-0000-0000-0000-000000000004',
-  garage: '10000000-0000-0000-0000-000000000005',
-};
+import { invalidateWalletsCache, resolveOrganizationFinanceIds } from '@saldacargo/domain-service';
 
 const WALLET_TO_METHOD: Record<string, string> = {
   bank: 'bank_invoice',
@@ -30,11 +23,19 @@ export const POST = createWebApiHandler(
   {
     routeName: 'web:/api/wallets/transfer',
     roles: ['admin', 'owner'],
+    requiredModule: 'finance',
     bodySchema: transferSchema,
   },
-  async ({ body }) => {
+  async ({ body, auth }) => {
     const { item_id, source, direction, target_wallet } = body;
     const supabase = createAdminClient();
+    const ids = resolveOrganizationFinanceIds(auth.orgSettings);
+    const walletIds: Record<string, string> = {
+      bank: ids.bankId,
+      cash: ids.cashId,
+      fuel_card: ids.fuelCardId,
+      garage: ids.garageId,
+    };
 
     if (source === 'trip_order') {
       const newMethod = WALLET_TO_METHOD[target_wallet];
@@ -47,10 +48,11 @@ export const POST = createWebApiHandler(
       const { error } = await supabase
         .from('trip_orders')
         .update({ payment_method: newMethod, settlement_status: 'completed' })
-        .eq('id', item_id);
+        .eq('id', item_id)
+        .eq('organization_id', auth.organizationId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     } else {
-      const walletId = WALLET_IDS[target_wallet];
+      const walletId = walletIds[target_wallet];
       if (!walletId) {
         return NextResponse.json({ error: 'Недопустимый целевой кошелёк' }, { status: 400 });
       }
@@ -58,11 +60,12 @@ export const POST = createWebApiHandler(
       const { error } = await supabase
         .from('transactions')
         .update({ [field]: walletId })
-        .eq('id', item_id);
+        .eq('id', item_id)
+        .eq('organization_id', auth.organizationId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    invalidateWalletsCache();
+    invalidateWalletsCache(auth.organizationId);
     return NextResponse.json({ ok: true });
   },
 );

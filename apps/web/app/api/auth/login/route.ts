@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
+  DEFAULT_ORGANIZATION_ID,
   SESSION_COOKIE_WEB,
   signSessionToken,
   hashPin,
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, name, roles, is_active, pin_code')
+      .select('id, name, roles, is_active, pin_code, default_organization_id')
       .eq('phone', cleanPhone)
       .single();
 
@@ -81,9 +82,13 @@ export async function POST(request: Request) {
         .eq('id', user.id);
     }
 
+    const oid =
+      (user as { default_organization_id?: string | null }).default_organization_id ||
+      DEFAULT_ORGANIZATION_ID;
     const sessionToken = await signSessionToken({
       uid: user.id,
       roles,
+      oid,
       ttlSeconds: 60 * 60 * 24 * 7, // 7 дней
     });
 

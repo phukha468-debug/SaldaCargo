@@ -18,6 +18,7 @@ export const POST = createWebApiHandler(
   {
     routeName: 'web:/api/staff/advance',
     roles: ['admin', 'owner'],
+    requiredModule: 'payroll',
     bodySchema: advanceSchema,
   },
   async ({ body, auth }) => {
@@ -42,6 +43,7 @@ export const POST = createWebApiHandler(
     const { data, error } = await supabase
       .from('transactions')
       .insert({
+        organization_id: auth.organizationId,
         direction: 'expense',
         category_id: ADVANCE_CATEGORY_ID,
         amount: amount.toFixed(2),
@@ -57,7 +59,7 @@ export const POST = createWebApiHandler(
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    invalidateWalletsCache();
+    invalidateWalletsCache(auth.organizationId);
     return NextResponse.json(data, { status: 201 });
   },
 );

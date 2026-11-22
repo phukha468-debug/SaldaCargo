@@ -1,4 +1,5 @@
 import { type ZodType, type ZodTypeDef } from 'zod';
+import { type SaldaModule } from '@saldacargo/shared';
 import {
   createApiHandler,
   type ApiHandlerContext,
@@ -10,6 +11,7 @@ export interface WebApiOptions<TBody, TQuery> {
   routeName?: string;
   roles?: string[];
   requireAuth?: boolean;
+  requiredModule?: SaldaModule;
   bodySchema?: ZodType<TBody, ZodTypeDef, unknown>;
   querySchema?: ZodType<TQuery, ZodTypeDef, unknown>;
   rateLimit?: RateLimitOptions & { keyPrefix: string };
@@ -18,6 +20,8 @@ export interface WebApiOptions<TBody, TQuery> {
 /**
  * Единая типизированная обёртка API-роутов для WebApp:
  * - автоматический RBAC (`roles` или `requireAuth`)
+ * - multi-tenant контекст организации (`auth.organizationId`, `auth.orgSettings`, `auth.enabledModules`)
+ * - проверка Feature Flag модуля (`requiredModule` → 403 MODULE_DISABLED)
  * - Zod-валидация body и query
  * - стандартизированная обработка ошибок и логирование
  */
@@ -37,9 +41,9 @@ export function createWebApiHandler<
       rateLimit: options.rateLimit,
       resolveAuth: async () => {
         if (options.roles && options.roles.length > 0) {
-          return requireRole(options.roles);
+          return requireRole(options.roles, options.requiredModule);
         }
-        return requireAuth();
+        return requireAuth(options.requiredModule);
       },
     },
     handler,

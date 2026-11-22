@@ -15,6 +15,7 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
   {
     routeName: 'web:/api/garage/orders/[id]/pay-salary',
     roles: ['admin', 'owner'],
+    requiredModule: 'garage',
   },
   async ({ params, auth }) => {
     const { id: orderId } = params;
@@ -37,6 +38,7 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
     `,
       )
       .eq('id', orderId)
+      .eq('organization_id', auth.organizationId)
       .single();
 
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
@@ -56,8 +58,9 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
     const { data: sto } = await (supabase as any)
       .from('sto_settings')
       .select('hourly_rate, hourly_rate_own')
+      .eq('organization_id', auth.organizationId)
       .limit(1)
-      .single();
+      .maybeSingle();
     const hourlyRate = parseFloat(
       order.machine_type === 'own'
         ? (sto?.hourly_rate_own ?? '1600')
@@ -128,6 +131,7 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
       const avgHours = totalMins / 60;
 
       txns.push({
+        organization_id: auth.organizationId,
         direction: 'expense',
         lifecycle_status: 'approved',
         settlement_status: 'pending',
@@ -151,6 +155,7 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
     await (supabase as any)
       .from('service_order_works')
       .update({ salary_paid: true })
+      .eq('organization_id', auth.organizationId)
       .in('id', workIds);
 
     // Auto-complete order status when salary is calculated/paid
@@ -161,7 +166,8 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
         status: 'completed',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .eq('organization_id', auth.organizationId);
 
     // Create salary transactions
     await (supabase as any).from('transactions').insert(txns);

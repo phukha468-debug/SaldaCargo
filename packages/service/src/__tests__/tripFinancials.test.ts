@@ -316,8 +316,23 @@ describe('syncTripFinancials', () => {
           },
         ],
       },
-      trip_expenses: [{ id: 'exp-1', trip_id: tripId, payment_method: 'cash', amount: '1200.00' }],
-      wallets: [{ id: 'wallet-driver-2', owner_user_id: 'driver-2', type: 'driver_accountable' }],
+      trip_expenses: [
+        {
+          id: 'exp-1',
+          organization_id: '00000000-0000-4000-8000-000000000001',
+          trip_id: tripId,
+          payment_method: 'cash',
+          amount: '1200.00',
+        },
+      ],
+      wallets: [
+        {
+          id: 'wallet-driver-2',
+          organization_id: '00000000-0000-4000-8000-000000000001',
+          owner_user_id: 'driver-2',
+          type: 'driver_accountable',
+        },
+      ],
     });
 
     await syncTripFinancials(supabase, tripId, 'admin-1');

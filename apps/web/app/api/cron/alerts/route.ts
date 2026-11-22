@@ -1,24 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/**
- * Ежедневная рассылка предупреждений в MAX.
- * Vercel Cron: каждый день в 09:00 МСК (06:00 UTC) — см. vercel.json.
- *
- * Для активации:
- * 1. Добавить в .env.local:
- *    MAX_BOT_TOKEN=<токен бота из https://dev.max.ru>
- *    CRON_SECRET=<любая случайная строка>
- * 2. Установить в Vercel Dashboard те же переменные.
- * 3. Раскомментировать проверку CRON_SECRET ниже (рекомендуется).
- */
-
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyCronAuthorization, notifyCronFailure } from '@saldacargo/shared';
+import {
+  DEFAULT_ORGANIZATION_ID,
+  verifyCronAuthorization,
+  notifyCronFailure,
+} from '@saldacargo/shared';
+import {
+  getIntegrationConfig,
+  type MaxBotIntegrationCredentials,
+} from '@saldacargo/domain-service';
 
 const MAX_BOT_API = 'https://botapi.max.ru';
 
-async function sendMaxMessage(maxUserId: string, text: string): Promise<void> {
-  const token = process.env.MAX_BOT_TOKEN;
+async function sendMaxMessage(token: string, maxUserId: string, text: string): Promise<void> {
   if (!token || !maxUserId) return;
 
   try {
@@ -72,44 +67,68 @@ export async function GET(req: NextRequest) {
 
   try {
     const supabase = createAdminClient();
+    const { data: orgs } = await (supabase.from('organizations') as any)
+      .select('id, name, slug')
+      .eq('is_active', true);
 
-    // Получаем данные параллельно
-    const [alertsRes, { data: admins }] = await Promise.all([
-      fetch(`${req.nextUrl.origin}/api/alerts`, {
-        headers: authHeader ? { Authorization: authHeader } : undefined,
-        cache: 'no-store',
-      }).then((r) => r.json()),
-      (supabase.from('users') as any)
-        .select('id, name, max_user_id')
-        .contains('roles', ['admin'])
-        .eq('is_active', true)
-        .not('max_user_id', 'is', null),
-    ]);
+    const activeOrgs: Array<{ id: string; name: string; slug: string }> =
+      Array.isArray(orgs) && orgs.length > 0
+        ? orgs
+        : [{ id: DEFAULT_ORGANIZATION_ID, name: 'ТК501', slug: 'tk501' }];
 
-    const { fleet = [], receivables = [], loans = [], total = 0 } = alertsRes;
+    let totalSent = 0;
+    const summary: Array<{ organizationId: string; sent: number; totalAlerts: number }> = [];
 
-    if (total === 0) {
-      return NextResponse.json({ sent: 0, message: 'Нет активных предупреждений' });
+    for (const org of activeOrgs) {
+      const maxBot = await getIntegrationConfig<MaxBotIntegrationCredentials>(
+        supabase,
+        org.id,
+        'max_bot',
+      );
+      if (!maxBot.isEnabled || !maxBot.credentials.token) {
+        continue;
+      }
+
+      const [alertsRes, { data: admins }] = await Promise.all([
+        fetch(`${req.nextUrl.origin}/api/alerts?organization_id=${encodeURIComponent(org.id)}`, {
+          headers: authHeader ? { Authorization: authHeader } : undefined,
+          cache: 'no-store',
+        }).then((r) => r.json()),
+        (supabase.from('users') as any)
+          .select('id, name, max_user_id')
+          .eq('default_organization_id', org.id)
+          .contains('roles', ['admin'])
+          .eq('is_active', true)
+          .not('max_user_id', 'is', null),
+      ]);
+
+      const { fleet = [], receivables = [], loans = [], total = 0 } = alertsRes;
+      if (total === 0) {
+        summary.push({ organizationId: org.id, sent: 0, totalAlerts: 0 });
+        continue;
+      }
+
+      const sections = [
+        `⚠️ ${org.name} — предупреждения на ${new Date().toLocaleDateString('ru-RU')}`,
+        formatDocAlerts(fleet),
+        formatReceivableAlerts(receivables),
+        formatLoanAlerts(loans),
+      ].filter(Boolean);
+
+      const message = sections.join('\n\n');
+      const recipients: string[] = ((admins as any[]) ?? [])
+        .map((u: any) => u.max_user_id)
+        .filter(Boolean);
+
+      await Promise.allSettled(
+        recipients.map((id) => sendMaxMessage(maxBot.credentials.token!, id, message)),
+      );
+
+      totalSent += recipients.length;
+      summary.push({ organizationId: org.id, sent: recipients.length, totalAlerts: total });
     }
 
-    // Формируем текст сообщения
-    const sections = [
-      `⚠️ TK501 — предупреждения на ${new Date().toLocaleDateString('ru-RU')}`,
-      formatDocAlerts(fleet),
-      formatReceivableAlerts(receivables),
-      formatLoanAlerts(loans),
-    ].filter(Boolean);
-
-    const message = sections.join('\n\n');
-
-    // Отправляем всем активным админам и владельцам
-    const recipients: string[] = ((admins as any[]) ?? [])
-      .map((u: any) => u.max_user_id)
-      .filter(Boolean);
-
-    await Promise.allSettled(recipients.map((id) => sendMaxMessage(id, message)));
-
-    return NextResponse.json({ sent: recipients.length, total_alerts: total });
+    return NextResponse.json({ sent: totalSent, organizations: summary });
   } catch (err: any) {
     await notifyCronFailure('alerts', err);
     return NextResponse.json({ error: err?.message }, { status: 500 });

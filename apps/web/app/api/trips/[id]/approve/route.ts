@@ -71,6 +71,7 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
   {
     routeName: 'web:/api/trips/[id]/approve',
     roles: ['admin', 'owner'],
+    requiredModule: 'transport',
   },
   async ({ params, auth }) => {
     const { id } = params;
@@ -91,6 +92,7 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
     `,
       )
       .eq('id', id)
+      .eq('organization_id', auth.organizationId)
       .single();
 
     if (fetchErr || !trip) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
@@ -164,6 +166,7 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
       if (!hasFuelExp) {
         const norm = calculateTripFuelNorm(distanceKm);
         await (supabase.from('trip_expenses') as any).insert({
+          organization_id: auth.organizationId,
           trip_id: id,
           category_id: CAT_FUEL_ID,
           amount: norm.amount,
@@ -176,13 +179,15 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
 
     const { error: tripError } = await (supabase.from('trips') as any)
       .update({ lifecycle_status: 'approved' })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', auth.organizationId);
 
     if (tripError) return NextResponse.json({ error: tripError.message }, { status: 500 });
 
     const { error: ordersError } = await (supabase.from('trip_orders') as any)
       .update({ lifecycle_status: 'approved' })
       .eq('trip_id', id)
+      .eq('organization_id', auth.organizationId)
       .neq('lifecycle_status', 'cancelled');
 
     if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 500 });
@@ -191,6 +196,7 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
     await (supabase.from('transactions') as any)
       .update({ lifecycle_status: 'approved', updated_at: new Date().toISOString() })
       .eq('trip_id', id)
+      .eq('organization_id', auth.organizationId)
       .neq('lifecycle_status', 'cancelled');
 
     // 1. Защита дебиторки: для юридических лиц и строгих контрагентов (ВСМПО, Ависма, Геострой)
@@ -207,8 +213,8 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
       const cpName = to.counterparty?.name || primaryCpName;
       const isLegal =
         Boolean(to.counterparty?.is_legal_entity) ||
-        isNoCashCounterparty(cpName) ||
-        isStrictDocCounterparty(cpName);
+        isNoCashCounterparty(cpName, auth.orgSettings) ||
+        isStrictDocCounterparty(cpName, auth.orgSettings);
 
       if (
         isLegal &&
@@ -242,27 +248,32 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
       .select(
         'id, status, client_id, loading_org_name, price_without_vat, client:counterparties!orders_client_id_fkey(id, name)',
       )
+      .eq('organization_id', auth.organizationId)
       .or(orConditions.join(','))
       .in('status', ['in_progress', 'pending_review']);
 
     if (linkedOrders && linkedOrders.length > 0) {
       for (const ord of linkedOrders) {
         const effectiveName = ord.client?.name || primaryCpName || ord.loading_org_name;
-        const is3Firms = isStrictDocCounterparty(effectiveName);
+        const is3Firms = isStrictDocCounterparty(effectiveName, auth.orgSettings);
         if (!is3Firms) {
           await (supabase.from('orders') as any)
             .update({
               status: 'completed',
               updated_at: new Date().toISOString(),
             })
-            .eq('id', ord.id);
+            .eq('id', ord.id)
+            .eq('organization_id', auth.organizationId);
         }
       }
     }
 
-    await syncTripFinancials(supabase, id, adminId);
+    await syncTripFinancials(supabase, id, adminId, {
+      organizationId: auth.organizationId,
+      orgSettings: auth.orgSettings,
+    });
     await updateAssetFuelAfterApproval(supabase, id);
-    invalidateWalletsCache();
+    invalidateWalletsCache(auth.organizationId);
 
     return NextResponse.json({ success: true });
   },

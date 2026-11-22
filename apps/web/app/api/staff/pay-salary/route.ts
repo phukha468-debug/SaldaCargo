@@ -44,6 +44,7 @@ export const POST = createWebApiHandler(
   {
     routeName: 'web:/api/staff/pay-salary',
     roles: ['admin', 'owner'],
+    requiredModule: 'payroll',
     bodySchema: paySalarySchema,
   },
   async ({ body, auth }) => {
@@ -94,6 +95,7 @@ export const POST = createWebApiHandler(
     const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
     const { data: activeHolds } = await (supabase.from('transactions') as any)
       .select('amount')
+      .eq('organization_id', auth.organizationId)
       .eq('category_id', CASH_COLLECT_CAT)
       .eq('settlement_status', 'pending')
       .neq('lifecycle_status', 'cancelled')
@@ -141,6 +143,7 @@ export const POST = createWebApiHandler(
 
       const { data, error } = await (supabase.from('transactions') as any)
         .insert({
+          organization_id: auth.organizationId,
           direction: 'expense',
           category_id: categoryId,
           amount: s.amount.toFixed(2),
@@ -159,7 +162,7 @@ export const POST = createWebApiHandler(
       createdTransactions.push(data);
     }
 
-    invalidateWalletsCache();
+    invalidateWalletsCache(auth.organizationId);
     return NextResponse.json(
       splits.length === 1
         ? createdTransactions[0]
