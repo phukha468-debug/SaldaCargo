@@ -31,6 +31,9 @@ jobs:
       - name: Turbo Typecheck
         run: pnpm turbo typecheck
 
+      - name: Unit Tests
+        run: pnpm test
+
       - name: Turbo Build
         run: pnpm turbo build
         env:

@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createWebApiHandler } from '@/lib/api';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const PAYROLL_CATEGORIES: Record<string, string> = {
   driver: 'd79213ee-3bc6-4433-b58a-ca7ea1040d00',
@@ -16,45 +18,37 @@ const PAYROLL_CATEGORIES: Record<string, string> = {
 };
 const OTHER_EXPENSE = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 
+const paySalarySchema = z.object({
+  user_id: z.string().uuid('Некорректный user_id'),
+  amount: z
+    .union([z.string(), z.number()])
+    .transform((v) => String(v))
+    .optional(),
+  from_wallet_id: z.string().uuid().optional(),
+  wallet_splits: z
+    .array(
+      z.object({
+        wallet_id: z.string().uuid(),
+        amount: z.union([z.number(), z.string()]),
+      }),
+    )
+    .optional(),
+  note: z.string().max(500).optional(),
+});
+
 /**
  * POST /api/staff/pay-salary
  * Ручная выплата ЗП — создаёт expense approved+completed транзакцию.
- * Используется для владельца и администратора у которых нет pending PAYROLL.
  */
-export async function POST(request: Request) {
-  try {
-    const authHeader = request.headers.get('Authorization');
-    let adminId = authHeader?.startsWith('Bearer ') ? authHeader.split('Bearer ')[1] : null;
-
-    if (!adminId) {
-      const cookieStore = await cookies();
-      adminId = cookieStore.get('salda_auth_token')?.value ?? null;
-    }
-
+export const POST = createWebApiHandler(
+  {
+    routeName: 'web:/api/staff/pay-salary',
+    roles: ['admin', 'owner'],
+    bodySchema: paySalarySchema,
+  },
+  async ({ body, auth }) => {
+    const adminId = auth.userId;
     const supabase = createAdminClient();
-
-    if (!adminId) {
-      const { data: adminUser } = await (supabase.from('users') as any)
-        .select('id')
-        .filter('roles', 'cs', '{"admin"}')
-        .limit(1)
-        .single();
-      adminId = adminUser?.id ?? null;
-    }
-
-    if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const body = (await request.json()) as {
-      user_id: string;
-      amount?: string;
-      from_wallet_id?: string;
-      wallet_splits?: Array<{ wallet_id: string; amount: number | string }>;
-      note?: string;
-    };
-
-    if (!body.user_id) {
-      return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
-    }
 
     let totalAmount = parseFloat(body.amount ?? '0');
     let splits: Array<{ wallet_id: string; amount: number }> = [];
@@ -165,13 +159,12 @@ export async function POST(request: Request) {
       createdTransactions.push(data);
     }
 
+    invalidateWalletsCache();
     return NextResponse.json(
       splits.length === 1
         ? createdTransactions[0]
         : { ok: true, transactions: createdTransactions },
       { status: 201 },
     );
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
-  }
-}
+  },
+);

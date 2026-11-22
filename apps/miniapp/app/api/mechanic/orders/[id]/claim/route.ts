@@ -1,13 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 /** POST /api/mechanic/orders/:id/claim — механик берёт незакреплённый наряд */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value;
+  const userId = await getVerifiedMiniappUserId();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();

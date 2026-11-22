@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { resolveKnownMasterCounterpartyId, cleanCounterpartySearchName } from '@saldacargo/shared';
+import {
+  resolveKnownMasterCounterpartyId,
+  cleanCounterpartySearchName,
+  buildIlikeOrFilter,
+  escapePostgrestValue,
+} from '@saldacargo/shared';
 
 /** GET /api/admin/counterparties?search= — поиск клиентов для привязки к машине */
 export async function GET(request: Request) {
@@ -16,8 +22,9 @@ export async function GET(request: Request) {
     .order('name')
     .limit(20);
 
-  if (search) {
-    query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+  const searchFilter = buildIlikeOrFilter(['name', 'phone'], search);
+  if (searchFilter) {
+    query = query.or(searchFilter);
   }
 
   const { data, error } = await query;
@@ -27,9 +34,7 @@ export async function GET(request: Request) {
 
 /** POST /api/admin/counterparties — создать нового клиента */
 export async function POST(request: Request) {
-  const { cookies } = await import('next/headers');
-  const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value;
+  const adminId = await getVerifiedMiniappUserId();
   if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
@@ -54,11 +59,15 @@ export async function POST(request: Request) {
 
   // 2. Поиск существующих активных контрагентов
   const simplifiedName = cleanCounterpartySearchName(cleanName);
-  const { data: existingList } = await (supabase.from('counterparties') as any)
-    .select('id, name, phone')
-    .eq('is_active', true)
-    .or(`name.ilike.%${cleanName}%,name.ilike.%${simplifiedName || cleanName}%`)
-    .limit(5);
+  const safeClean = escapePostgrestValue(cleanName);
+  const safeSimplified = escapePostgrestValue(simplifiedName || cleanName);
+  const { data: existingList } = safeClean
+    ? await (supabase.from('counterparties') as any)
+        .select('id, name, phone')
+        .eq('is_active', true)
+        .or(`name.ilike.%${safeClean}%,name.ilike.%${safeSimplified || safeClean}%`)
+        .limit(5)
+    : { data: [] };
 
   const existingMatch = (existingList || []).find((cp: any) => {
     const existingClean = cleanCounterpartySearchName(cp.name);

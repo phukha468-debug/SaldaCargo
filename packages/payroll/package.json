@@ -9,7 +9,8 @@
   },
   "scripts": {
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@saldacargo/shared-types": "workspace:*"

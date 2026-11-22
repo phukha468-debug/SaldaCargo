@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import {
@@ -17,11 +18,7 @@ async function resolveAdminId(
   supabase: any,
   bodyAdminId?: string,
 ): Promise<string | null> {
-  const explicit =
-    bodyAdminId ||
-    cookieStore.get('salda_user_id')?.value ||
-    request.headers.get('x-salda-user-id') ||
-    null;
+  const explicit = bodyAdminId || (await getVerifiedMiniappUserId()) || null;
   if (explicit) return explicit;
 
   const { data: adminUser } = await (supabase.from('users') as any)

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const OPTI24_ID = '20000000-0000-0000-0000-000000000001';
 const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
@@ -9,8 +9,7 @@ const CAT_OTHER_EXPENSE = 'df1022df-4ea6-46fc-b9aa-f3c9eb4e7f30';
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get('salda_user_id')?.value;
+    const userId = await getVerifiedMiniappUserId();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = (await request.json()) as {

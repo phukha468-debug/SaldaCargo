@@ -1,48 +1,33 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { createWebApiHandler } from '@/lib/api';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 
-async function resolveUserId(supabase: any): Promise<string> {
-  const cookieStore = await cookies();
-  const fromCookie = cookieStore.get('salda_user_id')?.value;
-  if (fromCookie) return fromCookie;
-  const { data } = await (supabase.from('users') as any)
-    .select('id')
-    .or('roles.cs.{owner},roles.cs.{admin}')
-    .limit(1)
-    .single();
-  return data?.id ?? '00000000-0000-0000-0000-000000000000';
-}
+const advanceSchema = z.object({
+  user_id: z.string().uuid('Некорректный user_id'),
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  from_wallet_id: z.string().uuid('Некорректный from_wallet_id'),
+  note: z.string().max(500).optional(),
+});
 
 /** POST /api/staff/advance — выдать аванс сотруднику */
-export async function POST(request: Request) {
-  try {
-    const supabase = createAdminClient();
-    const adminId = await resolveUserId(supabase);
-
-    const body = (await request.json()) as {
-      user_id: string;
-      amount: string;
-      from_wallet_id: string;
-      note?: string;
-    };
-
-    if (!body.user_id || !body.amount || !body.from_wallet_id) {
-      return NextResponse.json(
-        { error: 'user_id, amount, from_wallet_id обязательны' },
-        { status: 400 },
-      );
-    }
-
+export const POST = createWebApiHandler(
+  {
+    routeName: 'web:/api/staff/advance',
+    roles: ['admin', 'owner'],
+    bodySchema: advanceSchema,
+  },
+  async ({ body, auth }) => {
     const amount = parseFloat(body.amount);
     if (isNaN(amount) || amount <= 0) {
       return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
     }
 
-    const { data: user } = await (supabase as any)
+    const supabase = createAdminClient();
+    const { data: user } = await supabase
       .from('users')
       .select('name')
       .eq('id', body.user_id)
@@ -54,7 +39,7 @@ export async function POST(request: Request) {
       body.note?.trim() ||
       `Аванс: ${user.name} — ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('transactions')
       .insert({
         direction: 'expense',
@@ -65,16 +50,14 @@ export async function POST(request: Request) {
         settlement_status: 'completed',
         related_user_id: body.user_id,
         from_wallet_id: body.from_wallet_id,
-        created_by: adminId,
+        created_by: auth.userId,
         idempotency_key: crypto.randomUUID(),
       })
       .select()
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
+    invalidateWalletsCache();
     return NextResponse.json(data, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
-  }
-}
+  },
+);

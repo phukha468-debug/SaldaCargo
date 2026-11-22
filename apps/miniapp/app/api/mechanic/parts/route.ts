@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { buildIlikeOrFilter } from '@saldacargo/shared';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,8 +14,9 @@ export async function GET(request: Request) {
       .select('id, name, article, unit, min_stock, is_active')
       .eq('is_active', true);
 
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,article.ilike.%${search}%`);
+    const searchFilter = buildIlikeOrFilter(['name', 'article'], search);
+    if (searchFilter) {
+      query = query.or(searchFilter);
     }
 
     const { data, error } = await query.limit(50);

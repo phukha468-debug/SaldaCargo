@@ -1,15 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
+import { getMaxBotEnv, verifyCronAuthorization, notifyCronFailure } from '@saldacargo/shared';
 
 const MAX_BOT_API = 'https://botapi.max.ru';
-const DEFAULT_MAX_TOKEN =
-  'f9LHodD0cOKEmAc4Iy6Hq4JXmmVPVRpQ7vULw35IPAeFKQZMIpb1fSAwl5wl_mY1GcLcovMyJXcGngyIqypb';
 
 export const dynamic = 'force-dynamic';
 
 async function sendMaxMessage(maxUserId: string, text: string): Promise<boolean> {
-  const token = process.env.MAX_BOT_TOKEN || DEFAULT_MAX_TOKEN;
+  const token = getMaxBotEnv()?.token;
   if (!token || !maxUserId) return false;
 
   try {
@@ -33,6 +32,12 @@ async function sendMaxMessage(maxUserId: string, text: string): Promise<boolean>
  * о сверке суточного баланса, сейфа и банковской выписки.
  */
 export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get('authorization');
+  const cronAuth = verifyCronAuthorization(authHeader);
+  if (!cronAuth.ok) {
+    return NextResponse.json({ error: cronAuth.error }, { status: cronAuth.status });
+  }
+
   try {
     const supabase = createAdminClient();
     const today = new Date().toISOString().slice(0, 10);
@@ -54,6 +59,7 @@ export async function GET(req: NextRequest) {
     // Получаем текущие расчетные балансы дня
     const origin = req.nextUrl.origin;
     const balanceRes = await fetch(`${origin}/api/finance/daily-balance?date=${today}`, {
+      headers: authHeader ? { Authorization: authHeader } : undefined,
       cache: 'no-store',
     })
       .then((r) => r.json())
@@ -106,7 +112,7 @@ export async function GET(req: NextRequest) {
       results,
     });
   } catch (err: any) {
-    console.error('Error in evening-audit cron:', err);
+    await notifyCronFailure('evening-audit', err);
     return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
   }
 }

@@ -1,19 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { SESSION_COOKIE_MINIAPP } from '@saldacargo/shared/session';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 
-export async function GET(request: Request) {
-  const cookieStore = await cookies();
-  const url = new URL(request.url);
-  const customUserId =
-    cookieStore.get('salda_user_id')?.value ||
-    request.headers.get('x-salda-user-id') ||
-    url.searchParams.get('user_id');
+export async function GET() {
+  const userId = await getVerifiedMiniappUserId();
 
-  console.log('[API /me] Checking auth:', customUserId || 'NOT FOUND');
-
-  if (!customUserId) {
+  if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       {
@@ -25,27 +18,23 @@ export async function GET(request: Request) {
 
   try {
     const supabase = createAdminClient();
-
-    // Ищем пользователя по ID из куки
-    const { data, error } = await supabase
+    const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', customUserId)
+      .eq('id', userId)
       .single();
 
-    const user = data as any;
-
-    if (error || !user) {
-      console.error('[API /me] User not found in DB for ID:', customUserId);
-
+    if (error || !user || !user.is_active) {
       const response = NextResponse.json({ error: 'User not found' }, { status: 401 });
+      response.cookies.delete(SESSION_COOKIE_MINIAPP);
       response.cookies.delete('salda_user_id');
       return response;
     }
 
-    console.log('[API /me] Success for:', user.name);
+    const { pin_code: _pinCode, ...safeUser } = user;
+    void _pinCode;
 
-    return NextResponse.json(user, {
+    return NextResponse.json(safeUser, {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (err) {

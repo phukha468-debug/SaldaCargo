@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-import { invalidateWalletsCache } from '../route';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 
 const WALLET_IDS: Record<string, string> = {
   bank: '10000000-0000-0000-0000-000000000001',

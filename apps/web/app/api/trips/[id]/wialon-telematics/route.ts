@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchTripWialonMileage } from '@saldacargo/domain-service';
 import { syncTripFinancials } from '@/lib/tripFinancials';
-import { cookies } from 'next/headers';
 
 /**
  * GET /api/trips/:id/wialon-telematics
@@ -276,8 +276,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     // 6. Синхронизируем финансовые транзакции
-    const cookieStore = await cookies();
-    const adminId = cookieStore.get('salda_auth_token')?.value ?? null;
+    const adminId = (await getVerifiedWebUserId()) ?? null;
     await syncTripFinancials(supabase, id, adminId);
 
     return NextResponse.json({

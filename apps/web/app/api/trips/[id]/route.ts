@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 import {
   isNoCashCounterparty,
@@ -11,8 +12,8 @@ import {
   isStrictDocCounterparty,
   resolveKnownMasterCounterpartyId,
   cleanCounterpartySearchName,
+  escapePostgrestValue,
 } from '@saldacargo/shared';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 /** GET /api/trips/:id — получить детали одного рейса (по UUID или номеру рейса) */
@@ -220,11 +221,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       // 2. Поиск среди существующих активных контрагентов (с учётом форм собственности и кавычек)
       const simplifiedName = cleanCounterpartySearchName(name);
-      const { data: foundList } = await (supabase.from('counterparties') as any)
-        .select('id, name')
-        .eq('is_active', true)
-        .or(`name.ilike.%${name}%,name.ilike.%${simplifiedName || name}%`)
-        .limit(5);
+      const safeName = escapePostgrestValue(name);
+      const safeSimplified = escapePostgrestValue(simplifiedName || name);
+      const { data: foundList } = safeName
+        ? await (supabase.from('counterparties') as any)
+            .select('id, name')
+            .eq('is_active', true)
+            .or(`name.ilike.%${safeName}%,name.ilike.%${safeSimplified || safeName}%`)
+            .limit(5)
+        : { data: [] };
 
       const matched = (foundList || []).find((c: any) => {
         const cClean = cleanCounterpartySearchName(c.name);
@@ -437,8 +442,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .is('client_id', null);
     }
 
-    const cookieStore = await cookies();
-    const adminId = cookieStore.get('salda_auth_token')?.value ?? null;
+    const adminId = (await getVerifiedWebUserId()) ?? null;
     await syncTripFinancials(supabase, id, adminId);
 
     return NextResponse.json({ ok: true });
@@ -468,8 +472,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       })
       .eq('active_trip_id', id);
 
-    const cookieStore = await cookies();
-    const adminId = cookieStore.get('salda_auth_token')?.value ?? null;
+    const adminId = (await getVerifiedWebUserId()) ?? null;
     await syncTripFinancials(supabase, id, adminId);
 
     return NextResponse.json({ ok: true });

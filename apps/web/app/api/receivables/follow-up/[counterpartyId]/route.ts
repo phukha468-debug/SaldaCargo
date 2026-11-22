@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 /** PATCH /api/receivables/follow-up/[counterpartyId] — upsert follow-up record */
 export async function PATCH(
@@ -11,8 +11,7 @@ export async function PATCH(
   const { counterpartyId } = await params;
   const supabase = createAdminClient();
 
-  const cookieStore = await cookies();
-  let userId = cookieStore.get('salda_user_id')?.value ?? null;
+  let userId = (await getVerifiedWebUserId()) ?? null;
   if (!userId) {
     const { data: adminUser } = await (supabase as any)
       .from('users')

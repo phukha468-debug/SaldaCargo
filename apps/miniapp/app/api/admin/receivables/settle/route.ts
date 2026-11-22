@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { v4 as uuid } from 'uuid';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
@@ -15,8 +15,7 @@ function walletForDebt(isLegalEntity: boolean): string {
 
 /** POST /api/admin/receivables/settle — погасить долг по заказу или ручной записи */
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value;
+  const adminId = await getVerifiedMiniappUserId();
   if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as {

@@ -1,38 +1,24 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { createWebApiHandler } from '@/lib/api';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 import { SUPPLIERS } from '../route';
 
-async function resolveUserId(supabase: any): Promise<string> {
-  const cookieStore = await cookies();
-  const fromCookie = cookieStore.get('salda_user_id')?.value;
-  if (fromCookie) return fromCookie;
-  // webapp без cookie — берём любого owner/admin
-  const { data } = await (supabase.from('users') as any)
-    .select('id')
-    .or('roles.cs.{owner},roles.cs.{admin}')
-    .limit(1)
-    .single();
-  return data?.id ?? '00000000-0000-0000-0000-000000000000';
-}
+const payablePaymentSchema = z.object({
+  supplier_id: z.string().min(1, 'supplier_id обязателен'),
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  from_wallet_id: z.string().uuid('Некорректный from_wallet_id'),
+  description: z.string().max(500).optional(),
+});
 
-export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as {
-      supplier_id: string;
-      amount: string;
-      from_wallet_id: string;
-      description?: string;
-    };
-
-    if (!body.supplier_id || !body.amount || !body.from_wallet_id) {
-      return NextResponse.json(
-        { error: 'supplier_id, amount, from_wallet_id обязательны' },
-        { status: 400 },
-      );
-    }
-
+export const POST = createWebApiHandler(
+  {
+    routeName: 'web:/api/payables/payment',
+    roles: ['admin', 'owner'],
+    bodySchema: payablePaymentSchema,
+  },
+  async ({ body, auth }) => {
     const supplier = SUPPLIERS.find((s) => s.id === body.supplier_id);
     if (!supplier) {
       return NextResponse.json({ error: 'Неверный поставщик' }, { status: 400 });
@@ -44,10 +30,10 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminClient();
-    const userId = await resolveUserId(supabase);
     const description = body.description?.trim() || `Оплата долга: ${supplier.name}`;
 
-    const { data, error } = await (supabase.from('transactions') as any)
+    const { data, error } = await supabase
+      .from('transactions')
       .insert({
         direction: 'expense',
         amount: amt.toFixed(2),
@@ -57,15 +43,14 @@ export async function POST(request: Request) {
         lifecycle_status: 'approved',
         settlement_status: 'completed',
         description,
-        created_by: userId,
+        created_by: auth.userId,
         idempotency_key: crypto.randomUUID(),
       })
       .select('id')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    invalidateWalletsCache();
     return NextResponse.json(data, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
-  }
-}
+  },
+);

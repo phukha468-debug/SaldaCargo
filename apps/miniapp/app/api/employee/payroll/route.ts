@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const PAYROLL_DRIVER_CAT = 'd79213ee-3bc6-4433-b58a-ca7ea1040d00';
 const PAYROLL_LOADER_CAT = '18792fa8-fda8-472d-8e04-e19d2c6c053c';
@@ -17,11 +17,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 /** GET /api/employee/payroll — ожидающие подтверждения + накопленная сумма + история начислений и выплат */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const cookieStore = await cookies();
-  const userId =
-    searchParams.get('user_id') ||
-    request.headers.get('x-salda-user-id') ||
-    cookieStore.get('salda_user_id')?.value;
+  const userId = searchParams.get('user_id') || (await getVerifiedMiniappUserId());
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();
@@ -229,8 +225,7 @@ export async function GET(request: Request) {
 
 /** PATCH /api/employee/payroll — подтвердить или отклонить начисление */
 export async function PATCH(request: Request) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+  const userId = await getVerifiedMiniappUserId();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as {

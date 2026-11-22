@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 /**
  * POST /api/mechanic/orders/:id/extra-work
@@ -9,8 +9,7 @@ import { cookies } from 'next/headers';
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: orderId } = await params;
-  const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value;
+  const userId = await getVerifiedMiniappUserId();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();

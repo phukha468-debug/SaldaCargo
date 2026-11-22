@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { generateDeterministicUuid } from '@saldacargo/shared';
 
 const PAYROLL_CATEGORY_ID = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6'; // Категория начисления ЗП персонала / цеха
@@ -12,8 +12,7 @@ async function getAdminId(request: Request, supabase: any): Promise<string> {
 
   if (!adminId) {
     try {
-      const cookieStore = await cookies();
-      adminId = cookieStore.get('salda_auth_token')?.value ?? null;
+      adminId = (await getVerifiedWebUserId()) ?? null;
     } catch {
       // ignore
     }

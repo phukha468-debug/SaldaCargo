@@ -1,46 +1,42 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createWebApiHandler } from '@/lib/api';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 
-type OrderItem = { id: string; type: 'trip_order' | 'manual'; amount: string };
+const closeAllSchema = z.object({
+  orders: z
+    .array(
+      z.object({
+        id: z.string().uuid('Некорректный ID заказа'),
+        type: z.enum(['trip_order', 'manual']),
+        amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+      }),
+    )
+    .min(1, 'orders обязателен'),
+  to_wallet_id: z.string().uuid().optional(),
+  counterparty_name: z.string().max(300).optional(),
+});
 
 /**
  * POST /api/receivables/close-all
- * Body: { orders: OrderItem[], to_wallet_id?: string, counterparty_name?: string }
  * Closes all listed debts in one shot and creates income transactions.
  */
-export async function POST(req: Request) {
-  try {
-    const body = (await req.json()) as {
-      orders: OrderItem[];
-      to_wallet_id?: string;
-      counterparty_name?: string;
-    };
-
-    if (!Array.isArray(body.orders) || body.orders.length === 0) {
-      return NextResponse.json({ error: 'orders обязателен' }, { status: 400 });
-    }
-
+export const POST = createWebApiHandler(
+  {
+    routeName: 'web:/api/receivables/close-all',
+    roles: ['admin', 'owner'],
+    bodySchema: closeAllSchema,
+  },
+  async ({ body, auth }) => {
     const toWalletId = body.to_wallet_id ?? BANK_ID;
     const cpName = body.counterparty_name ?? 'Должник';
-
     const supabase = createAdminClient();
-    const cookieStore = await cookies();
-    let adminId = cookieStore.get('salda_user_id')?.value ?? null;
-
-    if (!adminId) {
-      const { data: adminUser } = await (supabase as any)
-        .from('users')
-        .select('id')
-        .contains('roles', ['admin'])
-        .limit(1)
-        .maybeSingle();
-      adminId = adminUser?.id ?? 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
-    }
+    const adminId = auth.userId;
 
     const tripOrders = body.orders.filter((o) => o.type === 'trip_order');
     const manuals = body.orders.filter((o) => o.type === 'manual');
@@ -123,8 +119,7 @@ export async function POST(req: Request) {
 
     if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
 
+    invalidateWalletsCache();
     return NextResponse.json({ ok: true, paid: totalAmount, count: body.orders.length });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
-  }
-}
+  },
+);

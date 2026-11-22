@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 async function getUserId(): Promise<string | null> {
-  const cookieStore = await cookies();
-  return cookieStore.get('salda_user_id')?.value ?? null;
+  return (await getVerifiedMiniappUserId()) ?? null;
 }
 
 /** POST /api/driver/service-orders — водитель создаёт заявку на ремонт */

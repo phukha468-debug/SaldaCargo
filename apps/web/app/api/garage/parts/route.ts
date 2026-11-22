@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { buildIlikeOrFilter } from '@saldacargo/shared';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -22,8 +23,9 @@ export async function GET(request: Request) {
       query = query.eq('category', brand);
     }
 
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,article.ilike.%${search}%`);
+    const searchFilter = buildIlikeOrFilter(['name', 'article'], search);
+    if (searchFilter) {
+      query = query.or(searchFilter);
     }
 
     query = query.order('name', { ascending: true });

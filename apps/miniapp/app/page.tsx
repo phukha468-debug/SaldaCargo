@@ -19,19 +19,6 @@ interface Vehicle {
   reg_number: string;
 }
 
-function getCookieValue(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
-  return match?.[2] ? decodeURIComponent(match[2]) : null;
-}
-
-function setClientCookie(name: string, value: string, maxAgeDays = 30) {
-  if (typeof document === 'undefined') return;
-  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-  const sameSitePolicy = isHttps ? '; SameSite=None; Secure' : '; SameSite=Lax';
-  document.cookie = `${name}=${value}; path=/; max-age=${60 * 60 * 24 * maxAgeDays}${sameSitePolicy}`;
-}
-
 function clearClientCookie(name: string) {
   if (typeof document === 'undefined') return;
   const expire = '=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
@@ -94,22 +81,11 @@ export default function RootDispatcher() {
           }
         }
 
-        const cookieId = getCookieValue('salda_user_id');
-        const localId =
-          typeof window !== 'undefined' ? localStorage.getItem('salda_user_id') : null;
         const savedRole =
           typeof window !== 'undefined' ? localStorage.getItem('selected_role') : null;
-        const userId = cookieId || localId;
 
-        // Если сессия не сохранена — остаёмся на экране выбора роли
-        if (!userId || !savedRole) {
-          if (!cancelled) setStep('role');
-          return;
-        }
-
-        // Проверяем валидность сохранённого пользователя
+        // Проверяем валидность подписанной httpOnly сессии на сервере
         const res = await fetch('/api/driver/me', {
-          headers: { 'x-salda-user-id': userId },
           cache: 'no-store',
         });
 
@@ -118,22 +94,23 @@ export default function RootDispatcher() {
         if (res.ok) {
           const user = await res.json();
           if (user && user.id) {
-            setSelectedRole(savedRole);
-            setClientCookie('salda_user_id', user.id);
+            const effectiveRole =
+              savedRole || (Array.isArray(user.roles) ? user.roles[0] : null) || 'driver';
+            setSelectedRole(effectiveRole);
             if (typeof window !== 'undefined') {
               try {
-                localStorage.setItem('salda_user_id', user.id);
+                localStorage.setItem('selected_role', effectiveRole);
               } catch (e) {
                 console.warn('localStorage write failed:', e);
               }
             }
 
             const targetPath =
-              savedRole === 'driver'
+              effectiveRole === 'driver'
                 ? '/driver'
-                : savedRole === 'admin' || savedRole === 'owner'
+                : effectiveRole === 'admin' || effectiveRole === 'owner'
                   ? '/admin'
-                  : savedRole === 'mechanic'
+                  : effectiveRole === 'mechanic'
                     ? '/mechanic'
                     : '/loader';
 
@@ -175,25 +152,14 @@ export default function RootDispatcher() {
   };
 
   const finishLogin = async (user: User) => {
-    setClientCookie('salda_user_id', user.id);
+    void user;
+    // Серверная подписанная httpOnly кука salda_session уже установлена в /api/auth/verify-pin или /api/auth/set-pin
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('salda_user_id', user.id);
-        if (selectedRole) {
-          localStorage.setItem('selected_role', selectedRole);
-        }
+      if (typeof window !== 'undefined' && selectedRole) {
+        localStorage.setItem('selected_role', selectedRole);
       }
     } catch (e) {
       console.warn('localStorage not accessible:', e);
-    }
-    try {
-      await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id }),
-      });
-    } catch (e) {
-      console.warn('Session API error:', e);
     }
   };
 

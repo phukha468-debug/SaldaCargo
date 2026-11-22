@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { generateDeterministicUuid } from '@saldacargo/shared';
+import { generateDeterministicUuid, escapePostgrestValue } from '@saldacargo/shared';
 
 const BANK_WALLET_ID = '10000000-0000-0000-0000-000000000001';
 const TRIP_REVENUE_CAT_ID = '74008cf7-0527-4e9f-afd2-d232b8f8125a'; // Выручка с рейса
@@ -12,9 +12,11 @@ const STO_REVENUE_CAT_ID = '600e7f70-2797-474d-948b-432230036d67'; // Выруч
  * по прямому idempotency_key (UUID) или по маркеру [bank_op:UUID] в description.
  */
 async function findExistingTransactions(supabase: any, idempotencyKey: string) {
+  const safeKey = escapePostgrestValue(idempotencyKey);
+  if (!safeKey) return [];
   const { data, error } = await (supabase.from('transactions') as any)
     .select('id, trip_order_id, idempotency_key, description')
-    .or(`idempotency_key.eq.${idempotencyKey},description.ilike.%${idempotencyKey}%`);
+    .or(`idempotency_key.eq.${safeKey},description.ilike.%${safeKey}%`);
 
   if (error) {
     console.error('Error finding existing transactions for link-bank-op:', error);

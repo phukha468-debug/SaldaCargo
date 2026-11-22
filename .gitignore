@@ -49,6 +49,7 @@ coverage/
 
 # Claude Code (may contain API keys)
 .claude/
+.claude/settings.local.json
 
 # Temporary and local scratch files
 scratch/

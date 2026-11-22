@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { SESSION_COOKIE_WEB, verifySessionToken } from '@saldacargo/shared/session';
+import { verifyCronAuthorization } from '@saldacargo/shared/cron';
 
-export function middleware(request: NextRequest): NextResponse {
+export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get('salda_auth_token')?.value;
+  const rawToken = request.cookies.get(SESSION_COOKIE_WEB)?.value;
+  const session = rawToken ? await verifySessionToken(rawToken) : null;
 
-  // Публичные маршруты, внешние вебхуки и крон-задачи
+  // Публичные маршруты, внешние вебхуки и крон-задачи (cron защищены через CRON_SECRET)
   const isPublicRoute =
     pathname === '/login' ||
     pathname.startsWith('/api/auth') ||
@@ -14,20 +17,35 @@ export function middleware(request: NextRequest): NextResponse {
     pathname.startsWith('/api/public');
 
   if (isPublicRoute) {
-    // Если уже авторизован и переходит на /login — перенаправляем на главную
-    if (token && pathname === '/login') {
+    if (session && pathname === '/login') {
       return NextResponse.redirect(new URL('/', request.url));
     }
     return NextResponse.next();
   }
 
-  // Если токена нет — перенаправляем на страницу входа
-  if (!token) {
+  if (!session) {
+    if (pathname.startsWith('/api/')) {
+      // Разрешаем внутренние серверные cron-запросы с валидным Bearer CRON_SECRET
+      const cronCheck = verifyCronAuthorization(request.headers.get('authorization'));
+      if (cronCheck.ok) {
+        return NextResponse.next();
+      }
+      const res = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      if (rawToken) {
+        res.cookies.delete(SESSION_COOKIE_WEB);
+      }
+      return res;
+    }
+
     const loginUrl = new URL('/login', request.url);
     if (pathname !== '/') {
       loginUrl.searchParams.set('from', pathname);
     }
-    return NextResponse.redirect(loginUrl);
+    const res = NextResponse.redirect(loginUrl);
+    if (rawToken) {
+      res.cookies.delete(SESSION_COOKIE_WEB);
+    }
+    return res;
   }
 
   return NextResponse.next();

@@ -1,14 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 
 async function resolveUserId(supabase: any): Promise<string> {
-  const cookieStore = await cookies();
-  const fromCookie = cookieStore.get('salda_user_id')?.value;
+  const fromCookie = await getVerifiedWebUserId();
   if (fromCookie) return fromCookie;
   const { data } = await (supabase.from('users') as any)
     .select('id')

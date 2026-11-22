@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const CASH_METHODS = ['cash'];
 
@@ -76,8 +76,7 @@ export async function GET() {
 
 /** POST /api/admin/cash-collections — record a cash collection from driver */
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value;
+  const adminId = await getVerifiedMiniappUserId();
   if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as {

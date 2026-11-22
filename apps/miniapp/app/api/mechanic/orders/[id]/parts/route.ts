@@ -1,16 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: orderId } = await params;
   const body = await request.json();
-  const cookieStore = await cookies();
-  const userId =
-    cookieStore.get('salda_user_id')?.value ||
-    request.headers.get('x-salda-user-id') ||
-    body.mechanic_id;
+  const userId = (await getVerifiedMiniappUserId()) || body.mechanic_id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { part_id, custom_part_name, quantity, unit } = body as {
@@ -97,8 +93,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'part_item_id required' }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const userId = cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+  const userId = await getVerifiedMiniappUserId();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();

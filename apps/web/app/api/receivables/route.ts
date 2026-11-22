@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { isInternalCounterparty } from '@saldacargo/shared';
 
 export const dynamic = 'force-dynamic';
@@ -177,8 +177,7 @@ export async function POST(req: Request) {
     }
 
     const supabase = createAdminClient();
-    const cookieStore = await cookies();
-    let adminId = cookieStore.get('salda_user_id')?.value ?? null;
+    let adminId = (await getVerifiedWebUserId()) ?? null;
 
     if (!adminId) {
       const { data: adminUser } = await (supabase as any)

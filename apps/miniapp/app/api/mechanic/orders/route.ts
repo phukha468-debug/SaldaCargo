@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import {
   isOilOrFilterWork,
   extractOrderDates,
@@ -9,23 +9,13 @@ import {
   formatOrderDatesNote,
 } from '@saldacargo/shared';
 
-function getUserId(
-  request: Request,
-  cookieStore: any,
-  searchParams?: URLSearchParams,
-): string | null {
-  return (
-    searchParams?.get('mechanic_id') ||
-    cookieStore.get('salda_user_id')?.value ||
-    request.headers.get('x-salda-user-id') ||
-    null
-  );
+async function getUserId(searchParams?: URLSearchParams): Promise<string | null> {
+  return (await getVerifiedMiniappUserId()) || searchParams?.get('mechanic_id') || null;
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const cookieStore = await cookies();
-  const mechanicId = getUserId(request, cookieStore, searchParams);
+  const mechanicId = await getUserId(searchParams);
   const status = searchParams.get('status') || undefined;
   const unassigned = searchParams.get('unassigned') === 'true';
   const activeStation = searchParams.get('active_station') === 'true';
@@ -250,12 +240,8 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
     const body = await request.json();
-    const mechanicId =
-      body.mechanic_id ||
-      cookieStore.get('salda_user_id')?.value ||
-      request.headers.get('x-salda-user-id');
+    const mechanicId = body.mechanic_id || (await getVerifiedMiniappUserId());
 
     if (!mechanicId) {
       return NextResponse.json({ error: 'Необходима авторизация механика' }, { status: 401 });

@@ -1,13 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 /** GET /api/driver/profile — профиль текущего водителя */
-export async function GET(request: Request) {
-  const cookieStore = await cookies();
-  const driverId =
-    request.headers.get('x-salda-user-id') || cookieStore.get('salda_user_id')?.value;
+export async function GET() {
+  const driverId = await getVerifiedMiniappUserId();
 
   if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -37,9 +35,7 @@ export async function GET(request: Request) {
 
 /** PATCH /api/driver/profile — обновить закреплённую машину */
 export async function PATCH(request: Request) {
-  const cookieStore = await cookies();
-  const driverId =
-    request.headers.get('x-salda-user-id') || cookieStore.get('salda_user_id')?.value;
+  const driverId = await getVerifiedMiniappUserId();
 
   if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

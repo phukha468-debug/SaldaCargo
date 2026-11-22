@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getMaxBotEnv, getYandexMapsEnv, checkRateLimit, getClientIp } from '@saldacargo/shared';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +18,18 @@ export async function OPTIONS() {
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`public-delivery:${ip}`, { limit: 20, windowMs: 60 * 1000 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Слишком много запросов. Попробуйте через минуту.' },
+        {
+          status: 429,
+          headers: { ...CORS_HEADERS, 'Retry-After': String(rl.retryAfterSeconds) },
+        },
+      );
+    }
+
     const body = await request.json();
 
     if (body.action === 'verify_pin') {
@@ -87,8 +100,7 @@ export async function POST(request: Request) {
         );
       }
 
-      const yandexApiKey =
-        process.env.YANDEX_MAPS_API_KEY || 'bb711687-f130-43ef-bde7-9308dfa82254';
+      const yandexApiKey = getYandexMapsEnv()?.apiKey ?? '';
 
       return NextResponse.json(
         {
@@ -347,9 +359,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Отправляем в MAX Бот администраторам и диспетчеру
-    const maxToken =
-      process.env.MAX_BOT_TOKEN ||
-      'f9LHodD0cOKEmAc4Iy6Hq4JXmmVPVRpQ7vULw35IPAeFKQZMIpb1fSAwl5wl_mY1GcLcovMyJXcGngyIqypb';
+    const maxToken = getMaxBotEnv()?.token;
     if (maxToken) {
       try {
         const { data: adminUsers } = await (supabaseAdmin

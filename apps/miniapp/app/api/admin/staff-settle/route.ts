@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
@@ -223,8 +223,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const adminId = cookieStore.get('salda_user_id')?.value;
+    const adminId = await getVerifiedMiniappUserId();
     if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const supabase = createAdminClient();

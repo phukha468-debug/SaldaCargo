@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { cookies } from 'next/headers';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import { calculateOrderPayroll } from '@saldacargo/domain-payroll';
 import {
@@ -21,9 +21,7 @@ import { syncTripFinancials } from '@/lib/tripFinancials';
  */
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const currentUserId =
-      cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+    const currentUserId = await getVerifiedMiniappUserId();
 
     const body = (await request.json()) as {
       counterparty_id?: string;

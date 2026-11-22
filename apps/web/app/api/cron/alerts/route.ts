@@ -13,6 +13,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyCronAuthorization, notifyCronFailure } from '@saldacargo/shared';
 
 const MAX_BOT_API = 'https://botapi.max.ru';
 
@@ -63,18 +64,21 @@ function formatLoanAlerts(loans: any[]): string {
 }
 
 export async function GET(req: NextRequest) {
-  // Раскомментировать в продакшне для защиты endpoint'а:
-  // const secret = req.headers.get('authorization');
-  // if (secret !== `Bearer ${process.env.CRON_SECRET}`) {
-  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  // }
+  const authHeader = req.headers.get('authorization');
+  const cronAuth = verifyCronAuthorization(authHeader);
+  if (!cronAuth.ok) {
+    return NextResponse.json({ error: cronAuth.error }, { status: cronAuth.status });
+  }
 
   try {
     const supabase = createAdminClient();
 
     // Получаем данные параллельно
     const [alertsRes, { data: admins }] = await Promise.all([
-      fetch(`${req.nextUrl.origin}/api/alerts`).then((r) => r.json()),
+      fetch(`${req.nextUrl.origin}/api/alerts`, {
+        headers: authHeader ? { Authorization: authHeader } : undefined,
+        cache: 'no-store',
+      }).then((r) => r.json()),
       (supabase.from('users') as any)
         .select('id, name, max_user_id')
         .contains('roles', ['admin'])
@@ -107,6 +111,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ sent: recipients.length, total_alerts: total });
   } catch (err: any) {
+    await notifyCronFailure('alerts', err);
     return NextResponse.json({ error: err?.message }, { status: 500 });
   }
 }

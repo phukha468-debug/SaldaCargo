@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import https from 'https';
+import { requireOpti24Env } from '@saldacargo/shared';
 
 export interface Opti24Card {
   id: string;
@@ -45,16 +46,7 @@ const cardBalanceCache = new Map<string, { data: any; cachedAt: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 минут кэш для экономии лимита 500 запросов/мес
 
 function getEnvConfig() {
-  const apiUrl = process.env.OPTI24_API_URL || 'https://api-demo.opti-24.ru';
-  const login = process.env.OPTI24_LOGIN || 'demo';
-  const passwordHash =
-    process.env.OPTI24_PASSWORD_HASH ||
-    '243460ae9475d4e1120ee2ba38e8883f3999a1cb808bc482d6820e5b401173cf28abdbebf676cc063e7798957daf4b4aecbe0606e7a78190909c75b7cff101eb';
-  const apiKey =
-    process.env.OPTI24_API_KEY ||
-    'GPN.3ce7b860ece5758d1d27c7f8b4796ea79b33927e.630c2bc76676191bd6e94222d9acaaf56bc0a750';
-
-  return { apiUrl, login, passwordHash, apiKey };
+  return requireOpti24Env();
 }
 
 function requestOpti24(

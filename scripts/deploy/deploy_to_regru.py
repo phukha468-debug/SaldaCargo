@@ -14,14 +14,35 @@ if sys.platform == 'win32':
     except Exception:
         pass
 
-HOST = "31.31.197.28"
-PORT = 22
-USER = "u3466140"
-PASS = "9L4Rb1EVhX7tVefb"
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def _load_dotenv_file(path):
+    if not os.path.isfile(path):
+        return
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            k, v = line.split('=', 1)
+            k = k.strip()
+            if k and k not in os.environ:
+                os.environ[k] = v.strip().strip('"').strip("'")
+
+_load_dotenv_file(os.path.join(REPO_ROOT, ".env.local"))
+
+HOST = os.environ.get("REGRU_SFTP_HOST", "").strip()
+PORT = int(os.environ.get("REGRU_SFTP_PORT", "22").strip() or "22")
+USER = os.environ.get("REGRU_SFTP_USER", "").strip()
+PASS = os.environ.get("REGRU_SFTP_PASS", "").strip()
+if not (HOST and USER and PASS):
+    raise RuntimeError(
+        "Не заданы переменные окружения REGRU_SFTP_HOST, REGRU_SFTP_USER, REGRU_SFTP_PASS "
+        "(проверьте .env.local или переменные среды)."
+    )
 TARGET_DIRS = ["www/tk501.ru", "www/ancargo66.ru"]
 
 # Выгружаем файлы непосредственно из apps/web/public (где находится актуальный calc.html)
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LOCAL_DIR = os.path.join(REPO_ROOT, "apps", "web", "public")
 if not os.path.isdir(LOCAL_DIR):
     raise FileNotFoundError(f"Папка с файлами для выгрузки не найдена: {LOCAL_DIR}")

@@ -1,0 +1,526 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  generateDeterministicUuid,
+  FINANCIAL_WALLETS,
+  FINANCIAL_CATEGORIES,
+  isInternalCounterparty,
+} from '@saldacargo/shared';
+
+const TRIP_REVENUE_CATEGORY = FINANCIAL_CATEGORIES.TRIP_REVENUE;
+const CASH_ID = FINANCIAL_WALLETS.CASH;
+const BANK_ID = FINANCIAL_WALLETS.BANK;
+const FUEL_CARD_ID = FINANCIAL_WALLETS.FUEL_CARD;
+const FUEL_CUBE_ID = FINANCIAL_WALLETS.FUEL_CUBE;
+const PAYROLL_DRIVER_CAT = FINANCIAL_CATEGORIES.PAYROLL_DRIVER;
+const PAYROLL_LOADER_CAT = FINANCIAL_CATEGORIES.PAYROLL_LOADER;
+const CAT_FUEL = FINANCIAL_CATEGORIES.FUEL;
+const CAT_OTHER = FINANCIAL_CATEGORIES.OTHER;
+const CASH_COLLECT_CAT = FINANCIAL_CATEGORIES.CASH_COLLECT;
+
+export async function syncTripFinancials(
+  supabase: any,
+  tripId: string,
+  adminId: string | null = null,
+) {
+  // 1. Fetch trip and all active orders
+  const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
+    .select(
+      `
+      id, trip_number, driver_id, loader_id, admin_note, driver_note, started_at, created_at, lifecycle_status,
+      driver:users!trips_driver_id_fkey(id, name),
+      trip_orders(
+        id, amount, payment_method, settlement_status, lifecycle_status, description,
+        direction, is_driver_loader, driver_car_pay, driver_loader_pay, driver_pay,
+        loaders_data, loader_id, loader_pay, loader2_id, loader2_pay,
+        counterparty:counterparties(name),
+        loader:users!trip_orders_loader_id_fkey(id, name),
+        loader2:users!trip_orders_loader2_id_fkey(id, name)
+      )
+      `,
+    )
+    .eq('id', tripId)
+    .single();
+
+  if (fetchErr || !trip) return;
+
+  if (trip.lifecycle_status === 'cancelled') {
+    // Рейс отменён — аннулируем все связанные транзакции рейса
+    await (supabase.from('transactions') as any)
+      .update({
+        lifecycle_status: 'cancelled',
+        cancelled_reason: `Рейс №${trip.trip_number} отменён`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('trip_id', tripId)
+      .neq('lifecycle_status', 'cancelled');
+    return;
+  }
+
+  // Only approved trips participate in financial balances, wallets and receivables
+  if (trip.lifecycle_status !== 'approved') return;
+
+  const orders = ((trip.trip_orders as any[]) ?? []).filter(
+    (o: any) => o.lifecycle_status !== 'cancelled',
+  );
+
+  // 2. Synchronize settlement_status of each order based on payment_method
+  for (const o of orders) {
+    let expectedSettlement: 'pending' | 'completed' = 'completed';
+    const isInternal = isInternalCounterparty((o.counterparty as any)?.name);
+    if (isInternal) {
+      expectedSettlement = 'completed';
+    } else if (
+      o.payment_method === 'debt_cash' ||
+      o.payment_method === 'debt' ||
+      o.payment_method === 'debt_bank' ||
+      o.payment_method === 'bank_invoice'
+    ) {
+      expectedSettlement = 'pending';
+    } else if (
+      o.payment_method === 'cash' ||
+      o.payment_method === 'card_driver' ||
+      o.payment_method === 'qr'
+    ) {
+      expectedSettlement = 'completed';
+    }
+    if (o.settlement_status !== expectedSettlement) {
+      await (supabase.from('trip_orders') as any)
+        .update({ settlement_status: expectedSettlement })
+        .eq('id', o.id);
+      o.settlement_status = expectedSettlement;
+    }
+  }
+
+  function buildOrderDescription(ordersList: any[], label: string) {
+    const names = [
+      ...new Set(
+        ordersList
+          .map((o: any) => (o.counterparty as any)?.name ?? o.description ?? null)
+          .filter(Boolean),
+      ),
+    ] as string[];
+    return [
+      `Рейс №${trip.trip_number}`,
+      (trip.driver as any)?.name ?? null,
+      names.length > 0 ? names.join(', ') : null,
+      label,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  // 3. Sync Cash Income (strictly cash, excluding internal company orders)
+  const cashOrders = orders.filter(
+    (o: any) =>
+      o.payment_method === 'cash' && !isInternalCounterparty((o.counterparty as any)?.name),
+  );
+  const cashTotal = cashOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+
+  // Вычитаем расходы наличными (например, заправка за наличные), оплаченные водителем из выручки рейса
+  const { data: tripCashExpensesData } = await (supabase.from('trip_expenses') as any)
+    .select('amount')
+    .eq('trip_id', tripId)
+    .eq('payment_method', 'cash');
+  const cashExpensesTotal = (tripCashExpensesData ?? []).reduce(
+    (s: number, e: any) => s + parseFloat(e.amount ?? '0'),
+    0,
+  );
+  const netCashHold = Math.max(0, cashTotal - cashExpensesTotal);
+
+  const cashIdempotency = generateDeterministicUuid(`trip-income-cash-${tripId}`);
+  const holdIdempotency = generateDeterministicUuid(`trip-cash-hold-${tripId}`);
+
+  const isCashNotSurrendered =
+    (trip.admin_note ?? '').includes('[CASH_NOT_SURRENDERED]') ||
+    (trip.driver_note ?? '').includes('[CASH_NOT_COLLECTED]') ||
+    (trip.driver_note ?? '').includes('[НЕ СДАНО В КАССУ') ||
+    (trip.driver_note ?? '').includes('[ПЕРЕНОС НАЛИЧНЫХ') ||
+    (trip.driver_note ?? '').includes('[CARRYOVER]');
+
+  const { data: existingCashTx } = await (supabase.from('transactions') as any)
+    .select('id')
+    .eq('trip_id', tripId)
+    .eq('category_id', TRIP_REVENUE_CATEGORY)
+    .eq('to_wallet_id', CASH_ID)
+    .maybeSingle();
+
+  const { data: existingHoldTx } = await (supabase.from('transactions') as any)
+    .select('id')
+    .eq('trip_id', tripId)
+    .eq('category_id', CASH_COLLECT_CAT)
+    .maybeSingle();
+
+  const tripDate = trip.started_at || trip.created_at || new Date().toISOString();
+
+  if (cashTotal > 0) {
+    if (isCashNotSurrendered) {
+      // Наличные НЕ сданы в кассу/сейф: удаляем доход сейфа, если он был
+      if (existingCashTx) {
+        await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
+      }
+
+      // Создаём или обновляем подотчёт сотрудника (водителя или грузчика)
+      const responsibleUserId =
+        trip.driver_id ||
+        trip.loader_id ||
+        orders.find((o: any) => o.loader_id)?.loader_id ||
+        orders.find((o: any) => o.loaders_data?.[0]?.loader_id)?.loaders_data?.[0]?.loader_id ||
+        null;
+
+      const { data: userWallet } = responsibleUserId
+        ? await (supabase.from('wallets') as any)
+            .select('id')
+            .eq('owner_user_id', responsibleUserId)
+            .in('type', ['driver_accountable', 'staff_accountable', 'employee'])
+            .limit(1)
+            .maybeSingle()
+        : { data: null };
+
+      const holdDescription = `[CARRYOVER] Рейс №${trip.trip_number} · Наличные на руках (не сданы в кассу)`;
+
+      if (existingHoldTx) {
+        await (supabase.from('transactions') as any)
+          .update({
+            amount: netCashHold.toFixed(2),
+            direction: 'transfer',
+            category_id: CASH_COLLECT_CAT,
+            from_wallet_id: userWallet?.id ?? null,
+            to_wallet_id: CASH_ID,
+            related_user_id: responsibleUserId,
+            description: holdDescription,
+            lifecycle_status: 'approved',
+            settlement_status: 'pending',
+            transaction_date: tripDate,
+          })
+          .eq('id', existingHoldTx.id);
+      } else {
+        await (supabase.from('transactions') as any).insert({
+          direction: 'transfer',
+          category_id: CASH_COLLECT_CAT,
+          amount: netCashHold.toFixed(2),
+          from_wallet_id: userWallet?.id ?? null,
+          to_wallet_id: CASH_ID,
+          trip_id: tripId,
+          related_user_id: responsibleUserId,
+          description: holdDescription,
+          lifecycle_status: 'approved',
+          settlement_status: 'pending',
+          transaction_date: tripDate,
+          created_at: tripDate,
+          created_by: adminId || responsibleUserId,
+          idempotency_key: holdIdempotency,
+        });
+      }
+    } else {
+      // Наличные сданы: удаляем подотчёт рейса, если он был
+      if (existingHoldTx) {
+        await (supabase.from('transactions') as any).delete().eq('id', existingHoldTx.id);
+      }
+
+      // Создаём или обновляем доход в сейф
+      if (existingCashTx) {
+        await (supabase.from('transactions') as any)
+          .update({
+            amount: cashTotal.toFixed(2),
+            description: buildOrderDescription(cashOrders, 'Нал'),
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            transaction_date: tripDate,
+            created_at: tripDate,
+          })
+          .eq('id', existingCashTx.id);
+      } else {
+        await (supabase.from('transactions') as any).insert({
+          direction: 'income',
+          category_id: TRIP_REVENUE_CATEGORY,
+          amount: cashTotal.toFixed(2),
+          to_wallet_id: CASH_ID,
+          trip_id: tripId,
+          description: buildOrderDescription(cashOrders, 'Нал'),
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          transaction_date: tripDate,
+          created_at: tripDate,
+          created_by: adminId,
+          idempotency_key: cashIdempotency,
+        });
+      }
+    }
+  } else {
+    if (existingCashTx) {
+      await (supabase.from('transactions') as any).delete().eq('id', existingCashTx.id);
+    }
+    if (existingHoldTx) {
+      await (supabase.from('transactions') as any).delete().eq('id', existingHoldTx.id);
+    }
+  }
+
+  // 4. Sync QR / Bank Income (qr + legacy card_driver, excluding internal company orders)
+  const qrOrders = orders.filter(
+    (o: any) =>
+      (o.payment_method === 'qr' || o.payment_method === 'card_driver') &&
+      !isInternalCounterparty((o.counterparty as any)?.name),
+  );
+  const qrTotal = qrOrders.reduce((s: number, o: any) => s + parseFloat(o.amount ?? '0'), 0);
+  const qrIdempotency = generateDeterministicUuid(`trip-income-qr-${tripId}`);
+
+  const { data: existingQrTx } = await (supabase.from('transactions') as any)
+    .select('id')
+    .eq('trip_id', tripId)
+    .eq('category_id', TRIP_REVENUE_CATEGORY)
+    .eq('to_wallet_id', BANK_ID)
+    .maybeSingle();
+
+  if (qrTotal > 0) {
+    const tripDate = trip.started_at || trip.created_at;
+    if (existingQrTx) {
+      await (supabase.from('transactions') as any)
+        .update({
+          amount: qrTotal.toFixed(2),
+          description: buildOrderDescription(qrOrders, 'QR/Безнал'),
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          transaction_date: tripDate,
+          created_at: tripDate,
+        })
+        .eq('id', existingQrTx.id);
+    } else {
+      await (supabase.from('transactions') as any).insert({
+        direction: 'income',
+        category_id: TRIP_REVENUE_CATEGORY,
+        amount: qrTotal.toFixed(2),
+        to_wallet_id: BANK_ID,
+        trip_id: tripId,
+        description: buildOrderDescription(qrOrders, 'QR/Безнал'),
+        lifecycle_status: 'approved',
+        settlement_status: 'completed',
+        transaction_date: tripDate,
+        created_at: tripDate,
+        created_by: adminId,
+        idempotency_key: qrIdempotency,
+      });
+    }
+  } else if (existingQrTx) {
+    await (supabase.from('transactions') as any).delete().eq('id', existingQrTx.id);
+  }
+
+  // 5. Sync Driver Payroll
+  if (trip.driver_id) {
+    const driverPay = orders.reduce((s: number, o: any) => s + parseFloat(o.driver_pay ?? '0'), 0);
+    const { data: existingDriverTx } = await (supabase.from('transactions') as any)
+      .select('id')
+      .eq('trip_id', tripId)
+      .eq('category_id', PAYROLL_DRIVER_CAT)
+      .eq('related_user_id', trip.driver_id)
+      .maybeSingle();
+
+    if (driverPay > 0) {
+      if (existingDriverTx) {
+        await (supabase.from('transactions') as any)
+          .update({
+            amount: driverPay.toFixed(2),
+            lifecycle_status: 'approved',
+            transaction_date: trip.started_at,
+          })
+          .eq('id', existingDriverTx.id);
+      } else {
+        await (supabase.from('transactions') as any).insert({
+          direction: 'expense',
+          category_id: PAYROLL_DRIVER_CAT,
+          amount: driverPay.toFixed(2),
+          description: `ЗП: ${(trip.driver as any)?.name ?? 'Водитель'} — рейс №${trip.trip_number}`,
+          lifecycle_status: 'approved',
+          settlement_status: 'pending',
+          employee_confirmed: true,
+          related_user_id: trip.driver_id,
+          trip_id: tripId,
+          transaction_date: trip.started_at,
+          created_by: adminId,
+          idempotency_key: generateDeterministicUuid(
+            `trip-payroll-driver-${tripId}-${trip.driver_id}`,
+          ),
+        });
+      }
+    } else if (existingDriverTx) {
+      await (supabase.from('transactions') as any).delete().eq('id', existingDriverTx.id);
+    }
+  }
+
+  // 6. Sync Loader Payroll (поддержка динамического loaders_data + fallback на loader_id / loader2_id)
+  const loaderPayMap = new Map<string, { name: string; pay: number }>();
+  for (const o of orders) {
+    if (Array.isArray(o.loaders_data) && o.loaders_data.length > 0) {
+      for (const item of o.loaders_data) {
+        if (item?.id && parseFloat(item.pay ?? '0') > 0) {
+          const prev = loaderPayMap.get(item.id) ?? { name: item.name ?? 'Грузчик', pay: 0 };
+          loaderPayMap.set(item.id, { ...prev, pay: prev.pay + parseFloat(item.pay) });
+        }
+      }
+    } else {
+      if (o.loader_id && parseFloat(o.loader_pay ?? '0') > 0) {
+        const prev = loaderPayMap.get(o.loader_id) ?? { name: o.loader?.name ?? 'Грузчик', pay: 0 };
+        loaderPayMap.set(o.loader_id, { ...prev, pay: prev.pay + parseFloat(o.loader_pay) });
+      }
+      if (o.loader2_id && parseFloat(o.loader2_pay ?? '0') > 0) {
+        const prev = loaderPayMap.get(o.loader2_id) ?? {
+          name: o.loader2?.name ?? 'Грузчик',
+          pay: 0,
+        };
+        loaderPayMap.set(o.loader2_id, { ...prev, pay: prev.pay + parseFloat(o.loader2_pay) });
+      }
+    }
+  }
+
+  // Получаем все существующие транзакции грузчиков для рейса
+  const { data: existingLoaderTxs } = await (supabase.from('transactions') as any)
+    .select('id, related_user_id')
+    .eq('trip_id', tripId)
+    .eq('category_id', PAYROLL_LOADER_CAT);
+
+  const processedUserIds = new Set<string>();
+
+  for (const [userId, { name, pay }] of loaderPayMap) {
+    processedUserIds.add(userId);
+    const existingLoaderTx = (existingLoaderTxs ?? []).find(
+      (t: any) => t.related_user_id === userId,
+    );
+
+    if (pay > 0) {
+      if (existingLoaderTx) {
+        await (supabase.from('transactions') as any)
+          .update({
+            amount: pay.toFixed(2),
+            lifecycle_status: 'approved',
+            transaction_date: trip.started_at,
+          })
+          .eq('id', existingLoaderTx.id);
+      } else {
+        await (supabase.from('transactions') as any).insert({
+          direction: 'expense',
+          category_id: PAYROLL_LOADER_CAT,
+          amount: pay.toFixed(2),
+          description: `ЗП: ${name} — рейс №${trip.trip_number}`,
+          lifecycle_status: 'approved',
+          settlement_status: 'pending',
+          employee_confirmed: true,
+          related_user_id: userId,
+          trip_id: tripId,
+          transaction_date: trip.started_at,
+          created_by: adminId,
+          idempotency_key: generateDeterministicUuid(`trip-payroll-loader-${tripId}-${userId}`),
+        });
+      }
+    }
+  }
+
+  // Удаляем транзакции грузчиков, которые были удалены из заказа
+  for (const tx of existingLoaderTxs ?? []) {
+    if (!processedUserIds.has(tx.related_user_id)) {
+      await (supabase.from('transactions') as any).delete().eq('id', tx.id);
+    }
+  }
+
+  // 7. Sync Trip Expenses (Fuel Card, Cash, etc.)
+  const { data: tripExpenses } = await (supabase.from('trip_expenses') as any)
+    .select('id, amount, payment_method, category_id, description, linked_expense_tx_id')
+    .eq('trip_id', tripId);
+
+  const activeTxIds = new Set<string>();
+
+  for (const exp of tripExpenses ?? []) {
+    const amountNum = parseFloat(exp.amount ?? '0');
+    if (amountNum <= 0) continue;
+
+    let walletId: string | null = null;
+    if (exp.payment_method === 'fuel_card') {
+      walletId = FUEL_CARD_ID;
+    } else if (exp.payment_method === 'cash') {
+      walletId = CASH_ID;
+    } else if (exp.payment_method === 'cube') {
+      walletId = FUEL_CUBE_ID;
+    }
+
+    if (!walletId) continue;
+
+    const catId =
+      exp.category_id ||
+      (exp.payment_method === 'fuel_card' || exp.payment_method === 'cube' ? CAT_FUEL : CAT_OTHER);
+    const desc = exp.description
+      ? `Расход рейса №${trip.trip_number}: ${exp.description}`
+      : `Расход рейса №${trip.trip_number} (${exp.payment_method === 'cube' ? 'Кубик ДТ' : exp.payment_method === 'fuel_card' ? 'Топливная карта' : 'Наличные'})`;
+
+    const txIdemp = generateDeterministicUuid(`trip-expense-${exp.id}`);
+
+    let existingExpTx: any = null;
+    if (exp.linked_expense_tx_id) {
+      const { data } = await (supabase.from('transactions') as any)
+        .select('id')
+        .eq('id', exp.linked_expense_tx_id)
+        .maybeSingle();
+      existingExpTx = data;
+    }
+    if (!existingExpTx) {
+      const { data } = await (supabase.from('transactions') as any)
+        .select('id')
+        .eq('idempotency_key', txIdemp)
+        .maybeSingle();
+      existingExpTx = data;
+    }
+
+    if (existingExpTx) {
+      activeTxIds.add(existingExpTx.id);
+      activeTxIds.add(txIdemp);
+      await (supabase.from('transactions') as any)
+        .update({
+          amount: amountNum.toFixed(2),
+          description: desc,
+          category_id: catId,
+          from_wallet_id: walletId,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+        })
+        .eq('id', existingExpTx.id);
+
+      await (supabase.from('trip_expenses') as any)
+        .update({ linked_expense_tx_id: existingExpTx.id })
+        .eq('id', exp.id);
+    } else {
+      const { data: insertedTx } = await (supabase.from('transactions') as any)
+        .insert({
+          direction: 'expense',
+          category_id: catId,
+          amount: amountNum.toFixed(2),
+          from_wallet_id: walletId,
+          trip_id: tripId,
+          description: desc,
+          lifecycle_status: 'approved',
+          settlement_status: 'completed',
+          created_by: adminId,
+          idempotency_key: txIdemp,
+        })
+        .select('id')
+        .single();
+
+      if (insertedTx?.id) {
+        activeTxIds.add(insertedTx.id);
+        activeTxIds.add(txIdemp);
+        await (supabase.from('trip_expenses') as any)
+          .update({ linked_expense_tx_id: insertedTx.id })
+          .eq('id', exp.id);
+      }
+    }
+  }
+
+  // Cleanup orphaned expense transactions for this trip
+  const { data: allTripExpenseTxs } = await (supabase.from('transactions') as any)
+    .select('id, idempotency_key')
+    .eq('trip_id', tripId)
+    .eq('direction', 'expense')
+    .in('category_id', [CAT_FUEL, CAT_OTHER]);
+
+  for (const tx of allTripExpenseTxs ?? []) {
+    if (!activeTxIds.has(tx.id) && !activeTxIds.has(tx.idempotency_key)) {
+      await (supabase.from('transactions') as any).delete().eq('id', tx.id);
+    }
+  }
+}

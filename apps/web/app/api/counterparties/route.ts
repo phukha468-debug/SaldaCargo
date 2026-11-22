@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-import { resolveKnownMasterCounterpartyId, cleanCounterpartySearchName } from '@saldacargo/shared';
+import {
+  resolveKnownMasterCounterpartyId,
+  cleanCounterpartySearchName,
+  escapePostgrestValue,
+} from '@saldacargo/shared';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const FUEL_CATEGORY_ID = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
@@ -529,11 +533,15 @@ export async function POST(request: Request) {
 
     // 3. Защита от дублей по очищенному наименованию среди активных контрагентов
     const simplifiedName = cleanCounterpartySearchName(cleanName);
-    const { data: existingList } = await (supabase.from('counterparties') as any)
-      .select('id, name, is_active')
-      .eq('is_active', true)
-      .or(`name.ilike.%${cleanName}%,name.ilike.%${simplifiedName || cleanName}%`)
-      .limit(5);
+    const safeClean = escapePostgrestValue(cleanName);
+    const safeSimplified = escapePostgrestValue(simplifiedName || cleanName);
+    const { data: existingList } = safeClean
+      ? await (supabase.from('counterparties') as any)
+          .select('id, name, is_active')
+          .eq('is_active', true)
+          .or(`name.ilike.%${safeClean}%,name.ilike.%${safeSimplified || safeClean}%`)
+          .limit(5)
+      : { data: [] };
 
     const existingMatch = (existingList || []).find((cp: any) => {
       const existingClean = cleanCounterpartySearchName(cp.name);

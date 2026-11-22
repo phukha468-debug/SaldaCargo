@@ -1,15 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const CASH_METHODS = ['cash'];
 const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 const CASH_WALLET_ID = '10000000-0000-0000-0000-000000000002'; // Сейф
 
 async function resolveAdminUserId(supabase: any): Promise<string> {
-  const cookieStore = await cookies();
-  const fromCookie = cookieStore.get('salda_user_id')?.value;
+  const fromCookie = await getVerifiedWebUserId();
   if (fromCookie) return fromCookie;
 
   const { data } = await (supabase.from('users') as any)

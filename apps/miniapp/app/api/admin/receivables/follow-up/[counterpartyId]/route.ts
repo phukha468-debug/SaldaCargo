@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 /** PATCH /api/admin/receivables/follow-up/[counterpartyId] — upsert follow-up record */
 export async function PATCH(
@@ -10,8 +10,7 @@ export async function PATCH(
 ) {
   const { counterpartyId } = await params;
 
-  const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value;
+  const adminId = await getVerifiedMiniappUserId();
   if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();

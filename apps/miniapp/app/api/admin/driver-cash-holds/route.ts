@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
 
@@ -75,9 +75,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const adminId =
-      cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+    const adminId = await getVerifiedMiniappUserId();
 
     const supabase = createAdminClient();
 
@@ -168,9 +166,7 @@ export async function POST(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const adminId =
-      cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+    const adminId = await getVerifiedMiniappUserId();
 
     const supabase = createAdminClient();
 

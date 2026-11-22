@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const cookieStore = await cookies();
-    const userId =
-      searchParams.get('user_id') ||
-      request.headers.get('x-salda-user-id') ||
-      cookieStore.get('salda_user_id')?.value;
+    const userId = searchParams.get('user_id') || (await getVerifiedWebUserId());
 
     if (!userId) {
       return NextResponse.json({ error: 'user_id required' }, { status: 400 });
@@ -53,11 +49,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const cookieStore = await cookies();
-    const userId =
-      body.user_id ||
-      request.headers.get('x-salda-user-id') ||
-      cookieStore.get('salda_user_id')?.value;
+    const userId = body.user_id || (await getVerifiedWebUserId());
 
     const { is_online, address, has_transport } = body;
 

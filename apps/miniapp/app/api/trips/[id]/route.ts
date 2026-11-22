@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 /** GET /api/trips/:id — детали рейса */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -38,8 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 /** PATCH /api/trips/:id — обновить поля рейса (только loaders_count, trip_type) */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const driverId = cookieStore.get('salda_user_id')?.value;
+  const driverId = await getVerifiedMiniappUserId();
   if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as Record<string, unknown>;
@@ -73,9 +72,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 /** DELETE /api/trips/:id — отменить/удалить рейс (водитель — свой не апрувнутый, администратор — любой) */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const callerId =
-    cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+  const callerId = await getVerifiedMiniappUserId();
   if (!callerId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createAdminClient();

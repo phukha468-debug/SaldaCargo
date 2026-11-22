@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOpti24ContractBalance, getOpti24Cards } from '@/lib/opti24';
+import { isEnvConfigError } from '@saldacargo/shared';
 
 // Простой счетчик дневных вызовов в памяти инстанса
 let dailyCallsCount = 0;
@@ -95,12 +96,13 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     console.error('Opti24 Route Error:', error);
+    const status = isEnvConfigError(error) ? 503 : 500;
     return NextResponse.json(
       {
         success: false,
         error: error?.message || 'Ошибка запроса к Opti24 API',
       },
-      { status: 500 },
+      { status },
     );
   }
 }

@@ -1,6 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { createWebApiHandler } from '@/lib/api';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 
 const WALLET_IDS: Record<string, string> = {
   bank: '10000000-0000-0000-0000-000000000001',
@@ -9,53 +11,58 @@ const WALLET_IDS: Record<string, string> = {
   garage: '10000000-0000-0000-0000-000000000005',
 };
 
-// payment_method to use when moving trip_order income to a wallet
 const WALLET_TO_METHOD: Record<string, string> = {
   bank: 'bank_invoice',
   cash: 'cash',
 };
 
+const transferSchema = z.object({
+  item_id: z.string().uuid('Некорректный item_id'),
+  source: z.enum(['trip_order', 'transaction']),
+  direction: z.enum(['in', 'out']).optional(),
+  target_wallet: z.enum(['bank', 'cash', 'card', 'fuel_card', 'garage']),
+});
+
 /**
  * POST /api/wallets/transfer
- * Body: { item_id, source: 'trip_order'|'transaction', direction: 'in'|'out', target_wallet: 'bank'|'cash'|'card'|'fuel_card'|'garage' }
  */
-export async function POST(request: Request) {
-  try {
-    const { item_id, source, direction, target_wallet } = (await request.json()) as {
-      item_id: string;
-      source: 'trip_order' | 'transaction';
-      direction: 'in' | 'out';
-      target_wallet: 'bank' | 'cash' | 'card' | 'fuel_card' | 'garage';
-    };
-
-    if (!item_id || !source || !target_wallet) {
-      return NextResponse.json(
-        { error: 'item_id, source, target_wallet обязательны' },
-        { status: 400 },
-      );
-    }
-
+export const POST = createWebApiHandler(
+  {
+    routeName: 'web:/api/wallets/transfer',
+    roles: ['admin', 'owner'],
+    bodySchema: transferSchema,
+  },
+  async ({ body }) => {
+    const { item_id, source, direction, target_wallet } = body;
     const supabase = createAdminClient();
 
     if (source === 'trip_order') {
       const newMethod = WALLET_TO_METHOD[target_wallet];
-      const { error } = await (supabase.from('trip_orders') as any)
+      if (!newMethod) {
+        return NextResponse.json(
+          { error: 'Недопустимый кошелёк для заказа рейса' },
+          { status: 400 },
+        );
+      }
+      const { error } = await supabase
+        .from('trip_orders')
         .update({ payment_method: newMethod, settlement_status: 'completed' })
         .eq('id', item_id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    } else if (source === 'transaction') {
+    } else {
       const walletId = WALLET_IDS[target_wallet];
+      if (!walletId) {
+        return NextResponse.json({ error: 'Недопустимый целевой кошелёк' }, { status: 400 });
+      }
       const field = direction === 'in' ? 'to_wallet_id' : 'from_wallet_id';
-      const { error } = await (supabase.from('transactions') as any)
+      const { error } = await supabase
+        .from('transactions')
         .update({ [field]: walletId })
         .eq('id', item_id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    } else {
-      return NextResponse.json({ error: 'cash_collection нельзя перенести' }, { status: 400 });
     }
 
+    invalidateWalletsCache();
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Ошибка' }, { status: 500 });
-  }
-}
+  },
+);

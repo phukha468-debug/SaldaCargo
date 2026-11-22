@@ -7,6 +7,7 @@ import {
   fetchWialonValdaiPositions,
   calibrateWialonOdometer,
 } from '@saldacargo/domain-service';
+import { getWialonEnv } from '@saldacargo/shared';
 
 /**
  * Нормализация госномера (очистка от спецсимволов и приведение латинских аналогов к кириллице)
@@ -279,20 +280,22 @@ async function processWialonEvent(req: Request) {
         `[Wialon Webhook] Получен заниженный одометр ${odoValue} км (меньше текущего ${currentAssetOdo} км). Запрашиваем фактический одометр из Wialon...`,
       );
       try {
-        const positions = await fetchWialonValdaiPositions(
-          process.env.WIALON_HOST || 'https://host.local4.wialon.host',
-          process.env.WIALON_TOKEN ||
-            '561a6efcd9ed8d38d0ff3b80c29253f01653C6698177A6D92E360BBD0D70D0B6AF5240DE',
-        );
-        const matchPos = positions.find(
-          (p) =>
-            normalizeRegNumber(p.regNumber) === normalizeRegNumber(asset.reg_number || '') ||
-            p.id === Number(unitIdStr),
-        );
-        if (matchPos && matchPos.odometerKm > 0) {
-          odoValue = Math.max(matchPos.odometerKm, currentAssetOdo);
-        } else {
+        const wialonEnv = getWialonEnv();
+        if (!wialonEnv) {
+          console.warn('[Wialon Webhook] WIALON_TOKEN не настроен, оставляем текущий одометр.');
           odoValue = currentAssetOdo;
+        } else {
+          const positions = await fetchWialonValdaiPositions(wialonEnv.host, wialonEnv.token);
+          const matchPos = positions.find(
+            (p) =>
+              normalizeRegNumber(p.regNumber) === normalizeRegNumber(asset.reg_number || '') ||
+              p.id === Number(unitIdStr),
+          );
+          if (matchPos && matchPos.odometerKm > 0) {
+            odoValue = Math.max(matchPos.odometerKm, currentAssetOdo);
+          } else {
+            odoValue = currentAssetOdo;
+          }
         }
       } catch {
         odoValue = currentAssetOdo;

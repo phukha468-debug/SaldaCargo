@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
@@ -17,8 +17,7 @@ async function getAdminId(request: Request): Promise<string | null> {
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.split('Bearer ')[1] ?? null;
   }
-  const cookieStore = await cookies();
-  const token = cookieStore.get('salda_auth_token')?.value;
+  const token = await getVerifiedWebUserId();
   if (token) return token;
 
   const supabase = createAdminClient();

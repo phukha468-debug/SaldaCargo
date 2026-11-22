@@ -19,6 +19,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyCronAuthorization, notifyCronFailure } from '@saldacargo/shared';
 
 const MAX_BOT_API = 'https://botapi.max.ru';
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
@@ -71,6 +72,11 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleOfficialPayrollCron(req: NextRequest) {
+  const cronAuth = verifyCronAuthorization(req.headers.get('authorization'));
+  if (!cronAuth.ok) {
+    return NextResponse.json({ error: cronAuth.error }, { status: cronAuth.status });
+  }
+
   try {
     const supabase = createAdminClient();
     const { searchParams } = new URL(req.url);
@@ -529,7 +535,7 @@ async function handleOfficialPayrollCron(req: NextRequest) {
 
     return NextResponse.json({ ok: true, results });
   } catch (err: any) {
-    console.error('Error in official payroll cron:', err);
+    await notifyCronFailure('official-payroll', err);
     return NextResponse.json(
       { error: err?.message ?? 'Внутренняя ошибка сервера' },
       { status: 500 },

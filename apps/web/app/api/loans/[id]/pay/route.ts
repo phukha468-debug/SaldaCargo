@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const LOAN_REPAYMENT_CATEGORY = '00000000-0000-0000-0000-000000000020';
 
@@ -10,8 +10,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { id: loanId } = await params;
     const supabase = createAdminClient();
 
-    const cookieStore = await cookies();
-    const cookieUserId = cookieStore.get('salda_user_id')?.value;
+    const cookieUserId = await getVerifiedWebUserId();
     let userId = cookieUserId;
     if (!userId) {
       const { data } = await (supabase.from('users') as any)

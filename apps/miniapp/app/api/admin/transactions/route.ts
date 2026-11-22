@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { v4 as uuid } from 'uuid';
 
 /** GET /api/admin/transactions?date=YYYY-MM-DD — транзакции за день */
@@ -43,8 +43,7 @@ function walletIdByMethod(method: string): string | null {
 
 /** POST /api/admin/transactions — добавить доход или расход */
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id');
+  const adminId = await getVerifiedMiniappUserId();
   if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as {

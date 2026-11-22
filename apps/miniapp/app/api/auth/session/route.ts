@@ -1,46 +1,47 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { SESSION_COOKIE_MINIAPP } from '@saldacargo/shared/session';
+import { getVerifiedMiniappSession, getMiniappCookieOptions } from '@/lib/auth/server';
 
-/** POST /api/auth/session — устанавливает серверную куку сессии salda_user_id */
-export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as { user_id?: string };
-    const { user_id } = body;
-
-    if (!user_id) {
-      return NextResponse.json({ error: 'Missing user_id' }, { status: 400 });
-    }
-
-    const isProd = process.env.NODE_ENV === 'production';
-    const cookieStore = await cookies();
-    cookieStore.set('salda_user_id', user_id, {
-      httpOnly: false,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 дней
-      path: '/',
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (err: unknown) {
-    console.error('[API /auth/session] Error:', err);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+/** GET /api/auth/session — возвращает информацию о текущей проверенной сессии */
+export async function GET() {
+  const session = await getVerifiedMiniappSession();
+  if (!session) {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
   }
+  return NextResponse.json({
+    authenticated: true,
+    user: {
+      id: session.uid,
+      roles: session.roles,
+    },
+  });
+}
+
+/**
+ * POST /api/auth/session — ЗАБЛОКИРОВАН.
+ * Сессия выдаётся исключительно после криптографической проверки в /api/auth/verify-pin, /api/auth/set-pin, /api/auth/max или /api/auth/verify.
+ */
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Прямая установка сессии запрещена. Используйте авторизацию по PIN или MAX SDK.' },
+    { status: 405 },
+  );
 }
 
 /** DELETE /api/auth/session — удаляет куку сессии */
 export async function DELETE() {
   try {
-    const isProd = process.env.NODE_ENV === 'production';
     const cookieStore = await cookies();
+    const expiredOpts = { ...getMiniappCookieOptions(0), expires: new Date(0) };
+
+    cookieStore.delete(SESSION_COOKIE_MINIAPP);
+    cookieStore.set(SESSION_COOKIE_MINIAPP, '', expiredOpts);
+
+    // Очищаем также legacy cookie salda_user_id, если осталась в браузере
     cookieStore.delete('salda_user_id');
-    cookieStore.set('salda_user_id', '', {
-      path: '/',
-      expires: new Date(0),
-      httpOnly: false,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-    });
+    cookieStore.set('salda_user_id', '', { ...expiredOpts, httpOnly: false });
+
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     console.error('[API /auth/session] Error:', err);

@@ -1,25 +1,40 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { SESSION_COOKIE_MINIAPP, verifySessionToken } from '@saldacargo/shared/session';
 
 export async function proxy(request: NextRequest) {
-  const userId =
-    request.cookies.get('salda_user_id')?.value ||
-    request.headers.get('x-salda-user-id') ||
-    request.nextUrl.searchParams.get('user_id');
+  const rawToken = request.cookies.get(SESSION_COOKIE_MINIAPP)?.value;
+  const session = rawToken ? await verifySessionToken(rawToken) : null;
   const { pathname } = request.nextUrl;
 
   const isAuthPage = pathname === '/login';
-  const isAuthApi = pathname.startsWith('/api/auth/') || pathname === '/api/driver/me';
+  const isAuthApi = pathname.startsWith('/api/auth/');
   const isPublicApi =
     pathname.startsWith('/api/users/public') ||
     pathname === '/api/vehicles/public' ||
-    pathname.startsWith('/api/public/') ||
-    pathname.startsWith('/api/wallets');
+    pathname.startsWith('/api/public/');
 
   // API-запросы не должны редиректиться на HTML страницу
   if (pathname.startsWith('/api/')) {
-    if (!userId && !isAuthApi && !isPublicApi) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (isAuthApi || isPublicApi) {
+      return NextResponse.next();
     }
+
+    if (!session) {
+      const res = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      if (rawToken) {
+        res.cookies.delete(SESSION_COOKIE_MINIAPP);
+      }
+      return res;
+    }
+
+    // Базовый RBAC-барьер на уровне edge для админских API
+    if (pathname.startsWith('/api/admin/')) {
+      const isAdmin = session.roles.includes('admin') || session.roles.includes('owner');
+      if (!isAdmin) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
     return NextResponse.next();
   }
 
@@ -29,8 +44,12 @@ export async function proxy(request: NextRequest) {
   }
 
   // Защищенные экраны: если пользователь не авторизован, направляем на выбор роли
-  if (!userId && pathname !== '/') {
-    return NextResponse.redirect(new URL('/', request.url));
+  if (!session && pathname !== '/') {
+    const res = NextResponse.redirect(new URL('/', request.url));
+    if (rawToken) {
+      res.cookies.delete(SESSION_COOKIE_MINIAPP);
+    }
+    return res;
   }
 
   return NextResponse.next();

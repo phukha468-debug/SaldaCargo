@@ -1,10 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-
-const MAX_BOT_TOKEN =
-  process.env.MAX_BOT_TOKEN ||
-  'f9LHodD0cOKEmAc4Iy6Hq4JXmmVPVRpQ7vULw35IPAeFKQZMIpb1fSAwl5wl_mY1GcLcovMyJXcGngyIqypb';
+import { isEnvConfigError, requireMaxBotEnv } from '@saldacargo/shared';
 
 // ID Александра Нигамедьянова в MAX Messenger
 const ALEX_MAX_USER_ID = '76489387';
@@ -149,6 +146,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const messageText = messageLines.join('\n');
 
     // 6. Отправляем в MAX Bot API Александру Нигамедьянову
+    const { token: maxBotToken } = requireMaxBotEnv();
     let sendSuccess = false;
     let maxErrorDetails = '';
 
@@ -156,7 +154,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const maxRes = await fetch(`https://botapi.max.ru/messages?user_id=${ALEX_MAX_USER_ID}`, {
         method: 'POST',
         headers: {
-          Authorization: MAX_BOT_TOKEN,
+          Authorization: maxBotToken,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ text: messageText }),
@@ -219,9 +217,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
   } catch (error: any) {
     console.error('Error sending order approval to MAX:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Внутренняя ошибка сервера' },
-      { status: 500 },
-    );
+    const status = isEnvConfigError(error) ? 503 : 500;
+    return NextResponse.json({ error: error?.message || 'Внутренняя ошибка сервера' }, { status });
   }
 }

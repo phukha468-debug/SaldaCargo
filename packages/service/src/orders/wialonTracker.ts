@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { handleVehicleDeparture, handleVehicleArrival } from './wialonOrderSync';
-import { TripRouteLeg, encodeTripRouteSheet, isMeaningfulDriverComment } from '@saldacargo/shared';
+import {
+  TripRouteLeg,
+  encodeTripRouteSheet,
+  isMeaningfulDriverComment,
+  requireWialonEnv,
+} from '@saldacargo/shared';
 
 // Координаты центра Верхней Салды и радиус границы города (в метрах)
 const SALDA_BASE_LAT = parseFloat(process.env.WIALON_BASE_LAT || '58.053');
@@ -884,11 +889,13 @@ export async function syncValdaiTelematics(
   supabase: SupabaseClient<any, any, any>,
   options?: { host?: string; token?: string },
 ) {
-  const host = options?.host || process.env.WIALON_HOST || 'https://host.local4.wialon.host';
-  const token =
-    options?.token ||
-    process.env.WIALON_TOKEN ||
-    '561a6efcd9ed8d38d0ff3b80c29253f01653C6698177A6D92E360BBD0D70D0B6AF5240DE';
+  const envFallback = options?.token ? null : requireWialonEnv();
+  const host =
+    options?.host ||
+    envFallback?.host ||
+    process.env.WIALON_HOST ||
+    'https://host.local4.wialon.host';
+  const token = options?.token || envFallback!.token;
 
   const cleanHost = host.replace(/\/+$/, '');
   const eid = await getWialonSession(cleanHost, token);
@@ -1447,11 +1454,13 @@ export async function fetchTripWialonMileage(options: {
   startedAt: string;
   endedAt?: string | null;
 }): Promise<TripWialonMileageResult | null> {
-  const host = options.host || process.env.WIALON_HOST || 'https://host.local4.wialon.host';
-  const token =
-    options.token ||
-    process.env.WIALON_TOKEN ||
-    '561a6efcd9ed8d38d0ff3b80c29253f01653C6698177A6D92E360BBD0D70D0B6AF5240DE';
+  const envFallback = options.token ? null : requireWialonEnv();
+  const host =
+    options.host ||
+    envFallback?.host ||
+    process.env.WIALON_HOST ||
+    'https://host.local4.wialon.host';
+  const token = options.token || envFallback!.token;
 
   const cleanHost = host.replace(/\/+$/, '');
   const cleanReg = options.regNumber.toUpperCase().replace(/\s+/g, '');

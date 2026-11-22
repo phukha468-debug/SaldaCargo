@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
+import { buildIlikeOrFilter } from '@saldacargo/shared';
 
 /** GET /api/admin/client-vehicles?search= */
 export async function GET(request: Request) {
@@ -17,10 +19,9 @@ export async function GET(request: Request) {
     .order('brand')
     .order('model');
 
-  if (search) {
-    query = query.or(
-      `brand.ilike.%${search}%,model.ilike.%${search}%,reg_number.ilike.%${search}%`,
-    );
+  const searchFilter = buildIlikeOrFilter(['brand', 'model', 'reg_number'], search);
+  if (searchFilter) {
+    query = query.or(searchFilter);
   }
 
   const { data, error } = await query;
@@ -30,9 +31,7 @@ export async function GET(request: Request) {
 
 /** POST /api/admin/client-vehicles */
 export async function POST(request: Request) {
-  const { cookies } = await import('next/headers');
-  const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value;
+  const adminId = await getVerifiedMiniappUserId();
   if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();

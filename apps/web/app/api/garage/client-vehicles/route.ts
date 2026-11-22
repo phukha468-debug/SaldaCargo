@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { buildIlikeOrFilter } from '@saldacargo/shared';
 
 /** GET /api/garage/client-vehicles?search=&counterparty_id= */
 export async function GET(request: Request) {
@@ -19,10 +20,9 @@ export async function GET(request: Request) {
     .order('brand')
     .order('model');
 
-  if (search) {
-    query = query.or(
-      `brand.ilike.%${search}%,model.ilike.%${search}%,reg_number.ilike.%${search}%`,
-    );
+  const searchFilter = buildIlikeOrFilter(['brand', 'model', 'reg_number'], search);
+  if (searchFilter) {
+    query = query.or(searchFilter);
   }
   if (counterpartyId) {
     query = query.eq('counterparty_id', counterpartyId);

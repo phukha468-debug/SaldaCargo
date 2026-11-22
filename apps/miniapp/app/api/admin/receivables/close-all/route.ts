@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
@@ -10,8 +10,7 @@ type OrderItem = { id: string; type: 'trip_order' | 'manual'; amount: string };
 
 /** POST /api/admin/receivables/close-all — погасить весь долг контрагента одной транзакцией */
 export async function POST(req: Request) {
-  const cookieStore = await cookies();
-  const adminId = cookieStore.get('salda_user_id')?.value;
+  const adminId = await getVerifiedMiniappUserId();
   if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await req.json()) as {

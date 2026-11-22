@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 const PAYROLL_MECHANIC_CAT = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
@@ -16,11 +16,7 @@ const WALLET_LABELS: Record<string, string> = {
 /** GET /api/mechanic/salary?year=2026&month=5 — начисления ЗП и история выплат механика */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const cookieStore = await cookies();
-  const userId =
-    searchParams.get('mechanic_id') ||
-    cookieStore.get('salda_user_id')?.value ||
-    request.headers.get('x-salda-user-id');
+  const userId = searchParams.get('mechanic_id') || (await getVerifiedMiniappUserId());
 
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

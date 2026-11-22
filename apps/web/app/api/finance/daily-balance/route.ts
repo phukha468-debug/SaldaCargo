@@ -2,6 +2,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { syncTBankBalance, fetchTBankStatement, TBankOperation } from '@/lib/tbank';
 import { NextResponse } from 'next/server';
+import { getMaxBotEnv } from '@saldacargo/shared';
 
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 const CASH_ID = '10000000-0000-0000-0000-000000000002';
@@ -609,9 +610,7 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     // 2. Отправка отчёта руководителю в мессенджер MAX
-    const maxToken =
-      process.env.MAX_BOT_TOKEN ||
-      'f9LHodD0cOKEmAc4Iy6Hq4JXmmVPVRpQ7vULw35IPAeFKQZMIpb1fSAwl5wl_mY1GcLcovMyJXcGngyIqypb';
+    const maxToken = getMaxBotEnv()?.token;
 
     const sign = discrepancy >= 0 ? '+' : '';
     const statusEmoji = status === 'confirmed' ? '✅' : '⚠️ РАСХОЖДЕНИЕ!';

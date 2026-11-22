@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
@@ -21,8 +21,7 @@ function walletForDebt(isLegalEntity: boolean): string {
 export async function POST(req: Request) {
   try {
     const supabase = createAdminClient();
-    const cookieStore = await cookies();
-    let adminId = cookieStore.get('salda_user_id')?.value ?? null;
+    let adminId = (await getVerifiedWebUserId()) ?? null;
 
     if (!adminId) {
       const { data: adminUser } = await (supabase as any)

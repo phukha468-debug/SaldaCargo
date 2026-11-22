@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebUserId } from '@/lib/auth';
 import { syncTBankBalance } from '@/lib/tbank';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
@@ -30,8 +30,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ orderId:
 /** PATCH /api/receivables/[orderId] — отметить заказ как оплаченный + создать доходную транзакцию */
 export async function PATCH(req: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
-  const cookieStore = await cookies();
-  let adminId = cookieStore.get('salda_user_id')?.value ?? null;
+  let adminId = (await getVerifiedWebUserId()) ?? null;
 
   const supabase = createAdminClient();
 

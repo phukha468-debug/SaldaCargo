@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import {
   generateDeterministicUuid,
   auditTripFuel,
@@ -11,6 +11,7 @@ import {
   isStrictDocCounterparty,
   resolveKnownMasterCounterpartyId,
   cleanCounterpartySearchName,
+  escapePostgrestValue,
 } from '@saldacargo/shared';
 
 async function updateAssetFuelAfterApproval(supabase: any, tripId: string) {
@@ -114,9 +115,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 /** PATCH /api/admin/trips/:id — одобрить, вернуть или отредактировать заказы */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const adminId =
-    cookieStore.get('salda_user_id')?.value || request.headers.get('x-salda-user-id') || null;
+  const adminId = (await getVerifiedMiniappUserId()) || null;
   const body = (await request.json()) as {
     action?:
       | 'approve'
@@ -228,11 +227,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       // 2. Поиск среди существующих активных контрагентов (с учётом форм собственности и кавычек)
       const simplifiedName = cleanCounterpartySearchName(name);
-      const { data: foundList } = await (supabase.from('counterparties') as any)
-        .select('id, name')
-        .eq('is_active', true)
-        .or(`name.ilike.%${name}%,name.ilike.%${simplifiedName || name}%`)
-        .limit(5);
+      const safeName = escapePostgrestValue(name);
+      const safeSimplified = escapePostgrestValue(simplifiedName || name);
+      const { data: foundList } = safeName
+        ? await (supabase.from('counterparties') as any)
+            .select('id, name')
+            .eq('is_active', true)
+            .or(`name.ilike.%${safeName}%,name.ilike.%${safeSimplified || safeName}%`)
+            .limit(5)
+        : { data: [] };
 
       const matched = (foundList || []).find((c: any) => {
         const cClean = cleanCounterpartySearchName(c.name);
