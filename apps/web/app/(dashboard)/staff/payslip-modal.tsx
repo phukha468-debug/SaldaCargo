@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import type { PayrollUser } from './page';
+import type { PayrollUser } from '@/features/staff/types';
 
 interface PayslipModalProps {
   user: PayrollUser;
@@ -37,11 +37,16 @@ const SALARY_CATEGORY_IDS = [
   '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6', // Механик
 ];
 
+const emptySubscribe = () => () => {};
+
 export const PayslipModal: React.FC<PayslipModalProps> = ({ user, onClose }) => {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 
   useEffect(() => {
-    setMounted(true);
     document.body.classList.add('payslip-modal-open');
     return () => {
       document.body.classList.remove('payslip-modal-open');

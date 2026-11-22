@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@saldacargo/ui';
-import type { PayrollUser } from './page';
+import type { PayrollUser } from '@/features/staff/types';
 
 interface ShiftCalendarModalProps {
   user: PayrollUser;
@@ -31,6 +31,8 @@ const MONTH_NAMES = [
 
 const WEEKDAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
+const emptySubscribe = () => () => {};
+
 export const ShiftCalendarModal: React.FC<ShiftCalendarModalProps> = ({
   user,
   initialYear,
@@ -39,7 +41,11 @@ export const ShiftCalendarModal: React.FC<ShiftCalendarModalProps> = ({
   onSaved,
   onOpenPayslip,
 }) => {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
 
@@ -56,14 +62,15 @@ export const ShiftCalendarModal: React.FC<ShiftCalendarModalProps> = ({
   });
 
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loadedPeriodKey, setLoadedPeriodKey] = useState('');
+  const periodKey = `${user.id}-${year}-${month}`;
+  const loading = loadedPeriodKey !== periodKey;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSettled, setIsSettled] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     document.body.classList.add('shift-modal-open');
     return () => {
       document.body.classList.remove('shift-modal-open');
@@ -73,8 +80,6 @@ export const ShiftCalendarModal: React.FC<ShiftCalendarModalProps> = ({
   // Загружаем сохранённые смены для данного месяца и сотрудника
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError('');
 
     fetch(`/api/staff/shifts?user_id=${user.id}&year=${year}&month=${month}`)
       .then((res) => res.json())
@@ -83,6 +88,7 @@ export const ShiftCalendarModal: React.FC<ShiftCalendarModalProps> = ({
         if (data.error) {
           setError(data.error);
         } else {
+          setError('');
           if (Array.isArray(data.selected_dates)) {
             setSelectedDates(new Set(data.selected_dates));
           } else {
@@ -98,13 +104,13 @@ export const ShiftCalendarModal: React.FC<ShiftCalendarModalProps> = ({
         if (!cancelled) setError(err.message || 'Ошибка загрузки смен');
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadedPeriodKey(periodKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [user.id, year, month]);
+  }, [user.id, year, month, periodKey]);
 
   // Навигация по месяцам
   const shiftMonth = (delta: number) => {
