@@ -830,7 +830,7 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
           >
             {saving ? 'Сохранение...' : 'Сохранить рейс'}
           </button>
-          {trip?.lifecycle_status === 'draft' && (
+          {(trip?.lifecycle_status === 'draft' || trip?.lifecycle_status === 'returned') && (
             <button
               type="button"
               onClick={() => handleSave(true)}

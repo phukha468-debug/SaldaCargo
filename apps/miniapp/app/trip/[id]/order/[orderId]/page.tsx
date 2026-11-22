@@ -1222,7 +1222,7 @@ export default function EditOrderPage() {
           </div>
         )}
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-zinc-200 z-50">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t-2 border-zinc-200 z-50 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] shadow-lg">
           <Button
             type="submit"
             size="hero"
