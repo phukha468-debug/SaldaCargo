@@ -8,6 +8,137 @@ export type Database = {
   };
   public: {
     Tables: {
+      organizations: {
+        Row: {
+          created_at: string;
+          currency: string;
+          enabled_modules: string[];
+          id: string;
+          inn: string | null;
+          is_active: boolean;
+          name: string;
+          plan: string;
+          settings: Json;
+          slug: string;
+          timezone: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          currency?: string;
+          enabled_modules?: string[];
+          id?: string;
+          inn?: string | null;
+          is_active?: boolean;
+          name: string;
+          plan?: string;
+          settings?: Json;
+          slug: string;
+          timezone?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          currency?: string;
+          enabled_modules?: string[];
+          id?: string;
+          inn?: string | null;
+          is_active?: boolean;
+          name?: string;
+          plan?: string;
+          settings?: Json;
+          slug?: string;
+          timezone?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      organization_members: {
+        Row: {
+          created_at: string;
+          id: string;
+          is_active: boolean;
+          organization_id: string;
+          roles: Database['public']['Enums']['user_role'][];
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          is_active?: boolean;
+          organization_id: string;
+          roles?: Database['public']['Enums']['user_role'][];
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          is_active?: boolean;
+          organization_id?: string;
+          roles?: Database['public']['Enums']['user_role'][];
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'organization_members_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'organization_members_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      organization_integrations: {
+        Row: {
+          config: Json;
+          created_at: string;
+          encrypted_secrets: string | null;
+          id: string;
+          is_enabled: boolean;
+          organization_id: string;
+          provider: string;
+          updated_at: string;
+        };
+        Insert: {
+          config?: Json;
+          created_at?: string;
+          encrypted_secrets?: string | null;
+          id?: string;
+          is_enabled?: boolean;
+          organization_id: string;
+          provider: string;
+          updated_at?: string;
+        };
+        Update: {
+          config?: Json;
+          created_at?: string;
+          encrypted_secrets?: string | null;
+          id?: string;
+          is_enabled?: boolean;
+          organization_id?: string;
+          provider?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'organization_integrations_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       asset_types: {
         Row: {
           capacity_m: number | null;

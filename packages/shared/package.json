@@ -13,7 +13,9 @@
     "./cron": "./src/cron.ts",
     "./logger": "./src/logger.ts",
     "./postgrest": "./src/postgrest.ts",
-    "./api-handler": "./src/apiHandler.ts"
+    "./api-handler": "./src/apiHandler.ts",
+    "./crypto": "./src/crypto.ts",
+    "./modules": "./src/modules.ts"
   },
   "scripts": {
     "lint": "eslint src/",

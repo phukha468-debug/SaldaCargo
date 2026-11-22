@@ -15,10 +15,52 @@ export type UUID = string;
 export type ISODateString = string; // "2026-04-19T08:30:00Z"
 export type MoneyString = string; // "1234.56" — всегда строка, никогда float!
 
+// ─── Организация (Multi-tenancy) ────────────────────────────────────────────
+
+export type OrganizationPlan = 'starter' | 'pro' | 'enterprise';
+
+export interface Organization {
+  id: UUID;
+  slug: string;
+  name: string;
+  inn: string | null;
+  timezone: string;
+  currency: string;
+  enabled_modules: string[];
+  plan: OrganizationPlan;
+  settings: Record<string, unknown>;
+  is_active: boolean;
+  created_at: ISODateString;
+  updated_at: ISODateString;
+}
+
+export interface OrganizationMember {
+  id: UUID;
+  organization_id: UUID;
+  user_id: UUID;
+  roles: UserRole[];
+  is_active: boolean;
+  created_at: ISODateString;
+  updated_at: ISODateString;
+}
+
+export interface OrganizationIntegration {
+  id: UUID;
+  organization_id: UUID;
+  provider: string;
+  is_enabled: boolean;
+  config: Record<string, unknown>;
+  encrypted_secrets: string | null;
+  created_at: ISODateString;
+  updated_at: ISODateString;
+}
+
 // ─── Пользователь ───────────────────────────────────────────────────────────
 
 export interface User {
   id: UUID;
+  organization_id?: UUID;
+  default_organization_id?: UUID | null;
   name: string;
   phone: string | null;
   max_user_id: string | null;

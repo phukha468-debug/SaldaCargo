@@ -5,17 +5,32 @@ const TEST_SECRET = 'test-super-secret-session-key-32-chars-minimum!';
 const OTHER_SECRET = 'another-different-secret-key-32-chars-minimum!';
 
 describe('session (HMAC-SHA256)', () => {
-  it('signs and verifies a valid session token', async () => {
+  it('signs and verifies a valid session token with optional organization id (oid)', async () => {
     const token = await signSessionToken(
-      { uid: 'user-123', roles: ['admin', 'driver'], ttlSeconds: 3600 },
+      {
+        uid: 'user-123',
+        oid: '00000000-0000-4000-8000-000000000001',
+        roles: ['admin', 'driver'],
+        ttlSeconds: 3600,
+      },
       TEST_SECRET,
     );
 
     const payload = await verifySessionToken(token, TEST_SECRET);
     expect(payload).not.toBeNull();
     expect(payload?.uid).toBe('user-123');
+    expect(payload?.oid).toBe('00000000-0000-4000-8000-000000000001');
     expect(payload?.roles).toEqual(['admin', 'driver']);
     expect(payload!.exp - payload!.iat).toBe(3600);
+
+    // Backward compatibility: token without oid still verifies cleanly
+    const legacyToken = await signSessionToken(
+      { uid: 'user-456', roles: ['driver'], ttlSeconds: 3600 },
+      TEST_SECRET,
+    );
+    const legacyPayload = await verifySessionToken(legacyToken, TEST_SECRET);
+    expect(legacyPayload?.uid).toBe('user-456');
+    expect(legacyPayload?.oid).toBeUndefined();
   });
 
   it('rejects token verified with wrong secret', async () => {

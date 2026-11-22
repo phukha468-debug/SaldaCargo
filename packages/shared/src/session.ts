@@ -5,6 +5,7 @@ export const SESSION_COOKIE_MINIAPP = 'salda_session';
 
 export interface SessionPayload {
   uid: string;
+  oid?: string;
   roles: string[];
   iat: number;
   exp: number;
@@ -60,7 +61,7 @@ function timingSafeEqualBytes(a: Uint8Array, b: Uint8Array): boolean {
  * Совместим с Edge Runtime (Next.js middleware/proxy) и Node.js.
  */
 export async function signSessionToken(
-  input: { uid: string; roles: string[]; ttlSeconds?: number },
+  input: { uid: string; oid?: string; roles: string[]; ttlSeconds?: number },
   secretOverride?: string,
 ): Promise<string> {
   const secret = secretOverride ?? getSessionSecret();
@@ -72,6 +73,7 @@ export async function signSessionToken(
   const ttl = input.ttlSeconds ?? 60 * 60 * 24 * 7; // 7 дней по умолчанию
   const payload: SessionPayload = {
     uid: input.uid,
+    ...(input.oid ? { oid: input.oid } : {}),
     roles: Array.isArray(input.roles) ? input.roles : [],
     iat: now,
     exp: now + ttl,
@@ -146,6 +148,7 @@ export async function verifySessionToken(
 
     return {
       uid: parsed.uid,
+      ...(typeof parsed.oid === 'string' && parsed.oid ? { oid: parsed.oid } : {}),
       roles: parsed.roles.filter((r): r is string => typeof r === 'string'),
       iat: parsed.iat,
       exp: parsed.exp,

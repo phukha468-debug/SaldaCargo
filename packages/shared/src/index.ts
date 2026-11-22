@@ -2103,3 +2103,5 @@ export * from './cron';
 export * from './logger';
 export * from './postgrest';
 export * from './apiHandler';
+export * from './crypto';
+export * from './modules';

@@ -187,3 +187,20 @@ export function requireSessionSecret(env: NodeJS.ProcessEnv = process.env): stri
   }
   return secret;
 }
+
+export function getEncryptionMasterKey(env: NodeJS.ProcessEnv = process.env): string | null {
+  const value = env.ENCRYPTION_MASTER_KEY?.trim();
+  if (!value || value.length < 32) return null;
+  return value;
+}
+
+export function requireEncryptionMasterKey(env: NodeJS.ProcessEnv = process.env): string {
+  const key = getEncryptionMasterKey(env);
+  if (!key) {
+    throw new EnvConfigError(
+      'encryption',
+      'ENCRYPTION_MASTER_KEY не настроен или короче 32 символов. Задайте криптостойкий ключ в переменных окружения.',
+    );
+  }
+  return key;
+}
