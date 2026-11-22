@@ -44,7 +44,13 @@ export interface OrganizationMember {
   updated_at: ISODateString;
 }
 
-export type IntegrationProvider = 'tbank' | 'wialon' | 'opti24' | 'max_bot' | 'yandex_maps';
+export type IntegrationProvider =
+  | 'tbank'
+  | 'wialon'
+  | 'opti24'
+  | 'max_bot'
+  | 'yandex_maps'
+  | 'resend';
 
 export interface OrganizationIntegration {
   id: UUID;

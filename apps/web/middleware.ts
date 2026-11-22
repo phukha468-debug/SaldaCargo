@@ -11,6 +11,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // Публичные маршруты, внешние вебхуки и крон-задачи (cron защищены через CRON_SECRET)
   const isPublicRoute =
     pathname === '/login' ||
+    pathname === '/onboarding' ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api/cron') ||

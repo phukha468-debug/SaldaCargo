@@ -204,3 +204,41 @@ export function requireEncryptionMasterKey(env: NodeJS.ProcessEnv = process.env)
   }
   return key;
 }
+
+export function getOrgRegistrationInviteCode(env: NodeJS.ProcessEnv = process.env): string | null {
+  const value = env.ORG_REGISTRATION_INVITE_CODE?.trim();
+  return value ? value : null;
+}
+
+export type InviteCodeCheckResult =
+  | { allowed: true }
+  | { allowed: false; reason: 'REGISTRATION_CLOSED' | 'INVALID_INVITE_CODE' };
+
+/**
+ * Проверяет инвайт-код для регистрации новой организации (Private Beta).
+ * Если ORG_REGISTRATION_INVITE_CODE не задан в env — регистрация полностью закрыта.
+ */
+export function verifyOrgRegistrationInviteCode(
+  inputCode: string | null | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): InviteCodeCheckResult {
+  const expected = getOrgRegistrationInviteCode(env);
+  if (!expected) {
+    return { allowed: false, reason: 'REGISTRATION_CLOSED' };
+  }
+  const actual = typeof inputCode === 'string' ? inputCode.trim() : '';
+  if (!actual) {
+    return { allowed: false, reason: 'INVALID_INVITE_CODE' };
+  }
+  const enc = new TextEncoder();
+  const a = enc.encode(actual);
+  const b = enc.encode(expected);
+  if (a.length !== b.length) {
+    return { allowed: false, reason: 'INVALID_INVITE_CODE' };
+  }
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  }
+  return diff === 0 ? { allowed: true } : { allowed: false, reason: 'INVALID_INVITE_CODE' };
+}

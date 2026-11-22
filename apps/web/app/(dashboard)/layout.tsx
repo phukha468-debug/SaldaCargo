@@ -5,19 +5,45 @@ import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Suspense, useState } from 'react';
 import { cn } from '@saldacargo/ui';
+import type { SaldaModule } from '@saldacargo/shared';
 import { SafeAdjustmentModal } from '@/components/SafeAdjustmentModal';
+import { hasAnyOrgModule, hasOrgModule, useOrganizationContext } from '@/lib/organization';
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: string;
+  modules?: readonly SaldaModule[];
+  adminOnly?: boolean;
+}
+
+const navItems: readonly NavItem[] = [
   { href: '/', label: 'Главная', icon: 'dashboard' },
-  { href: '/ati', label: 'Заявки Грузовики', icon: 'local_shipping' },
-  { href: '/review', label: 'Ревью рейсов', icon: 'rate_review' },
-  { href: '/finance', label: 'Финансы / P&L', icon: 'account_balance_wallet' },
-  { href: '/fleet', label: 'Автопарк', icon: 'directions_car' },
-  { href: '/garage', label: 'Гараж / СТО', icon: 'build' },
-  { href: '/counterparties', label: 'Контрагенты', icon: 'corporate_fare' },
-  { href: '/staff', label: 'Персонал', icon: 'badge' },
-  { href: '/retro', label: 'Ретро-ввод', icon: 'history' },
-] as const;
+  {
+    href: '/ati',
+    label: 'Заявки Грузовики',
+    icon: 'local_shipping',
+    modules: ['transport', 'expeditor'],
+  },
+  { href: '/review', label: 'Ревью рейсов', icon: 'rate_review', modules: ['transport'] },
+  {
+    href: '/finance',
+    label: 'Финансы / P&L',
+    icon: 'account_balance_wallet',
+    modules: ['finance'],
+  },
+  { href: '/fleet', label: 'Автопарк', icon: 'directions_car', modules: ['transport'] },
+  { href: '/garage', label: 'Гараж / СТО', icon: 'build', modules: ['garage'] },
+  {
+    href: '/counterparties',
+    label: 'Контрагенты',
+    icon: 'corporate_fare',
+    modules: ['transport', 'finance', 'expeditor'],
+  },
+  { href: '/staff', label: 'Персонал', icon: 'badge', modules: ['payroll', 'transport'] },
+  { href: '/retro', label: 'Ретро-ввод', icon: 'history', modules: ['transport'] },
+  { href: '/settings', label: 'Настройки', icon: 'settings', adminOnly: true },
+];
 
 const FINANCE_PATHS = ['/finance', '/receivables'];
 
@@ -53,6 +79,21 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  const { data: orgCtx } = useOrganizationContext();
+  const financeEnabled = hasOrgModule(orgCtx, 'finance');
+  const isOrgAdmin =
+    !orgCtx || orgCtx.user.roles.includes('owner') || orgCtx.user.roles.includes('admin');
+
+  const brandShortName = orgCtx?.settings?.branding?.short_name || orgCtx?.name || 'SALDA';
+  const brandFullName = orgCtx?.name || 'SALDA ERP';
+  const brandLogoUrl = orgCtx?.settings?.branding?.logo_url || '/logo.png';
+
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.adminOnly && !isOrgAdmin) return false;
+    if (item.modules && !hasAnyOrgModule(orgCtx, item.modules)) return false;
+    return true;
+  });
+
   const { data: alerts } = useQuery<AlertsData>({
     queryKey: ['alerts'],
     queryFn: () => fetch('/api/alerts').then((r) => r.json()),
@@ -72,6 +113,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     refetch: refetchWallets,
   } = useQuery<Wallets>({
     queryKey: ['wallets'],
+    enabled: financeEnabled,
     queryFn: async () => {
       const res = await fetch('/api/wallets');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -102,11 +144,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
   // Active section title
   const currentNav =
-    navItems.find((item) =>
+    visibleNavItems.find((item) =>
       item.href === '/finance'
         ? FINANCE_PATHS.some((p) => pathname === p || pathname.startsWith(p))
         : pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)),
-    ) ?? navItems[0];
+    ) ?? visibleNavItems[0];
 
   const getBadge = (href: string) => {
     let count = 0;
@@ -146,12 +188,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-amber-500 to-amber-700 shadow-sm flex-shrink-0">
                   <img
-                    src="/logo.png"
-                    alt="TK501"
+                    src={brandLogoUrl}
+                    alt={brandShortName}
                     className="w-full h-full object-cover rounded-[10px]"
                   />
                 </div>
-                <span className="font-extrabold text-slate-900 text-base">TK501</span>
+                <span className="font-extrabold text-slate-900 text-base truncate">
+                  {brandShortName}
+                </span>
               </div>
               <button
                 onClick={() => setMobileNavOpen(false)}
@@ -161,7 +205,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <nav className="mt-4 space-y-1 flex-1 overflow-y-auto">
-              {navItems.map((item) => {
+              {visibleNavItems.map((item) => {
                 const active = isNavActive(item.href);
                 const { count, isCritical } = getBadge(item.href);
 
@@ -223,17 +267,17 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-amber-500 to-amber-700 shadow-sm shadow-amber-900/20 flex-shrink-0">
                 <img
-                  src="/logo.png"
-                  alt="TK501"
+                  src={brandLogoUrl}
+                  alt={brandShortName}
                   className="w-full h-full object-cover rounded-[10px]"
                 />
               </div>
               <div className="hidden sm:block">
                 <div className="font-extrabold text-base tracking-tight text-slate-900 leading-tight">
-                  TK501
+                  {brandShortName}
                 </div>
                 <div className="text-[10px] text-slate-400 font-medium leading-none">
-                  Управление автопарком
+                  Управление бизнесом
                 </div>
               </div>
             </Link>
@@ -247,7 +291,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                   {currentNav?.label || 'Главная'}
                 </h1>
                 <span className="bg-sky-50 text-sky-700 border border-sky-200/70 text-[11px] font-bold px-2 py-0.5 rounded-full hidden md:inline-block">
-                  TK501 ERP
+                  SALDA ERP
                 </span>
               </div>
             </div>
@@ -255,65 +299,67 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
           {/* Right Live Balance Summary Widget & Date */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="flex items-center gap-3 bg-slate-900 text-white px-3.5 sm:px-4 py-2 rounded-2xl shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-400 text-[20px] sm:text-[22px]">
-                  account_balance
-                </span>
-                <div>
-                  <div className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
-                    Баланс ТК
-                  </div>
-                  <div className="text-sm sm:text-base font-black text-white leading-none mt-0.5">
-                    {totalBalance.toLocaleString('ru-RU')} ₽
-                  </div>
-                </div>
-              </div>
-              <div className="h-9 w-px bg-slate-700 mx-1 hidden md:block" />
-              <div className="text-[11px] text-slate-300 hidden md:block leading-tight space-y-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sky-400 font-bold">Банк:</span>{' '}
-                  <span>{bankNum.toLocaleString('ru-RU')} ₽</span>
-                  {wallets?.bank?.api_synced && (
-                    <span
-                      className="inline-block w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"
-                      title="Синхронизировано по API Т-Банка"
-                    />
-                  )}
-                </div>
-                <div
-                  onClick={() => setIsSafeAdjustOpen(true)}
-                  className="flex items-center gap-1 cursor-pointer group hover:text-white transition"
-                  title="Нажмите для быстрой коррекции наличных в сейфе"
-                >
-                  <span className="text-emerald-400 font-bold group-hover:underline">Сейф:</span>{' '}
-                  <span className="font-semibold">{cashNum.toLocaleString('ru-RU')} ₽</span>
-                  <span className="opacity-0 group-hover:opacity-100 text-[10px] text-slate-400 group-hover:text-emerald-300 transition">
-                    ✏️
+            {financeEnabled && (
+              <div className="flex items-center gap-3 bg-slate-900 text-white px-3.5 sm:px-4 py-2 rounded-2xl shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-400 text-[20px] sm:text-[22px]">
+                    account_balance
                   </span>
+                  <div>
+                    <div className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
+                      Баланс
+                    </div>
+                    <div className="text-sm sm:text-base font-black text-white leading-none mt-0.5">
+                      {totalBalance.toLocaleString('ru-RU')} ₽
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-amber-400 font-bold">ГСМ:</span>{' '}
-                  {fuelNum.toLocaleString('ru-RU')} ₽
+                <div className="h-9 w-px bg-slate-700 mx-1 hidden md:block" />
+                <div className="text-[11px] text-slate-300 hidden md:block leading-tight space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sky-400 font-bold">Банк:</span>{' '}
+                    <span>{bankNum.toLocaleString('ru-RU')} ₽</span>
+                    {wallets?.bank?.api_synced && (
+                      <span
+                        className="inline-block w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"
+                        title="Синхронизировано по API банка"
+                      />
+                    )}
+                  </div>
+                  <div
+                    onClick={() => setIsSafeAdjustOpen(true)}
+                    className="flex items-center gap-1 cursor-pointer group hover:text-white transition"
+                    title="Нажмите для быстрой коррекции наличных в сейфе"
+                  >
+                    <span className="text-emerald-400 font-bold group-hover:underline">Сейф:</span>{' '}
+                    <span className="font-semibold">{cashNum.toLocaleString('ru-RU')} ₽</span>
+                    <span className="opacity-0 group-hover:opacity-100 text-[10px] text-slate-400 group-hover:text-emerald-300 transition">
+                      ✏️
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-amber-400 font-bold">ГСМ:</span>{' '}
+                    {fuelNum.toLocaleString('ru-RU')} ₽
+                  </div>
                 </div>
-              </div>
-              <button
-                onClick={() => {
-                  fetch('/api/wallets?force=1').finally(() => refetchWallets());
-                }}
-                disabled={walletsFetching}
-                title="Синхронизировать баланс с Т-Банком сейчас"
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <span
-                  className={`material-symbols-outlined text-[18px] block ${
-                    walletsFetching ? 'animate-spin text-sky-400' : ''
-                  }`}
+                <button
+                  onClick={() => {
+                    fetch('/api/wallets?force=1').finally(() => refetchWallets());
+                  }}
+                  disabled={walletsFetching}
+                  title="Синхронизировать баланс сейчас"
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                 >
-                  sync
-                </span>
-              </button>
-            </div>
+                  <span
+                    className={`material-symbols-outlined text-[18px] block ${
+                      walletsFetching ? 'animate-spin text-sky-400' : ''
+                    }`}
+                  >
+                    sync
+                  </span>
+                </button>
+              </div>
+            )}
 
             <TodayDate />
           </div>
@@ -322,8 +368,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         {/* ── Horizontal Navigation Bar (Only for interior subpages, hidden on homepage) ── */}
         {pathname !== '/' && (
           <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-t border-slate-200/80">
-            <nav className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-              {navItems.map((item) => {
+            <nav className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2">
+              {visibleNavItems.map((item) => {
                 const active = isNavActive(item.href);
                 const { count, isCritical } = getBadge(item.href);
 
@@ -386,7 +432,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <footer className="py-2.5 px-6 border-t border-slate-200 text-center text-xs text-slate-500 bg-white flex-shrink-0 font-medium">
-        © 2026 TK501 ERP · ИП Нигамедьянов А.С. · Верхняя Салда
+        © {new Date().getFullYear()} SALDA ERP · {brandFullName}
       </footer>
 
       {/* Быстрая коррекция наличных в сейфе */}

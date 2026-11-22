@@ -1,4 +1,36 @@
 import { z } from 'zod';
+import { SALDA_MODULES } from './modules';
+
+const MODULE_ENUM = z.enum(SALDA_MODULES);
+
+export const ProvisionOrganizationSchema = z.object({
+  company_name: z.string().trim().min(2, 'Укажите название компании (минимум 2 символа)').max(120),
+  short_name: z.string().trim().min(2).max(40).optional(),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/, 'Slug должен содержать латиницу, цифры и дефисы')
+    .optional(),
+  inn: z
+    .string()
+    .trim()
+    .regex(/^\d{10}(\d{2})?$/, 'ИНН должен содержать 10 (ООО) или 12 (ИП) цифр')
+    .optional()
+    .or(z.literal('')),
+  enabled_modules: z
+    .array(MODULE_ENUM)
+    .min(1, 'Выберите хотя бы один модуль')
+    .default(['transport', 'finance']),
+  owner_name: z.string().trim().min(2, 'Укажите имя владельца').max(120),
+  owner_phone: z.string().trim().min(10, 'Укажите корректный номер телефона').max(24),
+  owner_pin: z
+    .string()
+    .trim()
+    .regex(/^\d{4,6}$/, 'ПИН-код должен состоять из 4–6 цифр'),
+});
+
+export type ProvisionOrganizationInput = z.infer<typeof ProvisionOrganizationSchema>;
 
 const optionalUuidSchema = z.string().uuid().optional();
 

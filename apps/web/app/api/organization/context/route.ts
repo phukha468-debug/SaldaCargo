@@ -11,6 +11,10 @@ export const GET = createWebApiHandler(
       slug: auth.organizationSlug,
       name: auth.organizationName,
       enabled_modules: auth.enabledModules,
+      user: {
+        id: auth.userId,
+        roles: auth.roles,
+      },
       settings: {
         branding: auth.orgSettings.branding,
         counterparty_rules: auth.orgSettings.counterparty_rules,

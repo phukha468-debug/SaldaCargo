@@ -109,9 +109,17 @@ function LoginForm() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-[10px] text-slate-500 uppercase tracking-widest">
-          Доступ только для сотрудников
-        </p>
+        <div className="mt-6 text-center space-y-2">
+          <p className="text-[10px] text-slate-500 uppercase tracking-widest">
+            Доступ только для сотрудников
+          </p>
+          <a
+            href="/onboarding"
+            className="inline-block text-xs text-slate-400 hover:text-amber-400 transition-colors"
+          >
+            Подключить новую компанию (Beta) →
+          </a>
+        </div>
       </div>
     </main>
   );
