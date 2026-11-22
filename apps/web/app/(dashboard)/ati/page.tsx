@@ -160,6 +160,7 @@ const STAGE_CONFIG: Record<
 export default function AtiPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'pipeline' | 'carrier' | 'expeditor'>('pipeline');
+  const [activeCarrierStage, setActiveCarrierStage] = useState<number>(1);
   const [filterDoc, setFilterDoc] = useState<'all' | 'etrn' | 'paper'>('all');
   const [selectedOrder, setSelectedOrder] = useState<AtiOrder | null>(null);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -955,51 +956,93 @@ export default function AtiPage() {
           </div>
 
           {/* ══════════════════════════════════════════════════════════════════════
-           КАНБАН-СЕТКА: РОVНО 8 КОЛОНОК БЕЗ СКРОЛЛА (Fit-to-Screen)
+           ПАПКИ ДОГОВОРОВ АТИ (ВАРИАНТ 1 · СБЕР / SAAS) + 1-СТРОЧНЫЕ КАРТОЧКИ
            ══════════════════════════════════════════════════════════════════════ */}
           {isLoading ? (
-            <div className="p-12 text-center text-slate-400 font-bold bg-white rounded-2xl border-2 border-slate-200">
-              Загрузка канбан-доски АТИ...
+            <div className="p-10 text-center text-slate-400 font-bold bg-white rounded-xl border border-slate-200 text-xs">
+              Загрузка договоров АТИ...
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-1.5 w-full items-start">
-              {[1, 2, 3, 4, 5, 6, 7].map((stageNum) => {
-                const cfg = STAGE_CONFIG[stageNum];
-                if (!cfg) return null;
+            <div className="space-y-3">
+              {/* 7 карточек-папок */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2.5">
+                {[1, 2, 3, 4, 5, 6, 7].map((stageNum) => {
+                  const cfg = STAGE_CONFIG[stageNum];
+                  if (!cfg) return null;
+                  const colOrders = ordersByStage[stageNum] || [];
+                  const isActive = activeCarrierStage === stageNum;
+                  const stageIcons: Record<number, string> = {
+                    1: '📥',
+                    2: '📝',
+                    3: '📦',
+                    4: '🏁',
+                    5: '📂',
+                    6: '💳',
+                    7: '🗄️',
+                  };
+
+                  return (
+                    <button
+                      key={stageNum}
+                      type="button"
+                      onClick={() => setActiveCarrierStage(stageNum)}
+                      className={`text-left rounded-xl px-3 py-2.5 border transition-all cursor-pointer flex flex-col gap-1.5 ${
+                        isActive
+                          ? 'border-emerald-600 bg-emerald-50 shadow-sm ring-1 ring-emerald-600/20'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:-translate-y-0.5'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span
+                          className={`text-[12px] font-bold truncate ${
+                            isActive ? 'text-emerald-900' : 'text-slate-800'
+                          }`}
+                          title={cfg.title}
+                        >
+                          {stageIcons[stageNum] || '📁'} {cfg.shortTitle}
+                        </span>
+                        <span
+                          className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full tabular-nums shrink-0 ${
+                            isActive ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {colOrders.length}
+                        </span>
+                      </div>
+                      <div
+                        className={`text-[10.5px] truncate ${
+                          isActive ? 'text-emerald-700/80' : 'text-slate-500'
+                        }`}
+                      >
+                        {cfg.title}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Список 1-строчных карточек активной папки */}
+              {(() => {
+                const stageNum = activeCarrierStage;
+                const cfg = STAGE_CONFIG[stageNum] || STAGE_CONFIG[1]!;
                 const colOrders = ordersByStage[stageNum] || [];
 
                 return (
-                  <div
-                    key={stageNum}
-                    className={`${cfg.bgHeader} rounded-xl border-2 ${cfg.borderCol} p-1.5 flex flex-col gap-1.5 min-w-0 shadow-2xs`}
-                  >
-                    {/* Заголовок колонки */}
-                    <div
-                      className={`flex items-center justify-between px-1 pb-1 border-b ${cfg.borderCol}`}
-                    >
-                      <div className="flex items-center gap-1 min-w-0">
-                        <span className={`w-2 h-2 rounded-full ${cfg.colorDot} shrink-0`} />
-                        <span
-                          className="text-[11px] font-black uppercase text-slate-800 truncate"
-                          title={cfg.title}
-                        >
-                          {cfg.shortTitle}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-mono font-black bg-white px-1 rounded border border-slate-300">
-                        {colOrders.length}
+                  <div className="space-y-2">
+                    <div className="text-[13px] font-bold text-slate-700 px-1 flex items-center gap-2">
+                      <span>{cfg.title}</span>
+                      <span className="text-[11.5px] font-medium text-slate-500">
+                        ({colOrders.length})
                       </span>
                     </div>
 
-                    {/* Список карточек в колонке */}
-                    <div className="flex flex-col gap-1.5 min-h-[120px]">
-                      {colOrders.length === 0 ? (
-                        <div className="h-16 border-2 border-dashed border-slate-300/60 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-bold">
-                          Пусто
-                        </div>
-                      ) : (
-                        colOrders.map((order) => {
-                          // Валидация 3 пунктов на этапе 5 (Документы)
+                    {colOrders.length === 0 ? (
+                      <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-xs font-semibold text-slate-500">
+                        В папке «{cfg.shortTitle}» пока нет договоров АТИ
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        {colOrders.map((order) => {
                           const isStage5 = stageNum === 5;
                           const isDocsSent = Boolean(order.docs_sent);
                           const isDocsReceived = Boolean(order.docs_received);
@@ -1016,127 +1059,92 @@ export default function AtiPage() {
                             <div
                               key={order.id}
                               onClick={() => setSelectedOrder(order)}
-                              className="bg-white rounded-2xl border-2 border-slate-300 hover:border-indigo-500 hover:shadow-md p-2.5 space-y-2 text-xs shadow-2xs transition cursor-pointer group select-none relative"
                               title="Нажмите, чтобы открыть полноэкранный договор-заявку"
+                              className="bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-xs rounded-xl px-3.5 py-2.5 flex items-center gap-3 cursor-pointer transition-all"
                             >
-                              {/* Шапка: Номер, Документ, Фрахт */}
-                              <div className="flex items-center justify-between gap-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="font-mono font-black text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[10px] shrink-0 border border-slate-200">
-                                    {order.order_number.split(' ')[0] || order.order_number}
-                                  </span>
-                                  <span
-                                    className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
-                                      order.doc_type === 'etrn'
-                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                        : 'bg-amber-100 text-amber-900 border-amber-300'
-                                    }`}
-                                  >
-                                    {order.doc_type === 'etrn' ? '⚡ ЭТрН' : '📮 Почта'}
-                                  </span>
-                                </div>
-                                <span className="font-mono font-black text-slate-900 text-xs shrink-0">
-                                  {Number(order.price || 0).toLocaleString('ru-RU')} ₽
-                                </span>
+                              {/* Номер */}
+                              <div className="font-mono text-[12.5px] font-extrabold text-slate-900 min-w-[78px] shrink-0">
+                                {order.order_number.split(' ')[0] || order.order_number}
                               </div>
 
-                              {/* Контрагент */}
-                              <div>
-                                <div
-                                  className="font-black text-slate-900 text-[11px] leading-snug line-clamp-2 group-hover:text-indigo-600 transition"
+                              {/* Тип ЭТрН / Почта */}
+                              <span
+                                className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${
+                                  order.doc_type === 'etrn'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-900 border-amber-200'
+                                }`}
+                              >
+                                {order.doc_type === 'etrn' ? '⚡ ЭТрН' : '📮 Почта'}
+                              </span>
+
+                              {/* Контрагент + АТИ код */}
+                              <div className="min-w-[160px] max-w-[210px] shrink-0 truncate">
+                                <span
+                                  className="text-[12.5px] font-bold text-slate-900"
                                   title={order.counterparty_name}
                                 >
                                   {order.counterparty_name}
-                                </div>
+                                </span>
                                 {order.ati_code && (
-                                  <span className="text-[9px] font-mono text-indigo-700 font-bold">
+                                  <span className="ml-1.5 text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
                                     АТИ {order.ati_code}
                                   </span>
                                 )}
                               </div>
 
                               {/* Маршрут */}
-                              <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/80 space-y-1 text-[10px]">
-                                <div className="flex items-center gap-1.5 font-bold text-slate-700 truncate">
-                                  <span className="text-emerald-600 text-xs shrink-0">🟢</span>
-                                  <span className="truncate">
-                                    {order.pickup_address
-                                      ? order.pickup_address.split(',')[1] ||
-                                        order.pickup_address.split(',')[0]
-                                      : 'Погрузка'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5 font-bold text-slate-700 truncate">
-                                  <span className="text-rose-600 text-xs shrink-0">🔴</span>
-                                  <span className="truncate">
-                                    {order.delivery_address
-                                      ? order.delivery_address.split(',')[1] ||
-                                        order.delivery_address.split(',')[0]
-                                      : 'Выгрузка'}
-                                  </span>
-                                </div>
+                              <div
+                                className="text-[12.5px] text-slate-700 flex-1 min-w-[160px] truncate"
+                                title={`${order.pickup_address || '—'} → ${order.delivery_address || '—'}`}
+                              >
+                                {order.pickup_address || '—'}{' '}
+                                <span className="text-slate-400">➔</span>{' '}
+                                {order.delivery_address || '—'}
                               </div>
 
-                              {/* Авто и Водитель */}
-                              <div className="text-[10px] text-slate-600 space-y-0.5 pt-0.5">
-                                {order.asset_name && (
-                                  <div className="truncate flex items-center gap-1">
-                                    <span>🚛</span>
-                                    <span className="font-bold text-slate-800">
-                                      {order.asset_name}
-                                    </span>
-                                    {order.asset_reg_number && (
-                                      <span className="font-mono text-[9px] text-slate-500">
-                                        ({order.asset_reg_number})
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                {order.driver_name && (
-                                  <div className="truncate flex items-center gap-1 text-[9px] text-slate-500">
-                                    <span>👤</span>
-                                    <span className="truncate">{order.driver_name}</span>
-                                  </div>
-                                )}
+                              {/* Авто + Водитель */}
+                              <div className="text-[12px] text-slate-700 min-w-[155px] max-w-[190px] truncate shrink-0 flex items-center gap-1.5">
+                                {order.asset_reg_number ? (
+                                  <span className="font-mono text-[11px] font-bold bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-900 shrink-0">
+                                    {order.asset_reg_number}
+                                  </span>
+                                ) : null}
+                                <span className="truncate">
+                                  {order.driver_name || (
+                                    <span className="text-slate-400 italic">Не назначен</span>
+                                  )}
+                                </span>
                               </div>
 
-                              {/* Индикаторы этапа 5 и 6 */}
-                              {isStage5 && (
-                                <div className="pt-0.5">
+                              {/* Статус этапа 5 / Дата оплаты этапа 6 */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                {isStage5 && (
                                   <span
-                                    className={`w-full block text-center text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                    className={`text-[11px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${
                                       isStage5Ready
-                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                        : 'bg-amber-50 text-amber-900 border-amber-300'
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                        : 'bg-amber-50 border-amber-200 text-amber-900'
                                     }`}
                                   >
-                                    {isStage5Ready
-                                      ? '3/3 готово к оплате ✓'
-                                      : `Документы: ${stage5CompletedCount}/3`}
+                                    Доки: {stage5CompletedCount}/3
                                   </span>
-                                </div>
-                              )}
-
-                              {stageNum === 6 && order.payment_promised_date && (
-                                <div className="pt-0.5">
-                                  <span className="w-full block text-center text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-900 border-amber-300">
-                                    📅 Оплата: {order.payment_promised_date}
+                                )}
+                                {stageNum === 6 && order.payment_promised_date && (
+                                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border bg-amber-50 text-amber-900 border-amber-200 whitespace-nowrap">
+                                    📅 {order.payment_promised_date}
                                   </span>
-                                </div>
-                              )}
-
-                              {/* Кнопка открытия полноэкранного договора-заявки */}
-                              <div className="pt-1">
-                                <div className="w-full py-1.5 px-2 bg-indigo-50/80 group-hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-[10px] flex items-center justify-center gap-1.5 transition">
-                                  <span>📋</span>
-                                  <span>Открыть договор-заявку</span>
-                                  <span className="text-[10px] text-indigo-500">↗</span>
-                                </div>
+                                )}
                               </div>
 
-                              {/* Кнопки управления этапами на карточке */}
+                              {/* Фрахт */}
+                              <div className="font-mono text-[12.5px] font-extrabold text-slate-900 min-w-[82px] text-right tabular-nums shrink-0">
+                                {Number(order.price || 0).toLocaleString('ru-RU')} ₽
+                              </div>
+
+                              {/* Кнопки управления этапом */}
                               <div
-                                className="pt-1 border-t border-slate-100 flex items-center gap-1"
+                                className="flex items-center gap-1 shrink-0"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {stageNum <= 5 && (
@@ -1161,7 +1169,7 @@ export default function AtiPage() {
                                       setClaimDueDays('5');
                                     }}
                                     title="Срыв договора-заявки / Претензия"
-                                    className="px-1.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-black text-[10px] border border-rose-200 cursor-pointer active:scale-95 transition"
+                                    className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-bold text-[11px] border border-rose-200 cursor-pointer transition"
                                   >
                                     ✕
                                   </button>
@@ -1177,7 +1185,7 @@ export default function AtiPage() {
                                       })
                                     }
                                     title="Вернуть на предыдущий этап"
-                                    className="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-black text-[10px] border border-slate-300 cursor-pointer active:scale-95 transition"
+                                    className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] border border-slate-300 cursor-pointer transition"
                                   >
                                     ↶
                                   </button>
@@ -1186,7 +1194,6 @@ export default function AtiPage() {
                                 {stageNum < 7 ? (
                                   <button
                                     type="button"
-                                    disabled={isStage5 && !isStage5Ready}
                                     onClick={() => {
                                       if (isStage5 && !isStage5Ready) {
                                         setSelectedOrder(order);
@@ -1202,10 +1209,10 @@ export default function AtiPage() {
                                         ? 'Нажмите, чтобы открыть заявку и заполнить 3 пункта'
                                         : cfg.btnForward
                                     }
-                                    className={`flex-1 py-1 rounded-lg font-black text-[10px] transition text-center ${
+                                    className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition whitespace-nowrap cursor-pointer ${
                                       isStage5 && !isStage5Ready
-                                        ? 'bg-amber-100 text-amber-900 border border-amber-300 cursor-pointer hover:bg-amber-200'
-                                        : `${cfg.btnClass} cursor-pointer active:scale-95`
+                                        ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                                     }`}
                                   >
                                     {isStage5 && !isStage5Ready
@@ -1213,19 +1220,19 @@ export default function AtiPage() {
                                       : cfg.btnForward}
                                   </button>
                                 ) : (
-                                  <div className="flex-1 text-center py-1 bg-emerald-100 text-emerald-900 rounded-lg font-black text-[10px]">
+                                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg font-bold text-[11px]">
                                     ✓ Закрыто
-                                  </div>
+                                  </span>
                                 )}
                               </div>
                             </div>
                           );
-                        })
-                      )}
-                    </div>
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
-              })}
+              })()}
             </div>
           )}
 

@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         `,
         )
         .in('status', ['in_progress', 'returned', 'created'])
-        .neq('lifecycle_status', 'cancelled')
+        .not('lifecycle_status', 'in', '(approved,cancelled)')
         .order('order_number', { ascending: false });
       if (error) throw error;
       return NextResponse.json(data ?? []);

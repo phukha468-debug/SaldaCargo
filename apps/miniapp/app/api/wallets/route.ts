@@ -23,6 +23,10 @@ export const revalidate = 0;
 let cachedWallets: { data: any; timestamp: number } | null = null;
 const CACHE_TTL_MS = 25000; // 25 seconds TTL
 
+export function invalidateWalletsCache() {
+  cachedWallets = null;
+}
+
 function requestTBankApi(host: string, path: string, token: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const req = https.request(

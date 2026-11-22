@@ -30,7 +30,7 @@ export async function GET() {
       `,
       )
       .in('status', ['created', 'in_progress'])
-      .neq('lifecycle_status', 'cancelled')
+      .not('lifecycle_status', 'in', '(approved,cancelled)')
       .order('created_at', { ascending: false }),
 
     // Наряды на утверждении (механик завершил)

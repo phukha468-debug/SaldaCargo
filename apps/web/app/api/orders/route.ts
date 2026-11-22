@@ -136,6 +136,68 @@ export async function GET(req: Request) {
       };
     });
 
+    // Синхронизация с разделом «Ревью»: подтягиваем рейсы на ревью из trips,
+    // которые созданы водителем без предварительной заявки в orders
+    if (!status || status === 'pending_review') {
+      const linkedTripIds = new Set(enriched.map((o: any) => o.active_trip_id).filter(Boolean));
+      const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
+      const { data: reviewTrips } = await (supabase.from('trips') as any)
+        .select(
+          `
+          id, trip_number, status, lifecycle_status, started_at, ended_at, created_at,
+          odometer_start, odometer_end, driver_note, admin_note, trip_type,
+          asset:assets(id, short_name, reg_number),
+          driver:users!trips_driver_id_fkey(id, full_name, phone),
+          trip_orders(id, amount, driver_pay, description, lifecycle_status, counterparty:counterparties(id, name, inn))
+        `,
+        )
+        .eq('status', 'completed')
+        .in('lifecycle_status', ['draft', 'returned'])
+        .gte('created_at', sixtyDaysAgo)
+        .order('created_at', { ascending: false });
+
+      for (const t of reviewTrips || []) {
+        if (linkedTripIds.has(t.id)) continue;
+        const activeTo = (t.trip_orders || []).filter(
+          (x: any) => x.lifecycle_status !== 'cancelled',
+        );
+        const totalAmount = activeTo.reduce(
+          (sum: number, x: any) => sum + Number(x.amount || 0),
+          0,
+        );
+        const firstCp = activeTo.find((x: any) => x.counterparty)?.counterparty || null;
+        enriched.push({
+          id: `trip-review-${t.id}`,
+          order_number: t.trip_number,
+          base_doc_number: String(t.trip_number || ''),
+          base_doc_name: 'Рейс на ревью',
+          status: 'pending_review',
+          active_trip_id: t.id,
+          assigned_vehicle_id: t.asset?.id || null,
+          assigned_driver_id: t.driver?.id || null,
+          client_id: firstCp?.id || null,
+          client: firstCp,
+          vehicle: t.asset || null,
+          driver: t.driver || null,
+          cargo_name: activeTo[0]?.description || '',
+          price_without_vat: totalAmount || null,
+          loading_address_json: {
+            raw: t.trip_type === 'intercity' ? 'Межгород' : 'В.Салда',
+            city: '',
+          },
+          unloading_address_json: { raw: '', city: '' },
+          created_at: t.started_at || t.created_at,
+          routes_json: [],
+          client_orders: [],
+          prevent_salda_auto_finish: false,
+          salda_transit_count: 0,
+          billing_docs: null,
+          trip: t,
+          is_trip_only_review: true,
+        });
+      }
+    }
+
     return NextResponse.json({ orders: enriched });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

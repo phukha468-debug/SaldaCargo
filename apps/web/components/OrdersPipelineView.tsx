@@ -174,102 +174,99 @@ export interface OrderItem {
   salda_transit_count?: number;
   billing_docs?: BillingDocsWorkflow | null;
   raw_parser_payload?: any;
+  is_trip_only_review?: boolean;
 }
 
-const KANBAN_STAGES: Array<{
-  status: OrderItem['status'];
-  title: string;
+type PipelineFolderId =
+  | 'waiting_vehicle'
+  | 'assigned'
+  | 'in_progress'
+  | 'pending_review'
+  | 'docs_collection'
+  | 'completed';
+
+const PIPELINE_FOLDERS: Array<{
+  id: PipelineFolderId;
   icon: string;
-  badgeBg: string;
-  badgeText: string;
-  borderCol: string;
-  headerBg: string;
+  name: string;
+  sub: string;
 }> = [
   {
-    status: 'waiting_vehicle',
-    title: 'Лист ожидания',
-    icon: '⏳',
-    badgeBg: 'bg-amber-100',
-    badgeText: 'text-amber-900',
-    borderCol: 'border-amber-300',
-    headerBg: 'bg-amber-50/80',
+    id: 'waiting_vehicle',
+    icon: '📥',
+    name: 'Лист ожидания',
+    sub: 'Заявка есть, машина не назначена',
   },
   {
-    status: 'assigned',
-    title: 'Назначены',
-    icon: '📋',
-    badgeBg: 'bg-sky-100',
-    badgeText: 'text-sky-900',
-    borderCol: 'border-sky-300',
-    headerBg: 'bg-sky-50/80',
+    id: 'assigned',
+    icon: '📌',
+    name: 'Назначенная',
+    sub: 'Водитель, маршрут и цена готовы',
   },
   {
-    status: 'in_progress',
-    title: 'В пути',
+    id: 'in_progress',
     icon: '🚛',
-    badgeBg: 'bg-purple-100',
-    badgeText: 'text-purple-900',
-    borderCol: 'border-purple-300',
-    headerBg: 'bg-purple-50/80',
+    name: 'В пути',
+    sub: 'Активные рейсы + Wialon GPS',
   },
   {
-    status: 'pending_review',
-    title: 'На ревью',
+    id: 'pending_review',
     icon: '🔍',
-    badgeBg: 'bg-orange-100',
-    badgeText: 'text-orange-900',
-    borderCol: 'border-orange-300',
-    headerBg: 'bg-orange-50/80',
+    name: 'На ревью',
+    sub: 'Синхронно с разделом «Ревью»',
   },
   {
-    status: 'docs_collection',
-    title: 'Сбор документов',
-    icon: '📑',
-    badgeBg: 'bg-indigo-100',
-    badgeText: 'text-indigo-900',
-    borderCol: 'border-indigo-300',
-    headerBg: 'bg-indigo-50/80',
+    id: 'docs_collection',
+    icon: '📂',
+    name: 'Сбор документов',
+    sub: 'ВСМПО-АВИСМА · АВИСМА · Геострой',
   },
   {
-    status: 'completed',
-    title: 'Завершены',
-    icon: '✅',
-    badgeBg: 'bg-emerald-100',
-    badgeText: 'text-emerald-900',
-    borderCol: 'border-emerald-300',
-    headerBg: 'bg-emerald-50/80',
+    id: 'completed',
+    icon: '🗄️',
+    name: 'Архив',
+    sub: 'Закрытые рейсы · фильтр по дате',
   },
 ];
 
 export function OrdersPipelineView() {
   const queryClient = useQueryClient();
 
-  // Вид: 'list' (по умолчанию: 1-строчный компактный вид по стандарту AGENTS.md) | 'kanban' | 'documents'
-  const [viewMode, setViewModeState] = useState<'kanban' | 'list' | 'documents'>('list');
+  const [activeFolder, setActiveFolderState] = useState<PipelineFolderId>('in_progress');
+  const [archiveMonth, setArchiveMonth] = useState<string>('all');
+  const [archiveDay, setArchiveDay] = useState<string>('');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('salda_orders_view_mode') as any;
-      if (saved && ['kanban', 'list', 'documents'].includes(saved)) {
-        setViewModeState(saved);
+      const saved = localStorage.getItem('salda_orders_active_folder') as PipelineFolderId | null;
+      if (
+        saved &&
+        [
+          'waiting_vehicle',
+          'assigned',
+          'in_progress',
+          'pending_review',
+          'docs_collection',
+          'completed',
+        ].includes(saved)
+      ) {
+        setActiveFolderState(saved);
       }
     }
   }, []);
 
-  const setViewMode = (mode: 'kanban' | 'list' | 'documents') => {
-    setViewModeState(mode);
+  const setActiveFolder = (folder: PipelineFolderId) => {
+    setActiveFolderState(folder);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('salda_orders_view_mode', mode);
+      localStorage.setItem('salda_orders_active_folder', folder);
     }
   };
-  const [activeStatusTab, setActiveStatusTab] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
 
   // Состояние раздела «Документы» (ВСМПО, ООО Ависма, Геостройиндустрия)
   const [docClientFilter, setDocClientFilter] = useState<'all' | 'vsmpo' | 'avisma' | 'geostroy'>(
     'all',
   );
-  const [showArchivedDocs, setShowArchivedDocs] = useState<boolean>(false);
   const [invoiceModalOrder, setInvoiceModalOrder] = useState<{
     order: OrderItem;
     initialStep5?: boolean;
@@ -362,23 +359,6 @@ export function OrdersPipelineView() {
       const res = await fetch('/api/loading-points');
       const json = await res.json();
       return json.loading_points || [];
-    },
-  });
-
-  // Ручная синхронизация Wialon по кнопке администратора (автоматический опрос Wialon из браузера отключен:
-  // синхронизация происходит строго через Вебхук Wialon либо серверный крон GitHub Actions)
-  const wialonSyncMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/cron/wialon-sync', { method: 'POST' });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка синхронизации Wialon');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
-      queryClient.invalidateQueries({ queryKey: ['vehicles-list'] });
     },
   });
 
@@ -575,19 +555,6 @@ export function OrdersPipelineView() {
       alert(`Ошибка: ${err.message}`);
     },
   });
-
-  const handleToggleWaybillType = (order: OrderItem, newType: 'paper' | 'etrn') => {
-    const cur = order.billing_docs || {};
-    billingDocsMutation.mutate({
-      orderId: order.id,
-      docs: {
-        ...cur,
-        waybill_type: newType,
-        tn_driver_delivered: newType === 'paper' ? cur.tn_driver_delivered : false,
-        etrn_signed_edo: newType === 'etrn' ? cur.etrn_signed_edo : false,
-      },
-    });
-  };
 
   const handleOpenWaybillModal = (order: OrderItem) => {
     const cur = order.billing_docs || {};
@@ -797,43 +764,6 @@ export function OrdersPipelineView() {
   };
 
   // Все рейсы 3-х контрагентов (ВСМПО, Ависма, Геострой), которые в пути, на ревью, сборе документов или завершены
-  const strictCounterpartyOrders = orders.filter((o) => {
-    if (!isStrictDocCounterparty(getOrderEffectiveClientName(o))) return false;
-    return ['in_progress', 'pending_review', 'docs_collection', 'completed'].includes(o.status);
-  });
-
-  const pendingDocsCount = strictCounterpartyOrders.filter((o) => {
-    const isAccepted = Boolean(
-      o.billing_docs?.client_accepted_edo || o.billing_docs?.status === 'accepted',
-    );
-    return !isAccepted;
-  }).length;
-
-  const filteredDocOrders = strictCounterpartyOrders.filter((o) => {
-    if (docClientFilter !== 'all') {
-      const name = getOrderEffectiveClientName(o).toLowerCase();
-      if (docClientFilter === 'vsmpo' && !name.includes('всмпо')) return false;
-      if (docClientFilter === 'avisma' && !name.includes('ависма')) return false;
-      if (docClientFilter === 'geostroy' && !name.includes('геострой')) return false;
-    }
-    const isAccepted = Boolean(
-      o.billing_docs?.client_accepted_edo || o.billing_docs?.status === 'accepted',
-    );
-    if (!showArchivedDocs && isAccepted) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const match =
-        String(o.trip?.trip_number || '').includes(q) ||
-        o.base_doc_number?.toLowerCase().includes(q) ||
-        String(o.order_number).includes(q) ||
-        o.client?.name?.toLowerCase().includes(q) ||
-        o.vehicle?.reg_number?.toLowerCase().includes(q) ||
-        o.driver?.name?.toLowerCase().includes(q);
-      if (!match) return false;
-    }
-    return true;
-  });
-
   // Фильтрация
   const filteredOrders = orders.filter((o) => {
     if (!search) return true;
@@ -849,53 +779,6 @@ export function OrdersPipelineView() {
     );
   });
 
-  const getStatusBadge = (status: OrderItem['status']) => {
-    switch (status) {
-      case 'waiting_vehicle':
-        return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">
-            ⏳ Лист ожидания
-          </span>
-        );
-      case 'assigned':
-        return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-sky-100 text-sky-800 border border-sky-300">
-            📋 Назначен
-          </span>
-        );
-      case 'in_progress':
-        return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-purple-100 text-purple-800 border border-purple-300 animate-pulse">
-            🚛 В пути
-          </span>
-        );
-      case 'pending_review':
-        return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-orange-100 text-orange-800 border border-orange-300">
-            🔍 На ревью
-          </span>
-        );
-      case 'docs_collection':
-        return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-800 border border-indigo-300">
-            📑 Сбор документов
-          </span>
-        );
-      case 'completed':
-        return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
-            ✅ Завершен
-          </span>
-        );
-      default:
-        return (
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-800">
-            Черновик
-          </span>
-        );
-    }
-  };
-
   // Вычисление краткого маршрута
   const formatRouteSummary = (order: OrderItem) => {
     const routes = order.routes_json || order.raw_parser_payload?.routes;
@@ -910,1050 +793,545 @@ export function OrdersPipelineView() {
     return `${load} → ${unload}`;
   };
 
-  return (
-    <div className="space-y-3 font-sans">
-      {/* ── ВЕРХНЯЯ СТРОКА: ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМОВ (КАНБАН / СПИСОК), ПОИСК, ДЕЙСТВИЯ ── */}
-      <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2">
-          {/* Переключатель вида */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-bold">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
-                viewMode === 'list'
-                  ? 'bg-white text-indigo-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>📑 Компактный список (1 строка)</span>
-            </button>
-            <button
-              onClick={() => setViewMode('kanban')}
-              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
-                viewMode === 'kanban'
-                  ? 'bg-white text-indigo-700 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>📊 Канбан-доска</span>
-            </button>
-            <button
-              onClick={() => setViewMode('documents')}
-              title="Документооборот и выставление счетов: ВСМПО-Ависма, ООО Ависма, Геостройиндустрия"
-              className={`px-3 py-1 rounded-md transition flex items-center gap-1.5 ${
-                viewMode === 'documents'
-                  ? 'bg-white text-indigo-700 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>📑 Документы</span>
-              {pendingDocsCount > 0 ? (
-                <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9.5px] rounded-full font-bold">
-                  {pendingDocsCount}
-                </span>
-              ) : (
-                <span className="px-1.5 py-0.2 bg-slate-200 text-slate-600 text-[9.5px] rounded-full font-bold">
-                  0
-                </span>
-              )}
-            </button>
-          </div>
+  // Подсчёт количества заявок в каждой из 6 папок
+  const getFolderOrders = (folderId: PipelineFolderId, sourceList: OrderItem[]) => {
+    return sourceList.filter((o) => {
+      if ((o.status as string) === 'cancelled') return false;
+      if (folderId === 'waiting_vehicle') {
+        return o.status === 'waiting_vehicle' || o.status === 'draft';
+      }
+      if (folderId === 'docs_collection') {
+        if (!isStrictDocCounterparty(getOrderEffectiveClientName(o))) return false;
+        const isAccepted = Boolean(
+          o.billing_docs?.client_accepted_edo || o.billing_docs?.status === 'accepted',
+        );
+        return o.status === 'docs_collection' && !isAccepted;
+      }
+      if (folderId === 'completed') {
+        const isAccepted = Boolean(
+          o.billing_docs?.client_accepted_edo || o.billing_docs?.status === 'accepted',
+        );
+        return o.status === 'completed' || (o.status === 'docs_collection' && isAccepted);
+      }
+      return o.status === folderId;
+    });
+  };
 
-          <div className="text-[11px] font-bold text-slate-500 hidden sm:block">
-            Всего заявок: <span className="text-slate-900 font-mono">{orders.length}</span>
+  // Доступные месяцы для фильтра Архива
+  const archiveMonths = Array.from(
+    new Set(
+      getFolderOrders('completed', orders)
+        .map((o) => {
+          const dt = o.trip?.started_at || o.created_at;
+          return dt ? dt.slice(0, 7) : null;
+        })
+        .filter((x): x is string => Boolean(x)),
+    ),
+  ).sort((a, b) => b.localeCompare(a));
+
+  const activeFolderMeta =
+    PIPELINE_FOLDERS.find((f) => f.id === activeFolder) || PIPELINE_FOLDERS[0]!;
+
+  const activeFolderOrders = getFolderOrders(activeFolder, filteredOrders).filter((o) => {
+    if (activeFolder === 'docs_collection' && docClientFilter !== 'all') {
+      const name = getOrderEffectiveClientName(o).toLowerCase();
+      if (docClientFilter === 'vsmpo' && !name.includes('всмпо')) return false;
+      if (docClientFilter === 'avisma' && !name.includes('ависма')) return false;
+      if (docClientFilter === 'geostroy' && !name.includes('геострой')) return false;
+    }
+    if (activeFolder === 'completed') {
+      const iso = (o.trip?.started_at || o.created_at || '').slice(0, 10);
+      if (archiveDay && iso !== archiveDay) return false;
+      if (!archiveDay && archiveMonth !== 'all' && !iso.startsWith(archiveMonth)) return false;
+    }
+    return true;
+  });
+
+  const formatMonthLabel = (ym: string) => {
+    const [y, m] = ym.split('-');
+    const names = [
+      'Январь',
+      'Февраль',
+      'Март',
+      'Апрель',
+      'Май',
+      'Июнь',
+      'Июль',
+      'Август',
+      'Сентябрь',
+      'Октябрь',
+      'Ноябрь',
+      'Декабрь',
+    ];
+    return `${names[Number(m) - 1] || m} ${y}`;
+  };
+
+  return (
+    <div className="space-y-3.5 font-sans">
+      {/* ── ВЕРХНЯЯ ПАНЕЛЬ (ВАРИАНТ 1 · СБЕР / SAAS) ── */}
+      <div className="bg-white px-4 py-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="text-[15px] font-extrabold text-slate-900 flex items-center gap-2">
+            <span>📝 Конвейер заявок & Wialon</span>
           </div>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Синхронно с Ревью и Wialon
+          </span>
         </div>
 
-        {/* Поиск и создание */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <input
             type="text"
-            placeholder="Поиск по номеру, клиенту, грузу..."
+            placeholder="Поиск по № рейса, клиенту, машине..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 w-52"
+            className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 focus:bg-white w-60"
           />
-          <button
-            onClick={() => wialonSyncMutation.mutate()}
-            disabled={wialonSyncMutation.isPending}
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition active:scale-95 disabled:opacity-50"
-          >
-            <span>{wialonSyncMutation.isPending ? '⏳...' : '🛰️ Wialon'}</span>
-          </button>
           <button
             onClick={() => {
               setDriverModalInitialId(undefined);
               setIsDriverModalOpen(true);
             }}
-            title="Справочник водителей: добавление и редактирование паспорта, прав, ИНН и телефона"
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+            title="Справочник водителей: паспорт, права, ИНН и телефон для печати 4-С и ТН"
+            className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
           >
             <span>👤 Водители ({drivers.length})</span>
           </button>
           <button
             onClick={() => setIsDocTemplatesModalOpen(true)}
-            title="Центр управления шаблонами документов: Путевые листы (4-С), Транспортные накладные (ТН), ЭТрн (МЧД/ЭДО)"
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+            title="Шаблоны Путевых листов (4-С), Транспортных накладных (ТН), ЭТрН"
+            className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
           >
-            <span>📋 Шаблоны документов</span>
+            <span>📋 Шаблоны</span>
           </button>
           <button
             onClick={() => {
               setEditingOrder(null);
               setIsCreateModalOpen(true);
             }}
-            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer transition active:scale-95"
           >
-            <span>+ Создать заявку</span>
+            <span>+ Новая заявка</span>
           </button>
         </div>
       </div>
 
-      {/* ── РЕЖИМ 1: КАНБАН-ДОСКА (ПО АНАЛОГИИ С ЭКСПЕДИЦИЕЙ, УЛЬТРА-КОМПАКТНЫЕ КАРТОЧКИ) ── */}
-      {viewMode === 'kanban' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 items-start">
-          {KANBAN_STAGES.map((col) => {
-            const colOrders = filteredOrders.filter((o) => {
-              if (col.status === 'waiting_vehicle') {
-                return o.status === 'waiting_vehicle' || o.status === 'draft';
-              }
-              return o.status === col.status;
-            });
-
-            const colSum = colOrders.reduce(
-              (acc, o) => acc + (Number(o.price_without_vat) || 0),
-              0,
-            );
-
-            return (
-              <div
-                key={col.status}
-                className={`bg-slate-50/70 rounded-xl border ${col.borderCol} p-2 flex flex-col min-h-[500px] shadow-2xs`}
-              >
-                {/* Шапка колонки */}
-                <div
-                  className={`p-1.5 rounded-lg ${col.headerBg} border border-slate-200/80 mb-2 flex items-center justify-between text-xs font-bold`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>{col.icon}</span>
-                    <span className="text-slate-900">{col.title}</span>
-                    <span
-                      className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-black ${col.badgeBg} ${col.badgeText}`}
-                    >
-                      {colOrders.length}
-                    </span>
-                  </div>
-                  {colSum > 0 && (
-                    <span className="text-[10px] font-black text-slate-700">
-                      {(colSum / 1000).toFixed(0)}k ₽
-                    </span>
-                  )}
-                </div>
-
-                {/* Список ультра-компактных карточек */}
-                <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[calc(100vh-260px)] pr-0.5">
-                  {colOrders.length === 0 ? (
-                    <div className="p-4 text-center text-[10.5px] text-slate-400 border border-dashed border-slate-200 rounded-lg">
-                      Нет заявок
-                    </div>
-                  ) : (
-                    colOrders.map((order) => {
-                      const isMulti = Boolean(
-                        (order.routes_json && order.routes_json.length > 1) ||
-                        (order.raw_parser_payload?.routes &&
-                          order.raw_parser_payload.routes.length > 1),
-                      );
-                      const isTransit = Boolean(
-                        order.prevent_salda_auto_finish ||
-                        order.raw_parser_payload?.prevent_salda_auto_finish,
-                      );
-                      const isCash = order.payment_terms?.includes('Наличные');
-                      const subOrders =
-                        order.client_orders && order.client_orders.length > 0
-                          ? order.client_orders
-                          : order.raw_parser_payload?.client_orders || [];
-                      const isMultiClient = Array.isArray(subOrders) && subOrders.length > 1;
-
-                      let clientShort =
-                        order.client?.name?.replace(/ПАО|ООО|«|»/g, '').trim() || 'Клиент';
-                      if (isMultiClient) {
-                        const names = subOrders
-                          .map((s: any) => s.client_name?.replace(/ПАО|ООО|«|»/g, '').trim())
-                          .filter(Boolean);
-                        clientShort =
-                          names.slice(0, 2).join(' + ') +
-                          (names.length > 2 ? ` (+${names.length - 2})` : '');
-                      }
-                      const routeText = formatRouteSummary(order);
-
-                      return (
-                        <div
-                          key={order.id}
-                          onClick={() => setSelectedDetailsOrder(order)}
-                          className="p-2 bg-white rounded-lg border border-slate-200 hover:border-indigo-400 hover:shadow-xs transition cursor-pointer select-none space-y-1 group relative active:scale-[0.99]"
-                        >
-                          {/* СТРОКА 1: Номер, Клиент, Бейджи, Ставка (Dense layout) */}
-                          <div className="flex items-center justify-between gap-1 text-[11px]">
-                            <div className="flex items-center gap-1.5 truncate">
-                              <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition shrink-0">
-                                {order.trip?.trip_number
-                                  ? `Рейс № ${order.trip.trip_number}`
-                                  : `№ ${order.base_doc_number || order.order_number}`}
-                              </span>
-                              {order.base_doc_number &&
-                                (order.base_doc_number.includes('/') ||
-                                order.base_doc_number.includes('\\') ? (
-                                  <span
-                                    className="px-1 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold shrink-0"
-                                    title="Номер Электронного поручения экспедитору (ЭПЭ)"
-                                  >
-                                    ЭПЭ {order.base_doc_number}
-                                  </span>
-                                ) : order.trip?.trip_number &&
-                                  order.base_doc_number !== String(order.trip.trip_number) ? (
-                                  <span
-                                    className="text-[9.5px] text-slate-400 font-mono shrink-0"
-                                    title="Входящий номер заявки"
-                                  >
-                                    (№{order.base_doc_number})
-                                  </span>
-                                ) : null)}
-                              <span
-                                className="text-[10px] text-slate-500 font-semibold truncate max-w-[120px]"
-                                title={
-                                  isMultiClient
-                                    ? `В рейсе ${subOrders.length} клиентов: ${subOrders.map((s: any) => `${s.client_name || 'Клиент'} (${Number(s.price_without_vat || 0).toLocaleString('ru-RU')} ₽)`).join(', ')}`
-                                    : order.client?.name || clientShort
-                                }
-                              >
-                                {clientShort}
-                              </span>
-                              {isMultiClient && (
-                                <span
-                                  className="px-1 py-0.2 bg-purple-100 text-purple-900 border border-purple-300 rounded text-[9px] font-bold shrink-0"
-                                  title="Мульти-заказ: несколько клиентов в одном рейсе с раздельными счетами"
-                                >
-                                  👥 {subOrders.length} кл.
-                                </span>
-                              )}
-                              {isTransit && (
-                                <span
-                                  className="px-1 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[9px] font-bold shrink-0"
-                                  title="Составной рейс через Салду (без авто-закрытия)"
-                                >
-                                  🔄 Салда
-                                </span>
-                              )}
-                              {isMulti && (
-                                <span
-                                  className="px-1 py-0.2 bg-indigo-100 text-indigo-900 border border-indigo-200 rounded text-[9px] font-bold shrink-0"
-                                  title="Мульти-стоп маршрут (несколько погрузок/разгрузок)"
-                                >
-                                  📍 Мульти
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="font-black text-slate-900 text-[11px]">
-                                {order.price_without_vat
-                                  ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
-                                  : '—'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenRateModal(order);
-                                }}
-                                className="text-[10px] text-slate-400 hover:text-indigo-600 p-0.5 rounded transition cursor-pointer"
-                                title="Быстро изменить ставку рейса"
-                              >
-                                ✏️
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* СТРОКА 2: Автомобиль/Водитель, маршрут, вес + Быстрое действие этапа (Строго 2 строки по стандарту AGENTS.md) */}
-                          <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600 pt-0.5">
-                            <div className="flex items-center gap-1 truncate">
-                              {order.vehicle?.reg_number ? (
-                                <span className="font-mono font-bold bg-slate-100 text-slate-800 px-1 py-0.2 rounded text-[9.5px]">
-                                  {order.vehicle.reg_number}
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setAssignModalOrder(order);
-                                  }}
-                                  className="text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-1 py-0.2 rounded font-bold text-[9px] cursor-pointer"
-                                >
-                                  + ТС
-                                </button>
-                              )}
-                              <span className="truncate max-w-[95px] font-medium text-slate-700">
-                                {routeText}
-                              </span>
-                              {order.weight_gross_kg ? (
-                                <span className="text-slate-400 font-medium shrink-0">
-                                  {(order.weight_gross_kg / 1000).toFixed(1)} т
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <div
-                              className="flex items-center gap-1 shrink-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <span className="text-[9.5px]">{isCash ? '💵' : '🏦'}</span>
-                              {order.status === 'assigned' && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    manualStageMutation.mutate({
-                                      orderId: order.id,
-                                      stage: 'in_progress',
-                                    })
-                                  }
-                                  title="Отправить в рейс"
-                                  className="px-1.5 py-0.2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded font-bold text-[9px] cursor-pointer"
-                                >
-                                  🚀 Рейс
-                                </button>
-                              )}
-                              {order.status === 'in_progress' && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    manualStageMutation.mutate({
-                                      orderId: order.id,
-                                      stage: 'pending_review',
-                                    })
-                                  }
-                                  title="Машина разгрузилась — на ревью"
-                                  className="px-1.5 py-0.2 bg-orange-100 hover:bg-orange-200 text-orange-900 border border-orange-300 rounded font-bold text-[9px] cursor-pointer"
-                                >
-                                  🏁 Ревью
-                                </button>
-                              )}
-                              {order.status === 'pending_review' && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    manualStageMutation.mutate({
-                                      orderId: order.id,
-                                      stage: 'docs_collection',
-                                    })
-                                  }
-                                  title="Одобрить и в сбор документов"
-                                  className="px-1.5 py-0.2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-[9px] cursor-pointer shadow-2xs"
-                                >
-                                  📑 Доки
-                                </button>
-                              )}
-                              {order.status === 'docs_collection' && (
-                                <button
-                                  type="button"
-                                  onClick={() => setInvoiceModalOrder({ order })}
-                                  title="Открыть чек-лист сбора документов"
-                                  className="px-1.5 py-0.2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded font-bold text-[9px] cursor-pointer"
-                                >
-                                  📑 Документы
-                                </button>
-                              )}
-                              {order.status === 'waiting_vehicle' && (
-                                <button
-                                  type="button"
-                                  onClick={() => setAssignModalOrder(order)}
-                                  className="px-1.5 py-0.2 bg-amber-500 hover:bg-amber-600 text-white rounded font-bold text-[9px] cursor-pointer shadow-2xs"
-                                >
-                                  + ТС
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── РЕЖИМ 2: КОМПАКТНЫЙ СПИСОК (1 СТРОКА НА ЗАЯВКУ) ── */}
-      {viewMode === 'list' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-          {/* Табы фильтров для списка */}
-          <div className="p-2 border-b border-slate-100 flex items-center gap-1 bg-slate-50/60 text-xs font-bold">
+      {/* ── 6 КАРТОЧЕК-ПАПОК (ВАРИАНТ 1 · СБЕР / SAAS) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
+        {PIPELINE_FOLDERS.map((folder) => {
+          const count = getFolderOrders(folder.id, orders).length;
+          const isActive = activeFolder === folder.id;
+          return (
             <button
-              onClick={() => setActiveStatusTab('all')}
-              className={`px-2.5 py-1 rounded-md transition ${activeStatusTab === 'all' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600'}`}
+              key={folder.id}
+              onClick={() => setActiveFolder(folder.id)}
+              className={`text-left rounded-xl px-3.5 py-2.5 border transition-all cursor-pointer flex flex-col gap-1.5 ${
+                isActive
+                  ? 'border-emerald-600 bg-emerald-50 shadow-sm ring-1 ring-emerald-600/20'
+                  : 'border-slate-200 bg-white hover:border-slate-300 hover:-translate-y-0.5'
+              }`}
             >
-              Все ({orders.length})
-            </button>
-            {KANBAN_STAGES.map((s) => (
-              <button
-                key={s.status}
-                onClick={() => setActiveStatusTab(s.status)}
-                className={`px-2.5 py-1 rounded-md transition ${activeStatusTab === s.status ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600'}`}
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`text-[12.5px] font-bold truncate ${
+                    isActive ? 'text-emerald-900' : 'text-slate-800'
+                  }`}
+                >
+                  {folder.icon} {folder.name}
+                </span>
+                <span
+                  className={`text-[11.5px] font-extrabold px-2 py-0.5 rounded-full tabular-nums shrink-0 ${
+                    isActive
+                      ? 'bg-emerald-600 text-white'
+                      : count > 0 && folder.id === 'docs_collection'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {count}
+                </span>
+              </div>
+              <div
+                className={`text-[11px] truncate ${
+                  isActive ? 'text-emerald-700/80' : 'text-slate-500'
+                }`}
               >
-                {s.icon} {s.title} ({orders.filter((o) => o.status === s.status).length})
+                {folder.sub}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── ПАНЕЛЬ АКТИВНОЙ ПАПКИ + ФИЛЬТРЫ (СБОР ДОКУМЕНТОВ / АРХИВ) ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div className="text-[13px] font-bold text-slate-700 flex items-center gap-2">
+          <span>
+            {activeFolderMeta.icon} {activeFolderMeta.name}
+          </span>
+          <span className="text-[11.5px] font-medium text-slate-500">
+            — {activeFolderMeta.sub} ({activeFolderOrders.length})
+          </span>
+        </div>
+
+        {activeFolder === 'docs_collection' && (
+          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 text-[11px] font-bold">
+            {(
+              [
+                { id: 'all', label: 'Все клиенты' },
+                { id: 'vsmpo', label: 'ВСМПО-АВИСМА' },
+                { id: 'avisma', label: 'ООО АВИСМА' },
+                { id: 'geostroy', label: 'Геостройиндустрия' },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setDocClientFilter(f.id)}
+                className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                  docClientFilter === f.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {f.label}
               </button>
             ))}
           </div>
+        )}
 
-          {isLoading ? (
-            <div className="p-8 text-center text-xs text-slate-500">Загрузка заявок...</div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500">Заявок не найдено.</div>
-          ) : (
-            <div className="divide-y divide-slate-100 text-[11px] whitespace-nowrap">
-              {filteredOrders
-                .filter((o) => (activeStatusTab === 'all' ? true : o.status === activeStatusTab))
-                .map((order) => {
-                  const routeText = formatRouteSummary(order);
-                  const cargoText = `${order.cargo_name || 'Груз'}, ${order.weight_gross_kg || 0} кг`;
-                  const isAssigned = Boolean(order.assigned_vehicle_id && order.assigned_driver_id);
-                  const isCash = order.payment_terms?.includes('Наличные');
-                  const isTransit = Boolean(
-                    order.prevent_salda_auto_finish ||
-                    order.raw_parser_payload?.prevent_salda_auto_finish,
-                  );
-
-                  return (
-                    <div
-                      key={order.id}
-                      onClick={() => setSelectedDetailsOrder(order)}
-                      className="px-3 py-2 flex items-center justify-between gap-2 hover:bg-slate-50/80 transition cursor-pointer select-none"
-                    >
-                      {/* Статус и номер */}
-                      <div className="flex items-center gap-2 min-w-[210px] shrink-0">
-                        {getStatusBadge(order.status)}
-                        <span className="font-bold text-slate-900 truncate shrink-0">
-                          {order.trip?.trip_number
-                            ? `Рейс № ${order.trip.trip_number}`
-                            : `№ ${order.base_doc_number || order.order_number}`}
-                        </span>
-                        {order.base_doc_number &&
-                          (order.base_doc_number.includes('/') ||
-                          order.base_doc_number.includes('\\') ? (
-                            <span
-                              className="px-1 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold shrink-0"
-                              title="Номер Электронного поручения (ЭПЭ)"
-                            >
-                              ЭПЭ {order.base_doc_number}
-                            </span>
-                          ) : order.trip?.trip_number &&
-                            order.base_doc_number !== String(order.trip.trip_number) ? (
-                            <span
-                              className="text-[9.5px] text-slate-400 font-mono shrink-0"
-                              title="Входящий номер заявки"
-                            >
-                              (№{order.base_doc_number})
-                            </span>
-                          ) : null)}
-                        {isTransit && (
-                          <span
-                            className="px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[9.5px] font-bold"
-                            title="Составной рейс через Салду"
-                          >
-                            🔄 Салда
-                          </span>
-                        )}
-                        <span className="text-[10px] text-slate-400">
-                          (
-                          {order.base_doc_date
-                            ? order.base_doc_date.slice(5)
-                            : order.planned_loading_at?.slice(5, 10) || '—'}
-                          )
-                        </span>
-                      </div>
-
-                      {/* Клиент */}
-                      <div className="flex items-center gap-1.5 min-w-[180px] max-w-[220px] truncate text-slate-700 shrink-0">
-                        <span className="font-semibold text-slate-900 truncate">
-                          {order.client?.name?.replace(/ПАО|ООО|«|»/g, '').trim() || 'Клиент'}
-                        </span>
-                        {order.forwarder && (
-                          <>
-                            <span className="text-slate-400">/</span>
-                            <span className="text-slate-500 truncate">
-                              {order.forwarder?.name?.split(' ')[1] || 'Экспедитор'}
-                            </span>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Маршрут */}
-                      <div className="min-w-[140px] max-w-[180px] truncate font-medium text-slate-800 shrink-0">
-                        📍 {routeText}
-                      </div>
-
-                      {/* Груз */}
-                      <div className="min-w-[150px] max-w-[200px] truncate text-slate-600 shrink-0">
-                        📦 {cargoText}
-                      </div>
-
-                      {/* Ставка и тип оплаты */}
-                      <div className="min-w-[110px] text-right shrink-0">
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="font-black text-slate-900">
-                            {order.price_without_vat
-                              ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
-                              : '—'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenRateModal(order);
-                            }}
-                            className="text-[11px] text-slate-400 hover:text-indigo-600 p-0.5 rounded transition cursor-pointer"
-                            title="Быстро изменить ставку рейса"
-                          >
-                            ✏️
-                          </button>
-                        </div>
-                        <div className="text-[9.5px] font-bold text-slate-500">
-                          {isCash ? '💵 Касса' : '🏦 Дебиторка'}
-                        </div>
-                      </div>
-
-                      {/* Авто и Водитель */}
-                      <div className="min-w-[170px] max-w-[210px] truncate text-slate-700 shrink-0">
-                        {isAssigned ? (
-                          <span className="flex items-center gap-1 font-medium">
-                            <span className="px-1.5 py-0.2 bg-slate-200 text-slate-800 rounded font-mono text-[10px] font-bold">
-                              {order.vehicle?.reg_number || 'Авто'}
-                            </span>
-                            <span className="truncate">{order.driver?.name || 'Водитель'}</span>
-                          </span>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAssignModalOrder(order);
-                            }}
-                            className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded font-bold text-[10px] cursor-pointer shadow-2xs"
-                          >
-                            + Назначить ТС
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Быстрое перемещение этапа (для машин без Wialon) */}
-                      <div
-                        className="flex items-center gap-1 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {order.status === 'assigned' && (
-                          <button
-                            onClick={() =>
-                              manualStageMutation.mutate({
-                                orderId: order.id,
-                                stage: 'pending_review',
-                              })
-                            }
-                            title="Машина уже разгрузилась — сразу перевести на ревью и сбор документов"
-                            className="px-2 py-0.8 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded text-[10px] border border-orange-300 cursor-pointer shadow-2xs"
-                          >
-                            ⏩ На ревью
-                          </button>
-                        )}
-                        {order.status === 'in_progress' && (
-                          <button
-                            onClick={() =>
-                              manualStageMutation.mutate({
-                                orderId: order.id,
-                                stage: 'pending_review',
-                              })
-                            }
-                            title="Машина разгрузилась — перевести на ревью"
-                            className="px-2 py-0.8 bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold rounded text-[10px] border border-orange-300 cursor-pointer shadow-2xs"
-                          >
-                            🏁 На ревью
-                          </button>
-                        )}
-                        {order.status === 'pending_review' && (
-                          <button
-                            onClick={() =>
-                              manualStageMutation.mutate({
-                                orderId: order.id,
-                                stage: 'docs_collection',
-                              })
-                            }
-                            title="Одобрить рейс (ЗП выплачена) и перевести в сбор документов"
-                            className="px-2 py-0.8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded text-[10px] shadow-2xs cursor-pointer"
-                          >
-                            📑 В документы
-                          </button>
-                        )}
-                        {order.status === 'docs_collection' && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setInvoiceModalOrder({ order })}
-                              title="Открыть чек-лист сбора документов"
-                              className="px-2 py-0.8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded text-[10px] border border-indigo-200 cursor-pointer shadow-2xs"
-                            >
-                              📑 Документы
-                            </button>
-                            <button
-                              onClick={() =>
-                                manualStageMutation.mutate({
-                                  orderId: order.id,
-                                  stage: 'completed',
-                                })
-                              }
-                              title="Завершить сделку"
-                              className="px-2 py-0.8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] shadow-2xs cursor-pointer"
-                            >
-                              ✓ Завершить
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Кнопки документов и Wialon */}
-                      <div
-                        className="flex items-center gap-1.5 shrink-0 justify-end"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <a
-                          href={`/api/orders/${order.id}/docs/tn-pdf`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Печать Транспортной накладной"
-                          className="px-2 py-0.8 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-[10.5px]"
-                        >
-                          📄 ТН
-                        </a>
-
-                        <a
-                          href={`/api/orders/${order.id}/docs/waybill-4c`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Печать Путевого листа № 4-С"
-                          className="px-2 py-0.8 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-[10.5px]"
-                        >
-                          📋 ПЛ
-                        </a>
-
-                        <button
-                          onClick={() =>
-                            handleDeleteOrder(order.id, order.base_doc_number || order.order_number)
-                          }
-                          title="Удалить заявку"
-                          className="px-1.5 py-0.8 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded font-bold text-[11px]"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── РЕЖИМ 3: ДОКУМЕНТООБОРОТ И СЧЕТА (ВСМПО, АВИСМА, ГЕОСТРОЙИНДУСТРИЯ) ── */}
-      {viewMode === 'documents' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden space-y-0">
-          {/* Панель фильтров по контрагентам и архив */}
-          <div className="p-2.5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-bold text-slate-700 mr-1">Контрагент:</span>
+        {activeFolder === 'completed' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={archiveMonth}
+              onChange={(e) => {
+                setArchiveMonth(e.target.value);
+                setArchiveDay('');
+              }}
+              className="border border-slate-300 bg-white rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800"
+            >
+              <option value="all">Все месяцы</option>
+              {archiveMonths.map((ym) => (
+                <option key={ym} value={ym}>
+                  {formatMonthLabel(ym)}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={archiveDay}
+              onChange={(e) => setArchiveDay(e.target.value)}
+              title="Фильтр по конкретному дню"
+              className="border border-slate-300 bg-white rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800"
+            />
+            {(archiveMonth !== 'all' || archiveDay) && (
               <button
-                onClick={() => setDocClientFilter('all')}
-                className={`px-2.5 py-1 rounded-md transition font-bold text-[11px] ${
-                  docClientFilter === 'all'
-                    ? 'bg-white text-indigo-700 shadow-2xs border border-indigo-200'
-                    : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
+                onClick={() => {
+                  setArchiveMonth('all');
+                  setArchiveDay('');
+                }}
+                className="px-2.5 py-1 text-xs font-bold bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-slate-700 cursor-pointer"
               >
-                Все 3 контрагента ({strictCounterpartyOrders.length})
+                Сбросить
               </button>
-              <button
-                onClick={() => setDocClientFilter('vsmpo')}
-                className={`px-2.5 py-1 rounded-md transition font-bold text-[11px] ${
-                  docClientFilter === 'vsmpo'
-                    ? 'bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
-              >
-                🏢 ВСМПО-АВИСМА (
-                {
-                  strictCounterpartyOrders.filter((o) =>
-                    getOrderEffectiveClientName(o).toLowerCase().includes('всмпо'),
-                  ).length
-                }
-                )
-              </button>
-              <button
-                onClick={() => setDocClientFilter('avisma')}
-                className={`px-2.5 py-1 rounded-md transition font-bold text-[11px] ${
-                  docClientFilter === 'avisma'
-                    ? 'bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
-              >
-                🏢 ООО Ависма (
-                {
-                  strictCounterpartyOrders.filter((o) =>
-                    getOrderEffectiveClientName(o).toLowerCase().includes('ависма'),
-                  ).length
-                }
-                )
-              </button>
-              <button
-                onClick={() => setDocClientFilter('geostroy')}
-                className={`px-2.5 py-1 rounded-md transition font-bold text-[11px] ${
-                  docClientFilter === 'geostroy'
-                    ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-200/60'
-                }`}
-              >
-                🏗️ Геостройиндустрия (
-                {
-                  strictCounterpartyOrders.filter((o) =>
-                    getOrderEffectiveClientName(o).toLowerCase().includes('геострой'),
-                  ).length
-                }
-                )
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 font-semibold select-none">
-                <input
-                  type="checkbox"
-                  checked={showArchivedDocs}
-                  onChange={(e) => setShowArchivedDocs(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-                <span>Показать завершённые в ЭДО (архив)</span>
-              </label>
-
-              <span className="text-[11px] text-slate-500 font-bold">
-                В сборе: <b className="text-amber-600 font-mono">{pendingDocsCount}</b>
-              </span>
-            </div>
+            )}
           </div>
+        )}
+      </div>
 
-          {/* Таблица строго в 1 строчку на рейс */}
-          {isLoading ? (
-            <div className="p-8 text-center text-xs text-slate-500">Загрузка документов...</div>
-          ) : filteredDocOrders.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-500 space-y-1">
-              <div className="text-base">🎉</div>
-              <div className="font-bold text-slate-700">
-                Все документы собраны и выставлены в оплату!
-              </div>
-              <div className="text-[11px] text-slate-400">
-                Нет активных рейсов, ожидающих сбора документов для выбранного контрагента.
-              </div>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100 text-[11px] whitespace-nowrap overflow-x-auto">
-              {/* Шапка таблицы */}
-              <div className="px-3 py-1.5 bg-slate-50 font-bold text-slate-500 text-[10px] uppercase tracking-wider flex items-center justify-between gap-2 border-b border-slate-200">
-                <div className="w-[195px] shrink-0">Рейс / ЭПЭ / Дата</div>
-                <div className="w-[160px] shrink-0">Транспорт / Водитель</div>
-                <div className="w-[150px] shrink-0">Контрагент</div>
-                <div className="w-[85px] text-right shrink-0">Ставка</div>
-                <div className="w-[135px] text-center shrink-0">1. Счёт</div>
-                <div className="w-[165px] text-center shrink-0">2. ТрН / ЭТрН (строго 1)</div>
-                <div className="w-[140px] text-center shrink-0">3. ЭПЭ в ЭДО</div>
-                <div className="w-[115px] text-center shrink-0">4. Пакет в ЭДО</div>
-                <div className="w-[155px] text-center shrink-0">5. В оплату (ЭДО)</div>
-                <div className="w-[100px] text-right shrink-0">Печать</div>
-              </div>
+      {/* ── ОДНОСТРОЧНЫЕ КАРТОЧКИ НА ВСЮ ШИРИНУ ЭКРАНА ── */}
+      {isLoading ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-xs font-bold text-slate-400">
+          Загрузка заявок...
+        </div>
+      ) : activeFolderOrders.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-xs font-semibold text-slate-500">
+          В папке «{activeFolderMeta.name}» нет заявок по выбранным фильтрам
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {activeFolderOrders.map((order) => {
+            const displayNum = order.trip?.trip_number
+              ? `№ ${order.trip.trip_number}`
+              : order.base_doc_number
+                ? `№ ${order.base_doc_number}`
+                : `#${order.order_number}`;
+            const rawDate = order.trip?.started_at || order.created_at;
+            const dateStr = rawDate
+              ? new Date(rawDate).toLocaleDateString('ru-RU', {
+                  day: '2-digit',
+                  month: '2-digit',
+                })
+              : '—';
+            const clientName =
+              getOrderEffectiveClientName(order) ||
+              (order.base_doc_name?.includes('ВЫЕЗД БЕЗ ЗАЯВКИ')
+                ? '⚠️ Выезд без заявки'
+                : 'Клиент не указан');
+            const routeText =
+              order.raw_parser_payload?.detected_route_summary || formatRouteSummary(order);
+            const docs = order.billing_docs || {};
+            const isWaybillDone =
+              docs.waybill_type === 'etrn'
+                ? Boolean(docs.etrn_signed_edo)
+                : Boolean(docs.tn_driver_delivered);
+            const isInvoiceDone = Boolean(docs.invoice_issued || docs.invoice_number);
+            const isAccepted = Boolean(docs.client_accepted_edo || docs.status === 'accepted');
+            const isSaldaOvernight = Boolean(order.raw_parser_payload?.in_salda_transit);
+            const isShaytanka = Boolean(order.raw_parser_payload?.visited_shaytanka);
 
-              {/* Строки рейсов (строго 1 строка на рейс) */}
-              {filteredDocOrders.map((order) => {
-                const docs = order.billing_docs || {};
-                const isAccepted = Boolean(docs.client_accepted_edo || docs.status === 'accepted');
-                const effectiveCpName = getOrderEffectiveClientName(order);
-                const badge = getDocCounterpartyBadge(effectiveCpName);
-                const isAssigned = Boolean(order.assigned_vehicle_id && order.assigned_driver_id);
-                const tripDate = order.base_doc_date
-                  ? order.base_doc_date.slice(5)
-                  : order.planned_loading_at?.slice(5, 10) || order.created_at?.slice(5, 10) || '—';
+            return (
+              <div
+                key={order.id}
+                onClick={() => {
+                  if (order.is_trip_only_review) {
+                    window.location.href = '/review';
+                  } else {
+                    setSelectedDetailsOrder(order);
+                  }
+                }}
+                className="bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-xs rounded-xl px-3.5 py-2.5 flex items-center gap-3 cursor-pointer transition-all"
+              >
+                {/* № рейса / заявки */}
+                <div className="font-mono text-[12.5px] font-extrabold text-slate-900 min-w-[74px] shrink-0">
+                  {displayNum}
+                </div>
 
-                return (
-                  <div
-                    key={order.id}
-                    className={`px-3 py-1.5 flex items-center justify-between gap-2 transition select-none ${
-                      isAccepted
-                        ? 'bg-slate-50/50 opacity-70 hover:opacity-100'
-                        : 'hover:bg-slate-50/80 bg-white'
-                    }`}
-                  >
-                    {/* Рейс / Номер / Дата */}
-                    <div className="w-[195px] flex items-center gap-1.5 shrink-0">
-                      <span className="font-bold text-slate-900 truncate">
-                        {order.trip?.trip_number
-                          ? `Рейс № ${order.trip.trip_number}`
-                          : `Заявка № ${order.base_doc_number || order.order_number}`}
+                {/* Дата */}
+                <div className="text-[11.5px] text-slate-500 min-w-[48px] shrink-0 tabular-nums">
+                  {dateStr}
+                </div>
+
+                {/* Клиент */}
+                <div
+                  className="text-[12.5px] font-bold text-slate-900 min-w-[160px] max-w-[210px] truncate shrink-0"
+                  title={clientName}
+                >
+                  {clientName}
+                </div>
+
+                {/* Маршрут */}
+                <div
+                  className="text-[12.5px] text-slate-700 flex-1 min-w-[160px] truncate"
+                  title={routeText}
+                >
+                  {routeText}
+                </div>
+
+                {/* Машина и водитель */}
+                <div className="text-[12px] text-slate-700 min-w-[165px] max-w-[200px] truncate shrink-0 flex items-center gap-1.5">
+                  {order.vehicle?.reg_number ? (
+                    <>
+                      <span className="font-mono text-[11px] font-bold bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-900 shrink-0">
+                        {order.vehicle.reg_number}
                       </span>
-                      {order.base_doc_number &&
-                        (order.base_doc_number.includes('/') ||
-                        order.base_doc_number.includes('\\') ? (
-                          <span
-                            className="px-1 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold shrink-0"
-                            title="Номер Электронного поручения экспедитору (ЭПЭ)"
-                          >
-                            ЭПЭ {order.base_doc_number}
-                          </span>
-                        ) : order.trip?.trip_number &&
-                          order.base_doc_number !== String(order.trip.trip_number) ? (
-                          <span
-                            className="text-[9.5px] text-slate-400 font-mono shrink-0"
-                            title="Номер входящей заявки"
-                          >
-                            (№{order.base_doc_number})
-                          </span>
-                        ) : null)}
-                      <span className="text-[10px] text-slate-400 font-mono">({tripDate})</span>
-                      {order.status === 'in_progress' ? (
-                        <span className="px-1 py-0.2 bg-purple-100 text-purple-900 font-bold rounded text-[9px] animate-pulse">
-                          В пути
-                        </span>
-                      ) : order.status === 'pending_review' ? (
-                        <span className="px-1 py-0.2 bg-orange-100 text-orange-900 font-bold rounded text-[9px]">
-                          Ревью
-                        </span>
-                      ) : (
-                        <span className="px-1 py-0.2 bg-emerald-100 text-emerald-900 font-bold rounded text-[9px]">
-                          Завершён
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Авто и Водитель */}
-                    <div className="w-[160px] truncate text-slate-700 shrink-0 flex items-center gap-1">
-                      {isAssigned ? (
-                        <>
-                          <span className="px-1.5 py-0.2 bg-slate-200 text-slate-800 rounded font-mono text-[10px] font-bold shrink-0">
-                            {order.vehicle?.reg_number || 'Авто'}
-                          </span>
-                          <span className="truncate text-slate-700">
-                            {order.driver?.name?.split(' ')[0] || 'Водитель'}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-slate-400 italic text-[10px]">ТС не назначено</span>
-                      )}
-                    </div>
-
-                    {/* Контрагент */}
-                    <div className="w-[150px] shrink-0 truncate">
-                      <span
-                        className={`px-2 py-0.5 rounded font-bold text-[10.5px] truncate inline-block max-w-[145px] ${badge.badgeClass}`}
-                        title={effectiveCpName || ''}
-                      >
-                        {badge.label}
+                      <span className="truncate">
+                        {(order.driver as any)?.full_name || order.driver?.name || ''}
                       </span>
-                    </div>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 italic text-[11.5px]">Не назначен</span>
+                  )}
+                </div>
 
-                    {/* Ставка */}
-                    <div className="w-[85px] text-right shrink-0 font-black text-slate-900 font-mono">
-                      {order.price_without_vat
-                        ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
-                        : '—'}
-                    </div>
-
-                    {/* 1. Счёт выставлен */}
-                    <div className="w-[135px] flex items-center justify-center shrink-0">
-                      {docs.invoice_issued && docs.invoice_number ? (
-                        <button
-                          onClick={() => handleOpenInvoiceModal(order)}
-                          title={`Счёт № ${docs.invoice_number} от ${docs.invoice_date || '—'}. Клик — изменить номер или дату`}
-                          className="px-2 py-0.8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition truncate max-w-[130px]"
-                        >
-                          <span className="truncate">🧾 № {docs.invoice_number}</span>
-                          {docs.invoice_date && (
-                            <span className="text-[9px] text-indigo-400 font-mono">
-                              ({docs.invoice_date.slice(5)})
-                            </span>
-                          )}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleOpenInvoiceModal(order)}
-                          title="Выставить счёт на этот рейс (ввести номер и дату)"
-                          className="px-2 py-0.8 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded font-semibold text-[10px] flex items-center gap-1 cursor-pointer transition"
-                        >
-                          <span>+ 🧾 Счёт</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* 2. Либо ТрН (бумага), либо ЭТрН (электронная) — строго один из двух вариантов! */}
-                    <div className="w-[165px] flex items-center justify-center shrink-0">
-                      {docs.waybill_type === 'etrn' ? (
-                        <div className="flex items-center">
-                          <button
-                            onClick={() => handleToggleWaybillType(order, 'paper')}
-                            title="Сейчас: ЭТрН. Клик — переключить на бумажную ТрН"
-                            className="px-1.5 py-0.8 bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-l text-[10px] font-bold border-y border-l border-purple-300 cursor-pointer"
-                          >
-                            ⚡ ЭТрН
-                          </button>
-                          <button
-                            onClick={() => handleOpenWaybillModal(order)}
-                            title="Клик — ввести номер ЭТрН и статус подписания в ЭДО"
-                            className={`px-1.5 py-0.8 rounded-r text-[10px] font-bold border transition cursor-pointer truncate max-w-[115px] ${
-                              docs.etrn_signed_edo
-                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
-                                : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                            }`}
-                          >
-                            {docs.etrn_signed_edo ? (
-                              <span className="truncate">
-                                ✔{' '}
-                                {docs.waybill_number || order.waybill_number
-                                  ? `№ ${docs.waybill_number || order.waybill_number}`
-                                  : 'Подписана'}
-                              </span>
-                            ) : (
-                              <span>⏳ Ждём (+№)</span>
-                            )}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center">
-                          <button
-                            onClick={() => handleToggleWaybillType(order, 'etrn')}
-                            title="Сейчас: Бумажная ТрН. Клик — переключить на электронную ЭТрН"
-                            className="px-1.5 py-0.8 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-l text-[10px] font-bold border-y border-l border-slate-300 cursor-pointer"
-                          >
-                            📄 ТрН
-                          </button>
-                          <button
-                            onClick={() => handleOpenWaybillModal(order)}
-                            title="Клик — ввести номер ТрН и подтвердить сдачу водителем"
-                            className={`px-1.5 py-0.8 rounded-r text-[10px] font-bold border transition cursor-pointer truncate max-w-[115px] ${
-                              docs.tn_driver_delivered
-                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
-                                : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
-                            }`}
-                          >
-                            {docs.tn_driver_delivered ? (
-                              <span className="truncate">
-                                ✔{' '}
-                                {docs.waybill_number || order.waybill_number
-                                  ? `№ ${docs.waybill_number || order.waybill_number}`
-                                  : 'Сдана'}
-                              </span>
-                            ) : (
-                              <span>❌ Ждём (+№)</span>
-                            )}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 3. ЭПЭ пришло в ЭДО */}
-                    <div className="w-[140px] flex items-center justify-center shrink-0">
-                      {docs.epe_received_edo ? (
-                        <button
-                          onClick={() => handleOpenEpeModal(order)}
-                          title={`ЭПЭ поступило в ЭДО (${docs.epe_number || order.base_doc_number || ''}). Клик — изменить`}
-                          className="px-2 py-0.8 rounded font-bold text-[10.5px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 cursor-pointer transition truncate max-w-[135px]"
-                        >
-                          <span className="truncate">
-                            ✔{' '}
-                            {docs.epe_number || order.base_doc_number
-                              ? `ЭПЭ ${docs.epe_number || order.base_doc_number}`
-                              : 'ЭПЭ в ЭДО'}
-                          </span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleOpenEpeModal(order)}
-                          title="Клик — вписать входящий номер ЭПЭ и зафиксировать поступление в ЭДО"
-                          className="px-2 py-0.8 rounded font-semibold text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 flex items-center gap-1 cursor-pointer transition"
-                        >
-                          <span>+ 📥 ЭПЭ в ЭДО</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* 4. Отправлены все документы по ЭДО */}
-                    <div className="w-[115px] flex items-center justify-center shrink-0">
+                {/* Средний статус / Интерактивные таблетки документов */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {activeFolder === 'docs_collection' ? (
+                    <>
                       <button
-                        onClick={() => handleToggleDocsSent(order)}
-                        title="Клик — отметить отправку полного пакета документов заказчику в ЭДО"
-                        className={`px-2 py-0.8 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition ${
-                          docs.docs_sent_edo
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenWaybillModal(order);
+                        }}
+                        title="ТН / ЭТрН — нажмите, чтобы отметить сдачу водителем или номер"
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                          isWaybillDone
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : 'bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100'
                         }`}
                       >
-                        <span>{docs.docs_sent_edo ? '✔ Пакет в ЭДО' : '✉️ Не отправлен'}</span>
+                        {isWaybillDone
+                          ? `✓ ${docs.waybill_type === 'etrn' ? 'ЭТрН' : 'ТН'}`
+                          : `○ ${docs.waybill_type === 'etrn' ? 'ЭТрН' : 'ТН'}`}
                       </button>
-                    </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEpeModal(order);
+                        }}
+                        title="ЭПЭ (поручение экспедитору) в ЭДО"
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                          docs.epe_received_edo
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : 'bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100'
+                        }`}
+                      >
+                        {docs.epe_received_edo ? '✓ ЭПЭ' : '○ ЭПЭ'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenInvoiceModal(order, false);
+                        }}
+                        title="Счёт на оплату"
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                          isInvoiceDone
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : 'bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100'
+                        }`}
+                      >
+                        {isInvoiceDone ? `✓ Сч ${docs.invoice_number || ''}` : '○ Счёт'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleDocsSent(order);
+                        }}
+                        title="Отправка полного пакета в ЭДО"
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                          docs.docs_sent_edo
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : 'bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100'
+                        }`}
+                      >
+                        {docs.docs_sent_edo ? '✓ ЭДО' : '○ ЭДО'}
+                      </button>
+                    </>
+                  ) : activeFolder === 'in_progress' ? (
+                    <span
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${
+                        isSaldaOvernight
+                          ? 'bg-blue-50 border-blue-200 text-blue-800'
+                          : isShaytanka
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                            : 'bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {isSaldaOvernight
+                        ? '🛰️ Ночёвка В.Салда'
+                        : isShaytanka
+                          ? '🌲 Погружен Шайтанка'
+                          : '🚛 В пути'}
+                    </span>
+                  ) : activeFolder === 'pending_review' ? (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md border bg-purple-50 border-purple-200 text-purple-800 whitespace-nowrap">
+                      🔍 Синхронно в Ревью
+                    </span>
+                  ) : activeFolder === 'completed' ? (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md border bg-emerald-50 border-emerald-200 text-emerald-800 whitespace-nowrap">
+                      {docs.invoice_number ? `✓ Счёт №${docs.invoice_number}` : '✓ Закрыт'}
+                    </span>
+                  ) : null}
+                </div>
 
-                    {/* 5. В ЭДО контрагент поставил В ОПЛАТУ (подписал) */}
-                    <div className="w-[155px] flex items-center justify-center shrink-0">
-                      {isAccepted ? (
-                        <button
-                          onClick={() => handleStep5Click(order)}
-                          title="Контрагент подписал документы и поставил в оплату. Счёт передан в Дебиторку. Клик — вернуть в работу"
-                          className="px-2.5 py-0.8 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition"
-                        >
-                          <span>🟢 В оплате (ЭДО)</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleStep5Click(order)}
-                          title="Контрагент подписал документы в ЭДО: зафиксировать счёт в Дебиторке и завершить документооборот"
-                          className="px-2.5 py-0.8 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-[10.5px] shadow-2xs flex items-center gap-1 cursor-pointer transition active:scale-95"
-                        >
-                          <span>⏳ Поставить В ОПЛАТУ</span>
-                        </button>
-                      )}
-                    </div>
+                {/* Ставка */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!order.is_trip_only_review) handleOpenRateModal(order);
+                  }}
+                  title={
+                    order.is_trip_only_review ? 'Ставка рейса' : 'Нажмите, чтобы изменить ставку'
+                  }
+                  className="text-[12.5px] font-extrabold text-slate-900 min-w-[82px] text-right tabular-nums shrink-0 hover:text-emerald-700 cursor-pointer"
+                >
+                  {order.price_without_vat
+                    ? `${Number(order.price_without_vat).toLocaleString('ru-RU')} ₽`
+                    : '—'}
+                </button>
 
-                    {/* Кнопки печати и детали */}
-                    <div className="w-[100px] flex items-center gap-1 shrink-0 justify-end">
+                {/* Быстрое действие справа */}
+                <div
+                  className="flex items-center gap-1 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {activeFolder === 'waiting_vehicle' && (
+                    <button
+                      onClick={() => setAssignModalOrder(order)}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 cursor-pointer whitespace-nowrap"
+                    >
+                      Назначить авто
+                    </button>
+                  )}
+                  {activeFolder === 'assigned' && (
+                    <>
+                      <a
+                        href={`/api/orders/${order.id}/docs/waybill-4c`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2 py-1 text-[11px] font-bold rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 whitespace-nowrap"
+                        title="Печать путевого листа 4-С"
+                      >
+                        📋 4-С
+                      </a>
+                      <button
+                        onClick={() =>
+                          manualStageMutation.mutate({ orderId: order.id, stage: 'in_progress' })
+                        }
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 cursor-pointer whitespace-nowrap"
+                      >
+                        В путь →
+                      </button>
+                    </>
+                  )}
+                  {activeFolder === 'in_progress' && (
+                    <button
+                      onClick={() =>
+                        manualStageMutation.mutate({ orderId: order.id, stage: 'pending_review' })
+                      }
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 cursor-pointer whitespace-nowrap"
+                    >
+                      На ревью
+                    </button>
+                  )}
+                  {activeFolder === 'pending_review' && (
+                    <a
+                      href="/review"
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 whitespace-nowrap"
+                    >
+                      Открыть в Ревью →
+                    </a>
+                  )}
+                  {activeFolder === 'docs_collection' && (
+                    <>
                       <a
                         href={`/api/orders/${order.id}/docs/tn-pdf`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Печать Транспортной накладной"
-                        className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-[10px]"
+                        className="px-1.5 py-1 text-[10.5px] font-bold rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700"
+                        title="Печать ТН"
                       >
-                        📄 ТН
+                        📄
                       </a>
                       <a
                         href={`/api/orders/${order.id}/docs/waybill-4c`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Печать Путевого листа № 4-С"
-                        className="px-1.5 py-0.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-[10px]"
+                        className="px-1.5 py-1 text-[10.5px] font-bold rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700"
+                        title="Печать Путевого листа 4-С"
                       >
-                        📋 ПЛ
+                        📋
                       </a>
                       <button
-                        onClick={() => setSelectedDetailsOrder(order)}
-                        title="Детали заявки"
-                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px]"
+                        onClick={() => handleStep5Click(order)}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer whitespace-nowrap"
                       >
-                        🔍
+                        {isAccepted ? 'В Архиве ✓' : 'В оплату ✓'}
                       </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    </>
+                  )}
+                  {activeFolder === 'completed' && (
+                    <button
+                      onClick={() => setSelectedDetailsOrder(order)}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer whitespace-nowrap"
+                    >
+                      Детали
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -2717,18 +2095,18 @@ function OrderDetailsModal({
               </span>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
-              {KANBAN_STAGES.map((st) => (
+              {PIPELINE_FOLDERS.map((st) => (
                 <button
-                  key={st.status}
-                  onClick={() => onManualStage && onManualStage(st.status)}
+                  key={st.id}
+                  onClick={() => onManualStage && onManualStage(st.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                    order.status === st.status
-                      ? `${st.badgeBg} ${st.badgeText} ring-2 ring-indigo-600 shadow-xs font-black scale-105`
+                    order.status === st.id
+                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-500 ring-2 ring-emerald-500/30 shadow-xs font-black'
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   <span>{st.icon}</span>
-                  <span>{st.title}</span>
+                  <span>{st.name}</span>
                 </button>
               ))}
             </div>

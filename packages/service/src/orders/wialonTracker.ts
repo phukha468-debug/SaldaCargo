@@ -739,13 +739,15 @@ export async function detectTripStopsAndRoute(
     };
 
     if (matchedPoints.length > 0) {
+      const shaytankaPoint = matchedPoints.find(
+        (p) =>
+          p.city.toLowerCase().includes('шайтан') ||
+          calculateDistanceMeters(p.lat, p.lon, SHAYTANKA_LAT, SHAYTANKA_LON) <=
+            SHAYTANKA_RADIUS_METERS,
+      );
       const firstLoc = matchedPoints[0]!;
-      const isShaytanka =
-        firstLoc.city.toLowerCase().includes('шайтан') ||
-        calculateDistanceMeters(firstLoc.lat, firstLoc.lon, SHAYTANKA_LAT, SHAYTANKA_LON) <=
-          SHAYTANKA_RADIUS_METERS;
 
-      if (isShaytanka) {
+      if (shaytankaPoint) {
         result.visitedShaytanka = true;
         result.loadingAddress = { city: 'Шайтанка', raw: 'Шайтанка' };
         result.clientId = GEOSTROY_CLIENT_ID;
@@ -757,8 +759,12 @@ export async function detectTripStopsAndRoute(
         result.loadingAddress = { city: firstLoc.city, raw: firstLoc.raw };
       }
 
-      if (matchedPoints.length > 1) {
-        const lastLoc = matchedPoints[matchedPoints.length - 1]!;
+      const unloadingCandidates = shaytankaPoint
+        ? matchedPoints.filter((p) => p !== shaytankaPoint)
+        : matchedPoints.slice(1);
+
+      if (unloadingCandidates.length > 0) {
+        const lastLoc = unloadingCandidates[unloadingCandidates.length - 1]!;
         result.hasUnloaded = true;
         result.unloadingAddress = { city: lastLoc.city, raw: lastLoc.raw };
         result.visitedMaminskoe = matchedPoints.some((p) => p.city === 'Маминское');
@@ -959,10 +965,12 @@ export async function syncValdaiTelematics(
       const { data: arrivingOrder } = await supabase
         .from('orders')
         .select(
-          'id, base_doc_number, price_without_vat, loading_address_json, unloading_address_json, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at)',
+          'id, base_doc_number, price_without_vat, loading_address_json, unloading_address_json, raw_parser_payload, trip:trips!orders_active_trip_id_fkey(id, started_at, driver_note)',
         )
         .eq('assigned_vehicle_id', asset.id)
         .eq('status', 'in_progress')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       const arrivingTrip = (
@@ -1023,16 +1031,22 @@ export async function syncValdaiTelematics(
               cargo_name: 'Пробы керна (Шайтанка)',
               price_without_vat: finalPrice,
               base_doc_name: 'Заявка ООО "Геостройиндустрия"',
-              loading_address_json: route?.loadingAddress ||
-                arrivingOrder.loading_address_json || {
-                  raw: 'Шайтанка',
-                  city: 'Шайтанка',
-                },
-              unloading_address_json: route?.unloadingAddress ||
-                arrivingOrder.unloading_address_json || {
-                  raw: 'с. Маминское, склад 2',
-                  city: 'Маминское',
-                },
+              loading_address_json:
+                route?.loadingAddress ||
+                (arrivingOrder.loading_address_json?.raw
+                  ? arrivingOrder.loading_address_json
+                  : {
+                      raw: 'Шайтанка',
+                      city: 'Шайтанка',
+                    }),
+              unloading_address_json:
+                route?.unloadingAddress ||
+                (arrivingOrder.unloading_address_json?.raw
+                  ? arrivingOrder.unloading_address_json
+                  : {
+                      raw: 'с. Маминское, склад 2',
+                      city: 'Маминское',
+                    }),
               updated_at: new Date().toISOString(),
             })
             .eq('id', arrivingOrder.id);
@@ -1092,10 +1106,10 @@ export async function syncValdaiTelematics(
       });
     }
 
-    // СОБЫТИЕ 3: Машина сейчас СНАРУЖИ — проверка промежуточного транзита
-    // ВАЖНО: Если машина снаружи, рейс НИКОГДА не может быть завершён!
-    // Фиксируется только отметка о транзите в заметках рейса, без закрытия заявки.
-    else if (!currentInside) {
+    // СОБЫТИЕ 3: Сопровождение активного рейса (машина в пути снаружи ИЛИ на ночёвке/отстое в Салде)
+    // ВАЖНО: Если машина снаружи или в транзитном отстое, рейс НЕ закрывается здесь.
+    // Проверяется посещение Шайтанки/Маминского, обновляется маршрутный лист и отметка о транзите.
+    else {
       const { data: activeOrder } = await supabase
         .from('orders')
         .select(
@@ -1103,6 +1117,8 @@ export async function syncValdaiTelematics(
         )
         .eq('assigned_vehicle_id', asset.id)
         .eq('status', 'in_progress')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       const tripObj = (
@@ -1111,7 +1127,11 @@ export async function syncValdaiTelematics(
 
       if (activeOrder && tripObj?.started_at) {
         // Снятие транзитного флага при выходе на Тагил (на запад, lon < 60.35):
-        if (pos.lon < 60.35 && !activeOrder.raw_parser_payload?.has_departed_west) {
+        if (
+          !currentInside &&
+          pos.lon < 60.35 &&
+          !activeOrder.raw_parser_payload?.has_departed_west
+        ) {
           console.log(
             `[Wialon Tracker] 🧭 Валдай ${pos.regNumber} вышел на трассу в сторону Нижнего Тагила (lon=${pos.lon}). Транзитный статус СНЯТ.`,
           );
@@ -1130,13 +1150,9 @@ export async function syncValdaiTelematics(
             .eq('id', activeOrder.id);
         }
 
-        // Автоматический опрос остановок трека Wialon:
-        // Смотрим историю до 36 часов назад, чтобы не потерять вечернюю погрузку в Шайтанке перед ночёвкой на базе!
-        const tripStartTs = new Date(tripObj.started_at).getTime();
-        const lookbackLimitTs = Date.now() - 36 * 3600 * 1000;
-        const effectiveLookupStartIso = new Date(
-          Math.min(tripStartTs, lookbackLimitTs),
-        ).toISOString();
+        // Автоматический опрос остановок трека Wialon строго от начала текущего рейса
+        // (detectTripStopsAndRoute сам добавляет буфер -15 мин, не захватывая предыдущие рейсы)
+        const effectiveLookupStartIso = tripObj.started_at;
 
         const routeInfo = await detectTripStopsAndRoute(
           cleanHost,
@@ -1227,20 +1243,26 @@ export async function syncValdaiTelematics(
               cargo_name: 'Пробы керна (Шайтанка)',
               price_without_vat: dynamicPrice,
               base_doc_name: 'Заявка ООО "Геостройиндустрия"',
-              loading_address_json: routeInfo?.loadingAddress ||
-                activeOrder.loading_address_json || {
-                  raw: 'Шайтанка',
-                  city: 'Шайтанка',
-                },
+              loading_address_json:
+                routeInfo?.loadingAddress ||
+                (activeOrder.loading_address_json?.raw
+                  ? activeOrder.loading_address_json
+                  : {
+                      raw: 'Шайтанка',
+                      city: 'Шайтанка',
+                    }),
               updated_at: new Date().toISOString(),
             };
 
             if (routeInfo?.unloadingAddress || isCurrentlyInMaminskoe) {
-              updateOrderPayload.unloading_address_json = routeInfo?.unloadingAddress ||
-                activeOrder.unloading_address_json || {
-                  raw: 'с. Маминское, склад 2',
-                  city: 'Маминское',
-                };
+              updateOrderPayload.unloading_address_json =
+                routeInfo?.unloadingAddress ||
+                (activeOrder.unloading_address_json?.raw
+                  ? activeOrder.unloading_address_json
+                  : {
+                      raw: 'с. Маминское, склад 2',
+                      city: 'Маминское',
+                    });
             }
 
             await supabase.from('orders').update(updateOrderPayload).eq('id', activeOrder.id);
@@ -1251,6 +1273,8 @@ export async function syncValdaiTelematics(
               .select('id, amount, description')
               .eq('trip_id', tripObj.id)
               .filter('lifecycle_status', 'neq', 'cancelled')
+              .order('created_at', { ascending: false })
+              .limit(1)
               .maybeSingle();
 
             if (existingTo) {
@@ -1318,7 +1342,7 @@ export async function syncValdaiTelematics(
         const lastTransitTs = activeOrder.raw_parser_payload?.last_transit_checked_at || 0;
         const nowSec = Math.floor(Date.now() / 1000);
 
-        if (nowSec - lastTransitTs > 3600) {
+        if (!currentInside && nowSec - lastTransitTs > 3600) {
           const fromSec = Math.max(
             Math.floor(new Date(tripObj.started_at).getTime() / 1000),
             lastTransitTs || 0,

@@ -35,9 +35,11 @@ export default function MechanicWorksPage() {
       return order.status === 'completed' && order.lifecycle_status === 'draft';
     if (filter === 'in_progress')
       return (
-        order.status === 'in_progress' ||
-        order.status === 'created' ||
-        order.lifecycle_status === 'returned'
+        order.lifecycle_status !== 'approved' &&
+        order.lifecycle_status !== 'cancelled' &&
+        (order.status === 'in_progress' ||
+          order.status === 'created' ||
+          order.lifecycle_status === 'returned')
       );
     return true;
   });

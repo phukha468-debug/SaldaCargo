@@ -313,7 +313,8 @@ fun MechanicScreen(
     }
 
     val activeOrders = orders.filter {
-        it.status == "in_progress" || it.status == "created" || it.lifecycleStatus == "returned"
+        it.lifecycleStatus != "approved" && it.lifecycleStatus != "cancelled" &&
+            (it.status == "in_progress" || it.status == "created" || it.lifecycleStatus == "returned")
     }
     val reviewOrders = orders.filter {
         it.status == "completed" && it.lifecycleStatus == "draft"
@@ -2655,7 +2656,8 @@ private fun AllMechanicOrdersScreen(
         when (filter) {
             "approved" -> o.lifecycleStatus == "approved"
             "review" -> o.status == "completed" && o.lifecycleStatus == "draft"
-            "active" -> o.status == "in_progress" || o.status == "created" || o.lifecycleStatus == "returned"
+            "active" -> o.lifecycleStatus != "approved" && o.lifecycleStatus != "cancelled" &&
+                (o.status == "in_progress" || o.status == "created" || o.lifecycleStatus == "returned")
             else -> true
         }
     }

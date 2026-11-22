@@ -91,7 +91,9 @@ export default function MechanicHomePage() {
   // Разделяем наряды: В работе, На проверке (draft + completed), Закрытые (approved)
   const activeOrders = orders.filter(
     (o) =>
-      o.status === 'in_progress' || o.status === 'created' || o.lifecycle_status === 'returned',
+      o.lifecycle_status !== 'approved' &&
+      o.lifecycle_status !== 'cancelled' &&
+      (o.status === 'in_progress' || o.status === 'created' || o.lifecycle_status === 'returned'),
   );
   const reviewOrders = orders.filter(
     (o) => o.status === 'completed' && o.lifecycle_status === 'draft',

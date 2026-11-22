@@ -392,15 +392,15 @@ export default function CreateOrderModal({
                   setErrorMsg('');
                 }}
                 className={cn(
-                  'py-2 px-2.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all',
+                  'py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all',
                   orderMode === 'existing'
-                    ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/40'
-                    : 'text-slate-500 hover:text-slate-800',
+                    ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/50 ring-1 ring-[#21A038]/20'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50',
                 )}
               >
-                <span>🔧 В наряд в работе</span>
+                <span>🔧 В работе</span>
                 {activeStationOrders.length > 0 && (
-                  <span className="bg-[#E8F7EC] text-[#21A038] text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                  <span className="bg-[#E8F7EC] text-[#21A038] text-[10px] px-2 py-0.5 rounded-full font-black">
                     {activeStationOrders.length}
                   </span>
                 )}
@@ -412,10 +412,10 @@ export default function CreateOrderModal({
                   setErrorMsg('');
                 }}
                 className={cn(
-                  'py-2 px-2.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all',
+                  'py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all',
                   orderMode === 'new'
-                    ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/40'
-                    : 'text-slate-500 hover:text-slate-800',
+                    ? 'bg-white text-slate-900 shadow-xs border border-[#21A038]/50 ring-1 ring-[#21A038]/20'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50',
                 )}
               >
                 <span>➕ Новый автомобиль</span>

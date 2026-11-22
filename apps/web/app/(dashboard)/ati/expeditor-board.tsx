@@ -82,6 +82,7 @@ export const ExpeditorBoard: React.FC = () => {
     type: 'order' | 'offer';
   } | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'individual' | 'legal'>('all');
+  const [activeExpeditorStage, setActiveExpeditorStage] = useState<number>(1);
 
   // Режим редактирования карточки
   const [isEditingOrder, setIsEditingOrder] = useState(false);
@@ -464,165 +465,212 @@ export const ExpeditorBoard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── КАНБАН-СЕТКА: 6 КОЛОНОК ──────────────────────────────────────── */}
+      {/* ── ПАПКИ ЭТАПОВ (ВАРИАНТ 1 · СБЕР / SAAS) + 1-СТРОЧНЫЕ КАРТОЧКИ ── */}
       {isLoading ? (
-        <div className="p-12 text-center text-slate-400 font-bold bg-white rounded-2xl border-2 border-slate-200">
+        <div className="p-10 text-center text-slate-400 font-bold bg-white rounded-xl border border-slate-200 text-xs">
           Загрузка экспедиторских рейсов...
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 w-full items-start">
-          {[1, 2, 3, 4, 5, 6].map((stageNum) => {
-            const cfg = EXPEDITOR_STAGES[stageNum];
-            if (!cfg) return null;
-            const colOrders = ordersByStage[stageNum] || [];
+        <div className="space-y-3">
+          {/* 6 карточек-папок */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
+            {[1, 2, 3, 4, 5, 6].map((stageNum) => {
+              const cfg = EXPEDITOR_STAGES[stageNum];
+              if (!cfg) return null;
+              const colOrders = ordersByStage[stageNum] || [];
+              const isActive = activeExpeditorStage === stageNum;
+              const stageIcons: Record<number, string> = {
+                1: '📥',
+                2: '📋',
+                3: '🚛',
+                4: '📦',
+                5: '💳',
+                6: '🗄️',
+              };
 
-            return (
-              <div
-                key={stageNum}
-                className={`${cfg.bgHeader} rounded-xl border-2 ${cfg.borderCol} p-2 flex flex-col gap-2 min-w-0 shadow-2xs`}
-              >
-                {/* Заголовок колонки */}
-                <div
-                  className={`flex items-center justify-between pb-1.5 border-b ${cfg.borderCol}`}
+              return (
+                <button
+                  key={stageNum}
+                  type="button"
+                  onClick={() => setActiveExpeditorStage(stageNum)}
+                  className={`text-left rounded-xl px-3.5 py-2.5 border transition-all cursor-pointer flex flex-col gap-1.5 ${
+                    isActive
+                      ? 'border-emerald-600 bg-emerald-50 shadow-sm ring-1 ring-emerald-600/20'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:-translate-y-0.5'
+                  }`}
                 >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className={`w-2 h-2 rounded-full ${cfg.colorDot} shrink-0`} />
+                  <div className="flex items-center justify-between gap-2">
                     <span
-                      className="text-xs font-black uppercase text-slate-800 truncate"
+                      className={`text-[12.5px] font-bold truncate ${
+                        isActive ? 'text-emerald-900' : 'text-slate-800'
+                      }`}
                       title={cfg.title}
                     >
-                      {cfg.shortTitle}
+                      {stageIcons[stageNum] || '📁'} {cfg.shortTitle}
+                    </span>
+                    <span
+                      className={`text-[11.5px] font-extrabold px-2 py-0.5 rounded-full tabular-nums shrink-0 ${
+                        isActive ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {colOrders.length}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono font-black bg-white px-1.5 py-0.5 rounded border border-slate-300">
-                    {colOrders.length}
+                  <div
+                    className={`text-[11px] truncate ${
+                      isActive ? 'text-emerald-700/80' : 'text-slate-500'
+                    }`}
+                  >
+                    {cfg.title}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Заголовок активной папки */}
+          {(() => {
+            const cfg = EXPEDITOR_STAGES[activeExpeditorStage] || EXPEDITOR_STAGES[1]!;
+            const colOrders = ordersByStage[activeExpeditorStage] || [];
+            return (
+              <div className="space-y-2">
+                <div className="text-[13px] font-bold text-slate-700 px-1 flex items-center gap-2">
+                  <span>{cfg.title}</span>
+                  <span className="text-[11.5px] font-medium text-slate-500">
+                    ({colOrders.length})
                   </span>
                 </div>
 
-                {/* Список карточек */}
-                <div className="flex flex-col gap-2 min-h-[140px]">
-                  {colOrders.length === 0 ? (
-                    <div className="h-20 border-2 border-dashed border-slate-300/60 rounded-xl flex items-center justify-center text-[10px] text-slate-400 font-bold">
-                      Нет рейсов
-                    </div>
-                  ) : (
-                    colOrders.map((order) => {
+                {colOrders.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-xs font-semibold text-slate-500">
+                    В папке «{cfg.shortTitle}» пока нет экспедиторских рейсов
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {colOrders.map((order) => {
                       const margin =
                         (order.total_client_price || 0) - (order.carrier_freight_price || 0);
+                      const routeFrom = order.pickup_route_title || order.pickup_address || '—';
+                      const routeTo = order.delivery_route_title || order.delivery_address || '—';
 
                       return (
                         <div
                           key={order.id}
                           onClick={() => setSelectedOrder(order)}
-                          className="bg-white rounded-xl border-2 border-slate-300 hover:border-indigo-500 hover:shadow-md p-2.5 space-y-2 text-xs shadow-2xs transition cursor-pointer group select-none relative"
+                          className="bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-xs rounded-xl px-3.5 py-2.5 flex items-center gap-3 cursor-pointer transition-all"
                         >
-                          {/* Шапка: Номер, Бейдж физ/юрлица */}
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-mono font-black text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">
-                              {order.order_number.split(' ')[0] || order.order_number}
-                            </span>
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
-                                order.client_type === 'individual'
-                                  ? 'bg-sky-50 text-sky-800 border-sky-300'
-                                  : 'bg-indigo-50 text-indigo-800 border-indigo-300'
-                              }`}
-                            >
-                              {order.client_type === 'individual' ? '👤 Физлицо' : '🏢 B2B'}
-                            </span>
+                          {/* Номер */}
+                          <div className="font-mono text-[12.5px] font-extrabold text-slate-900 min-w-[78px] shrink-0">
+                            {order.order_number.split(' ')[0] || order.order_number}
                           </div>
 
+                          {/* Тип клиента */}
+                          <span
+                            className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${
+                              order.client_type === 'individual'
+                                ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                            }`}
+                          >
+                            {order.client_type === 'individual' ? '👤 Физлицо' : '🏢 B2B'}
+                          </span>
+
                           {/* Заказчик */}
-                          <div>
-                            <div className="text-[10px] text-slate-400 font-bold uppercase">
-                              Заказчик:
-                            </div>
-                            <div className="font-black text-slate-900 text-[11px] truncate group-hover:text-indigo-600">
-                              {order.client_name}
-                            </div>
-                            {order.passenger_in_cabin && (
-                              <span className="inline-block mt-0.5 text-[9px] bg-amber-100 text-amber-900 border border-amber-300 px-1 rounded font-bold">
-                                💺 Пассажир в кабине
-                              </span>
-                            )}
+                          <div
+                            className="text-[12.5px] font-bold text-slate-900 min-w-[140px] max-w-[190px] truncate shrink-0"
+                            title={order.client_name}
+                          >
+                            {order.client_name}
                           </div>
 
                           {/* Маршрут */}
-                          <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 space-y-0.5 text-[10px]">
-                            <div className="truncate font-semibold text-slate-700">
-                              🟢 {order.pickup_route_title || order.pickup_address}
-                            </div>
-                            <div className="truncate font-semibold text-slate-700">
-                              🔴 {order.delivery_route_title || order.delivery_address}
-                            </div>
+                          <div
+                            className="text-[12.5px] text-slate-700 flex-1 min-w-[160px] truncate"
+                            title={`${routeFrom} → ${routeTo}`}
+                          >
+                            {routeFrom} <span className="text-slate-400">➔</span> {routeTo}
                           </div>
 
                           {/* Перевозчик */}
-                          <div className="border-t border-slate-100 pt-1">
-                            <div className="text-[10px] text-slate-400 font-bold uppercase">
-                              Перевозчик:
-                            </div>
-                            <div className="font-bold text-slate-800 text-[11px] truncate">
-                              {order.carrier_name || 'Не назначен'}
-                            </div>
-                            {order.carrier_reg_number && (
-                              <div className="text-[10px] font-mono text-slate-600 font-bold">
-                                🚛 {order.carrier_reg_number} ({order.carrier_vehicle || 'Тент'})
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Финансы и маржа */}
-                          <div className="bg-indigo-50/60 p-1.5 rounded-lg border border-indigo-100 space-y-0.5 text-[10px]">
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-600">Клиент:</span>
-                              <span className="font-mono font-bold text-slate-900">
-                                {order.total_client_price.toLocaleString('ru-RU')} ₽
+                          <div className="text-[12px] text-slate-700 min-w-[155px] max-w-[190px] truncate shrink-0 flex items-center gap-1.5">
+                            {order.carrier_reg_number ? (
+                              <span className="font-mono text-[11px] font-bold bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-900 shrink-0">
+                                {order.carrier_reg_number}
                               </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-600">Водитель:</span>
-                              <span className="font-mono font-bold text-slate-900">
-                                {order.carrier_freight_price.toLocaleString('ru-RU')} ₽
-                              </span>
-                            </div>
-                            {margin > 0 && (
-                              <div className="flex justify-between items-center pt-0.5 border-t border-indigo-200/60 font-black text-emerald-700">
-                                <span>Маржа:</span>
-                                <span className="font-mono">
-                                  +{margin.toLocaleString('ru-RU')} ₽
+                            ) : null}
+                            <span className="truncate">
+                              {order.carrier_name || (
+                                <span className="text-slate-400 italic">
+                                  Перевозчик не назначен
                                 </span>
-                              </div>
-                            )}
+                              )}
+                            </span>
                           </div>
 
                           {/* Документы */}
-                          <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
-                            <span>📁 Документов: {order.documents?.length || 0}</span>
-                            <span className="text-indigo-600 font-bold">Открыть ↗</span>
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                            📁 {order.documents?.length || 0}
+                          </span>
+
+                          {/* Финансы + маржа */}
+                          <div className="text-right shrink-0 min-w-[140px] flex items-center justify-end gap-2 tabular-nums">
+                            <span className="text-[12.5px] font-extrabold text-slate-900">
+                              {order.total_client_price.toLocaleString('ru-RU')} ₽
+                            </span>
+                            {margin > 0 && (
+                              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                +{margin.toLocaleString('ru-RU')} ₽
+                              </span>
+                            )}
                           </div>
 
                           {/* Кнопка смены этапа */}
-                          {stageNum < 6 && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateStageMutation.mutate({ id: order.id, stage: stageNum + 1 });
-                              }}
-                              className={`w-full py-1 rounded-lg text-[10px] font-bold cursor-pointer transition shadow-2xs ${cfg.btnClass}`}
-                            >
-                              {cfg.btnForward}
-                            </button>
-                          )}
+                          <div
+                            className="flex items-center gap-1 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {activeExpeditorStage > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateStageMutation.mutate({
+                                    id: order.id,
+                                    stage: activeExpeditorStage - 1,
+                                  })
+                                }
+                                title="Вернуть на предыдущий этап"
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] border border-slate-300 cursor-pointer"
+                              >
+                                ↶
+                              </button>
+                            )}
+                            {activeExpeditorStage < 6 ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateStageMutation.mutate({
+                                    id: order.id,
+                                    stage: activeExpeditorStage + 1,
+                                  })
+                                }
+                                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition whitespace-nowrap"
+                              >
+                                {cfg.btnForward}
+                              </button>
+                            ) : (
+                              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg font-bold text-[11px]">
+                                ✓ Закрыто
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
-                    })
-                  )}
-                </div>
+                    })}
+                  </div>
+                )}
               </div>
             );
-          })}
+          })()}
         </div>
       )}
 

@@ -53,7 +53,9 @@ export async function GET(request: Request) {
     if (filter === 'review') {
       q = q.eq('status', 'completed').eq('lifecycle_status', 'draft');
     } else if (filter === 'active') {
-      q = q.in('status', ['created', 'in_progress']).neq('lifecycle_status', 'cancelled');
+      q = q
+        .in('status', ['created', 'in_progress'])
+        .not('lifecycle_status', 'in', '(approved,cancelled)');
     } else if (filter === 'history') {
       q = q
         .or(

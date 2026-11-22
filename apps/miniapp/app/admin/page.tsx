@@ -1022,7 +1022,12 @@ function SafeAdjustMiniappModal({
           audited_by: 'Директор (Бот)',
         }),
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Ошибка сервера (${res.status})`);
+      }
       if (!res.ok) throw new Error(data.error ?? 'Ошибка коррекции сейфа');
       return data;
     },

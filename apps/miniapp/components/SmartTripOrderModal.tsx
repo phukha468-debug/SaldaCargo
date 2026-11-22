@@ -405,11 +405,11 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
         body: JSON.stringify({
           action: 'edit_orders',
           orders: ordersPayload,
-          driver_pay: String(form.driver_pay),
+          driver_pay: String(Number(form.driver_pay || 0)),
           driver_id: form.assigned_driver_id || undefined,
           note:
             form.admin_note ||
-            `Маршрут: ${primaryLoadCity} ➔ ${primaryUnloadCity} | ЗП: ${form.driver_pay} ₽`,
+            `Маршрут: ${primaryLoadCity} ➔ ${primaryUnloadCity} | ЗП: ${Number(form.driver_pay || 0)} ₽`,
         }),
       });
 
@@ -805,8 +805,14 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
               </div>
               <input
                 type="number"
-                value={form.driver_pay}
-                onChange={(e) => setForm({ ...form, driver_pay: Number(e.target.value) || 0 })}
+                value={
+                  form.driver_pay === '' || form.driver_pay === undefined ? '' : form.driver_pay
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm({ ...form, driver_pay: val === '' ? '' : Number(val) });
+                }}
+                placeholder="0"
                 className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-emerald-700 bg-white"
               />
             </div>

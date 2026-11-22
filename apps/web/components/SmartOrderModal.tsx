@@ -888,7 +888,7 @@ export function SmartOrderModal({
             orders: tripOrdersPayload,
             admin_note:
               form.admin_note ||
-              `Маршрут: ${primaryLoadCity} ➔ ${primaryUnloadCity} | ЗП: ${form.driver_pay} ₽`,
+              `Маршрут: ${primaryLoadCity} ➔ ${primaryUnloadCity} | ЗП: ${Number(form.driver_pay || 0)} ₽`,
             driver_note: form.driver_note || undefined,
             ...(form.assigned_driver_id ? { driver_id: form.assigned_driver_id } : {}),
           }),
@@ -1335,8 +1335,14 @@ export function SmartOrderModal({
               </div>
               <input
                 type="number"
-                value={form.driver_pay}
-                onChange={(e) => setForm({ ...form, driver_pay: Number(e.target.value) || 0 })}
+                value={
+                  form.driver_pay === '' || form.driver_pay === undefined ? '' : form.driver_pay
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm({ ...form, driver_pay: val === '' ? '' : Number(val) });
+                }}
+                placeholder="0"
                 className="w-full p-1.5 border border-slate-300 rounded bg-white font-bold text-emerald-700"
               />
             </div>
