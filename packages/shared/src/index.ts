@@ -2138,3 +2138,4 @@ export * from './apiHandler';
 export * from './crypto';
 export * from './modules';
 export * from './orgSettings';
+export * from './tripCalc';

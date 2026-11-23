@@ -1,0 +1,77 @@
+import type { AtiStageConfig } from './types';
+
+export const STAGE_CONFIG: Record<number, AtiStageConfig> = {
+  1: {
+    title: '1. Договор на почте',
+    shortTitle: '1. Договор',
+    colorDot: 'bg-slate-500',
+    bgHeader: 'bg-slate-200/70',
+    borderCol: 'border-slate-300',
+    btnForward: 'Согласовать →',
+    btnClass: 'bg-indigo-600 hover:bg-indigo-500 text-white',
+  },
+  2: {
+    title: '2. Согласование Заявки-ЭТрН',
+    shortTitle: '2. ЭТрН Заявка',
+    colorDot: 'bg-sky-500',
+    bgHeader: 'bg-sky-50/80',
+    borderCol: 'border-sky-200',
+    btnForward: 'На погрузку →',
+    btnClass: 'bg-sky-600 hover:bg-sky-500 text-white',
+  },
+  3: {
+    title: '3. Погрузка & Подпись',
+    shortTitle: '3. Погрузка',
+    colorDot: 'bg-amber-500',
+    bgHeader: 'bg-amber-50/80',
+    borderCol: 'border-amber-200',
+    btnForward: 'На выгрузку →',
+    btnClass: 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black',
+  },
+  4: {
+    title: '4. Выгрузка & Сдача рейса',
+    shortTitle: '4. Выгрузка',
+    colorDot: 'bg-indigo-600',
+    bgHeader: 'bg-indigo-50/80',
+    borderCol: 'border-indigo-200',
+    btnForward: 'В документы →',
+    btnClass: 'bg-indigo-600 hover:bg-indigo-500 text-white',
+  },
+  5: {
+    title: '5. Документооборот (ЭДО / Почта)',
+    shortTitle: '5. Документы',
+    colorDot: 'bg-purple-600',
+    bgHeader: 'bg-purple-50/80',
+    borderCol: 'border-purple-200',
+    btnForward: 'В оплату →',
+    btnClass: 'bg-purple-600 hover:bg-purple-500 text-white',
+  },
+  6: {
+    title: '6. Ожидание оплаты (Дебиторка)',
+    shortTitle: '6. Дебиторка',
+    colorDot: 'bg-rose-600',
+    bgHeader: 'bg-rose-50/80',
+    borderCol: 'border-rose-200',
+    btnForward: '✓ Оплачено на Р/С',
+    btnClass: 'bg-emerald-600 hover:bg-emerald-500 text-white',
+  },
+  7: {
+    title: '7. Оплачено и закрыто',
+    shortTitle: '7. Оплачено',
+    colorDot: 'bg-emerald-600',
+    bgHeader: 'bg-emerald-50/80',
+    borderCol: 'border-emerald-200',
+    btnForward: '✓ Закрыто',
+    btnClass: 'bg-slate-300 text-slate-700',
+  },
+};
+
+export const STAGE_ICONS: Record<number, string> = {
+  1: '📥',
+  2: '📝',
+  3: '📦',
+  4: '🏁',
+  5: '📂',
+  6: '💳',
+  7: '🗄️',
+};
