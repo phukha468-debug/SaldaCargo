@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +44,8 @@ export async function POST(request: Request) {
     const { data: profiles } = await (supabase.from('profiles') as any).select('id').limit(1);
     const actorId = profiles?.[0]?.id || 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
 
+    const session = await getVerifiedWebSession();
+    const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
     const movementsToInsert: any[] = [];
     const partsToUpdate: Array<{ id: string; purchase_price?: number; client_price?: number }> = [];
 
@@ -53,6 +57,7 @@ export async function POST(request: Request) {
       if (diff > 0) {
         // Оприходование обнаруженного излишка
         movementsToInsert.push({
+          organization_id: organizationId,
           part_id: item.id,
           direction: 'in',
           quantity: diff,
@@ -63,6 +68,7 @@ export async function POST(request: Request) {
       } else if (diff < 0) {
         // Списание недостачи
         movementsToInsert.push({
+          organization_id: organizationId,
           part_id: item.id,
           direction: 'out',
           quantity: Math.abs(diff),

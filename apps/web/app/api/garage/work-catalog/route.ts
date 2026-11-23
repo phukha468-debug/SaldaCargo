@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 /** GET /api/garage/work-catalog */
@@ -39,8 +41,11 @@ export async function POST(request: Request) {
   if (!name?.trim()) return NextResponse.json({ error: 'Название обязательно' }, { status: 400 });
 
   const supabase = createAdminClient();
+  const session = await getVerifiedWebSession();
+  const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
   const { data, error } = await (supabase.from('work_catalog') as any)
     .insert({
+      organization_id: organizationId,
       code: code?.trim() || null,
       name: name.trim(),
       category: category?.trim() || null,

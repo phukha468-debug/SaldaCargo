@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 export function computeAlertStatus({
@@ -129,8 +131,12 @@ export async function POST(request: Request) {
     odometer_current: odo,
   });
 
+  const session = await getVerifiedWebSession();
+  const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
+
   const { data, error } = await (supabase.from('maintenance_items') as any)
     .insert({
+      organization_id: organizationId,
       asset_id,
       work_name: work_name.trim(),
       interval_km: interval_km ? Number(interval_km) : null,

@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { getVerifiedMiniappSession, getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import {
+  DEFAULT_ORGANIZATION_ID,
   isOilOrFilterWork,
   extractOrderDates,
   cleanOrderNotes,
@@ -299,14 +300,17 @@ export async function POST(request: Request) {
         mechanic_id: w.mechanic_id || null,
         second_mechanic_id: w.second_mechanic_id || null,
       }))
-      .filter((w) => w.name.length > 0 && w.minutes > 0);
+      .filter((w) => w.name.length > 0);
 
     if (submit_immediately && validWorks.length === 0) {
       return NextResponse.json(
-        { error: 'Добавьте хотя бы одну выполненную работу с временем в минутах' },
+        { error: 'Добавьте хотя бы одну выполненную работу' },
         { status: 400 },
       );
     }
+
+    const session = await getVerifiedMiniappSession();
+    const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
 
     const validParts = parts_provided_by_service
       ? (parts ?? [])
@@ -390,6 +394,7 @@ export async function POST(request: Request) {
               : null);
 
           return {
+            organization_id: existingOrder.organization_id || organizationId,
             service_order_id: existingOrderId,
             work_catalog_id: w.work_catalog_id,
             custom_work_name: w.name,
@@ -413,6 +418,7 @@ export async function POST(request: Request) {
       // 2. Вставляем запчасти автосервиса
       if (validParts.length > 0) {
         const partsInsert = validParts.map((p) => ({
+          organization_id: existingOrder.organization_id || organizationId,
           service_order_id: existingOrderId,
           custom_part_name: p.name,
           quantity: p.quantity,
@@ -524,6 +530,7 @@ export async function POST(request: Request) {
         } else {
           const { data: newCv } = await (supabase.from('client_vehicles') as any)
             .insert({
+              organization_id: organizationId,
               brand: cleanModel,
               model: '',
               reg_number: cleanReg,
@@ -597,6 +604,7 @@ export async function POST(request: Request) {
     const orderStatus = submit_immediately ? 'completed' : 'in_progress';
 
     const baseInsertPayload = {
+      organization_id: organizationId,
       machine_type: isOwn ? 'own' : 'client',
       asset_id: isOwn ? asset_id : null,
       client_vehicle_id: isOwn ? null : clientVehicleId,
@@ -662,6 +670,7 @@ export async function POST(request: Request) {
             : null);
 
         return {
+          organization_id: organizationId,
           service_order_id: createdOrder.id,
           work_catalog_id: w.work_catalog_id,
           custom_work_name: w.name,
@@ -684,6 +693,7 @@ export async function POST(request: Request) {
     // Вставляем запчасти автосервиса
     if (validParts.length > 0) {
       const partsInsert = validParts.map((p) => ({
+        organization_id: organizationId,
         service_order_id: createdOrder.id,
         custom_part_name: p.name,
         quantity: p.quantity,

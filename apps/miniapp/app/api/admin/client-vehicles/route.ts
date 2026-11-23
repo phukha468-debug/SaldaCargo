@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { getVerifiedMiniappSession } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
-import { buildIlikeOrFilter } from '@saldacargo/shared';
+import { buildIlikeOrFilter, DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 
 /** GET /api/admin/client-vehicles?search= */
 export async function GET(request: Request) {
@@ -31,8 +31,9 @@ export async function GET(request: Request) {
 
 /** POST /api/admin/client-vehicles */
 export async function POST(request: Request) {
-  const adminId = await getVerifiedMiniappUserId();
-  if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const session = await getVerifiedMiniappSession();
+  if (!session?.uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const organizationId = session.oid || DEFAULT_ORGANIZATION_ID;
 
   const body = await request.json();
   const { brand, model, year, reg_number, vin, color, counterparty_id, notes } = body;
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
   const { data, error } = await (supabase.from('client_vehicles') as any)
     .insert({
+      organization_id: organizationId,
       brand: brand.trim(),
       model: model?.trim() || null,
       year: year ? Number(year) : null,

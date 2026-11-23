@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -34,7 +36,12 @@ export async function PATCH(request: Request) {
     if (sto) {
       await (supabase.from('sto_settings') as any).update(updates).eq('id', sto.id);
     } else {
-      await (supabase.from('sto_settings') as any).insert(updates);
+      const session = await getVerifiedWebSession();
+      const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
+      await (supabase.from('sto_settings') as any).insert({
+        ...updates,
+        organization_id: organizationId,
+      });
     }
   }
   if ('mechanic_id' in body && 'mechanic_salary_pct' in body) {

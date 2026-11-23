@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 /** POST /api/garage/orders/[id]/works — добавить работу в наряд (admin) */
@@ -94,9 +96,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const cleanCategory = category?.trim() || null;
   const cleanNotes = cleanCategory ? `[category:${cleanCategory}]` : null;
 
+  const session = await getVerifiedWebSession();
+  const organizationId = order.organization_id || session?.oid || DEFAULT_ORGANIZATION_ID;
+
   // Works always start as pending — mechanic or admin marks them done separately
   const { data, error } = await (supabase.from('service_order_works') as any)
     .insert({
+      organization_id: organizationId,
       service_order_id: orderId,
       work_catalog_id: work_catalog_id ?? null,
       custom_work_name: custom_work_name?.trim() ?? null,

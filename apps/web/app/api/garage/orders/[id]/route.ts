@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import {
+  DEFAULT_ORGANIZATION_ID,
   isOilOrFilterWork,
   extractOrderDates,
   cleanOrderNotes,
@@ -209,6 +211,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const supabase = createAdminClient();
+    const session = await getVerifiedWebSession();
+    const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
 
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     const cleanNum = id.replace(/[^0-9]/g, '');
@@ -245,6 +249,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       await (supabase.from('service_order_works') as any).delete().eq('service_order_id', targetId);
 
       await (supabase.from('service_order_works') as any).insert({
+        organization_id: organizationId,
         service_order_id: targetId,
         custom_work_name: `${extTitle} (${extOrg})`,
         price_client: extAmount,
@@ -293,6 +298,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             .maybeSingle();
 
           await (supabase as any).from('transactions').insert({
+            organization_id: organizationId,
             direction: 'expense',
             amount: extAmount.toFixed(2),
             category_id: REPAIR_EXTERNAL_CAT,
@@ -422,6 +428,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         if (validWorks.length > 0) {
           await (supabase.from('service_order_works') as any).insert(
             validWorks.map((w) => ({
+              organization_id: organizationId,
               service_order_id: targetId,
               custom_work_name: w.name,
               norm_minutes: w.minutes,
@@ -547,6 +554,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         if (validParts.length > 0) {
           await (supabase.from('service_order_parts') as any).insert(
             validParts.map((p) => ({
+              organization_id: organizationId,
               service_order_id: targetId,
               custom_part_name: p.name,
               quantity: p.quantity,
@@ -577,6 +585,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           if (amount <= 0) continue;
           const mUser = userMap.get(mechId);
           newTxns.push({
+            organization_id: organizationId,
             direction: 'expense',
             lifecycle_status: 'approved',
             settlement_status: 'pending',
@@ -757,6 +766,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             .maybeSingle();
 
           await (supabase as any).from('client_vehicle_recommendations').insert({
+            organization_id: organizationId,
             client_vehicle_id: fullOrder.client_vehicle_id,
             service_order_id: targetId,
             text: body.mechanic_note.trim(),
@@ -802,6 +812,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             .limit(1)
             .maybeSingle();
           await (supabase as any).from('transactions').insert({
+            organization_id: organizationId,
             direction: 'income',
             lifecycle_status: 'approved',
             settlement_status: 'completed',
@@ -869,6 +880,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
                 .maybeSingle();
 
               await (supabase as any).from('transactions').insert({
+                organization_id: organizationId,
                 direction: 'expense',
                 amount: costTotal.toFixed(2),
                 category_id: REPAIR_EXTERNAL_CAT,
@@ -921,6 +933,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               if (isNaN(salary) || salary <= 0) continue;
 
               txns.push({
+                organization_id: organizationId,
                 direction: 'expense',
                 lifecycle_status: 'approved',
                 settlement_status: 'pending',
@@ -1015,6 +1028,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               totalPrimaryPay += salary;
 
               txns.push({
+                organization_id: organizationId,
                 direction: 'expense',
                 lifecycle_status: 'approved',
                 settlement_status: 'pending',
@@ -1210,6 +1224,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               .maybeSingle();
 
             await (supabase as any).from('transactions').insert({
+              organization_id: organizationId,
               direction: 'income',
               lifecycle_status: 'approved',
               settlement_status: 'completed',

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { getVerifiedMiniappSession } from '@/lib/auth/server';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 /**
@@ -9,8 +10,9 @@ import { NextResponse } from 'next/server';
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: orderId } = await params;
-  const userId = await getVerifiedMiniappUserId();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const session = await getVerifiedMiniappSession();
+  if (!session?.uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const organizationId = session.oid || DEFAULT_ORGANIZATION_ID;
 
   const body = await request.json();
   const { work_catalog_id, custom_work_name, mechanic_note } = body as {
@@ -34,22 +36,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const supabase = createAdminClient();
 
-  // Получаем нормачасы из каталога если указан
-  let normMinutes = 60;
-  if (work_catalog_id) {
-    const { data: wc } = await (supabase.from('work_catalog') as any)
-      .select('norm_minutes')
-      .eq('id', work_catalog_id)
-      .single();
-    if (wc) normMinutes = wc.norm_minutes;
-  }
-
   const { data, error } = await (supabase.from('service_order_works') as any)
     .insert({
+      organization_id: organizationId,
       service_order_id: orderId,
       work_catalog_id: work_catalog_id ?? null,
       custom_work_name: custom_work_name ?? null,
-      norm_minutes: normMinutes,
+      norm_minutes: 0,
+      actual_minutes: 0,
       price_client: 0,
       status: 'pending',
       requires_admin_review: true,

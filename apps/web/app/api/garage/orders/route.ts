@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { extractOrderDates, cleanOrderNotes, getOrderEffectiveDate } from '@saldacargo/shared';
+import {
+  DEFAULT_ORGANIZATION_ID,
+  extractOrderDates,
+  cleanOrderNotes,
+  getOrderEffectiveDate,
+} from '@saldacargo/shared';
 
 /** GET /api/garage/orders?filter=review|active|history&date=YYYY-MM-DD */
 export async function GET(request: Request) {
@@ -270,10 +276,13 @@ export async function POST(request: Request) {
     }
 
     const isCompleted = isExternal ? body.is_completed !== false : false;
+    const session = await getVerifiedWebSession();
+    const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
 
     const { data, error } = await (supabase as any)
       .from('service_orders')
       .insert({
+        organization_id: organizationId,
         machine_type: body.machine_type,
         asset_id: body.asset_id || null,
         client_vehicle_id: body.client_vehicle_id || null,
@@ -303,6 +312,7 @@ export async function POST(request: Request) {
 
       if (worksCost > 0 || body.work_description) {
         const { error: workErr } = await (supabase as any).from('service_order_works').insert({
+          organization_id: organizationId,
           service_order_id: data.id,
           custom_work_name:
             body.work_description?.trim() ||
@@ -321,6 +331,7 @@ export async function POST(request: Request) {
 
       if (partsCost > 0 || body.parts_description) {
         const { error: partErr } = await (supabase as any).from('service_order_parts').insert({
+          organization_id: organizationId,
           service_order_id: data.id,
           custom_part_name: body.parts_description?.trim() || 'Запчасти стороннего сервиса',
           quantity: 1,
@@ -357,6 +368,7 @@ export async function POST(request: Request) {
         const contractorDesc = body.contractor_name ? ` · ${body.contractor_name.trim()}` : '';
 
         await (supabase as any).from('transactions').insert({
+          organization_id: organizationId,
           direction: 'expense',
           amount: totalCost,
           category_id: REPAIR_EXTERNAL_CAT,

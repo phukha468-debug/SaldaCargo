@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { getVerifiedMiniappSession, getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -8,12 +9,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json();
   const supabase = createAdminClient();
 
-  const userId = (await getVerifiedMiniappUserId()) || body.mechanic_id;
+  const session = await getVerifiedMiniappSession();
+  const userId = session?.uid || body.mechanic_id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const [{ data: order }, { data: sto }] = await Promise.all([
     (supabase.from('service_orders') as any)
-      .select('id, machine_type')
+      .select('id, machine_type, organization_id')
       .eq('id', orderId)
       .maybeSingle(),
     (supabase.from('sto_settings') as any)
@@ -22,25 +24,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .maybeSingle(),
   ]);
 
+  const organizationId = order?.organization_id || session?.oid || DEFAULT_ORGANIZATION_ID;
   const isOwn = order?.machine_type === 'own';
   const rateClient = parseFloat(sto?.hourly_rate ?? '2000') || 2000;
   const rateOwn = parseFloat(sto?.hourly_rate_own ?? '1600') || 1600;
   const hourlyRate = isOwn ? rateOwn : rateClient;
 
-  let minutes = Number(body.minutes ?? body.actual_minutes ?? body.norm_minutes ?? 0);
-  if (body.work_catalog_id && (!minutes || minutes <= 0)) {
-    const { data: cat } = await (supabase.from('work_catalog') as any)
-      .select('norm_minutes, norm_minutes_valdai')
-      .eq('id', body.work_catalog_id)
-      .maybeSingle();
-    if (cat) {
-      minutes =
-        isOwn && cat.norm_minutes_valdai ? cat.norm_minutes_valdai : (cat.norm_minutes ?? 60);
-    }
-  }
-  if (!minutes || minutes <= 0) minutes = 60;
+  // Механики в MiniApp вводят только перечень работ; время выставляет директор/приёмщик (по умолчанию 0)
+  const minutes = Math.max(
+    0,
+    Math.round(Number(body.minutes ?? body.actual_minutes ?? body.norm_minutes ?? 0) || 0),
+  );
 
-  const priceClient = ((minutes / 60) * hourlyRate).toFixed(2);
+  const priceClient = minutes > 0 ? ((minutes / 60) * hourlyRate).toFixed(2) : '0.00';
   const markCompleted = body.completed !== false;
 
   const cleanCategory = body.category?.trim() || null;
@@ -56,6 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { data, error } = await (supabase.from('service_order_works') as any)
     .insert({
+      organization_id: organizationId,
       service_order_id: orderId,
       work_catalog_id: body.work_catalog_id ?? null,
       custom_work_name: body.custom_work_name?.trim() ?? null,

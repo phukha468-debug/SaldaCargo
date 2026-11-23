@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 type ImportWork = {
@@ -83,9 +85,13 @@ export async function POST(request: Request) {
       }
     }
 
+    const session = await getVerifiedWebSession();
+    const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
+
     const { data: order, error: orderErr } = await (supabase as any)
       .from('service_orders')
       .insert({
+        organization_id: organizationId,
         machine_type: body.order.machine_type,
         asset_id: body.order.asset_id || null,
         client_vehicle_id: body.order.client_vehicle_id || null,
@@ -122,6 +128,7 @@ export async function POST(request: Request) {
       const worksToInsert = worksList
         .filter((w) => w.custom_work_name?.trim())
         .map((w) => ({
+          organization_id: organizationId,
           service_order_id: order.id,
           custom_work_name: w.custom_work_name.trim(),
           work_description: w.work_description?.trim() || null,
@@ -146,6 +153,7 @@ export async function POST(request: Request) {
       const partsToInsert = partsList
         .filter((p) => p.name?.trim())
         .map((p) => ({
+          organization_id: organizationId,
           service_order_id: order.id,
           part_id: null,
           custom_part_name: p.name.trim(),

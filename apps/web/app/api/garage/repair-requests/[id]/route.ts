@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 /** PATCH /api/garage/repair-requests/:id — attach_json | approve | reject */
@@ -18,6 +20,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     };
 
   const supabase = createAdminClient();
+  const session = await getVerifiedWebSession();
+  const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
 
   if (action === 'attach_json') {
     const { data: req, error: reqErr } = await (supabase.from('repair_requests') as any)
@@ -73,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             return name && !existingNames.has(name.toLowerCase());
           })
           .map((w) => ({
+            organization_id: organizationId,
             service_order_id: req.service_order_id,
             custom_work_name: (w.custom_work_name ?? w.name ?? '').trim(),
             work_description: w.work_description?.trim() || null,
@@ -92,6 +97,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const partsToInsert = parts
           .filter((p) => p.name?.trim())
           .map((p) => ({
+            organization_id: organizationId,
             service_order_id: req.service_order_id,
             part_id: null,
             custom_part_name: p.name.trim(),
@@ -160,6 +166,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
       .insert({
+        organization_id: organizationId,
         machine_type: 'own',
         asset_id: req.asset_id,
         odometer_start: odometer ?? null,
@@ -182,6 +189,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     // Работы из JSON (приоритет) или из каталога
     if (sjWorks.length > 0) {
       const worksToInsert = sjWorks.map((w: any) => ({
+        organization_id: organizationId,
         service_order_id: order.id,
         custom_work_name: (w.custom_work_name ?? w.name ?? '').trim(),
         work_description: w.work_description?.trim() || null,
@@ -198,6 +206,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const partsToInsert = sjParts
         .filter((p: any) => p.name?.trim())
         .map((p: any) => ({
+          organization_id: organizationId,
           service_order_id: order.id,
           part_id: null,
           custom_part_name: p.name.trim(),
@@ -219,6 +228,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (catalog?.length) {
         await (supabase.from('service_order_works') as any).insert(
           catalog.map((w: any) => ({
+            organization_id: organizationId,
             service_order_id: order.id,
             work_catalog_id: w.id,
             norm_minutes: w.norm_minutes,

@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 import { buildIlikeOrFilter } from '@saldacargo/shared';
 
@@ -125,9 +127,13 @@ export async function POST(request: Request) {
         ? Math.max(0, parseFloat(String(client_price)) || 0)
         : Math.round(pPrice * 1.3);
 
+    const session = await getVerifiedWebSession();
+    const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
+
     // 1. Создаём запись в parts
     const { data: newPart, error: partErr } = await (supabase.from('parts') as any)
       .insert({
+        organization_id: organizationId,
         name: name.trim(),
         article: article?.trim() || null,
         category: brand,
@@ -155,6 +161,7 @@ export async function POST(request: Request) {
       const createdBy = adminUser?.id || 'e9a1c980-eb1e-5c87-9f6d-c7f67eb28a1d';
 
       await (supabase.from('part_movements') as any).insert({
+        organization_id: organizationId,
         part_id: newPart.id,
         direction: 'in',
         quantity: initStock,

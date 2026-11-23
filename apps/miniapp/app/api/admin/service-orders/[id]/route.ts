@@ -4,6 +4,7 @@ import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import {
+  DEFAULT_ORGANIZATION_ID,
   isOilOrFilterWork,
   extractOrderDates,
   cleanOrderNotes,
@@ -246,6 +247,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (validWorks.length > 0) {
         await (supabase.from('service_order_works') as any).insert(
           validWorks.map((w) => ({
+            organization_id: ord.organization_id || DEFAULT_ORGANIZATION_ID,
             service_order_id: targetId,
             custom_work_name: w.name,
             norm_minutes: w.minutes,
@@ -286,6 +288,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (validParts.length > 0) {
         await (supabase.from('service_order_parts') as any).insert(
           validParts.map((p) => ({
+            organization_id: ord.organization_id || DEFAULT_ORGANIZATION_ID,
             service_order_id: targetId,
             custom_part_name: p.name,
             quantity: p.quantity,
@@ -424,6 +427,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
         if (calcSalary > 0) {
           await (supabase.from('transactions') as any).insert({
+            organization_id: order.organization_id || DEFAULT_ORGANIZATION_ID,
             direction: 'expense',
             category_id: PAYROLL_MECHANIC_CAT,
             amount: salary,

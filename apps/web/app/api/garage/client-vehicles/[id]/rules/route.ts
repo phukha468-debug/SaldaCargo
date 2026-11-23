@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 /** POST /api/garage/client-vehicles/[id]/rules */
@@ -13,8 +15,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const supabase = createAdminClient();
+  const session = await getVerifiedWebSession();
+  const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
   const { data, error } = await (supabase.from('client_vehicle_maintenance_rules') as any)
     .insert({
+      organization_id: organizationId,
       client_vehicle_id: id,
       work_name,
       interval_km: interval_km ? Number(interval_km) : null,

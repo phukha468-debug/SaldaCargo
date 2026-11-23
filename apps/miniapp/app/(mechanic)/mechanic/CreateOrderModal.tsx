@@ -74,10 +74,9 @@ export default function CreateOrderModal({
     'both',
   );
 
-  // 5. Перечень работ
+  // 5. Перечень работ (время выставляет директор/приёмщик)
   const [works, setWorks] = useState<WorkDraft[]>([]);
   const [workNameInput, setWorkNameInput] = useState<string>('');
-  const [workMinutesInput, setWorkMinutesInput] = useState<string>('');
 
   // 6. Чекбокс запчастей автосервиса
   const [partsProvidedByService, setPartsProvidedByService] = useState<boolean>(false);
@@ -154,9 +153,8 @@ export default function CreateOrderModal({
     };
   };
 
-  // Учитываем в превью и уже добавленные работы, и текущую вводимую строку
-  const pendingInputMins =
-    workNameInput.trim() && Number(workMinutesInput) > 0 ? Number(workMinutesInput) : 0;
+  // Время выставляет директор/приёмщик, поэтому предварительный расчёт в минутах отключён
+  const pendingInputMins = 0;
   const totalMinutes = works.reduce((sum, w) => sum + w.minutes, 0) + pendingInputMins;
 
   const totalShares = works.reduce(
@@ -187,13 +185,8 @@ export default function CreateOrderModal({
   const handleAddWork = () => {
     setErrorMsg('');
     const cleanName = workNameInput.trim();
-    const mins = Math.round(Number(workMinutesInput) || 0);
     if (!cleanName) {
       setErrorMsg('Введите наименование выполненной работы');
-      return;
-    }
-    if (mins <= 0) {
-      setErrorMsg('Укажите время выполнения работы в минутах');
       return;
     }
     setWorks((prev) => [
@@ -201,12 +194,11 @@ export default function CreateOrderModal({
       {
         id: `${Date.now()}-${Math.random()}`,
         name: cleanName,
-        minutes: mins,
+        minutes: 0,
         performer: secondMechanicId ? workPerformerInput : 'primary',
       },
     ]);
     setWorkNameInput('');
-    setWorkMinutesInput('');
   };
 
   const handleRemoveWork = (id: string) => {
@@ -242,13 +234,13 @@ export default function CreateOrderModal({
     mutationFn: async (submitImmediately: boolean) => {
       setErrorMsg('');
 
-      // Если механик вписал работу в поля ввода, но не нажал «+ Добавить», подхватываем её автоматически
+      // Если механик вписал работу в поле ввода, но не нажал «+ Добавить», подхватываем её автоматически
       const finalWorks = [...works];
-      if (workNameInput.trim() && Number(workMinutesInput) > 0) {
+      if (workNameInput.trim()) {
         finalWorks.push({
           id: 'auto-work',
           name: workNameInput.trim(),
-          minutes: Math.round(Number(workMinutesInput)),
+          minutes: 0,
           performer: secondMechanicId ? workPerformerInput : 'primary',
         });
       }
@@ -281,7 +273,7 @@ export default function CreateOrderModal({
       }
 
       if (submitImmediately && finalWorks.length === 0) {
-        throw new Error('Добавьте хотя бы одну работу и укажите время в минутах');
+        throw new Error('Добавьте хотя бы одну выполненную работу');
       }
 
       const payload: any = {
@@ -339,7 +331,6 @@ export default function CreateOrderModal({
       setWorkPerformerInput('both');
       setWorks([]);
       setWorkNameInput('');
-      setWorkMinutesInput('');
       setParts([]);
       setPartNameInput('');
       setPartQtyInput('1');
@@ -727,92 +718,73 @@ export default function CreateOrderModal({
             )}
           </div>
 
-          {/* ШАГ 4: Перечень работ (1 строка - название, 2 строка - время в минутах) */}
+          {/* ШАГ 4: Перечень работ (без ввода времени — время выставляет директор/приёмщик) */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3.5">
             <div className="flex items-center justify-between flex-wrap gap-1">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 4. Перечень выполненных работ ({works.length})
               </label>
-              {totalMinutes > 0 && (
-                <div className="text-right">
-                  <span className="text-xs font-extrabold text-[#21A038] block">
-                    Вам: +{totalShares.primary.toLocaleString('ru-RU')} ₽
-                  </span>
-                  {secondMechanicId && totalShares.second > 0 && (
-                    <span className="text-[10px] font-bold text-sky-700 block">
-                      Напарнику: +{totalShares.second.toLocaleString('ru-RU')} ₽
-                    </span>
-                  )}
-                </div>
-              )}
+              <span className="text-[10px] font-bold text-slate-400">
+                Время выставляет приёмщик
+              </span>
             </div>
 
             {/* Список уже добавленных работ */}
             {works.length > 0 && (
               <div className="space-y-2">
-                {works.map((w, idx) => {
-                  const shares = calcWorkShares(
-                    w.minutes,
-                    w.performer || (secondMechanicId ? 'both' : 'primary'),
-                  );
-                  return (
-                    <div
-                      key={w.id}
-                      className="bg-[#F8FAFC] border border-slate-200 rounded-xl p-3 flex items-start justify-between gap-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-extrabold text-slate-900 leading-snug">
-                          {idx + 1}. {w.name}
-                        </p>
-                        <div className="flex items-center flex-wrap gap-2 mt-1">
-                          <span className="text-xs font-bold text-slate-500">
-                            ⏱ Время: {w.minutes} мин
-                          </span>
-                          <span className="text-xs font-extrabold text-[#21A038] bg-[#E8F7EC] px-2 py-0.5 rounded-md">
-                            +{shares.primary.toLocaleString('ru-RU')} ₽ вам
-                          </span>
-                          {secondMechanicId && shares.second > 0 && (
-                            <span className="text-xs font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/60">
-                              +{shares.second.toLocaleString('ru-RU')} ₽ напарнику
-                            </span>
-                          )}
-                          {secondMechanicId && (
-                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                              {w.performer === 'both'
-                                ? '👥 Вдвоём (50/50)'
-                                : w.performer === 'second'
-                                  ? `👤 ${secondMechanicName.split(' ')[0]}`
-                                  : '👤 Только я'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveWork(w.id)}
-                        className="w-7 h-7 rounded-lg bg-red-50 text-red-500 font-bold text-xs flex items-center justify-center shrink-0 active:scale-95"
-                      >
-                        ✕
-                      </button>
+                {works.map((w, idx) => (
+                  <div
+                    key={w.id}
+                    className="bg-[#F8FAFC] border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-extrabold text-slate-900 leading-snug">
+                        {idx + 1}. {w.name}
+                      </p>
+                      {secondMechanicId && (
+                        <span className="inline-block mt-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          {w.performer === 'both'
+                            ? '👥 Вдвоём (50/50)'
+                            : w.performer === 'second'
+                              ? `👤 ${secondMechanicName.split(' ')[0]}`
+                              : '👤 Только я'}
+                        </span>
+                      )}
                     </div>
-                  );
-                })}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveWork(w.id)}
+                      className="w-7 h-7 rounded-lg bg-red-50 text-red-500 font-bold text-xs flex items-center justify-center shrink-0 active:scale-95"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* Поля ввода новой работы */}
+            {/* Поле ввода новой работы */}
             <div className="bg-[#F2F4F7] rounded-2xl p-3 space-y-2.5 border border-slate-200/70">
               <div>
                 <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                  Строка 1 — Наименование работы
+                  Наименование работы
                 </label>
-                <input
-                  type="text"
-                  value={workNameInput}
-                  onChange={(e) => setWorkNameInput(e.target.value)}
-                  placeholder="К примеру: Замена глушителя (бочка)"
-                  className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={workNameInput}
+                    onChange={(e) => setWorkNameInput(e.target.value)}
+                    placeholder="К примеру: Замена глушителя (бочка)"
+                    className="flex-1 h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddWork}
+                    className="px-4 h-11 rounded-xl bg-[#21A038] text-white font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform shrink-0 shadow-xs"
+                  >
+                    + Добавить
+                  </button>
+                </div>
               </div>
 
               {secondMechanicId && (
@@ -860,61 +832,6 @@ export default function CreateOrderModal({
                   </div>
                 </div>
               )}
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                    Строка 2 — Время в минутах
-                  </label>
-                  {Number(workMinutesInput) > 0 && (
-                    <span className="text-[11px] font-extrabold text-[#21A038]">
-                      Начисление: +
-                      {calcWorkShares(
-                        Number(workMinutesInput),
-                        secondMechanicId ? workPerformerInput : 'primary',
-                      ).primary.toLocaleString('ru-RU')}{' '}
-                      ₽ вам
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={workMinutesInput}
-                    onChange={(e) => setWorkMinutesInput(e.target.value)}
-                    placeholder="Минуты (напр. 60)"
-                    className="flex-1 h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-extrabold text-slate-900 focus:outline-none focus:border-[#21A038]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddWork}
-                    className="px-4 h-11 rounded-xl bg-[#21A038] text-white font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform shrink-0 shadow-xs"
-                  >
-                    + Добавить
-                  </button>
-                </div>
-
-                {/* Быстрые кнопки минут */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {[30, 45, 60, 90, 120, 180].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setWorkMinutesInput(String(m))}
-                      className={cn(
-                        'px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors',
-                        Number(workMinutesInput) === m
-                          ? 'bg-[#21A038] text-white'
-                          : 'bg-white text-slate-600 border border-slate-200',
-                      )}
-                    >
-                      {m} мин
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
 

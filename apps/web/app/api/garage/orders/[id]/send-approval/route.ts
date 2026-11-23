@@ -194,6 +194,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     try {
       await (supabase.from('audit_log') as any).insert({
+        organization_id: order.organization_id || '00000000-0000-0000-0000-000000000001',
         table_name: 'service_orders',
         record_id: order.id,
         action: 'send_approval_max',

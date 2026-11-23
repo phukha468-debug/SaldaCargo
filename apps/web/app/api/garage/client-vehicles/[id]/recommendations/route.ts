@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getVerifiedWebSession } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 /** POST /api/garage/client-vehicles/[id]/recommendations */
@@ -27,8 +29,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Не найден пользователь-автор' }, { status: 500 });
   }
 
+  const session = await getVerifiedWebSession();
+  const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
+
   const { data, error } = await (supabase.from('client_vehicle_recommendations') as any)
     .insert({
+      organization_id: organizationId,
       client_vehicle_id: id,
       text,
       due_km: due_km ? Number(due_km) : null,

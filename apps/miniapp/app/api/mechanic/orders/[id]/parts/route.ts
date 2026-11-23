@@ -1,13 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { getVerifiedMiniappSession, getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: orderId } = await params;
   const body = await request.json();
-  const userId = (await getVerifiedMiniappUserId()) || body.mechanic_id;
+  const session = await getVerifiedMiniappSession();
+  const userId = session?.uid || body.mechanic_id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const organizationId = session?.oid || DEFAULT_ORGANIZATION_ID;
 
   const { part_id, custom_part_name, quantity, unit } = body as {
     part_id?: string;
@@ -23,6 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (custom_part_name && custom_part_name.trim()) {
     const { data: sop, error: sopErr } = await (supabase.from('service_order_parts') as any)
       .insert({
+        organization_id: organizationId,
         service_order_id: orderId,
         custom_part_name: custom_part_name.trim(),
         quantity: qty,
@@ -55,6 +59,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { data: movement, error: mvErr } = await (supabase.from('part_movements') as any)
     .insert({
+      organization_id: organizationId,
       part_id,
       direction: 'out',
       quantity: qty,
@@ -69,6 +74,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { data: sop, error: sopErr } = await (supabase.from('service_order_parts') as any)
     .insert({
+      organization_id: organizationId,
       service_order_id: orderId,
       part_id,
       quantity: qty,
