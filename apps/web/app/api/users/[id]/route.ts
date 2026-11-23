@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { hashPin, isHashedPin } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -36,7 +37,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (update.name) update.name = update.name.trim();
     if ('pin_code' in update) {
-      update.pin_code = update.pin_code ? String(update.pin_code).trim() : null;
+      const rawPin = update.pin_code ? String(update.pin_code).trim() : null;
+      update.pin_code = rawPin ? (isHashedPin(rawPin) ? rawPin : hashPin(rawPin)) : null;
     }
 
     const supabase = createAdminClient();

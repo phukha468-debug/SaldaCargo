@@ -322,7 +322,9 @@ export function PayrollRow({
           )}
           {user.pin_code ? (
             <span className="text-xs bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-mono font-bold inline-flex items-center gap-1">
-              🔒 PIN: {user.pin_code}
+              {user.pin_code.startsWith('scrypt:')
+                ? '🔒 PIN установлен'
+                : `🔒 PIN: ${user.pin_code}`}
             </span>
           ) : (
             <span className="text-xs bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-md font-medium inline-flex items-center gap-1">

@@ -18,13 +18,16 @@ export function StaffModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const hasHashedPin = Boolean(editUser?.pin_code?.startsWith('scrypt:'));
+  const [pinCleared, setPinCleared] = useState(false);
+
   const [form, setForm] = useState(
     editUser
       ? {
           name: editUser.name,
           phone: editUser.phone ?? '',
           max_user_id: editUser.max_user_id ?? '',
-          pin_code: editUser.pin_code ?? '',
+          pin_code: hasHashedPin ? '' : (editUser.pin_code ?? ''),
           roles: editUser.roles,
           current_asset_id: editUser.current_asset_id ?? '',
           auto_settle: editUser.auto_settle,
@@ -67,11 +70,10 @@ export function StaffModal({
     }
     setSaving(true);
     setError('');
-    const payload = {
+    const payload: Record<string, unknown> = {
       name: form.name,
       phone: form.phone || null,
       max_user_id: form.max_user_id || null,
-      pin_code: form.pin_code ? form.pin_code.trim() : null,
       roles: form.roles,
       current_asset_id: form.current_asset_id || null,
       auto_settle: form.auto_settle,
@@ -83,6 +85,11 @@ export function StaffModal({
       court_order_pct: parseFloat(form.court_order_pct || '50') || 50,
       court_order_notes: form.court_order_notes || null,
     };
+    if (form.pin_code.trim()) {
+      payload.pin_code = form.pin_code.trim();
+    } else if (!hasHashedPin || pinCleared) {
+      payload.pin_code = null;
+    }
     const url = editUser ? `/api/users/${editUser.id}` : '/api/users';
     const method = editUser ? 'PATCH' : 'POST';
     const res = await fetch(url, {
@@ -172,10 +179,13 @@ export function StaffModal({
                 <span>🔒</span>
                 <span>Личный PIN-код (4 цифры)</span>
               </label>
-              {form.pin_code && (
+              {(form.pin_code || (hasHashedPin && !pinCleared)) && (
                 <button
                   type="button"
-                  onClick={() => setForm((p) => ({ ...p, pin_code: '' }))}
+                  onClick={() => {
+                    setForm((p) => ({ ...p, pin_code: '' }));
+                    setPinCleared(true);
+                  }}
                   className="text-[11px] text-rose-600 font-semibold hover:underline"
                 >
                   Сбросить PIN
@@ -187,12 +197,17 @@ export function StaffModal({
                 inputCls,
                 'font-mono tracking-widest text-base font-bold bg-white text-slate-800 placeholder:text-xs placeholder:font-normal placeholder:tracking-normal',
               )}
-              placeholder="Не установлен (напр. 1234)"
+              placeholder={
+                hasHashedPin && !pinCleared
+                  ? 'PIN установлен (введите 4 цифры для смены)'
+                  : 'Не установлен (напр. 1234)'
+              }
               maxLength={4}
               value={form.pin_code}
               onChange={(e) => {
                 const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                 setForm((p) => ({ ...p, pin_code: val }));
+                if (val) setPinCleared(false);
               }}
             />
             <p className="text-[11px] text-amber-800/80 mt-1.5 leading-snug">

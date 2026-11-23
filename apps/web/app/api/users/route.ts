@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { hashPin, isHashedPin } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -93,7 +94,11 @@ export async function POST(request: Request) {
         name: name.trim(),
         phone: phone || null,
         max_user_id: max_user_id || null,
-        pin_code: pin_code ? String(pin_code).trim() : null,
+        pin_code: pin_code
+          ? isHashedPin(String(pin_code).trim())
+            ? String(pin_code).trim()
+            : hashPin(String(pin_code).trim())
+          : null,
         roles,
         current_asset_id: current_asset_id || null,
         auto_settle: body.auto_settle ?? false,
