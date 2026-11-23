@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   DEFAULT_ORGANIZATION_ID,
   OrganizationSettingsSchema,
+  OrganizationTelematicsSettingsSchema,
   SALDA_MODULES,
   getMaxBotEnv,
   getOpti24Env,
@@ -72,6 +73,7 @@ const patchSettingsSchema = z.object({
           directions: z.array(z.string().trim().min(1).max(60)).max(30).optional(),
         })
         .optional(),
+      telematics: OrganizationTelematicsSettingsSchema.optional(),
     })
     .optional(),
 });
@@ -181,6 +183,28 @@ export const PATCH = createWebApiHandler(
         ...current.fleet_rules,
         ...(body.settings?.fleet_rules ?? {}),
       },
+      telematics: body.settings?.telematics
+        ? {
+            ...current.telematics,
+            ...body.settings.telematics,
+            base_geofence: {
+              ...current.telematics.base_geofence,
+              ...body.settings.telematics.base_geofence,
+            },
+            thresholds: {
+              ...current.telematics.thresholds,
+              ...body.settings.telematics.thresholds,
+            },
+            transit_rules: {
+              ...current.telematics.transit_rules,
+              ...body.settings.telematics.transit_rules,
+            },
+            tariffs: {
+              ...current.telematics.tariffs,
+              ...body.settings.telematics.tariffs,
+            },
+          }
+        : current.telematics,
     });
 
     const updatePayload: Record<string, unknown> = {

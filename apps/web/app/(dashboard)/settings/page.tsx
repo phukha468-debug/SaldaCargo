@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MODULE_META, SALDA_MODULES, type SaldaModule } from '@saldacargo/shared';
+import {
+  DEFAULT_ORGANIZATION_SETTINGS,
+  MODULE_META,
+  SALDA_MODULES,
+  type OrganizationTelematicsSettings,
+  type SaldaModule,
+} from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
 import { LegalEntityModal, type LegalEntityItem } from './LegalEntityModal';
 import {
@@ -10,6 +16,7 @@ import {
   PROVIDER_META,
   type IntegrationStatusItem,
 } from './IntegrationConfigModal';
+import { TelematicsAutopilotTab } from './TelematicsAutopilotTab';
 
 interface SettingsResponse {
   organization: {
@@ -28,13 +35,14 @@ interface SettingsResponse {
         cube_fuel_price_per_liter?: number;
         diesel_fuel_price_per_liter?: number;
       };
+      telematics?: OrganizationTelematicsSettings;
     };
   };
   integrations: IntegrationStatusItem[];
   can_edit: boolean;
 }
 
-type SettingsTab = 'company' | 'modules' | 'integrations';
+type SettingsTab = 'company' | 'modules' | 'integrations' | 'telematics';
 
 export default function OrganizationSettingsPage() {
   const queryClient = useQueryClient();
@@ -203,6 +211,7 @@ export default function OrganizationSettingsPage() {
               { id: 'company', label: 'Компания и юрлица', icon: 'business' },
               { id: 'modules', label: 'Модули', icon: 'extension' },
               { id: 'integrations', label: 'Интеграции', icon: 'hub' },
+              { id: 'telematics', label: 'Автопилот GPS', icon: 'satellite_alt' },
             ] as const
           ).map((t) => (
             <button
@@ -533,6 +542,21 @@ export default function OrganizationSettingsPage() {
             })}
           </div>
         </div>
+      )}
+
+      {/* ── Tab 4: Автопилот GPS и журнал решений ────────────────────── */}
+      {tab === 'telematics' && (
+        <TelematicsAutopilotTab
+          initialSettings={
+            data?.organization?.settings?.telematics ?? DEFAULT_ORGANIZATION_SETTINGS.telematics
+          }
+          canEdit={canEdit}
+          onSaved={() => {
+            refetch();
+            queryClient.invalidateQueries({ queryKey: ['organization-settings'] });
+          }}
+          onToast={showToast}
+        />
       )}
 
       {/* Modals */}

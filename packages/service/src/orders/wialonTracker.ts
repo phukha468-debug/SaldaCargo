@@ -7,6 +7,7 @@ import {
   isMeaningfulDriverComment,
   requireWialonEnv,
 } from '@saldacargo/shared';
+import { calculateDistanceMeters } from '../providers/telematics/types';
 
 // Координаты центра Верхней Салды и радиус границы города (в метрах)
 const SALDA_BASE_LAT = parseFloat(process.env.WIALON_BASE_LAT || '58.053');
@@ -231,28 +232,7 @@ export interface WialonUnitPosition {
   isInsideBase: boolean;
 }
 
-/**
- * Расчет расстояния по формуле гаверсинусов (в метрах)
- */
-export function calculateDistanceMeters(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-): number {
-  const R = 6371e3; // радиус Земли в метрах
-  const phi1 = (lat1 * Math.PI) / 180;
-  const phi2 = (lat2 * Math.PI) / 180;
-  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
-  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
-}
+// calculateDistanceMeters импортирован из ../providers/telematics/types
 
 /**
  * 1. Получение сессии Wialon через токен

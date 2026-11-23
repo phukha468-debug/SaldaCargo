@@ -1,389 +1,356 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
-  handleVehicleDeparture,
-  handleVehicleArrival,
-  fetchWialonValdaiPositions,
-  calibrateWialonOdometer,
+  WialonTelematicsProvider,
+  buildWebhookSnapshot,
+  getIntegrationConfig,
+  getOrganizationContext,
+  normalizePlate,
+  processVehicleSnapshot,
+  type AssetForTelematics,
+  type WialonIntegrationCredentials,
 } from '@saldacargo/domain-service';
-import { getWialonEnv } from '@saldacargo/shared';
+import { DEFAULT_ORGANIZATION_ID, hasModule, logger } from '@saldacargo/shared';
 
-/**
- * Нормализация госномера (очистка от спецсимволов и приведение латинских аналогов к кириллице)
- */
-function normalizeRegNumber(raw: string): string {
-  if (!raw) return '';
-  const latToCyrMap: Record<string, string> = {
-    A: 'А',
-    B: 'В',
-    E: 'Е',
-    K: 'К',
-    M: 'М',
-    H: 'Н',
-    O: 'О',
-    P: 'Р',
-    C: 'С',
-    T: 'Т',
-    Y: 'У',
-    X: 'Х',
-  };
+const DEFAULT_WIALON_HOST = 'https://host.local4.wialon.host';
 
-  const upper = raw.toUpperCase().replace(/[^A-ZА-Я0-9]/g, '');
-  let normalized = '';
-  for (const ch of upper) {
-    normalized += latToCyrMap[ch] || ch;
-  }
-  return normalized;
+const WebhookPayloadSchema = z
+  .object({
+    org: z.string().trim().max(80).optional(),
+    secret: z.string().trim().max(256).optional(),
+    token: z.string().trim().max(256).optional(),
+    event: z.string().optional(),
+    action: z.string().optional(),
+    type: z.string().optional(),
+    zone_status: z.string().optional(),
+    status: z.string().optional(),
+    notification: z.string().optional(),
+    text: z.string().optional(),
+    raw_body: z.string().optional(),
+    unit: z.string().optional(),
+    unit_name: z.string().optional(),
+    unitName: z.string().optional(),
+    name: z.string().optional(),
+    unit_id: z.union([z.string(), z.number()]).optional(),
+    time: z.union([z.string(), z.number()]).optional(),
+    timestamp: z.union([z.string(), z.number()]).optional(),
+    pos_time: z.union([z.string(), z.number()]).optional(),
+    curr_time: z.union([z.string(), z.number()]).optional(),
+    lat: z.union([z.string(), z.number()]).optional(),
+    lon: z.union([z.string(), z.number()]).optional(),
+    odometer: z.union([z.string(), z.number()]).optional(),
+    odo: z.union([z.string(), z.number()]).optional(),
+    mileage: z.union([z.string(), z.number()]).optional(),
+    mileage_km: z.union([z.string(), z.number()]).optional(),
+    km: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough();
+
+type WebhookPayload = z.infer<typeof WebhookPayloadSchema>;
+
+function isUnexpandedMacro(val: unknown): boolean {
+  return typeof val === 'string' && val.startsWith('%') && val.endsWith('%');
 }
 
-/**
- * Явная карта соответствия ID объектов Wialon и госномеров
- */
-const WIALON_ID_TO_PLATE: Record<string, string> = {
-  '11873': 'А096МВ196',
-  '11876': 'О188ТА196',
-  '11875': 'У446ВН96',
-  '11874': 'У883АР96',
-};
-
-/**
- * Явная карта соответствия имен объектов Wialon и госномеров Валдаев
- */
-const WIALON_VALDAI_MAP: Record<string, string> = {
-  НИГАМЕДЬЯНОВА096МВ196: 'А096МВ196',
-  НИГАМЕДЬЯНОВО188ТА196: 'О188ТА196',
-  НИГАМЕДЬЯНОВУ446ВН96: 'У446ВН96',
-  НИГАМЕДЬЯНОВУ883АР96: 'У883АР96',
-};
-
-/**
- * Поиск автомобиля в базе assets по имени или номеру из Wialon
- */
-async function findAssetByWialonUnit(supabase: any, unitStr: string, unitIdStr?: string) {
-  // 0. Поиск по прямому маппингу ID Wialon (11873, 11876 и т.д.)
-  const targetFromId = unitIdStr ? WIALON_ID_TO_PLATE[unitIdStr] : undefined;
-  const clean = normalizeRegNumber(unitStr);
-  const targetReg = targetFromId || WIALON_VALDAI_MAP[clean] || clean;
-
-  const { data: assets, error } = await supabase
-    .from('assets')
-    .select('id, reg_number, short_name, odometer_current, notes')
-    .eq('status', 'active');
-
-  if (error || !assets || assets.length === 0) {
-    return null;
+function parseWialonTimestampSec(raw?: string | number): number {
+  if (!raw || isUnexpandedMacro(raw)) return Math.floor(Date.now() / 1000);
+  if (typeof raw === 'number') {
+    return raw > 1e11 ? Math.floor(raw / 1000) : Math.floor(raw);
   }
-
-  // 1. Поиск по целевому номеру (из ID Wialon или карты имен)
-  for (const asset of assets) {
-    const assetNorm = normalizeRegNumber(asset.reg_number || '');
-    const shortNorm = normalizeRegNumber(asset.short_name || '');
-    if (assetNorm === targetReg || shortNorm === targetReg) {
-      return asset;
-    }
+  const str = raw.trim();
+  const ruMatch = str.match(/^(\d{2})[.-](\d{2})[.-](\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (ruMatch) {
+    const [, d, m, y, hh = '00', mm = '00', ss = '00'] = ruMatch;
+    const ms = Date.parse(`${y}-${m}-${d}T${hh}:${mm}:${ss}+05:00`);
+    if (!Number.isNaN(ms)) return Math.floor(ms / 1000);
   }
+  const ms = Date.parse(str);
+  return Number.isNaN(ms) ? Math.floor(Date.now() / 1000) : Math.floor(ms / 1000);
+}
 
-  // 2. Поиск по вхождению госномера в имя Wialon (например "Нигамедьянов А096МВ196")
-  for (const asset of assets) {
-    const assetNorm = normalizeRegNumber(asset.reg_number || '');
-    const shortNorm = normalizeRegNumber(asset.short_name || '');
-    if (assetNorm && (clean.includes(assetNorm) || assetNorm.includes(clean))) {
-      return asset;
-    }
-    if (shortNorm && (clean.includes(shortNorm) || shortNorm.includes(clean))) {
-      return asset;
-    }
-  }
+function parseOptionalNumber(raw?: string | number): number | undefined {
+  if (raw === undefined || raw === null || isUnexpandedMacro(raw)) return undefined;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : undefined;
+  const match = raw
+    .replace(/\s+/g, '')
+    .replace(',', '.')
+    .match(/-?\d+(?:\.\d+)?/);
+  if (!match) return undefined;
+  const num = Number(match[0]);
+  return Number.isFinite(num) ? num : undefined;
+}
 
-  // 3. Поиск по заметкам (где может быть сохранен wialon_unit_id)
-  if (unitIdStr) {
-    for (const asset of assets) {
-      if (asset.notes && asset.notes.includes(unitIdStr)) {
-        return asset;
-      }
-    }
-  }
+function classifyWebhookEvent(payload: WebhookPayload): 'departure' | 'arrival' | null {
+  const explicit =
+    `${payload.event ?? ''} ${payload.action ?? ''} ${payload.type ?? ''} ${payload.zone_status ?? ''}`
+      .trim()
+      .toLowerCase();
+  const fullText = `${payload.text ?? ''} ${payload.notification ?? ''} ${payload.raw_body ?? ''}`
+    .trim()
+    .toLowerCase();
 
+  const exitWords = [
+    'вышел',
+    'выход',
+    'покинул',
+    'выезд',
+    'уехал',
+    'depart',
+    'exit',
+    'leave',
+    'left',
+    'outside',
+  ];
+  const enterWords = [
+    'вошел',
+    'вошёл',
+    'вход',
+    'въезд',
+    'приезд',
+    'заезд',
+    'прибыл',
+    'arrive',
+    'enter',
+    'inside',
+  ];
+
+  if (explicit === '2' || explicit === 'out') return 'departure';
+  if (explicit === '1' || explicit === 'in') return 'arrival';
+
+  const textHasExit = exitWords.some((w) => fullText.includes(w) || explicit.includes(w));
+  const textHasEnter = enterWords.some((w) => fullText.includes(w) || explicit.includes(w));
+
+  if (textHasExit && !textHasEnter) return 'departure';
+  if (textHasEnter && !textHasExit) return 'arrival';
+  // Если в тексте оба слова (напр. название правила «Вход/Выход»), опираемся на явное поле event
+  if (exitWords.some((w) => explicit.includes(w))) return 'departure';
+  if (enterWords.some((w) => explicit.includes(w))) return 'arrival';
   return null;
 }
 
-/**
- * Безопасный парсинг времени Wialon (поддерживает русский формат DD.MM.YYYY HH:mm:ss, ISO и UNIX timestamp)
- */
-function parseWialonTime(raw?: string | number): string {
-  if (!raw) return new Date().toISOString();
-  if (typeof raw === 'number') {
-    // Если передан UNIX timestamp в секундах
-    return new Date(raw > 1e11 ? raw : raw * 1000).toISOString();
-  }
-  const str = String(raw).trim();
-  // Формат DD.MM.YYYY или DD.MM.YYYY HH:mm[:ss]
-  const match = str.match(/^(\d{2})[.-](\d{2})[.-](\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
-  if (match) {
-    const [, d, m, y, hh = '00', mm = '00', ss = '00'] = match;
-    // Время базы (Верхняя Салда / Екатеринбург) — UTC+5
-    return new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}+05:00`).toISOString();
-  }
-  const parsed = new Date(str);
-  return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+async function resolveOrganizationId(supabase: SupabaseClient, orgSlug?: string): Promise<string> {
+  if (!orgSlug) return DEFAULT_ORGANIZATION_ID;
+  const { data } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', orgSlug)
+    .eq('is_active', true)
+    .maybeSingle();
+  return data?.id ? String(data.id) : DEFAULT_ORGANIZATION_ID;
 }
 
-/**
- * Унифицированный обработчик вебхука Wialon
- * Поддерживает как GET, так и POST запросы
- */
-async function processWialonEvent(req: Request) {
-  try {
-    const rawUrl = req.url;
-    const firstQ = rawUrl.indexOf('?');
-    const cleanUrlString =
-      firstQ !== -1
-        ? rawUrl.slice(0, firstQ + 1) + rawUrl.slice(firstQ + 1).replace(/\?/g, '&')
-        : rawUrl;
-    const url = new URL(cleanUrlString);
-    let payload: Record<string, any> = {};
-
-    if (req.method === 'POST') {
-      try {
-        const rawBody = await req.text();
-        if (rawBody) {
-          try {
-            const parsed = JSON.parse(rawBody);
-            if (parsed && typeof parsed === 'object') {
-              payload = { ...parsed };
-            }
-          } catch {
-            if (rawBody.includes('=')) {
-              const sp = new URLSearchParams(rawBody);
-              sp.forEach((val, key) => {
-                payload[key] = val;
-              });
-            }
-            payload.raw_body = rawBody;
-            if (!payload.text) {
-              payload.text = rawBody;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Wialon Webhook] Ошибка чтения POST body:', e);
-      }
-    }
-
-    // Параметры из query string перекрывают или дополняют body (если они не нераскрытые макросы вроде %UNIT%)
-    url.searchParams.forEach((val, key) => {
-      if (!val.startsWith('%') || !val.endsWith('%')) {
-        payload[key] = val;
-      } else if (!payload[key]) {
-        payload[key] = val;
-      }
-    });
-
-    // Поддержка сырого текста в URL без параметров key=value (например "?Нигамедьянов О188ТА196 вошел в Салда.")
-    try {
-      const rawQuery = decodeURIComponent(url.search.replace(/^\?/, '').trim());
-      if (rawQuery && !rawQuery.includes('=')) {
-        if (!payload.text) payload.text = rawQuery;
-        if (!payload.raw_body) payload.raw_body = rawQuery;
-      }
-    } catch {}
-
-    // Извлечение ключевых параметров Wialon
-    const eventCandidate = String(
-      payload.event ||
-        payload.action ||
-        payload.type ||
-        payload.zone_status ||
-        payload.status ||
-        payload.notification ||
-        payload.text ||
-        payload.raw_body ||
-        '',
+async function findOrgAsset(
+  supabase: SupabaseClient,
+  organizationId: string,
+  unitStr: string,
+  unitIdStr?: string,
+): Promise<AssetForTelematics | null> {
+  const { data: assetsRaw } = await supabase
+    .from('assets')
+    .select(
+      'id, reg_number, short_name, wialon_id, odometer_current, odometer_offset_km, assigned_driver_id',
     )
-      .trim()
-      .toLowerCase();
+    .eq('organization_id', organizationId)
+    .eq('status', 'active');
 
-    let unitStr = String(
-      payload.unit || payload.unit_name || payload.unitName || payload.name || '',
-    ).trim();
+  const assets = (assetsRaw ?? []) as AssetForTelematics[];
+  if (assets.length === 0) return null;
 
-    // Если передан нераскрытый тег Wialon "%UNIT%", сбрасываем его
-    if (unitStr.startsWith('%') && unitStr.endsWith('%')) {
-      unitStr = '';
+  if (unitIdStr) {
+    const byId = assets.find((a) => a.wialon_id && String(a.wialon_id) === unitIdStr);
+    if (byId) return byId;
+  }
+
+  const cleanUnit = normalizePlate(unitStr);
+  if (!cleanUnit) return null;
+
+  for (const a of assets) {
+    const reg = normalizePlate(a.reg_number);
+    const short = normalizePlate(a.short_name);
+    if (reg && (reg === cleanUnit || cleanUnit.includes(reg) || reg.includes(cleanUnit))) {
+      return a;
     }
-
-    // Если имя объекта не передано отдельным полем, но есть текст уведомления
-    if (!unitStr && (payload.text || payload.raw_body)) {
-      unitStr = String(payload.text || payload.raw_body);
+    if (short && short.length >= 3 && cleanUnit.includes(short)) {
+      return a;
     }
+  }
+  return null;
+}
 
-    const unitIdStr = payload.unit_id ? String(payload.unit_id) : undefined;
-    const rawTimeCandidate =
-      payload.time ?? payload.timestamp ?? payload.pos_time ?? payload.curr_time;
-    const timeStr = parseWialonTime(rawTimeCandidate);
+async function parseIncomingRequest(req: Request): Promise<WebhookPayload> {
+  const rawUrl = req.url;
+  const firstQ = rawUrl.indexOf('?');
+  const cleanUrl =
+    firstQ !== -1
+      ? rawUrl.slice(0, firstQ + 1) + rawUrl.slice(firstQ + 1).replace(/\?/g, '&')
+      : rawUrl;
+  const url = new URL(cleanUrl);
+  const raw: Record<string, unknown> = {};
 
-    let rawOdo =
-      payload.odometer ?? payload.odo ?? payload.mileage ?? payload.mileage_km ?? payload.km;
-    if (typeof rawOdo === 'string' && rawOdo.startsWith('%') && rawOdo.endsWith('%')) {
-      rawOdo = undefined;
-    }
-    let odometer: number | undefined = undefined;
-    if (rawOdo !== undefined && rawOdo !== null) {
-      if (typeof rawOdo === 'string') {
-        const match = rawOdo
-          .replace(/\s+/g, '')
-          .replace(',', '.')
-          .match(/(\d+(?:\.\d+)?)/);
-        if (match && match[1]) rawOdo = match[1];
+  if (req.method === 'POST') {
+    const bodyText = await req.text().catch(() => '');
+    if (bodyText) {
+      try {
+        const parsed = JSON.parse(bodyText) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          Object.assign(raw, parsed);
+        }
+      } catch {
+        if (bodyText.includes('=')) {
+          const sp = new URLSearchParams(bodyText);
+          sp.forEach((v, k) => {
+            raw[k] = v;
+          });
+        }
+        raw.raw_body = bodyText;
+        if (!raw.text) raw.text = bodyText;
       }
-      const num = Number(rawOdo);
-      if (!isNaN(num) && num > 0) {
-        // Если одометр передан в метрах (> 2 000 000 для пробега), переводим в км
-        odometer = num > 2000000 ? Math.round(num / 1000) : Math.round(num);
-      }
+    }
+  }
+
+  url.searchParams.forEach((val, key) => {
+    if (!isUnexpandedMacro(val) || !raw[key]) {
+      raw[key] = val;
+    }
+  });
+
+  try {
+    const rawQuery = decodeURIComponent(url.search.replace(/^\?/, '').trim());
+    if (rawQuery && !rawQuery.includes('=')) {
+      if (!raw.text) raw.text = rawQuery;
+      if (!raw.raw_body) raw.raw_body = rawQuery;
+    }
+  } catch {
+    // ignore malformed percent encoding
+  }
+
+  return WebhookPayloadSchema.parse(raw);
+}
+
+async function processWialonWebhook(req: Request) {
+  try {
+    const payload = await parseIncomingRequest(req);
+    const supabase = createAdminClient() as unknown as SupabaseClient;
+    const organizationId = await resolveOrganizationId(supabase, payload.org);
+
+    const orgCtx = await getOrganizationContext(supabase, organizationId);
+    if (!orgCtx || !orgCtx.isActive || !hasModule(orgCtx.enabledModules, 'transport')) {
+      return NextResponse.json({ error: 'Модуль транспорта отключён' }, { status: 403 });
     }
 
-    // Проверка секретного ключа (если задан в переменных окружения)
-    const expectedSecret = process.env.WIALON_WEBHOOK_SECRET;
-    const providedSecret = payload.secret || payload.token || req.headers.get('x-wialon-secret');
+    const wialon = await getIntegrationConfig<
+      WialonIntegrationCredentials & { webhook_secret?: string }
+    >(supabase, organizationId, 'wialon');
+
+    const expectedSecret =
+      wialon.credentials.webhook_secret ||
+      (organizationId === DEFAULT_ORGANIZATION_ID ? process.env.WIALON_WEBHOOK_SECRET : undefined);
+    const providedSecret =
+      payload.secret || payload.token || req.headers.get('x-wialon-secret') || undefined;
+
     if (expectedSecret && providedSecret !== expectedSecret) {
-      return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 });
+      return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
+    }
+
+    const unitIdStr =
+      payload.unit_id !== undefined && !isUnexpandedMacro(payload.unit_id)
+        ? String(payload.unit_id)
+        : undefined;
+    let unitStr = String(
+      payload.unit ?? payload.unit_name ?? payload.unitName ?? payload.name ?? '',
+    ).trim();
+    if (isUnexpandedMacro(unitStr)) unitStr = '';
+    if (!unitStr && (payload.text || payload.raw_body)) {
+      unitStr = String(payload.text ?? payload.raw_body);
     }
 
     if (!unitStr && !unitIdStr) {
       return NextResponse.json({ error: 'Параметр unit или unit_id обязателен' }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
-    const asset = await findAssetByWialonUnit(supabase, unitStr, unitIdStr);
+    const eventType = classifyWebhookEvent(payload);
+    if (!eventType) {
+      return NextResponse.json({ error: 'Некорректный тип события' }, { status: 400 });
+    }
 
+    const asset = await findOrgAsset(supabase, organizationId, unitStr, unitIdStr);
     if (!asset) {
-      console.warn(
-        `[Wialon Webhook] Автомобиль не найден для unit="${unitStr}", unit_id="${unitIdStr}"`,
-      );
+      logger.warn('Wialon webhook: asset not found', { organizationId, unitStr, unitIdStr });
       return NextResponse.json({ error: 'Объект не найден' }, { status: 404 });
     }
 
-    // Приоритет одометра:
-    // Если Wialon передает реальный абсолютный одометр трекера (например 140xxx км), используем его.
-    // Если передан заниженный/относительный счетчик Wialon (%MILEAGE% = cnm, например 62802 при одометре 140075),
-    // запрашиваем реальный одометр объекта из Wialon API через fetchWialonValdaiPositions.
-    const currentAssetOdo = Number(asset.odometer_current || 0);
-    if (odometer && odometer > 0) {
-      odometer = calibrateWialonOdometer(asset.reg_number || unitStr || '', odometer);
-    }
-    let odoValue = odometer && odometer > 0 ? Math.round(odometer) : currentAssetOdo || 120000;
-
-    if (currentAssetOdo > 0 && odoValue < currentAssetOdo - 1000) {
-      console.warn(
-        `[Wialon Webhook] Получен заниженный одометр ${odoValue} км (меньше текущего ${currentAssetOdo} км). Запрашиваем фактический одометр из Wialon...`,
-      );
-      try {
-        const wialonEnv = getWialonEnv();
-        if (!wialonEnv) {
-          console.warn('[Wialon Webhook] WIALON_TOKEN не настроен, оставляем текущий одометр.');
-          odoValue = currentAssetOdo;
-        } else {
-          const positions = await fetchWialonValdaiPositions(wialonEnv.host, wialonEnv.token);
-          const matchPos = positions.find(
-            (p) =>
-              normalizeRegNumber(p.regNumber) === normalizeRegNumber(asset.reg_number || '') ||
-              p.id === Number(unitIdStr),
-          );
-          if (matchPos && matchPos.odometerKm > 0) {
-            odoValue = Math.max(matchPos.odometerKm, currentAssetOdo);
-          } else {
-            odoValue = currentAssetOdo;
-          }
-        }
-      } catch {
-        odoValue = currentAssetOdo;
-      }
+    if (!wialon.isEnabled || !wialon.credentials.token) {
+      return NextResponse.json({ error: 'Интеграция Wialon не настроена' }, { status: 503 });
     }
 
-    // Проверяем текст уведомления (например "%UNIT% вышел из %ZONE%." или "Выход из геозоны")
-    const fullTextCandidate =
-      `${payload.text || ''} ${payload.notification || ''} ${payload.name || ''}`.toLowerCase();
-    const isExplicitTextExit =
-      fullTextCandidate.includes('вышел') ||
-      fullTextCandidate.includes('выход') ||
-      fullTextCandidate.includes('покинул') ||
-      fullTextCandidate.includes('выезд');
-    const isExplicitTextEnter =
-      fullTextCandidate.includes('вошел') ||
-      fullTextCandidate.includes('вход') ||
-      fullTextCandidate.includes('въезд') ||
-      fullTextCandidate.includes('прибыл');
+    const host =
+      typeof wialon.config.host === 'string' && wialon.config.host
+        ? wialon.config.host
+        : DEFAULT_WIALON_HOST;
 
-    // Определяем событие: выезд (старт) или въезд (финиш)
-    const isDeparture =
-      isExplicitTextExit ||
-      (!isExplicitTextEnter &&
-        (eventCandidate === '2' ||
-          eventCandidate.includes('выход') ||
-          eventCandidate.includes('выезд') ||
-          eventCandidate.includes('покинул') ||
-          eventCandidate.includes('уехал') ||
-          eventCandidate.includes('depart') ||
-          eventCandidate.includes('departure') ||
-          eventCandidate.includes('exit') ||
-          eventCandidate.includes('exited') ||
-          eventCandidate.includes('leave') ||
-          eventCandidate.includes('left') ||
-          eventCandidate.includes('outside') ||
-          eventCandidate === 'out'));
+    const provider = new WialonTelematicsProvider({ host, token: wialon.credentials.token });
+    const targetExternalId = asset.wialon_id || unitIdStr || '';
 
-    const isArrival =
-      isExplicitTextEnter ||
-      (!isExplicitTextExit &&
-        (eventCandidate === '1' ||
-          eventCandidate.includes('вход') ||
-          eventCandidate.includes('въезд') ||
-          eventCandidate.includes('приезд') ||
-          eventCandidate.includes('заезд') ||
-          eventCandidate.includes('вошел') ||
-          eventCandidate.includes('прибыл') ||
-          eventCandidate.includes('arrive') ||
-          eventCandidate.includes('arrival') ||
-          eventCandidate.includes('enter') ||
-          eventCandidate.includes('entered') ||
-          eventCandidate.includes('inside') ||
-          eventCandidate === 'in'));
-
-    console.log(
-      `[Wialon Webhook] Event: "${eventCandidate}" -> ${isDeparture ? 'DEPARTURE' : isArrival ? 'ARRIVAL' : 'UNKNOWN'} | Unit: ${unitStr} (Asset: ${asset.reg_number}, Odo: ${odoValue} km)`,
+    // Получаем фактическую позицию из Wialon (чтобы иметь точные lat/lon и одометр, а не гадать направление)
+    const snapshots = await provider.fetchUnitsSnapshot(
+      targetExternalId ? [targetExternalId] : undefined,
     );
+    let snapshot =
+      snapshots.find((s) => s.externalUnitId === targetExternalId) ??
+      snapshots.find((s) => {
+        const reg = normalizePlate(asset.reg_number);
+        return Boolean(reg && s.plateHint && s.plateHint.includes(reg));
+      }) ??
+      null;
 
-    if (isDeparture) {
-      await handleVehicleDeparture(supabase, {
-        vehicleId: asset.id,
-        odometer: odoValue,
-        timestamp: typeof timeStr === 'string' ? timeStr : new Date().toISOString(),
+    if (!snapshot) {
+      const lat = parseOptionalNumber(payload.lat);
+      const lon = parseOptionalNumber(payload.lon);
+      if (lat === undefined || lon === undefined) {
+        return NextResponse.json(
+          { error: 'Не удалось получить координаты объекта из Wialon' },
+          { status: 502 },
+        );
+      }
+      snapshot = buildWebhookSnapshot({
+        externalUnitId: targetExternalId || asset.id,
+        unitName: unitStr || asset.reg_number,
+        lat,
+        lon,
+        timestampSec: parseWialonTimestampSec(
+          payload.time ?? payload.timestamp ?? payload.pos_time ?? payload.curr_time,
+        ),
+        rawOdometerKm: parseOptionalNumber(
+          payload.odometer ?? payload.odo ?? payload.mileage ?? payload.mileage_km ?? payload.km,
+        ),
       });
-      return NextResponse.json({ success: true });
     }
 
-    if (isArrival) {
-      await handleVehicleArrival(supabase, {
-        vehicleId: asset.id,
-        odometer: odoValue,
-        timestamp: typeof timeStr === 'string' ? timeStr : new Date().toISOString(),
-      });
-      return NextResponse.json({ success: true });
-    }
+    const outcome = await processVehicleSnapshot({
+      supabase,
+      organizationId,
+      orgSettings: orgCtx.settings,
+      asset,
+      provider,
+      snapshot,
+      source: 'webhook',
+      webhookHint: eventType,
+    });
 
-    return NextResponse.json({ error: 'Некорректный тип события' }, { status: 400 });
-  } catch (err: any) {
-    console.error('Ошибка обработки вебхука Wialon:', err);
-    return NextResponse.json({ error: err?.message || 'Внутренняя ошибка' }, { status: 500 });
+    return NextResponse.json({ success: true, eventType, outcome });
+  } catch (err) {
+    logger.error('Wialon webhook processing error', {}, err);
+    const message = err instanceof Error ? err.message : 'Внутренняя ошибка';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function GET(req: Request) {
-  return processWialonEvent(req);
+  return processWialonWebhook(req);
 }
 
 export async function POST(req: Request) {
-  return processWialonEvent(req);
+  return processWialonWebhook(req);
 }
