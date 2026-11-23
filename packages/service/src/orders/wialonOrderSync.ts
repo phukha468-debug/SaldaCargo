@@ -253,37 +253,11 @@ export async function handleVehicleDeparture(
     tripNote = `⚠️ УТОЧНИТЬ ВОДИТЕЛЯ! На автомобиле нет закрепленного водителя.\n${tripNote}`;
   }
 
-  // Парсим номер рейса из номера заявки, если рейс создавался по заранее заведенной заявке
-  const rawOrderNum = targetOrder.base_doc_number || targetOrder.internal_order_number;
-  const cleanNumStr = String(rawOrderNum || '')
-    .replace(/^№\s*/, '')
-    .replace(/^Заявка\s*№?\s*/i, '');
-  const isEpeWithSlash = cleanNumStr.includes('/') || cleanNumStr.includes('\\');
-  const parsedTripNum = !isEpeWithSlash
-    ? parseInt((cleanNumStr.split('/')[0] || '').trim(), 10)
-    : NaN;
-
-  // Определение сквозного номера рейса:
-  // Если рейс по заявке и номер валидный — используем его.
-  // Иначе (выезд без заявки Wialon) — СТРОГО берем max(trip_number) + 1 из сквозного счетчика автопарка (>1050),
-  // чтобы номера всегда шли непрерывной чередой 1056, 1057... и не брали локальный id из таблицы orders!
-  let finalTripNumber: number;
-  if (!isEmergency && !isNaN(parsedTripNum) && parsedTripNum > 0 && parsedTripNum < 100000) {
-    finalTripNumber = parsedTripNum;
-  } else {
-    const { data: maxTrip } = await supabase
-      .from('trips')
-      .select('trip_number')
-      .order('trip_number', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    finalTripNumber = Math.max(1000, Number(maxTrip?.trip_number || 0)) + 1;
-  }
-
+  // Номер рейса (trip_number) выдаётся единым PostgreSQL SEQUENCE (DEFAULT nextval),
+  // чтобы автовыезд и ручные рейсы никогда не создавали дубликаты номеров.
   const tripInsertPayload: Record<string, any> = {
     asset_id: params.vehicleId,
     driver_id: driverId,
-    trip_number: finalTripNumber,
     trip_type: 'intercity',
     status: 'in_progress',
     lifecycle_status: 'draft',

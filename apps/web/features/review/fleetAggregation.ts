@@ -130,6 +130,12 @@ export function computeGarageSummary(
   };
 }
 
+export function isRelevantFleetServiceOrder(so: ReviewServiceOrder): boolean {
+  if (so.machine_type !== 'own' || !so.asset) return false;
+  if (so.lifecycle_status === 'cancelled' || so.lifecycle_status === 'returned') return false;
+  return calcServiceOrder(so).totalCost > 0;
+}
+
 export function aggregateFleetStats({
   listTrips,
   listServiceOrders,
@@ -210,7 +216,7 @@ export function aggregateFleetStats({
 
   if (mode === 'history') {
     for (const so of listServiceOrders) {
-      if (so.machine_type !== 'own' || !so.asset) continue;
+      if (!isRelevantFleetServiceOrder(so) || !so.asset) continue;
       const assetKey = `${so.asset.short_name ?? 'Свой ТС'} (${so.asset.reg_number ?? ''})`;
       const g = getOrCreate(assetKey, so.asset.short_name ?? 'Свой ТС', so.asset.reg_number ?? '');
       g.serviceOrders.push(so);

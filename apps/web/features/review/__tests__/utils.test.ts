@@ -443,4 +443,51 @@ describe('review/fleetAggregation — aggregateFleetStats & computeGarageSummary
     expect(summary.clientNetProfit).toBe(1000);
     expect(summary.ownBilledToCarrier).toBe(1600);
   });
+
+  it('filters out zero-cost, cancelled, and returned service orders from fleet history while keeping real repair expenses', () => {
+    const paidRepair = makeServiceOrder({
+      id: 'so-paid',
+      machine_type: 'own',
+      lifecycle_status: 'approved',
+      asset: { short_name: 'Валдай 6м', reg_number: 'А096МВ196' },
+      parts: [
+        { id: 'p1', custom_part_name: 'Сцепление', quantity: 1, unit_price: '17600', unit: 'шт' },
+      ],
+    });
+    const zeroCostOrder = makeServiceOrder({
+      id: 'so-zero',
+      machine_type: 'own',
+      lifecycle_status: 'approved',
+      asset: { short_name: 'Газель', reg_number: 'Х866КМ66' },
+      mechanic_pay: '0',
+      parts: [],
+    });
+    const cancelledOrder = makeServiceOrder({
+      id: 'so-cancelled',
+      machine_type: 'own',
+      lifecycle_status: 'cancelled',
+      asset: { short_name: 'Газель 2', reg_number: 'В222ВВ96' },
+      mechanic_pay: '5000',
+    });
+    const returnedOrder = makeServiceOrder({
+      id: 'so-returned',
+      machine_type: 'own',
+      lifecycle_status: 'returned',
+      asset: { short_name: 'Газель 3', reg_number: 'С333СС96' },
+      mechanic_pay: '3000',
+    });
+
+    const stats = aggregateFleetStats({
+      listTrips: [],
+      listServiceOrders: [paidRepair, zeroCostOrder, cancelledOrder, returnedOrder],
+      mode: 'history',
+      settlements: [],
+    });
+
+    expect(stats.combinedAssetGroups).toHaveLength(1);
+    expect(stats.combinedAssetGroups[0]?.assetName).toBe('Валдай 6м');
+    expect(stats.combinedAssetGroups[0]?.maintenanceTotal).toBe(17600);
+    expect(stats.combinedAssetGroups[0]?.netProfit).toBe(-17600);
+    expect(stats.totalFleetMaintenance).toBe(17600);
+  });
 });

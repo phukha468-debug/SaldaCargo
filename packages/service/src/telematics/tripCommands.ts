@@ -255,16 +255,8 @@ async function executeOpenTrip(
     existingPayload = emergencyPayload;
   }
 
-  // Генерируем сквозной номер рейса
-  const { data: maxTrip } = await ctx.supabase
-    .from('trips')
-    .select('trip_number')
-    .eq('organization_id', ctx.organizationId)
-    .order('trip_number', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const nextTripNumber = Math.max(1000, Number(maxTrip?.trip_number ?? 0)) + 1;
+  // Номер рейса (trip_number) выдаётся единым PostgreSQL SEQUENCE (DEFAULT nextval),
+  // чтобы автопилот и ручные рейсы никогда не создавали дубликаты номеров.
   const odoStart = cmd.odometerKm > 0 ? cmd.odometerKm : ctx.currentOdometerKm || 0;
   const notePrefix = isDriverUncertain
     ? '⚠️ УТОЧНИТЬ ВОДИТЕЛЯ! На автомобиле нет закреплённого водителя.\n'
@@ -281,7 +273,6 @@ async function executeOpenTrip(
       organization_id: ctx.organizationId,
       asset_id: ctx.assetId,
       driver_id: driverId,
-      trip_number: nextTripNumber,
       trip_type: 'intercity',
       status: 'in_progress',
       lifecycle_status: 'draft',

@@ -14,6 +14,7 @@ import { getWeekDates } from '@/features/review/utils';
 import {
   aggregateFleetStats,
   computeGarageSummary,
+  isRelevantFleetServiceOrder,
   type VehicleAssetGroup,
 } from '@/features/review/fleetAggregation';
 import { DateNav } from '@/features/review/DateNav';
@@ -442,17 +443,17 @@ export default function ReviewPage() {
             : monthTrips
       : trips;
 
-  const listServiceOrders = useMemo(
-    () =>
+  const listServiceOrders = useMemo(() => {
+    const raw =
       mode === 'history'
         ? statsPeriod === 'day'
           ? dayServiceOrders
           : statsPeriod === 'week'
             ? weekServiceOrders
             : monthServiceOrders
-        : [],
-    [mode, statsPeriod, dayServiceOrders, weekServiceOrders, monthServiceOrders],
-  );
+        : [];
+    return raw.filter(isRelevantFleetServiceOrder);
+  }, [mode, statsPeriod, dayServiceOrders, weekServiceOrders, monthServiceOrders]);
 
   const currentPeriodEndIso = useMemo(() => {
     if (mode !== 'history') return undefined;

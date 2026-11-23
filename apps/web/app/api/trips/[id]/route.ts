@@ -51,7 +51,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (isUuid) {
       query = query.eq('id', id);
     } else if (cleanNum) {
-      query = query.eq('trip_number', parseInt(cleanNum, 10));
+      // Защита от падения maybeSingle() на исторических дубликатах trip_number (#1016-#1060)
+      query = query
+        .eq('trip_number', parseInt(cleanNum, 10))
+        .order('created_at', { ascending: false })
+        .limit(1);
     } else {
       query = query.eq('id', id);
     }
