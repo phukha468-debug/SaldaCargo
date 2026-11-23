@@ -5,6 +5,7 @@ import {
   DEFAULT_ORGANIZATION_ID,
   SESSION_COOKIE_MINIAPP,
   signSessionToken,
+  encryptPin,
   hashPin,
   verifyPin,
   checkRateLimit,
@@ -96,10 +97,12 @@ export async function POST(request: Request) {
     }
 
     const hashed = hashPin(cleanPin);
+    const encrypted = encryptPin(cleanPin);
     const { error: updateError } = await supabase
       .from('users')
       .update({
         pin_code: hashed,
+        pin_encrypted: encrypted,
         updated_at: new Date().toISOString(),
       })
       .eq('id', user_id);

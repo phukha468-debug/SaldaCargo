@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireSession } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import {
   isNoCashCounterparty,
@@ -13,6 +14,9 @@ import {
 
 /** POST /api/trips/:id/orders — добавить заказ */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   const { id: tripId } = await params;
   const body = (await request.json()) as {
     direction?: string;
@@ -86,6 +90,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { data, error } = await ((supabase.from('trip_orders') as any)
     .insert({
+      organization_id: auth.organizationId,
       trip_id: tripId,
       direction: body.direction || 'local',
       is_driver_loader: Boolean(body.is_driver_loader),

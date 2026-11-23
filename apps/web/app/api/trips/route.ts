@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireAuth } from '@/lib/auth';
 import { isInternalCounterparty, validateTripOdometer } from '@saldacargo/shared';
 import { NextResponse } from 'next/server';
 
@@ -119,6 +120,10 @@ export async function GET(request: Request) {
 
 /** POST /api/trips — ручной ввод рейса (ретро) */
 export async function POST(request: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const organizationId = auth.organizationId;
+
   const body = (await request.json()) as {
     driver_id: string;
     asset_id: string;
@@ -187,6 +192,7 @@ export async function POST(request: Request) {
   const { data: trip, error: tripError } = await supabase
     .from('trips')
     .insert({
+      organization_id: organizationId,
       driver_id: body.driver_id,
       asset_id: body.asset_id,
       loader_id: body.loader_id || null,
@@ -225,6 +231,7 @@ export async function POST(request: Request) {
         o.counterparty_id ? cpMap.get(o.counterparty_id) : undefined,
       );
       return {
+        organization_id: organizationId,
         trip_id: trip.id,
         amount: isInternal ? '0.00' : o.amount,
         driver_pay: o.driver_pay,
@@ -252,6 +259,7 @@ export async function POST(request: Request) {
   if (body.expenses && body.expenses.length > 0) {
     const defaultFuelCat = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
     const expensesToInsert = body.expenses.map((e) => ({
+      organization_id: organizationId,
       trip_id: trip.id,
       amount: e.amount,
       payment_method: e.payment_method || 'fuel_card',

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireSession } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import {
   isGeostroyCounterparty,
@@ -12,6 +13,9 @@ import {
 
 /** POST /api/trips/:id/finish — завершить рейс */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await params;
   const body = (await request.json()) as {
     odometer_end?: number | string;
@@ -32,7 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // 1. Получаем рейс и данные автомобиля
   const { data: trip, error: tripErr } = await (supabase.from('trips') as any)
     .select(
-      'id, driver_id, trip_number, asset_id, odometer_start, status, trip_type, asset:assets(id, short_name, reg_number, odometer_current, asset_type:asset_types(code))',
+      'id, organization_id, driver_id, trip_number, asset_id, odometer_start, status, trip_type, asset:assets(id, short_name, reg_number, odometer_current, asset_type:asset_types(code))',
     )
     .eq('id', id)
     .maybeSingle();
@@ -40,6 +44,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (tripErr || !trip) {
     return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
   }
+
+  const organizationId = trip.organization_id || auth.organizationId;
 
   if (trip.status === 'completed') {
     return NextResponse.json(trip);
@@ -141,6 +147,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .maybeSingle();
 
     await (supabase.from('transactions') as any).insert({
+      organization_id: organizationId,
       direction: 'transfer',
       amount: carryAmt.toFixed(2),
       category_id: CASH_COLLECT_CAT,
@@ -226,6 +233,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           .eq('id', existingCubeExp.id);
       } else {
         await (supabase.from('trip_expenses') as any).insert({
+          organization_id: organizationId,
           trip_id: id,
           category_id: fuelCatId,
           amount: amount.toFixed(2),

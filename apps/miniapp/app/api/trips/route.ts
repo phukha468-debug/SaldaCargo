@@ -1,16 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireSession } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 /** POST /api/trips — создать рейс */
 export async function POST(request: Request) {
   try {
-    const userId = await getVerifiedMiniappUserId();
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (auth instanceof NextResponse) return auth;
+    const { userId, organizationId } = auth;
 
     const body = (await request.json()) as {
       asset_id: string;
@@ -73,6 +71,7 @@ export async function POST(request: Request) {
 
     const { data, error } = await ((supabase.from('trips') as any)
       .insert({
+        organization_id: organizationId,
         driver_id: userId,
         asset_id: body.asset_id,
         loaders_count: body.loaders_count ?? 0,

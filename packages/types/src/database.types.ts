@@ -2496,6 +2496,7 @@ export type Database = {
           notes: string | null;
           phone: string | null;
           pin_code: string | null;
+          pin_encrypted: string | null;
           roles: Database['public']['Enums']['user_role'][];
           updated_at: string | null;
         };
@@ -2511,6 +2512,7 @@ export type Database = {
           notes?: string | null;
           phone?: string | null;
           pin_code?: string | null;
+          pin_encrypted?: string | null;
           roles?: Database['public']['Enums']['user_role'][];
           updated_at?: string | null;
         };
@@ -2526,6 +2528,7 @@ export type Database = {
           notes?: string | null;
           phone?: string | null;
           pin_code?: string | null;
+          pin_encrypted?: string | null;
           roles?: Database['public']['Enums']['user_role'][];
           updated_at?: string | null;
         };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hashPin, isHashedPin, verifyPin } from '../pin';
+import { decryptPin, encryptPin, hashPin, isHashedPin, verifyPin } from '../pin';
 
 describe('pin (scrypt + legacy compatibility)', () => {
   it('hashes PIN with random salt and verifies it without rehash', () => {
@@ -37,5 +37,23 @@ describe('pin (scrypt + legacy compatibility)', () => {
       valid: false,
       needsRehash: false,
     });
+  });
+
+  it('encrypts and decrypts PIN with AES-256-GCM for admin reveal', () => {
+    const masterKey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    const otherKey = 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
+
+    const enc1 = encryptPin(' 4829 ', masterKey);
+    const enc2 = encryptPin('4829', masterKey);
+
+    expect(enc1).toMatch(/^v1:/);
+    expect(enc1).not.toContain('4829');
+    expect(enc1).not.toBe(enc2);
+
+    expect(decryptPin(enc1, masterKey)).toBe('4829');
+    expect(decryptPin(enc1, otherKey)).toBeNull();
+    expect(decryptPin(null, masterKey)).toBeNull();
+    expect(decryptPin('corrupted', masterKey)).toBeNull();
+    expect(encryptPin('   ', masterKey)).toBeNull();
   });
 });

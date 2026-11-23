@@ -35,7 +35,37 @@ export function PayrollRow({
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
   const deactivateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showPassportModal, setShowPassportModal] = useState(false);
+  const [revealedPin, setRevealedPin] = useState<string | null>(null);
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinHint, setPinHint] = useState<string | null>(null);
   const { noteText, passport } = parseUserNotesAndPassport(user);
+
+  const handleTogglePin = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (revealedPin) {
+      setRevealedPin(null);
+      return;
+    }
+    setPinLoading(true);
+    setPinHint(null);
+    try {
+      const res = await fetch(`/api/users/${user.id}/pin`);
+      const data = (await res.json()) as { pin?: string | null; reason?: string; error?: string };
+      if (!res.ok) {
+        setPinHint(data.error || 'Ошибка загрузки PIN');
+      } else if (data.pin) {
+        setRevealedPin(data.pin);
+      } else if (data.reason === 'hashed_only') {
+        setPinHint('Старый хеш — появится после входа или смены PIN');
+      } else {
+        setPinHint('PIN не установлен');
+      }
+    } catch {
+      setPinHint('Ошибка сети');
+    } finally {
+      setPinLoading(false);
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -321,10 +351,32 @@ export function PayrollRow({
             <span className="text-xs text-rose-400 font-medium">MAX не привязан</span>
           )}
           {user.pin_code ? (
-            <span className="text-xs bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-mono font-bold inline-flex items-center gap-1">
-              {user.pin_code.startsWith('scrypt:')
-                ? '🔒 PIN установлен'
-                : `🔒 PIN: ${user.pin_code}`}
+            <span className="text-xs bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-mono font-bold inline-flex items-center gap-1.5">
+              {user.pin_code.startsWith('scrypt:') ? (
+                <>
+                  <span>{revealedPin ? `🔒 PIN: ${revealedPin}` : '🔒 PIN установлен'}</span>
+                  <button
+                    type="button"
+                    disabled={pinLoading}
+                    onClick={handleTogglePin}
+                    className="text-[11px] font-sans font-semibold text-amber-800 hover:text-amber-950 underline decoration-dotted cursor-pointer disabled:opacity-50"
+                    title={
+                      revealedPin
+                        ? 'Скрыть PIN-код'
+                        : 'Показать PIN-код (только для администратора)'
+                    }
+                  >
+                    {pinLoading ? '...' : revealedPin ? '🙈' : '👁 Показать'}
+                  </button>
+                  {pinHint && (
+                    <span className="text-[10px] font-sans font-normal text-amber-800/90">
+                      ({pinHint})
+                    </span>
+                  )}
+                </>
+              ) : (
+                `🔒 PIN: ${user.pin_code}`
+              )}
             </span>
           ) : (
             <span className="text-xs bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded-md font-medium inline-flex items-center gap-1">

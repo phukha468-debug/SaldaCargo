@@ -1,9 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireSession } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 /** POST /api/trips/:id/expenses — добавить расход */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireSession();
+  if (auth instanceof NextResponse) return auth;
+
   const { id: tripId } = await params;
   const body = (await request.json()) as {
     category_id: string;
@@ -39,6 +43,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { data, error } = await ((supabase.from('trip_expenses') as any)
     .insert({
+      organization_id: auth.organizationId,
       trip_id: tripId,
       category_id: body.category_id,
       amount: body.amount,

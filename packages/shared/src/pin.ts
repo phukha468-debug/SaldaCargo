@@ -1,7 +1,53 @@
 import * as crypto from 'crypto';
+import { encryptSecret, decryptSecret } from './crypto';
+import { getSessionSecret, getEncryptionMasterKey } from './env';
 
 const SCRYPT_PREFIX = 'scrypt:';
 const KEY_LENGTH = 32;
+
+function resolvePinEncryptionKeys(masterKeyOverride?: string): string[] {
+  if (masterKeyOverride && masterKeyOverride.trim().length >= 32) {
+    return [masterKeyOverride.trim()];
+  }
+  const keys: string[] = [];
+  const encKey = getEncryptionMasterKey();
+  if (encKey) keys.push(encKey);
+  const authKey = getSessionSecret();
+  if (authKey && !keys.includes(authKey)) keys.push(authKey);
+  return keys;
+}
+
+/**
+ * Шифрует PIN-код алгоритмом AES-256-GCM для возможности просмотра администратором.
+ * Если мастер-ключ шифрования не настроен в окружении — возвращает null (не ломает сохранение scrypt-хеша).
+ */
+export function encryptPin(pin: string, masterKeyOverride?: string): string | null {
+  const cleanPin = String(pin).trim();
+  if (!cleanPin) return null;
+  const [primaryKey] = resolvePinEncryptionKeys(masterKeyOverride);
+  if (!primaryKey) return null;
+  return encryptSecret(cleanPin, primaryKey);
+}
+
+/**
+ * Расшифровывает PIN-код, зашифрованный через `encryptPin`.
+ * Возвращает null при отсутствии значения, неверном формате или ключе.
+ */
+export function decryptPin(
+  encrypted: string | null | undefined,
+  masterKeyOverride?: string,
+): string | null {
+  if (!encrypted || typeof encrypted !== 'string') return null;
+  const keys = resolvePinEncryptionKeys(masterKeyOverride);
+  for (const key of keys) {
+    try {
+      return decryptSecret(encrypted, key);
+    } catch {
+      // Пробуем следующий доступный ключ (например, fallback при ротации)
+    }
+  }
+  return null;
+}
 
 export function isHashedPin(stored: string | null | undefined): boolean {
   return typeof stored === 'string' && stored.startsWith(SCRYPT_PREFIX);

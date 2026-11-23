@@ -5,6 +5,7 @@ import {
   DEFAULT_ORGANIZATION_ID,
   SESSION_COOKIE_MINIAPP,
   signSessionToken,
+  encryptPin,
   hashPin,
   verifyPin,
   checkRateLimit,
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, name, roles, pin_code, is_active, default_organization_id')
+      .select('id, name, roles, pin_code, pin_encrypted, is_active, default_organization_id')
       .eq('id', user_id)
       .maybeSingle();
 
@@ -71,15 +72,21 @@ export async function POST(request: Request) {
       ttlSeconds: 60 * 60 * 24 * 30, // 30 дней
     });
 
-    // Прозрачная миграция legacy plaintext PIN на scrypt-хэш после успешного подписания сессии
-    if (pinCheck.needsRehash) {
-      await supabase
-        .from('users')
-        .update({
-          pin_code: hashPin(String(pin)),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+    // Прозрачная миграция legacy plaintext PIN на scrypt-хэш и сохранение зашифрованной копии для админа
+    if (pinCheck.needsRehash || !user.pin_encrypted) {
+      const pinPatch: Record<string, string | null> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (pinCheck.needsRehash) {
+        pinPatch.pin_code = hashPin(String(pin));
+      }
+      if (!user.pin_encrypted) {
+        const encrypted = encryptPin(String(pin));
+        if (encrypted) pinPatch.pin_encrypted = encrypted;
+      }
+      if (pinPatch.pin_code || pinPatch.pin_encrypted) {
+        await supabase.from('users').update(pinPatch).eq('id', user.id);
+      }
     }
 
     const cookieStore = await cookies();

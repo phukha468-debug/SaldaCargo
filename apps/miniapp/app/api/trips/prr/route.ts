@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireSession } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import { calculateOrderPayroll } from '@saldacargo/domain-payroll';
 import {
@@ -21,7 +21,10 @@ import { syncTripFinancials } from '@/lib/tripFinancials';
  */
 export async function POST(request: Request) {
   try {
-    const currentUserId = await getVerifiedMiniappUserId();
+    const auth = await requireSession();
+    if (auth instanceof NextResponse) return auth;
+    const currentUserId = auth.userId;
+    const organizationId = auth.organizationId;
 
     const body = (await request.json()) as {
       counterparty_id?: string;
@@ -104,6 +107,7 @@ export async function POST(request: Request) {
     let { data: asset } = await (supabase
       .from('assets')
       .select('id')
+      .eq('organization_id', organizationId)
       .eq('reg_number', 'БЕЗ АВТО')
       .maybeSingle() as any);
 
@@ -111,6 +115,7 @@ export async function POST(request: Request) {
       const { data: createdAsset, error: assetErr } = await (supabase
         .from('assets')
         .insert({
+          organization_id: organizationId,
           reg_number: 'БЕЗ АВТО',
           short_name: 'Без авто (ПРР)',
           year: 2026,
@@ -175,6 +180,7 @@ export async function POST(request: Request) {
     const { data: newTrip, error: tripError } = await (supabase
       .from('trips')
       .insert({
+        organization_id: organizationId,
         driver_id: effectiveUserId,
         asset_id: asset.id,
         loaders_count: loaders.length,
@@ -209,6 +215,7 @@ export async function POST(request: Request) {
     const { data: newOrder, error: orderError } = await (supabase
       .from('trip_orders')
       .insert({
+        organization_id: organizationId,
         trip_id: newTrip.id,
         direction: 'loaders_only',
         is_driver_loader: isDriverLoader,
