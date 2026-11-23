@@ -98,11 +98,7 @@ BEGIN
   FOREACH tbl IN ARRAY domain_tables LOOP
     IF to_regclass('public.' || tbl) IS NOT NULL THEN
       EXECUTE format(
-        'ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES public.organizations(id) ON DELETE RESTRICT',
-        tbl
-      );
-      EXECUTE format(
-        'UPDATE public.%I SET organization_id = %L WHERE organization_id IS NULL',
+        'ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS organization_id UUID NOT NULL DEFAULT %L REFERENCES public.organizations(id) ON DELETE RESTRICT',
         tbl, default_org
       );
       EXECUTE format(
@@ -161,12 +157,17 @@ BEGIN
   CREATE UNIQUE INDEX IF NOT EXISTS uq_transaction_categories_org_code
     ON public.transaction_categories (organization_id, code);
 
-  -- fault_catalog.code -> (organization_id, code)
-  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fault_catalog_code_key') THEN
-    ALTER TABLE public.fault_catalog DROP CONSTRAINT fault_catalog_code_key;
+  -- fault_catalog.code -> (organization_id, code) (если колонка code присутствует)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'fault_catalog' AND column_name = 'code'
+  ) THEN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fault_catalog_code_key') THEN
+      ALTER TABLE public.fault_catalog DROP CONSTRAINT fault_catalog_code_key;
+    END IF;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_fault_catalog_org_code
+      ON public.fault_catalog (organization_id, code);
   END IF;
-  CREATE UNIQUE INDEX IF NOT EXISTS uq_fault_catalog_org_code
-    ON public.fault_catalog (organization_id, code);
 
   -- daily_finance_audits.date -> (organization_id, date)
   IF to_regclass('public.daily_finance_audits') IS NOT NULL THEN
