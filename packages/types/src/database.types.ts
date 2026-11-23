@@ -172,6 +172,159 @@ export type Database = {
         };
         Relationships: [];
       };
+      vehicle_telematics_state: {
+        Row: {
+          id: string;
+          organization_id: string;
+          asset_id: string;
+          provider: string;
+          external_unit_id: string | null;
+          state: string;
+          base_confirm_since: string | null;
+          depart_confirm_count: number;
+          transit_entered_at: string | null;
+          last_msg_ts: number;
+          last_lat: number | null;
+          last_lon: number | null;
+          last_speed: number | null;
+          last_odometer_km: number | null;
+          pending_stop_json: Json | null;
+          locked_until: string | null;
+          locked_by: string | null;
+          updated_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          asset_id: string;
+          provider?: string;
+          external_unit_id?: string | null;
+          state?: string;
+          base_confirm_since?: string | null;
+          depart_confirm_count?: number;
+          transit_entered_at?: string | null;
+          last_msg_ts?: number;
+          last_lat?: number | null;
+          last_lon?: number | null;
+          last_speed?: number | null;
+          last_odometer_km?: number | null;
+          pending_stop_json?: Json | null;
+          locked_until?: string | null;
+          locked_by?: string | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          asset_id?: string;
+          provider?: string;
+          external_unit_id?: string | null;
+          state?: string;
+          base_confirm_since?: string | null;
+          depart_confirm_count?: number;
+          transit_entered_at?: string | null;
+          last_msg_ts?: number;
+          last_lat?: number | null;
+          last_lon?: number | null;
+          last_speed?: number | null;
+          last_odometer_km?: number | null;
+          pending_stop_json?: Json | null;
+          locked_until?: string | null;
+          locked_by?: string | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      telematics_events: {
+        Row: {
+          id: string;
+          organization_id: string;
+          asset_id: string;
+          order_id: string | null;
+          trip_id: string | null;
+          source: string;
+          decision: string;
+          reason_code: string;
+          reason_text: string;
+          state_before: string | null;
+          state_after: string | null;
+          telemetry_snapshot: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          asset_id: string;
+          order_id?: string | null;
+          trip_id?: string | null;
+          source?: string;
+          decision: string;
+          reason_code: string;
+          reason_text: string;
+          state_before?: string | null;
+          state_after?: string | null;
+          telemetry_snapshot?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          asset_id?: string;
+          order_id?: string | null;
+          trip_id?: string | null;
+          source?: string;
+          decision?: string;
+          reason_code?: string;
+          reason_text?: string;
+          state_before?: string | null;
+          state_after?: string | null;
+          telemetry_snapshot?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      telematics_geocode_cache: {
+        Row: {
+          id: string;
+          organization_id: string;
+          lat_grid: number;
+          lon_grid: number;
+          city: string;
+          raw_address: string;
+          name: string;
+          is_service_stop: boolean;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          lat_grid: number;
+          lon_grid: number;
+          city: string;
+          raw_address: string;
+          name: string;
+          is_service_stop?: boolean;
+          expires_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          lat_grid?: number;
+          lon_grid?: number;
+          city?: string;
+          raw_address?: string;
+          name?: string;
+          is_service_stop?: boolean;
+          expires_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       assets: {
         Row: {
           asset_type_id: string;
@@ -186,6 +339,7 @@ export type Database = {
           needs_update: boolean | null;
           notes: string | null;
           odometer_current: number;
+          odometer_offset_km: number;
           opti24_card_number: string | null;
           reg_number: string;
           remaining_depreciation_months: number | null;
@@ -209,6 +363,7 @@ export type Database = {
           needs_update?: boolean | null;
           notes?: string | null;
           odometer_current?: number;
+          odometer_offset_km?: number;
           opti24_card_number?: string | null;
           reg_number: string;
           remaining_depreciation_months?: number | null;
@@ -232,6 +387,7 @@ export type Database = {
           needs_update?: boolean | null;
           notes?: string | null;
           odometer_current?: number;
+          odometer_offset_km?: number;
           opti24_card_number?: string | null;
           reg_number?: string;
           remaining_depreciation_months?: number | null;

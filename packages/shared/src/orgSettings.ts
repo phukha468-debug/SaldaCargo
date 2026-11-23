@@ -94,12 +94,97 @@ export const OrganizationFleetRulesSchema = z
   })
   .default({});
 
+export const TelematicsBaseGeofenceSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).default('База'),
+    lat: z.number().min(-90).max(90).default(58.053),
+    lon: z.number().min(-180).max(180).default(60.552),
+    radius_m: z.number().min(200).max(50000).default(5000),
+    departure_hysteresis_m: z.number().min(100).max(15000).default(1500),
+  })
+  .default({});
+
+export const TelematicsThresholdsSchema = z
+  .object({
+    min_moving_speed_kmh: z.number().min(1).max(60).default(10),
+    stop_max_speed_kmh: z.number().min(0).max(20).default(5),
+    stop_cluster_radius_m: z.number().min(50).max(2000).default(250),
+    stop_min_duration_known_min: z.number().min(3).max(240).default(15),
+    stop_min_duration_unknown_min: z.number().min(5).max(240).default(25),
+    arrival_confirm_min: z.number().min(1).max(60).default(5),
+    min_trip_distance_km: z.number().min(1).max(200).default(10),
+    max_gps_age_min: z.number().min(5).max(1440).default(30),
+    noise_speed_spike_limit: z.number().int().min(0).max(10).default(2),
+  })
+  .default({});
+
+export const TelematicsKnownGeofenceSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  name: z.string().trim().min(1).max(120),
+  city: z.string().trim().min(1).max(120),
+  raw_address: z.string().trim().min(1).max(240),
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+  radius_m: z.number().min(100).max(50000),
+  role: z.enum(['loading', 'unloading', 'any']).default('any'),
+});
+
+export const TelematicsRoutePresetSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  trigger_geofence_id: z.string().trim().min(1).max(64),
+  client_id: optionalUuidSchema,
+  base_doc_name: z.string().trim().max(160).optional(),
+  cargo_name: z.string().trim().max(160).optional(),
+  price_without_vat: z.number().min(0).optional(),
+  default_loading_city: z.string().trim().max(120).optional(),
+  default_loading_raw: z.string().trim().max(240).optional(),
+  default_unloading_city: z.string().trim().max(120).optional(),
+  default_unloading_raw: z.string().trim().max(240).optional(),
+  min_return_distance_km: z.number().min(0).optional(),
+  fallback_distance_km: z.number().min(0).optional(),
+});
+
+export const TelematicsTransitRulesSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    east_departure_lon_threshold: z.number().min(-180).max(180).optional(),
+    west_exit_lon_threshold: z.number().min(-180).max(180).optional(),
+    max_transit_hours: z.number().min(1).max(168).default(36),
+  })
+  .default({});
+
+export const TelematicsTariffsSchema = z
+  .object({
+    fuel_rate_per_100km: z.number().positive().max(100).default(18),
+    driver_pay_per_km: z.number().min(0).max(500).default(10),
+    driver_per_diem: z.number().min(0).max(50000).default(1000),
+    min_km_for_per_diem: z.number().min(0).max(2000).default(100),
+  })
+  .default({});
+
+export const OrganizationTelematicsSettingsSchema = z
+  .object({
+    autopilot_enabled: z.boolean().default(false),
+    base_geofence: TelematicsBaseGeofenceSchema,
+    thresholds: TelematicsThresholdsSchema,
+    known_geofences: z.array(TelematicsKnownGeofenceSchema).max(100).default([]),
+    route_presets: z.array(TelematicsRoutePresetSchema).max(50).default([]),
+    transit_rules: TelematicsTransitRulesSchema,
+    tariffs: TelematicsTariffsSchema,
+  })
+  .default({});
+
+export type TelematicsKnownGeofence = z.infer<typeof TelematicsKnownGeofenceSchema>;
+export type TelematicsRoutePreset = z.infer<typeof TelematicsRoutePresetSchema>;
+export type OrganizationTelematicsSettings = z.infer<typeof OrganizationTelematicsSettingsSchema>;
+
 export const OrganizationSettingsSchema = z
   .object({
     branding: OrganizationBrandingSettingsSchema,
     finance: OrganizationFinanceSettingsSchema,
     counterparty_rules: OrganizationCounterpartyRulesSchema,
     fleet_rules: OrganizationFleetRulesSchema,
+    telematics: OrganizationTelematicsSettingsSchema,
   })
   .default({});
 
@@ -137,6 +222,9 @@ export function parseOrganizationSettings(raw: unknown): OrganizationSettings {
     fleet_rules: OrganizationFleetRulesSchema.safeParse(obj.fleet_rules).success
       ? OrganizationFleetRulesSchema.parse(obj.fleet_rules)
       : DEFAULT_ORGANIZATION_SETTINGS.fleet_rules,
+    telematics: OrganizationTelematicsSettingsSchema.safeParse(obj.telematics).success
+      ? OrganizationTelematicsSettingsSchema.parse(obj.telematics)
+      : DEFAULT_ORGANIZATION_SETTINGS.telematics,
   };
 }
 
