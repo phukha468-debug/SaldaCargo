@@ -1781,9 +1781,9 @@ export function generateWaybill4cHtml(data: WaybillData, options?: { isEmpty?: b
 
       const fields = tpl.fields || tpl;
 
-      // Применяем все поля шаблона, кроме уникальных реквизитов документа (№ и дата)
+      // Применяем все поля шаблона, кроме даты документа (день, месяц, год)
       Object.keys(fields).forEach(field => {
-        if (field === 'docNumber' || field === 'docDay' || field === 'docMonth' || field === 'docYear') return;
+        if (field === 'docDay' || field === 'docMonth' || field === 'docYear') return;
         const el = document.querySelector('[data-field=\"' + field + '\"]');
         if (el) {
           el.innerText = fields[field] || '';
