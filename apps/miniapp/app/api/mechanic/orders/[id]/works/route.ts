@@ -50,6 +50,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!isNaN(d.getTime())) workDateIso = d.toISOString();
   }
 
+  const quantity = Math.max(1, Math.round(Number(body.quantity ?? 1) || 1));
+
   const { data, error } = await (supabase.from('service_order_works') as any)
     .insert({
       organization_id: organizationId,
@@ -62,7 +64,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       norm_minutes: minutes,
       actual_minutes: minutes,
       price_client: priceClient,
-      quantity: 1,
+      quantity,
       status: markCompleted ? 'completed' : 'pending',
       mechanic_id: body.mechanic_id || userId,
       second_mechanic_id: body.second_mechanic_id || null,

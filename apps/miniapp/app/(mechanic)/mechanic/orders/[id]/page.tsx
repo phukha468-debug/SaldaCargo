@@ -5,15 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Money, cn } from '@saldacargo/ui';
-import {
-  formatDate,
-  isOilOrFilterWork,
-  GARAGE_WORK_CATEGORIES,
-  GARAGE_WORK_ACTIONS,
-  GARAGE_WORK_POSITIONS,
-  POPULAR_GARAGE_COMPONENTS,
-  buildStandardWorkName,
-} from '@saldacargo/shared';
+import { formatDate, isOilOrFilterWork } from '@saldacargo/shared';
+import MechanicWorkConstructorForm, {
+  type MechanicWorkPayload,
+} from '../../MechanicWorkConstructorForm';
 
 interface WorkItem {
   id: string;
@@ -26,6 +21,7 @@ interface WorkItem {
   norm_minutes: number;
   actual_minutes: number;
   price_client?: string;
+  quantity?: number;
   mechanic_id?: string;
   second_mechanic_id?: string;
 }
@@ -71,19 +67,6 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [workNameInput, setWorkNameInput] = useState('');
-  const [workCategoryInput, setWorkCategoryInput] = useState<string>(GARAGE_WORK_CATEGORIES[0]);
-  const [workActionInput, setWorkActionInput] = useState<string>(GARAGE_WORK_ACTIONS[0]);
-  const [workComponentInput, setWorkComponentInput] = useState<string>('');
-  const [workPositionInput, setWorkPositionInput] = useState<string>('');
-  const [workDateInput, setWorkDateInput] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10),
-  );
-  const [secondMechanicId, setSecondMechanicId] = useState<string>('');
-  const [workPerformerInput, setWorkPerformerInput] = useState<'both' | 'primary' | 'second'>(
-    'both',
-  );
-
   const [partsProvided, setPartsProvided] = useState<boolean | null>(null);
   const [partNameInput, setPartNameInput] = useState('');
   const [partQtyInput, setPartQtyInput] = useState('1');
@@ -107,8 +90,6 @@ export default function OrderDetailPage() {
     staleTime: 60000,
   });
 
-  const otherMechanics = allMechanics.filter((m) => m.id !== me?.id);
-
   const { data: order, isLoading } = useQuery<OrderDetail>({
     queryKey: ['order-detail', id],
     queryFn: async () => {
@@ -120,30 +101,25 @@ export default function OrderDetailPage() {
   });
 
   const addWorkMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload: MechanicWorkPayload) => {
       setActionError('');
-      const cleanName = workNameInput.trim();
+      const cleanName = payload.custom_work_name.trim();
       if (!cleanName) throw new Error('Введите наименование работы');
-
-      const wMechId =
-        workPerformerInput === 'second' && secondMechanicId
-          ? secondMechanicId
-          : me?.id || undefined;
-      const wSecondId = workPerformerInput === 'both' && secondMechanicId ? secondMechanicId : null;
 
       const res = await fetch(`/api/mechanic/orders/${id}/works`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           custom_work_name: cleanName,
-          category: workCategoryInput,
-          work_date: workDateInput,
+          category: payload.category,
+          work_date: payload.work_date,
+          quantity: payload.quantity,
           minutes: 0,
           norm_minutes: 0,
           actual_minutes: 0,
           completed: true,
-          mechanic_id: wMechId,
-          second_mechanic_id: wSecondId,
+          mechanic_id: payload.mechanic_id || me?.id || undefined,
+          second_mechanic_id: payload.second_mechanic_id || null,
         }),
       });
       const data = await res.json();
@@ -151,9 +127,6 @@ export default function OrderDetailPage() {
       return data;
     },
     onSuccess: () => {
-      setWorkNameInput('');
-      setWorkComponentInput('');
-      setWorkPositionInput('');
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['mechanic-works-history'] });
       queryClient.invalidateQueries({ queryKey: ['mechanic-salary'] });
@@ -409,40 +382,45 @@ export default function OrderDetailPage() {
                 w.custom_work_description || w.notes?.match(/\[category:([^\]]+)\]/)?.[1] || null;
               const dateFormatted = w.created_at ? formatDate(w.created_at) : null;
               const mins = w.actual_minutes || w.norm_minutes || 0;
-              const workPay = calcWorkPay(mins);
+              const qty = Math.max(1, Number(w.quantity ?? 1));
+              const workPay = calcWorkPay(mins * qty);
               return (
                 <div
                   key={w.id}
-                  className="bg-[#F8FAFC] border border-slate-200/80 rounded-2xl p-3.5 flex items-start justify-between gap-2"
+                  className="bg-[#F8FAFC] border border-slate-200/80 rounded-2xl p-3 flex items-center justify-between gap-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                      {dateFormatted && (
-                        <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded leading-none">
-                          📅 {dateFormatted}
-                        </span>
-                      )}
-                      {category && (
-                        <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100/90 px-1.5 py-0.5 rounded leading-none">
-                          ⚙️ {category}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <p className="text-xs font-extrabold text-slate-900 truncate">
+                        {idx + 1}. {name}
+                      </p>
+                      {qty > 1 && (
+                        <span className="text-[10px] font-extrabold text-slate-700 bg-slate-200/80 px-1.5 py-0.5 rounded shrink-0">
+                          ×{qty}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-extrabold text-slate-900">
-                      {idx + 1}. {name}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-xs font-bold text-slate-500">⏱ Время: {mins} мин</span>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px]">
+                      {dateFormatted && (
+                        <span className="font-bold text-slate-500">📅 {dateFormatted}</span>
+                      )}
+                      {category && (
+                        <span className="font-extrabold text-blue-700 bg-blue-100/90 px-1.5 py-0.5 rounded leading-none">
+                          {category}
+                        </span>
+                      )}
                       {w.mechanic_id && (
-                        <span className="text-[10px] font-extrabold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                        <span className="font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded leading-none">
                           👤 {allMechanics.find((m) => m.id === w.mechanic_id)?.name || 'Механик'}
                           {w.second_mechanic_id &&
                             ` + ${allMechanics.find((m) => m.id === w.second_mechanic_id)?.name || 'Напарник'}`}
                         </span>
                       )}
-                      <span className="text-xs font-extrabold text-[#21A038] bg-[#E8F7EC] px-2 py-0.5 rounded-md">
-                        +{workPay.toLocaleString('ru-RU')} ₽ в ЗП
-                      </span>
+                      {mins > 0 && (
+                        <span className="font-extrabold text-[#21A038] bg-[#E8F7EC] px-1.5 py-0.5 rounded leading-none">
+                          {mins} мин • +{workPay.toLocaleString('ru-RU')} ₽
+                        </span>
+                      )}
                     </div>
                   </div>
                   {isEditable && (
@@ -461,211 +439,16 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* Форма добавления работы (Правило 3-х слов) */}
+        {/* Форма добавления работы (Вариант 1 — компактная карточка-конструктор) */}
         {isEditable && (
-          <div className="bg-[#F2F4F7] rounded-2xl p-3.5 space-y-2.5 border border-slate-200/70">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                  📅 Дата работы
-                </label>
-                <input
-                  type="date"
-                  value={workDateInput}
-                  onChange={(e) => setWorkDateInput(e.target.value)}
-                  className="w-full h-10 px-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                  ⚙️ Узел / Категория
-                </label>
-                <select
-                  value={workCategoryInput}
-                  onChange={(e) => setWorkCategoryInput(e.target.value)}
-                  className="w-full h-10 px-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
-                >
-                  {GARAGE_WORK_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Конструктор 3-х слов: Действие + Сторона */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                  1. Действие *
-                </label>
-                <select
-                  value={workActionInput}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setWorkActionInput(val);
-                    setWorkNameInput(
-                      buildStandardWorkName(val, workComponentInput, workPositionInput),
-                    );
-                  }}
-                  className="w-full h-10 px-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
-                >
-                  {GARAGE_WORK_ACTIONS.map((act) => (
-                    <option key={act} value={act}>
-                      {act}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                  3. Сторона / Положение
-                </label>
-                <select
-                  value={workPositionInput}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setWorkPositionInput(val);
-                    setWorkNameInput(
-                      buildStandardWorkName(workActionInput, workComponentInput, val),
-                    );
-                  }}
-                  className="w-full h-10 px-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
-                >
-                  {GARAGE_WORK_POSITIONS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* 2. Деталь / Узел */}
-            <div>
-              <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                2. Деталь / Узел автомобиля *
-              </label>
-              <input
-                list="miniapp-popular-components"
-                type="text"
-                value={workComponentInput}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setWorkComponentInput(val);
-                  setWorkNameInput(buildStandardWorkName(workActionInput, val, workPositionInput));
-                }}
-                placeholder="Например: тормозные колодки"
-                className="w-full h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
-              />
-              <datalist id="miniapp-popular-components">
-                {POPULAR_GARAGE_COMPONENTS.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
-            </div>
-
-            {/* Assembled Name Preview */}
-            <div className="bg-white rounded-xl p-2.5 border border-slate-200 space-y-1">
-              <label className="block text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
-                🏷 Итоговое наименование (по формуле 3-х слов):
-              </label>
-              <input
-                type="text"
-                value={workNameInput}
-                onChange={(e) => setWorkNameInput(e.target.value)}
-                placeholder="Заполните действие и деталь выше или введите вручную..."
-                className="w-full text-xs font-extrabold text-slate-900 outline-none"
-              />
-            </div>
-
-            {/* Напарник / Второй механик */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                  👥 Кто выполнял работу
-                </label>
-                {secondMechanicId && (
-                  <button
-                    type="button"
-                    onClick={() => setSecondMechanicId('')}
-                    className="text-[10px] font-bold text-rose-500 hover:underline"
-                  >
-                    Сбросить напарника
-                  </button>
-                )}
-              </div>
-              <select
-                value={secondMechanicId}
-                onChange={(e) => setSecondMechanicId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800"
-              >
-                <option value="">Делал один (100% ЗП мне)</option>
-                {otherMechanics.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    Вместе с: {m.name}
-                  </option>
-                ))}
-              </select>
-
-              {secondMechanicId && (
-                <div className="grid grid-cols-3 gap-1 mt-1.5 bg-white p-1 rounded-xl border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setWorkPerformerInput('both')}
-                    className={cn(
-                      'py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all',
-                      workPerformerInput === 'both'
-                        ? 'bg-[#E8F7EC] text-[#0E7C5B] border border-[#21A038]/30'
-                        : 'text-slate-500',
-                    )}
-                  >
-                    Вдвоём (50/50)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWorkPerformerInput('primary')}
-                    className={cn(
-                      'py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all',
-                      workPerformerInput === 'primary'
-                        ? 'bg-[#E8F7EC] text-[#0E7C5B] border border-[#21A038]/30'
-                        : 'text-slate-500',
-                    )}
-                  >
-                    Только я
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWorkPerformerInput('second')}
-                    className={cn(
-                      'py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all',
-                      workPerformerInput === 'second'
-                        ? 'bg-[#E8F7EC] text-[#0E7C5B] border border-[#21A038]/30'
-                        : 'text-slate-500',
-                    )}
-                  >
-                    Напарник
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <span className="text-[10px] text-slate-400 font-bold">
-                Время и стоимость выставляет приёмщик
-              </span>
-              <button
-                type="button"
-                onClick={() => addWorkMutation.mutate()}
-                disabled={addWorkMutation.isPending}
-                className="px-4 h-10 rounded-xl bg-[#21A038] text-white font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform shrink-0"
-              >
-                {addWorkMutation.isPending ? '...' : '+ Добавить'}
-              </button>
-            </div>
-          </div>
+          <MechanicWorkConstructorForm
+            mechanics={allMechanics}
+            currentMechanicId={me?.id}
+            isPending={addWorkMutation.isPending}
+            onSubmit={async (payload) => {
+              await addWorkMutation.mutateAsync(payload);
+            }}
+          />
         )}
       </div>
 

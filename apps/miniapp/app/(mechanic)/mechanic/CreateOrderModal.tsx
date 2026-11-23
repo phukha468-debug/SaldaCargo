@@ -5,12 +5,19 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@saldacargo/ui';
 import { isOilOrFilterWork } from '@saldacargo/shared';
+import MechanicWorkConstructorForm, {
+  type MechanicWorkPayload,
+} from './MechanicWorkConstructorForm';
 
 interface WorkDraft {
   id: string;
   name: string;
+  category?: string;
+  work_date?: string;
+  quantity: number;
   minutes: number;
-  performer?: 'both' | 'primary' | 'second';
+  mechanic_id?: string | null;
+  second_mechanic_id?: string | null;
 }
 
 interface PartDraft {
@@ -70,13 +77,10 @@ export default function CreateOrderModal({
 
   // 4. Напарник / Второй механик
   const [secondMechanicId, setSecondMechanicId] = useState<string>('');
-  const [workPerformerInput, setWorkPerformerInput] = useState<'both' | 'primary' | 'second'>(
-    'both',
-  );
 
   // 5. Перечень работ (время выставляет директор/приёмщик)
   const [works, setWorks] = useState<WorkDraft[]>([]);
-  const [workNameInput, setWorkNameInput] = useState<string>('');
+  const [pendingWorkDraft, setPendingWorkDraft] = useState<MechanicWorkPayload | null>(null);
 
   // 6. Чекбокс запчастей автосервиса
   const [partsProvidedByService, setPartsProvidedByService] = useState<boolean>(false);
@@ -154,12 +158,16 @@ export default function CreateOrderModal({
   };
 
   // Время выставляет директор/приёмщик, поэтому предварительный расчёт в минутах отключён
-  const pendingInputMins = 0;
-  const totalMinutes = works.reduce((sum, w) => sum + w.minutes, 0) + pendingInputMins;
+  const totalMinutes = works.reduce((sum, w) => sum + w.minutes, 0);
 
   const totalShares = works.reduce(
     (acc, w) => {
-      const s = calcWorkShares(w.minutes, w.performer || (secondMechanicId ? 'both' : 'primary'));
+      const performer: 'both' | 'primary' | 'second' = w.second_mechanic_id
+        ? 'both'
+        : w.mechanic_id && w.mechanic_id !== mechanicId
+          ? 'second'
+          : 'primary';
+      const s = calcWorkShares(w.minutes, performer);
       return {
         primary: acc.primary + s.primary,
         second: acc.second + s.second,
@@ -168,23 +176,15 @@ export default function CreateOrderModal({
     { primary: 0, second: 0 },
   );
 
-  if (pendingInputMins > 0) {
-    const pendingShares = calcWorkShares(
-      pendingInputMins,
-      secondMechanicId ? workPerformerInput : 'primary',
-    );
-    totalShares.primary += pendingShares.primary;
-    totalShares.second += pendingShares.second;
-  }
-
   const totalEstimatedPay = totalShares.primary;
 
   const hasOilWork =
-    works.some((w) => isOilOrFilterWork(w.name)) || isOilOrFilterWork(workNameInput);
+    works.some((w) => isOilOrFilterWork(w.name)) ||
+    isOilOrFilterWork(pendingWorkDraft?.custom_work_name || '');
 
-  const handleAddWork = () => {
+  const handleAddWork = (payload: MechanicWorkPayload) => {
     setErrorMsg('');
-    const cleanName = workNameInput.trim();
+    const cleanName = payload.custom_work_name.trim();
     if (!cleanName) {
       setErrorMsg('Введите наименование выполненной работы');
       return;
@@ -194,11 +194,15 @@ export default function CreateOrderModal({
       {
         id: `${Date.now()}-${Math.random()}`,
         name: cleanName,
+        category: payload.category,
+        work_date: payload.work_date,
+        quantity: payload.quantity,
         minutes: 0,
-        performer: secondMechanicId ? workPerformerInput : 'primary',
+        mechanic_id: payload.mechanic_id || mechanicId || null,
+        second_mechanic_id: payload.second_mechanic_id || null,
       },
     ]);
-    setWorkNameInput('');
+    setPendingWorkDraft(null);
   };
 
   const handleRemoveWork = (id: string) => {
@@ -234,14 +238,18 @@ export default function CreateOrderModal({
     mutationFn: async (submitImmediately: boolean) => {
       setErrorMsg('');
 
-      // Если механик вписал работу в поле ввода, но не нажал «+ Добавить», подхватываем её автоматически
+      // Если механик набрал работу в конструкторе, но не нажал «+ Добавить работу», подхватываем её автоматически
       const finalWorks = [...works];
-      if (workNameInput.trim()) {
+      if (pendingWorkDraft?.custom_work_name.trim()) {
         finalWorks.push({
           id: 'auto-work',
-          name: workNameInput.trim(),
+          name: pendingWorkDraft.custom_work_name.trim(),
+          category: pendingWorkDraft.category,
+          work_date: pendingWorkDraft.work_date,
+          quantity: pendingWorkDraft.quantity,
           minutes: 0,
-          performer: secondMechanicId ? workPerformerInput : 'primary',
+          mechanic_id: pendingWorkDraft.mechanic_id || mechanicId || null,
+          second_mechanic_id: pendingWorkDraft.second_mechanic_id || null,
         });
       }
 
@@ -281,9 +289,12 @@ export default function CreateOrderModal({
         second_mechanic_id: secondMechanicId || undefined,
         works: finalWorks.map((w) => ({
           name: w.name,
+          category: w.category,
+          work_date: w.work_date,
+          quantity: w.quantity,
           minutes: w.minutes,
-          mechanic_id: w.performer === 'second' ? secondMechanicId : mechanicId,
-          second_mechanic_id: w.performer === 'both' ? secondMechanicId : null,
+          mechanic_id: w.mechanic_id || mechanicId,
+          second_mechanic_id: w.second_mechanic_id || null,
         })),
         parts_provided_by_service: partsProvidedByService,
         parts: partsProvidedByService
@@ -328,9 +339,8 @@ export default function CreateOrderModal({
       // Сбрасываем форму
       setSelectedExistingOrderId('');
       setSecondMechanicId('');
-      setWorkPerformerInput('both');
       setWorks([]);
-      setWorkNameInput('');
+      setPendingWorkDraft(null);
       setParts([]);
       setPartNameInput('');
       setPartQtyInput('1');
@@ -732,107 +742,64 @@ export default function CreateOrderModal({
             {/* Список уже добавленных работ */}
             {works.length > 0 && (
               <div className="space-y-2">
-                {works.map((w, idx) => (
-                  <div
-                    key={w.id}
-                    className="bg-[#F8FAFC] border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-extrabold text-slate-900 leading-snug">
-                        {idx + 1}. {w.name}
-                      </p>
-                      {secondMechanicId && (
-                        <span className="inline-block mt-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                          {w.performer === 'both'
-                            ? '👥 Вдвоём (50/50)'
-                            : w.performer === 'second'
-                              ? `👤 ${secondMechanicName.split(' ')[0]}`
-                              : '👤 Только я'}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveWork(w.id)}
-                      className="w-7 h-7 rounded-lg bg-red-50 text-red-500 font-bold text-xs flex items-center justify-center shrink-0 active:scale-95"
+                {works.map((w, idx) => {
+                  const mech1Name =
+                    allMechanics.find((m) => m.id === w.mechanic_id)?.name?.split(' ')[0] || null;
+                  const mech2Name =
+                    allMechanics.find((m) => m.id === w.second_mechanic_id)?.name?.split(' ')[0] ||
+                    null;
+                  return (
+                    <div
+                      key={w.id}
+                      className="bg-[#F8FAFC] border border-slate-200 rounded-xl p-2.5 flex items-center justify-between gap-2"
                     >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-xs font-extrabold text-slate-900 truncate">
+                            {idx + 1}. {w.name}
+                          </p>
+                          {w.quantity > 1 && (
+                            <span className="text-[10px] font-extrabold text-slate-700 bg-slate-200/80 px-1.5 py-0.5 rounded shrink-0">
+                              ×{w.quantity}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px]">
+                          {w.category && (
+                            <span className="font-bold text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded leading-none">
+                              {w.category}
+                            </span>
+                          )}
+                          {mech1Name && (
+                            <span className="font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded leading-none">
+                              👤 {mech1Name}
+                              {mech2Name ? ` + ${mech2Name}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveWork(w.id)}
+                        className="w-7 h-7 rounded-lg bg-red-50 text-red-500 font-bold text-xs flex items-center justify-center shrink-0 active:scale-95"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {/* Поле ввода новой работы */}
-            <div className="bg-[#F2F4F7] rounded-2xl p-3 space-y-2.5 border border-slate-200/70">
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                  Наименование работы
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={workNameInput}
-                    onChange={(e) => setWorkNameInput(e.target.value)}
-                    placeholder="К примеру: Замена глушителя (бочка)"
-                    className="flex-1 h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#21A038]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddWork}
-                    className="px-4 h-11 rounded-xl bg-[#21A038] text-white font-extrabold text-xs uppercase tracking-wide active:scale-95 transition-transform shrink-0 shadow-xs"
-                  >
-                    + Добавить
-                  </button>
-                </div>
-              </div>
-
-              {secondMechanicId && (
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-                    Кто делал работу?
-                  </label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setWorkPerformerInput('both')}
-                      className={cn(
-                        'py-2 px-1 rounded-xl text-xs font-black text-center transition-all',
-                        workPerformerInput === 'both'
-                          ? 'bg-[#21A038] text-white shadow-xs'
-                          : 'bg-white border border-slate-200 text-slate-700',
-                      )}
-                    >
-                      👥 Вдвоём 50/50
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWorkPerformerInput('primary')}
-                      className={cn(
-                        'py-2 px-1 rounded-xl text-xs font-black text-center transition-all',
-                        workPerformerInput === 'primary'
-                          ? 'bg-[#21A038] text-white shadow-xs'
-                          : 'bg-white border border-slate-200 text-slate-700',
-                      )}
-                    >
-                      👤 Только я
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWorkPerformerInput('second')}
-                      className={cn(
-                        'py-2 px-1 rounded-xl text-xs font-black text-center truncate transition-all',
-                        workPerformerInput === 'second'
-                          ? 'bg-[#21A038] text-white shadow-xs'
-                          : 'bg-white border border-slate-200 text-slate-700',
-                      )}
-                    >
-                      👤 {secondMechanicName.split(' ')[0] || 'Напарник'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Конструктор добавления новой работы (Вариант 1) */}
+            <MechanicWorkConstructorForm
+              mechanics={allMechanics}
+              currentMechanicId={mechanicId}
+              defaultSecondMechanicId={secondMechanicId}
+              defaultDate={startDate}
+              onSubmit={handleAddWork}
+              onDraftChange={setPendingWorkDraft}
+            />
           </div>
 
           {/* ШАГ 5: Чек-бокс «Запчасти предоставил автосервис (мы)» */}

@@ -279,8 +279,11 @@ export async function POST(request: Request) {
       works?: Array<{
         name: string;
         minutes: number | string;
+        category?: string | null;
+        work_date?: string | null;
+        quantity?: number | string;
         work_catalog_id?: string;
-        mechanic_id?: string;
+        mechanic_id?: string | null;
         second_mechanic_id?: string | null;
       }>;
       parts_provided_by_service?: boolean;
@@ -293,13 +296,25 @@ export async function POST(request: Request) {
     const odoNum = odometer != null && String(odometer).trim() !== '' ? Number(odometer) : null;
 
     const validWorks = (works ?? [])
-      .map((w) => ({
-        name: (w.name || '').trim(),
-        minutes: Math.max(0, Math.round(Number(w.minutes) || 0)),
-        work_catalog_id: w.work_catalog_id || null,
-        mechanic_id: w.mechanic_id || null,
-        second_mechanic_id: w.second_mechanic_id || null,
-      }))
+      .map((w) => {
+        const cleanCategory = w.category?.trim() || null;
+        let workDateIso: string | undefined;
+        if (w.work_date) {
+          const parsed = new Date(w.work_date);
+          if (!isNaN(parsed.getTime())) workDateIso = parsed.toISOString();
+        }
+        return {
+          name: (w.name || '').trim(),
+          minutes: Math.max(0, Math.round(Number(w.minutes) || 0)),
+          category: cleanCategory,
+          notes: cleanCategory ? `[category:${cleanCategory}]` : null,
+          work_date_iso: workDateIso,
+          quantity: Math.max(1, Math.round(Number(w.quantity ?? 1) || 1)),
+          work_catalog_id: w.work_catalog_id || null,
+          mechanic_id: w.mechanic_id || null,
+          second_mechanic_id: w.second_mechanic_id || null,
+        };
+      })
       .filter((w) => w.name.length > 0);
 
     if (submit_immediately && validWorks.length === 0) {
@@ -398,10 +413,13 @@ export async function POST(request: Request) {
             service_order_id: existingOrderId,
             work_catalog_id: w.work_catalog_id,
             custom_work_name: w.name,
+            custom_work_description: w.category,
+            notes: w.notes,
+            ...(w.work_date_iso ? { created_at: w.work_date_iso } : {}),
             norm_minutes: w.minutes,
             actual_minutes: w.minutes,
             price_client: priceClient,
-            quantity: 1,
+            quantity: w.quantity,
             status: submit_immediately ? 'completed' : 'in_progress',
             salary_paid: false,
             mechanic_id: wMech1,
@@ -659,10 +677,7 @@ export async function POST(request: Request) {
     if (validWorks.length > 0) {
       const worksInsert = validWorks.map((w) => {
         const priceClient = ((w.minutes / 60) * hourlyRate).toFixed(2);
-        const wMech1 =
-          w.mechanic_id && w.mechanic_id === cleanSecondMechId && !w.second_mechanic_id
-            ? cleanSecondMechId
-            : mechanicId;
+        const wMech1 = w.mechanic_id || mechanicId;
         const wMech2 =
           w.second_mechanic_id ||
           (cleanSecondMechId && (!w.mechanic_id || w.mechanic_id === mechanicId)
@@ -674,10 +689,13 @@ export async function POST(request: Request) {
           service_order_id: createdOrder.id,
           work_catalog_id: w.work_catalog_id,
           custom_work_name: w.name,
+          custom_work_description: w.category,
+          notes: w.notes,
+          ...(w.work_date_iso ? { created_at: w.work_date_iso } : {}),
           norm_minutes: w.minutes,
           actual_minutes: w.minutes,
           price_client: priceClient,
-          quantity: 1,
+          quantity: w.quantity,
           status: submit_immediately ? 'completed' : 'in_progress',
           mechanic_id: wMech1,
           second_mechanic_id: wMech2,
