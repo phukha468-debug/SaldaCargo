@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { IntegrationProvider } from '@saldacargo/shared-types';
 
 export interface IntegrationStatusItem {
@@ -125,20 +125,6 @@ export const PROVIDER_META: Record<
       },
     ],
   },
-  resend: {
-    title: 'Resend (Email)',
-    shortDesc: 'Отправка документов и уведомлений на почту',
-    icon: 'mail',
-    fields: [
-      { key: 'api_key', label: 'Resend API Key', placeholder: 're_...', secret: true },
-      {
-        key: 'from_email',
-        label: 'Адрес отправителя (From)',
-        placeholder: 'Документы <docs@your-domain.ru>',
-        secret: false,
-      },
-    ],
-  },
 };
 
 interface Props {
@@ -147,38 +133,54 @@ interface Props {
   onSaved: () => void;
 }
 
+function buildInitialFields(item: IntegrationStatusItem) {
+  const meta = PROVIDER_META[item.provider];
+  const config: Record<string, string> = {};
+  const secrets: Record<string, string> = {};
+  for (const f of meta.fields) {
+    if (f.secret) {
+      secrets[f.key] = '';
+    } else {
+      const val = item.config?.[f.key];
+      config[f.key] = typeof val === 'string' ? val : '';
+    }
+  }
+  return { config, secrets };
+}
+
 export function IntegrationConfigModal({ item, onClose, onSaved }: Props) {
-  const [isEnabled, setIsEnabled] = useState(true);
-  const [configValues, setConfigValues] = useState<Record<string, string>>({});
-  const [secretValues, setSecretValues] = useState<Record<string, string>>({});
+  if (!item) return null;
+  return (
+    <IntegrationConfigModalBody
+      key={`${item.provider}:${item.updated_at ?? 'new'}`}
+      item={item}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+}
+
+function IntegrationConfigModalBody({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: IntegrationStatusItem;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const initial = buildInitialFields(item);
+  // При первой настройке (source === 'none') включаем интеграцию по умолчанию
+  const [isEnabled, setIsEnabled] = useState(item.source === 'none' ? true : item.is_enabled);
+  const [configValues, setConfigValues] = useState<Record<string, string>>(initial.config);
+  const [secretValues, setSecretValues] = useState<Record<string, string>>(initial.secrets);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!item) return;
-    setError('');
-    setIsEnabled(item.is_enabled);
-    const meta = PROVIDER_META[item.provider];
-    const nextConfig: Record<string, string> = {};
-    const nextSecrets: Record<string, string> = {};
-    for (const f of meta.fields) {
-      if (f.secret) {
-        nextSecrets[f.key] = '';
-      } else {
-        const val = item.config?.[f.key];
-        nextConfig[f.key] = typeof val === 'string' ? val : '';
-      }
-    }
-    setConfigValues(nextConfig);
-    setSecretValues(nextSecrets);
-  }, [item]);
-
-  if (!item) return null;
   const meta = PROVIDER_META[item.provider];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!item) return;
     setSaving(true);
     setError('');
     try {
@@ -270,7 +272,11 @@ export function IntegrationConfigModal({ item, onClose, onSaved }: Props) {
                     setConfigValues((prev) => ({ ...prev, [field.key]: val }));
                   }
                 }}
-                placeholder={field.placeholder}
+                placeholder={
+                  field.secret && item.has_secrets
+                    ? 'Сохранён — оставьте пустым, чтобы не менять'
+                    : field.placeholder
+                }
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono"
               />
             </div>

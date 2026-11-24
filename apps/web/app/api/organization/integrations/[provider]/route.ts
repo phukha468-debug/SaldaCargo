@@ -12,7 +12,6 @@ const ALLOWED_PROVIDERS = new Set<IntegrationProvider>([
   'max_bot',
   'yandex_maps',
   'smtp',
-  'resend',
 ]);
 
 const putIntegrationSchema = z.object({

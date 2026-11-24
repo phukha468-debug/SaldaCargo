@@ -50,8 +50,7 @@ export type IntegrationProvider =
   | 'opti24'
   | 'max_bot'
   | 'yandex_maps'
-  | 'smtp'
-  | 'resend';
+  | 'smtp';
 
 export interface OrganizationIntegration {
   id: UUID;
