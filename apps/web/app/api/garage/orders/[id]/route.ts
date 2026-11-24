@@ -612,6 +612,42 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ ok: true, action: 'edited', id: targetId });
     }
 
+    if (body.action === 'approve_works') {
+      // Оценка работ в открытом наряде: фиксируем [reviewed], ЗП начислится разом при закрытии/выдаче машины
+      const { data: worksRows, error: worksErr } = await (supabase as any)
+        .from('service_order_works')
+        .select('id, status, salary_paid, extra_work_status, notes')
+        .eq('service_order_id', targetId);
+
+      if (worksErr) throw worksErr;
+
+      const pendingWorks = (worksRows ?? []).filter(
+        (w: any) =>
+          w.status === 'completed' &&
+          !w.salary_paid &&
+          w.extra_work_status !== 'rejected' &&
+          !String(w.notes || '').includes('[reviewed]'),
+      );
+
+      if (pendingWorks.length > 0) {
+        await Promise.all(
+          pendingWorks.map((w: any) => {
+            const nextNotes = w.notes ? `${String(w.notes).trim()} [reviewed]` : '[reviewed]';
+            return (supabase as any)
+              .from('service_order_works')
+              .update({ notes: nextNotes })
+              .eq('id', w.id);
+          }),
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        action: 'works_reviewed',
+        works_reviewed: pendingWorks.length,
+      });
+    }
+
     if (body.action === 'approve') body.lifecycle_status = 'approved';
     if (body.action === 'return') body.lifecycle_status = 'returned';
     if (body.action === 'cancel') body.lifecycle_status = 'cancelled';

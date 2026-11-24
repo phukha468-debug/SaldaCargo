@@ -91,6 +91,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const body = (await request.json()) as {
     action?:
       | 'approve'
+      | 'approve_works'
       | 'return'
       | 'cancel'
       | 'edit_note'
@@ -309,6 +310,44 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   // ── Утверждение наряда + начисление ЗП ────────────────────────────────
+  // Шаг 4: Оценка работ в открытом наряде — фиксируем проверку [reviewed], ЗП начисляется позже при закрытии/выдаче авто
+  if (action === 'approve_works') {
+    const { data: worksRows, error: worksErr } = await (supabase.from('service_order_works') as any)
+      .select('id, status, salary_paid, extra_work_status, notes')
+      .eq('service_order_id', targetId);
+
+    if (worksErr) {
+      return NextResponse.json({ error: worksErr.message }, { status: 500 });
+    }
+
+    const pendingWorks = (worksRows ?? []).filter(
+      (w: any) =>
+        w.status === 'completed' &&
+        !w.salary_paid &&
+        w.extra_work_status !== 'rejected' &&
+        !String(w.notes || '').includes('[reviewed]'),
+    );
+
+    if (pendingWorks.length === 0) {
+      return NextResponse.json({ ok: true, action: 'no_pending_works' });
+    }
+
+    await Promise.all(
+      pendingWorks.map((w: any) => {
+        const nextNotes = w.notes ? `${String(w.notes).trim()} [reviewed]` : '[reviewed]';
+        return (supabase.from('service_order_works') as any)
+          .update({ notes: nextNotes })
+          .eq('id', w.id);
+      }),
+    );
+
+    return NextResponse.json({
+      ok: true,
+      action: 'works_reviewed',
+      works_reviewed: pendingWorks.length,
+    });
+  }
+
   if (action === 'approve') {
     if (body.mechanic_id !== undefined || body.second_mechanic_id !== undefined) {
       await (supabase.from('service_orders') as any)
@@ -322,11 +361,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { data: order, error: orderErr } = await (supabase.from('service_orders') as any)
       .select(
         `
-        id, order_number, asset_id, client_vehicle_id, machine_type, odometer_start, odometer_end,
+        id, organization_id, order_number, asset_id, client_vehicle_id, machine_type, odometer_start, odometer_end,
         lifecycle_status, mechanic_pay,
         mechanic:users!service_orders_assigned_mechanic_id_fkey(id, name, mechanic_salary_pct),
         second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
-        service_order_works(id, norm_minutes, actual_minutes, price_client, quantity, status, extra_work_status, custom_work_name, work_description, work_catalog:work_catalog(name))
+        service_order_works(id, norm_minutes, actual_minutes, price_client, quantity, status, salary_paid, extra_work_status, mechanic_id, second_mechanic_id, notes, custom_work_name, work_description, work_catalog:work_catalog(name))
       `,
       )
       .eq('id', targetId)
@@ -370,14 +409,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const works = (order.service_order_works ?? []).filter(
       (w: any) => w.status !== 'cancelled' && w.extra_work_status !== 'rejected',
     );
-    const totalNm =
-      approvedNm ??
-      works.reduce(
-        (sum: number, w: any) =>
-          sum +
-          Number(w.actual_minutes ?? w.norm_minutes ?? 0) * Math.max(1, Number(w.quantity ?? 1)),
-        0,
-      );
+    const unpaidWorks = works.filter((w: any) => !w.salary_paid);
 
     const [{ data: settings }, { data: existingPayrollTx }] = await Promise.all([
       (supabase.from('sto_settings') as any)
@@ -386,7 +418,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .maybeSingle(),
       (supabase.from('transactions') as any)
         .select('id')
-        .eq('service_order_id', id)
+        .eq('service_order_id', targetId)
         .eq('category_id', PAYROLL_MECHANIC_CAT)
         .neq('lifecycle_status', 'cancelled')
         .limit(1)
@@ -399,10 +431,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         : parseFloat(settings?.hourly_rate_own ?? '1600') || 1600;
 
     const accruals: string[] = [];
-    const mechanics = [order.mechanic, order.second_mechanic].filter(Boolean);
-    const totalNmHours = totalNm / 60;
-    const nmPerMechanic = mechanics.length === 2 ? totalNmHours / 2 : totalNmHours;
-
     const manualOverridePay =
       body.mechanic_pay != null &&
       !isNaN(Number(body.mechanic_pay)) &&
@@ -412,18 +440,99 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     let primaryMechanicPay: string | null = null;
 
-    if (!existingPayrollTx) {
-      for (let idx = 0; idx < mechanics.length; idx++) {
-        const mech = mechanics[idx];
-        if (!mech?.id) continue;
-        const pct = (parseFloat(mech.mechanic_salary_pct ?? '50') || 50) / 100;
-        const calcSalary =
-          manualOverridePay != null && mechanics.length === 1
-            ? manualOverridePay
-            : nmPerMechanic * hourlyRate * pct;
+    // Шаг 5: При закрытии/выдаче машины начисляем ЗП всем механикам, выполнявшим работы в наряде
+    if (unpaidWorks.length > 0 || !existingPayrollTx) {
+      const mechInfoMap = new Map<string, { id: string; name: string; pct: number }>();
+      if (order.mechanic?.id) {
+        mechInfoMap.set(order.mechanic.id, {
+          id: order.mechanic.id,
+          name: order.mechanic.name || '',
+          pct: parseFloat(order.mechanic.mechanic_salary_pct ?? '50') || 50,
+        });
+      }
+      if (order.second_mechanic?.id) {
+        mechInfoMap.set(order.second_mechanic.id, {
+          id: order.second_mechanic.id,
+          name: order.second_mechanic.name || '',
+          pct: parseFloat(order.second_mechanic.mechanic_salary_pct ?? '50') || 50,
+        });
+      }
+
+      const workMechIds = new Set<string>();
+      for (const w of unpaidWorks) {
+        const m1 = w.mechanic_id || order.mechanic?.id;
+        const m2 = w.second_mechanic_id || (!w.mechanic_id ? order.second_mechanic?.id : null);
+        if (m1) workMechIds.add(m1);
+        if (m2) workMechIds.add(m2);
+      }
+      const missingIds = [...workMechIds].filter((mid) => !mechInfoMap.has(mid));
+      if (missingIds.length > 0) {
+        const { data: extraMechs } = await (supabase.from('users') as any)
+          .select('id, name, mechanic_salary_pct')
+          .in('id', missingIds);
+        for (const m of extraMechs ?? []) {
+          mechInfoMap.set(m.id, {
+            id: m.id,
+            name: m.name || '',
+            pct: parseFloat(m.mechanic_salary_pct ?? '50') || 50,
+          });
+        }
+      }
+
+      const salaryByMech = new Map<string, number>();
+      if (approvedNm != null) {
+        // Если директор явно задал общее adjusted_norm_minutes
+        const orderMechs = [order.mechanic, order.second_mechanic].filter(Boolean);
+        const hoursPerMech = orderMechs.length === 2 ? approvedNm / 60 / 2 : approvedNm / 60;
+        for (const mech of orderMechs) {
+          if (!mech?.id) continue;
+          const pct = mechInfoMap.get(mech.id)?.pct ?? 50;
+          salaryByMech.set(mech.id, (hoursPerMech * hourlyRate * pct) / 100);
+        }
+      } else {
+        for (const w of unpaidWorks) {
+          const qty = Math.max(1, Number(w.quantity ?? 1));
+          const mins = Number(w.actual_minutes ?? w.norm_minutes ?? 0) * qty;
+          const explicitPrice = parseFloat(w.price_client ?? '0');
+          const workPrice = explicitPrice > 0 ? explicitPrice : (mins / 60) * hourlyRate;
+
+          const customPctMatch = w.notes
+            ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+            : null;
+          const customPct = customPctMatch?.[1] ? parseFloat(customPctMatch[1]) : null;
+
+          const m1 = w.mechanic_id || order.mechanic?.id || null;
+          const m2Raw = w.second_mechanic_id || (!w.mechanic_id ? order.second_mechanic?.id : null);
+          const m2 = m2Raw && m2Raw !== m1 ? m2Raw : null;
+
+          if (m1 && m2) {
+            const half = workPrice / 2;
+            const p1 = customPct ?? mechInfoMap.get(m1)?.pct ?? 50;
+            const p2 = customPct ?? mechInfoMap.get(m2)?.pct ?? 50;
+            salaryByMech.set(m1, (salaryByMech.get(m1) ?? 0) + (half * p1) / 100);
+            salaryByMech.set(m2, (salaryByMech.get(m2) ?? 0) + (half * p2) / 100);
+          } else if (m1) {
+            const p1 = customPct ?? mechInfoMap.get(m1)?.pct ?? 50;
+            salaryByMech.set(m1, (salaryByMech.get(m1) ?? 0) + (workPrice * p1) / 100);
+          }
+        }
+      }
+
+      // Если передан ручной оверрайд ЗП и участник один (и ранее ЗП не начислялась)
+      if (manualOverridePay != null && salaryByMech.size <= 1 && !existingPayrollTx) {
+        const onlyMechId = [...salaryByMech.keys()][0] || order.mechanic?.id;
+        if (onlyMechId) {
+          salaryByMech.set(onlyMechId, manualOverridePay);
+        }
+      }
+
+      let idx = 0;
+      for (const [mid, calcSalary] of salaryByMech.entries()) {
+        const info = mechInfoMap.get(mid);
         const salary = calcSalary.toFixed(2);
         if (idx === 0) primaryMechanicPay = salary;
-        accruals.push(`${mech.name || mech.id}: ${salary} ₽`);
+        idx += 1;
+        accruals.push(`${info?.name || mid}: ${salary} ₽`);
 
         if (calcSalary > 0) {
           await (supabase.from('transactions') as any).insert({
@@ -431,14 +540,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             direction: 'expense',
             category_id: PAYROLL_MECHANIC_CAT,
             amount: salary,
-            service_order_id: id,
-            related_user_id: mech.id,
+            service_order_id: targetId,
+            related_user_id: mid,
             lifecycle_status: 'approved',
             settlement_status: 'pending',
             from_wallet_id: null,
             employee_confirmed: true,
             description:
-              `ЗП механика ${mech.name || ''}: наряд #${order.order_number || id.slice(0, 6)}`.trim(),
+              `ЗП механика ${info?.name || ''}: наряд #${order.order_number || targetId.slice(0, 6)}`.trim(),
             created_by: adminId,
             idempotency_key: crypto.randomUUID(),
           });

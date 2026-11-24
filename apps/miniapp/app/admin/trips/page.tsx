@@ -202,13 +202,13 @@ function TripsContent() {
     }
   }
 
-  async function handleApproveOrder(orderId: string) {
+  async function handleApproveOrder(orderId: string, isPartialWorkReview = false) {
     setApprovingId(orderId);
     try {
       const res = await fetch(`/api/admin/service-orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve' }),
+        body: JSON.stringify({ action: isPartialWorkReview ? 'approve_works' : 'approve' }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Ошибка утверждения');
       refresh();

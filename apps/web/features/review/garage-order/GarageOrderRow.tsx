@@ -141,14 +141,18 @@ export function GarageOrderRow({
                   ? 'bg-emerald-100 text-emerald-800'
                   : order.lifecycle_status === 'returned'
                     ? 'bg-rose-100 text-rose-800'
-                    : 'bg-amber-100 text-amber-800',
+                    : order.is_partial_work_review
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : 'bg-amber-100 text-amber-800',
               )}
             >
               {order.lifecycle_status === 'approved'
                 ? '✓ Закрыт'
                 : order.lifecycle_status === 'returned'
                   ? '↩ Доработка'
-                  : '⏳ Ревью'}
+                  : order.is_partial_work_review
+                    ? '🔧 В работе · работы на ревью'
+                    : '⏳ Ревью'}
             </span>
             <span className="text-[10px] text-slate-400 font-medium shrink-0 hidden md:block">
               {formatOrderDateRange(order.started_at, order.completed_at, order.created_at)}

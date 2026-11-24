@@ -65,6 +65,7 @@ export interface ReviewServiceOrder {
   machine_type: string;
   status: string;
   lifecycle_status: string;
+  is_partial_work_review?: boolean;
   created_at: string;
   started_at?: string | null;
   completed_at?: string | null;

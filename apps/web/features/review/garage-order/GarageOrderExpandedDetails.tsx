@@ -498,7 +498,11 @@ export function GarageOrderExpandedDetails({
                 disabled={approving}
                 className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer disabled:opacity-50 transition-colors"
               >
-                {approving ? 'Утверждаем...' : '✓ Утвердить наряд (начислить ЗП)'}
+                {approving
+                  ? 'Сохраняем...'
+                  : order.is_partial_work_review
+                    ? '✓ Зафиксировать оценку (ЗП при выдаче)'
+                    : '✓ Утвердить наряд (начислить ЗП)'}
               </button>
             ) : (
               <button

@@ -66,6 +66,7 @@ export interface MiniappTrip extends CalcTripInput<MiniappTripOrder, MiniappTrip
 export interface MiniappServiceOrderWork {
   id?: string;
   status?: string | null;
+  salary_paid?: boolean | null;
   custom_work_name?: string | null;
   work_description?: string | null;
   work_catalog?: { name?: string | null } | null;
@@ -90,7 +91,10 @@ export interface MiniappServiceOrder extends CalcServiceOrderInput {
   id: string;
   order_number?: string | number | null;
   machine_type?: 'own' | 'client' | string;
+  status?: string | null;
   lifecycle_status: LifecycleStatus;
+  is_partial_work_review?: boolean;
+  pending_review_works_count?: number;
   created_at: string;
   hourly_rate?: number | string | null;
   salary_pct?: number | string | null;

@@ -15,7 +15,7 @@ export function ServiceOrderReviewCard({
 }: {
   order: MiniappServiceOrder;
   onEdit: (o: MiniappServiceOrder) => void;
-  onApprove: (id: string) => void;
+  onApprove: (id: string, isPartialWorkReview?: boolean) => void;
   onReturn: (id: string) => void;
   onDelete: (id: string) => void;
   approving: boolean;
@@ -37,6 +37,7 @@ export function ServiceOrderReviewCard({
   const worksSum = parseFloat(order.works_total || '0') || (totalMinutes / 60) * hourlyRate;
   const odo = order.odometer_end || order.odometer_start;
   const canReview = order.lifecycle_status === 'draft' || order.lifecycle_status === 'returned';
+  const isPartialWorkReview = Boolean(order.is_partial_work_review);
 
   const vehicleTitle = isOwn
     ? `${order.asset?.short_name ?? 'Свой ТС'} · ${order.asset?.reg_number ?? ''}`
@@ -67,6 +68,11 @@ export function ServiceOrderReviewCard({
               {isOwn ? '🏢 Свой авто · 1 600 ₽/ч' : '🚗 Клиентский · 2 000 ₽/ч'}
             </span>
             <LifecycleBadge status={order.lifecycle_status} />
+            {isPartialWorkReview && (
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                🔧 В работе · работы на ревью
+              </span>
+            )}
           </div>
           <p className="text-xs font-extrabold text-zinc-800 truncate">{vehicleTitle}</p>
           <p className="text-[11px] text-zinc-500 font-bold mt-0.5">
@@ -113,12 +119,24 @@ export function ServiceOrderReviewCard({
                       className="bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2 flex items-center justify-between gap-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-zinc-900">
-                          {i + 1}.{' '}
-                          {w.custom_work_name ||
-                            w.work_catalog?.name ||
-                            w.work_description ||
-                            'Работа'}
+                        <p className="text-xs font-bold text-zinc-900 flex items-center gap-1.5 flex-wrap">
+                          <span>
+                            {i + 1}.{' '}
+                            {w.custom_work_name ||
+                              w.work_catalog?.name ||
+                              w.work_description ||
+                              'Работа'}
+                          </span>
+                          {isPartialWorkReview &&
+                            (w.salary_paid || String(w.notes || '').includes('[reviewed]') ? (
+                              <span className="text-[9px] font-extrabold text-zinc-500 bg-zinc-200/80 px-1.5 py-0.5 rounded">
+                                Оценено
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                                На ревью
+                              </span>
+                            ))}
                         </p>
                         <p className="text-[11px] text-emerald-700 font-extrabold mt-0.5">
                           ⏱ Время: {mins} мин · ЗП: {Math.round(wPay).toLocaleString('ru-RU')} ₽
@@ -226,11 +244,15 @@ export function ServiceOrderReviewCard({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onApprove(order.id)}
+                  onClick={() => onApprove(order.id, isPartialWorkReview)}
                   disabled={approving}
                   className="flex-1 text-xs font-black text-white bg-emerald-600 py-2.5 rounded-xl active:bg-emerald-700 text-center disabled:opacity-50 shadow-sm"
                 >
-                  {approving ? '...' : '✓ Одобрить'}
+                  {approving
+                    ? '...'
+                    : isPartialWorkReview
+                      ? '✓ Зафиксировать оценку'
+                      : '✓ Одобрить'}
                 </button>
               </>
             )}

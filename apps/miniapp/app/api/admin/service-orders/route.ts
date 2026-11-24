@@ -51,7 +51,8 @@ export async function GET(request: Request) {
       .limit(150);
 
     if (filter === 'review') {
-      q = q.eq('status', 'completed').eq('lifecycle_status', 'draft');
+      // Закрытые черновики + открытые наряды, в которые механик уже отправил выполненные работы (salary_paid = false)
+      q = q.eq('lifecycle_status', 'draft').in('status', ['completed', 'in_progress', 'created']);
     } else if (filter === 'active') {
       q = q
         .in('status', ['created', 'in_progress'])
@@ -92,7 +93,17 @@ export async function GET(request: Request) {
     const { data: rawOrders, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const orders = rawOrders ?? [];
+    const isPendingWorkReview = (w: any) =>
+      w.status === 'completed' && !w.salary_paid && !String(w.notes || '').includes('[reviewed]');
+
+    const rawList = rawOrders ?? [];
+    const orders =
+      filter === 'review'
+        ? rawList.filter((o: any) => {
+            if (o.status === 'completed') return true;
+            return (o.works ?? []).some(isPendingWorkReview);
+          })
+        : rawList;
     const orderIds = orders.map((o: any) => o.id);
 
     // Подтягиваем транзакции ЗП механиков по этим нарядам
@@ -131,11 +142,16 @@ export async function GET(request: Request) {
           : 50;
 
       const activeWorks = (o.works ?? []).filter((w: any) => w.status !== 'cancelled');
+      const isPartialWorkReview = filter === 'review' && o.status !== 'completed';
+      const reviewTargetWorks = isPartialWorkReview
+        ? activeWorks.filter(isPendingWorkReview)
+        : activeWorks;
+
       let totalMinutes = 0;
       let worksClientSum = 0;
       let estimatedPay = 0;
 
-      for (const w of activeWorks) {
+      for (const w of reviewTargetWorks) {
         const qty = Math.max(1, Number(w.quantity ?? 1));
         const mins = Number(w.actual_minutes || w.norm_minutes || 0) * qty;
         totalMinutes += mins;
@@ -156,7 +172,13 @@ export async function GET(request: Request) {
 
       const txPay = txByOrder.get(o.id) ?? 0;
       const storedPay = parseFloat(o.mechanic_pay ?? '0') || 0;
-      const effectivePay = txPay > 0 ? txPay : storedPay > 0 ? storedPay : estimatedPay;
+      const effectivePay = isPartialWorkReview
+        ? estimatedPay
+        : txPay > 0
+          ? txPay
+          : storedPay > 0
+            ? storedPay
+            : estimatedPay;
 
       const partsFromService =
         (o.parts ?? []).length > 0 ||
@@ -167,6 +189,8 @@ export async function GET(request: Request) {
 
       return {
         ...o,
+        is_partial_work_review: isPartialWorkReview,
+        pending_review_works_count: activeWorks.filter(isPendingWorkReview).length,
         started_at: orderDates.started_at,
         completed_at: orderDates.completed_at,
         effective_date: effectiveDate,
@@ -181,7 +205,11 @@ export async function GET(request: Request) {
         parts_total: partsSum.toFixed(2),
         order_total: (worksClientSum + partsSum).toFixed(2),
         estimated_pay: estimatedPay.toFixed(2),
-        mechanic_pay: o.mechanic_pay != null ? o.mechanic_pay : effectivePay.toFixed(2),
+        mechanic_pay: isPartialWorkReview
+          ? effectivePay.toFixed(2)
+          : o.mechanic_pay != null
+            ? o.mechanic_pay
+            : effectivePay.toFixed(2),
         parts_provided_by_service: partsFromService,
       };
     });

@@ -146,8 +146,8 @@ export async function GET(request: Request) {
       .limit(300);
 
     if (filter === 'review') {
-      // draft orders that mechanic completed (status=completed) and admin hasn't closed yet
-      q = q.eq('lifecycle_status', 'draft').eq('status', 'completed');
+      // Закрытые черновики + открытые наряды с выполненными неоплаченными работами от механиков
+      q = q.eq('lifecycle_status', 'draft').in('status', ['completed', 'in_progress', 'created']);
     } else if (filter === 'active') {
       // All open (draft) orders regardless of work status
       q = q.eq('lifecycle_status', 'draft');
@@ -169,11 +169,26 @@ export async function GET(request: Request) {
     const { data, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const mapped = (data ?? []).map((o: any) => {
+    const rawRows = data ?? [];
+    const filteredRows =
+      filter === 'review'
+        ? rawRows.filter((o: any) => {
+            if (o.status === 'completed') return true;
+            return (o.works ?? []).some(
+              (w: any) =>
+                w.status === 'completed' &&
+                !w.salary_paid &&
+                !String(w.notes || '').includes('[reviewed]'),
+            );
+          })
+        : rawRows;
+
+    const mapped = filteredRows.map((o: any) => {
       const dates = extractOrderDates(o);
       const effectiveDate = getOrderEffectiveDate(o);
       const copy = {
         ...o,
+        is_partial_work_review: filter === 'review' && o.status !== 'completed',
         started_at: dates.started_at,
         completed_at: dates.completed_at,
         effective_date: effectiveDate,

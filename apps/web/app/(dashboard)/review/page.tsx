@@ -344,7 +344,7 @@ export default function ReviewPage() {
     }
   }
 
-  const handleApproveServiceOrder = (orderId: string) =>
+  const handleApproveServiceOrder = (orderId: string, isPartialWorkReview = false) =>
     runAction(
       orderId,
       setApprovingId,
@@ -352,9 +352,13 @@ export default function ReviewPage() {
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve', lifecycle_status: 'approved' }),
+        body: JSON.stringify(
+          isPartialWorkReview
+            ? { action: 'approve_works' }
+            : { action: 'approve', lifecycle_status: 'approved' },
+        ),
       },
-      'Ошибка утверждения',
+      isPartialWorkReview ? 'Ошибка фиксации оценки работ' : 'Ошибка утверждения',
     );
 
   const handleApproveExternalServiceOrder = (
@@ -655,7 +659,9 @@ export default function ReviewPage() {
                   expanded={expandedGarageOrderIds.has(order.id)}
                   onToggle={() => toggleInSet(setExpandedGarageOrderIds, order.id)}
                   onEdit={() => setEditServiceOrder(order)}
-                  onApprove={() => handleApproveServiceOrder(order.id)}
+                  onApprove={() =>
+                    handleApproveServiceOrder(order.id, Boolean(order.is_partial_work_review))
+                  }
                   onApproveExternal={handleApproveExternalServiceOrder}
                   onReturn={() => handleReturnServiceOrder(order.id)}
                   onDelete={() => handleDeleteServiceOrder(order.id)}
