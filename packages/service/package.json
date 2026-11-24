@@ -16,9 +16,11 @@
     "@saldacargo/shared": "workspace:*",
     "@saldacargo/shared-types": "workspace:*",
     "@types/pdf-parse": "^1.1.5",
+    "nodemailer": "^10.6.1",
     "pdf-parse": "1.1.1"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
     "typescript": "^5.4.5"
   }
 }

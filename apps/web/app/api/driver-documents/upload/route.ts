@@ -1,47 +1,39 @@
-import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { ApiError } from '@saldacargo/shared';
+import { uploadEntityDocument } from '@saldacargo/domain-service';
+import { createWebApiHandler } from '@/lib/api';
+import { createAdminClient } from '@/lib/supabase/admin';
 
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
-}
+export const POST = createWebApiHandler(
+  {
+    roles: ['owner', 'admin'],
+    routeName: 'POST /api/driver-documents/upload',
+    rateLimit: { keyPrefix: 'web-driver-doc-upload', limit: 30, windowMs: 60_000 },
+  },
+  async ({ auth, request }) => {
+    const formData = await request.formData();
+    const file = formData.get('file');
+    const driverId = String(formData.get('driverId') ?? '').trim();
+    const isPassPackageRaw = formData.get('isPassPackage');
+    const isPassPackage = isPassPackageRaw === null ? true : String(isPassPackageRaw) !== 'false';
 
-function cors(res: NextResponse) {
-  res.headers.set('Access-Control-Allow-Origin', '*');
-  return res;
-}
-
-export async function POST(req: Request) {
-  try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    const driverId = formData.get('driverId') as string;
-
-    if (!file || !driverId) {
-      return cors(NextResponse.json({ error: 'Missing file or driverId' }, { status: 400 }));
+    if (!(file instanceof File) || !driverId) {
+      throw new ApiError(400, 'Необходимо передать файл и driverId');
     }
 
+    const buffer = Buffer.from(await file.arrayBuffer());
     const supabase = createAdminClient();
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${driverId}-${Date.now()}.${fileExt}`;
-    const filePath = `${driverId}/${fileName}`;
+    const doc = await uploadEntityDocument(supabase, {
+      organizationId: auth.organizationId,
+      entityKind: 'driver',
+      entityId: driverId,
+      uploadedBy: auth.userId,
+      fileName: file.name,
+      mimeType: file.type,
+      buffer,
+      isPassPackage,
+    });
 
-    // Upload to storage using service role key (bypasses RLS)
-    const { error: uploadError } = await supabase.storage
-      .from('driver-documents')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    return cors(NextResponse.json({ success: true }));
-  } catch (err: any) {
-    console.error('Upload error:', err);
-    return cors(NextResponse.json({ error: err.message }, { status: 500 }));
-  }
-}
+    return NextResponse.json(doc, { status: 201 });
+  },
+);

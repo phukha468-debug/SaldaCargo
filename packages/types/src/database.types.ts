@@ -856,8 +856,12 @@ export type Database = {
           driver_id: string;
           file_name: string;
           file_path: string;
+          file_size_bytes: number | null;
           file_type: string;
           id: string;
+          is_pass_package: boolean;
+          mime_type: string | null;
+          organization_id: string;
         };
         Insert: {
           created_at?: string | null;
@@ -865,8 +869,12 @@ export type Database = {
           driver_id: string;
           file_name: string;
           file_path: string;
+          file_size_bytes?: number | null;
           file_type: string;
           id?: string;
+          is_pass_package?: boolean;
+          mime_type?: string | null;
+          organization_id: string;
         };
         Update: {
           created_at?: string | null;
@@ -874,8 +882,12 @@ export type Database = {
           driver_id?: string;
           file_name?: string;
           file_path?: string;
+          file_size_bytes?: number | null;
           file_type?: string;
           id?: string;
+          is_pass_package?: boolean;
+          mime_type?: string | null;
+          organization_id?: string;
         };
         Relationships: [
           {
@@ -886,6 +898,107 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      asset_documents: {
+        Row: {
+          asset_id: string;
+          created_at: string;
+          created_by: string | null;
+          file_name: string;
+          file_path: string;
+          file_size_bytes: number | null;
+          file_type: string;
+          id: string;
+          is_pass_package: boolean;
+          mime_type: string | null;
+          organization_id: string;
+        };
+        Insert: {
+          asset_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          file_name: string;
+          file_path: string;
+          file_size_bytes?: number | null;
+          file_type: string;
+          id?: string;
+          is_pass_package?: boolean;
+          mime_type?: string | null;
+          organization_id: string;
+        };
+        Update: {
+          asset_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          file_name?: string;
+          file_path?: string;
+          file_size_bytes?: number | null;
+          file_type?: string;
+          id?: string;
+          is_pass_package?: boolean;
+          mime_type?: string | null;
+          organization_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'asset_documents_asset_id_fkey';
+            columns: ['asset_id'];
+            isOneToOne: false;
+            referencedRelation: 'assets';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      document_sends: {
+        Row: {
+          asset_id: string | null;
+          attachments_count: number;
+          counterparty_id: string | null;
+          created_at: string;
+          document_ids: Json;
+          driver_id: string | null;
+          external_message_id: string | null;
+          id: string;
+          organization_id: string;
+          provider: string;
+          recipient_email: string;
+          sent_by: string | null;
+          subject: string | null;
+          total_size_bytes: number;
+        };
+        Insert: {
+          asset_id?: string | null;
+          attachments_count?: number;
+          counterparty_id?: string | null;
+          created_at?: string;
+          document_ids?: Json;
+          driver_id?: string | null;
+          external_message_id?: string | null;
+          id?: string;
+          organization_id: string;
+          provider?: string;
+          recipient_email: string;
+          sent_by?: string | null;
+          subject?: string | null;
+          total_size_bytes?: number;
+        };
+        Update: {
+          asset_id?: string | null;
+          attachments_count?: number;
+          counterparty_id?: string | null;
+          created_at?: string;
+          document_ids?: Json;
+          driver_id?: string | null;
+          external_message_id?: string | null;
+          id?: string;
+          organization_id?: string;
+          provider?: string;
+          recipient_email?: string;
+          sent_by?: string | null;
+          subject?: string | null;
+          total_size_bytes?: number;
+        };
+        Relationships: [];
       };
       fault_catalog: {
         Row: {

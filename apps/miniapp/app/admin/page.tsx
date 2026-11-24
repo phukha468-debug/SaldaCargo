@@ -98,6 +98,18 @@ export default function AdminDashboard() {
         </button>
       </header>
 
+      {/* Быстрая отправка документов на пропуск */}
+      <Link
+        href="/admin/send-docs"
+        className="flex items-center justify-between gap-3 bg-[#FFDD2D] hover:bg-[#FCC521] active:scale-[0.99] text-[#111111] rounded-2xl px-4 py-3 shadow-xs transition-all"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="text-lg leading-none shrink-0">📄</span>
+          <span className="text-xs font-extrabold truncate">Отправить документы на пропуск</span>
+        </div>
+        <span className="text-xs font-black shrink-0">→</span>
+      </Link>
+
       {/* Форма перевода */}
       {showTransfer && (
         <TransferForm

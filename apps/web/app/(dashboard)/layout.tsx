@@ -25,6 +25,12 @@ const navItems: readonly NavItem[] = [
     icon: 'local_shipping',
     modules: ['transport', 'expeditor'],
   },
+  {
+    href: '/send-docs',
+    label: 'Отправить документы',
+    icon: 'send',
+    modules: ['transport', 'expeditor'],
+  },
   { href: '/review', label: 'Ревью рейсов', icon: 'rate_review', modules: ['transport'] },
   {
     href: '/finance',

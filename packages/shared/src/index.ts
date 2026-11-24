@@ -2139,3 +2139,4 @@ export * from './crypto';
 export * from './modules';
 export * from './orgSettings';
 export * from './tripCalc';
+export * from './passDocumentsSchemas';

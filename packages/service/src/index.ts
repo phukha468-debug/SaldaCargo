@@ -5,7 +5,9 @@ export * from './finance';
 export * from './integrations';
 export * from './organization';
 export * from './providers/telematics';
+export * from './providers/email';
 export * from './telematics';
+export * from './documents';
 
 /**
  * Вычисляет фактическое время работы из сегментов таймера.

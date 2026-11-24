@@ -1,43 +1,30 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
+import { sendPassDocumentsPackage, sendPassPackageBodySchema } from '@saldacargo/domain-service';
+import { createWebApiHandler } from '@/lib/api';
+import { createAdminClient } from '@/lib/supabase/admin';
 
-export async function POST(req: Request) {
-  try {
-    const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key');
-    const { email, fileUrl, fileName } = await req.json();
-
-    if (!email || !fileUrl || !fileName) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    // Скачиваем файл из Supabase Storage по публичной или подписанной ссылке
-    const fileResponse = await fetch(fileUrl);
-    
-    if (!fileResponse.ok) {
-      return NextResponse.json({ error: 'Failed to fetch file from storage' }, { status: 500 });
-    }
-
-    const fileBuffer = await fileResponse.arrayBuffer();
-    const buffer = Buffer.from(fileBuffer);
-
-    // Отправляем письмо через Resend
-    const data = await resend.emails.send({
-      from: 'Acme <onboarding@resend.dev>', // Используем дефолтный тестовый адрес Resend
-      to: [email],
-      subject: `Документы водителя: ${fileName}`,
-      text: 'Во вложении находятся документы водителя.',
-      attachments: [
-        {
-          filename: fileName,
-          content: buffer,
-        },
-      ],
+export const POST = createWebApiHandler(
+  {
+    roles: ['owner', 'admin'],
+    bodySchema: sendPassPackageBodySchema,
+    routeName: 'POST /api/driver-documents/send-email',
+    rateLimit: { keyPrefix: 'web-pass-send', limit: 20, windowMs: 60_000 },
+  },
+  async ({ auth, body }) => {
+    const supabase = createAdminClient();
+    const result = await sendPassDocumentsPackage(supabase, {
+      organizationId: auth.organizationId,
+      sentBy: auth.userId,
+      recipientEmail: body.recipientEmail,
+      counterpartyId: body.counterpartyId ?? null,
+      assetId: body.assetId ?? null,
+      driverId: body.driverId ?? null,
+      assetDocumentIds: body.assetDocumentIds,
+      driverDocumentIds: body.driverDocumentIds,
+      subject: body.subject ?? null,
+      bodyText: body.bodyText ?? null,
+      includeSignature: body.includeSignature,
     });
-
-    return NextResponse.json({ success: true, data });
-  } catch (error: any) {
-    console.error('Error sending email:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+    return NextResponse.json({ success: true, ...result });
+  },
+);

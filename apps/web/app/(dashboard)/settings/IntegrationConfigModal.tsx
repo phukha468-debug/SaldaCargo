@@ -103,11 +103,41 @@ export const PROVIDER_META: Record<
       },
     ],
   },
+  smtp: {
+    title: 'Почта SMTP (Mail.ru / Яндекс)',
+    shortDesc: 'Отправка документов напрямую с вашего ящика (Mail.ru, Яндекс и др.)',
+    icon: 'mail',
+    fields: [
+      { key: 'host', label: 'SMTP-сервер', placeholder: 'smtp.mail.ru', secret: false },
+      { key: 'port', label: 'Порт (465 SSL)', placeholder: '465', secret: false },
+      { key: 'user', label: 'Email ящика (логин)', placeholder: 'name@mail.ru', secret: false },
+      {
+        key: 'pass',
+        label: 'Пароль для внешнего приложения',
+        placeholder: 'Создаётся в безопасности Mail.ru',
+        secret: true,
+      },
+      {
+        key: 'from_name',
+        label: 'Имя отправителя (необязательно)',
+        placeholder: 'Диспетчерская служба',
+        secret: false,
+      },
+    ],
+  },
   resend: {
     title: 'Resend (Email)',
     shortDesc: 'Отправка документов и уведомлений на почту',
     icon: 'mail',
-    fields: [{ key: 'api_key', label: 'Resend API Key', placeholder: 're_...', secret: true }],
+    fields: [
+      { key: 'api_key', label: 'Resend API Key', placeholder: 're_...', secret: true },
+      {
+        key: 'from_email',
+        label: 'Адрес отправителя (From)',
+        placeholder: 'Документы <docs@your-domain.ru>',
+        secret: false,
+      },
+    ],
   },
 };
 

@@ -11,6 +11,7 @@ const ALLOWED_PROVIDERS = new Set<IntegrationProvider>([
   'opti24',
   'max_bot',
   'yandex_maps',
+  'smtp',
   'resend',
 ]);
 

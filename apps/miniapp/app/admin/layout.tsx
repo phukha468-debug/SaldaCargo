@@ -15,6 +15,7 @@ interface MiniappNavItem {
 const NAV: MiniappNavItem[] = [
   { href: '/admin', label: 'Главная', icon: '🏠' },
   { href: '/admin/trips', label: 'Рейсы', icon: '🚛', module: 'transport' },
+  { href: '/admin/send-docs', label: 'Документы', icon: '📄', module: 'transport' },
   { href: '/admin/finance', label: 'Финансы', icon: '💰', module: 'finance' },
   { href: '/admin/staff', label: 'Персонал', icon: '👥', module: 'payroll' },
 ];

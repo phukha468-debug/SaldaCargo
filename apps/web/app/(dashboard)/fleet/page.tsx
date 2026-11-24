@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { AssetDocuments } from '@/components/AssetDocuments';
 import { useState, useMemo } from 'react';
 import { Money, cn } from '@saldacargo/ui';
 import {
@@ -2346,6 +2347,9 @@ function VehicleEditModal({
               onChange={f('notes')}
             />
           </div>
+
+          {/* 7. Документы ТС (СТС, ОСАГО и др. для отправки на пропуск) */}
+          {asset && <AssetDocuments assetId={asset.id} />}
 
           {error && (
             <p className="text-xs text-rose-600 font-bold bg-rose-50 p-2.5 rounded-xl border border-rose-200">

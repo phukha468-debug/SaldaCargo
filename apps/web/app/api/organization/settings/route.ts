@@ -24,6 +24,7 @@ const KNOWN_PROVIDERS: IntegrationProvider[] = [
   'opti24',
   'max_bot',
   'yandex_maps',
+  'smtp',
   'resend',
 ];
 
@@ -39,6 +40,8 @@ function hasEnvFallbackForTenant1(provider: IntegrationProvider): boolean {
       return Boolean(getMaxBotEnv()?.token);
     case 'yandex_maps':
       return Boolean(getYandexMapsEnv()?.apiKey);
+    case 'smtp':
+      return Boolean(process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim());
     case 'resend':
       return Boolean(process.env.RESEND_API_KEY?.trim());
     default:
