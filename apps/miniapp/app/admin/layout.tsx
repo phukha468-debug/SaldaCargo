@@ -48,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen bg-zinc-50 pb-24">
       {children}
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-200 z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-200 z-30">
         <div className="flex max-w-lg mx-auto">
           {visibleNav.map((item) => {
             const active =

@@ -93,9 +93,9 @@ export function ServiceOrderEditModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center p-0 sm:p-4">
-      <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-end justify-center p-0 sm:p-4">
+      <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92dvh] flex flex-col overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-zinc-100 px-5 pt-4 pb-3">
           <div>
             <h3 className="font-black text-zinc-900 text-base">
               Редактировать наряд №{order.order_number}
@@ -112,188 +112,197 @@ export function ServiceOrderEditModal({
           </button>
         </div>
 
-        {!isOwn && (
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1">
-                Модель авто
-              </label>
-              <input
-                type="text"
-                value={clientModel}
-                onChange={(e) => setClientModel(e.target.value)}
-                className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1">
-                Госномер
-              </label>
-              <input
-                type="text"
-                value={clientReg}
-                onChange={(e) => setClientReg(e.target.value.toUpperCase())}
-                className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold uppercase"
-              />
-            </div>
-          </div>
-        )}
-
-        <div>
-          <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1">
-            Пробег (одометр, км)
-          </label>
-          <input
-            type="number"
-            value={odometer}
-            onChange={(e) => setOdometer(e.target.value)}
-            placeholder="Пробег в км"
-            className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase text-zinc-400">
-              Перечень работ ({works.length})
-            </span>
-            <button
-              type="button"
-              onClick={() => setWorks((prev) => [...prev, { name: '', minutes: '30' }])}
-              className="text-xs font-black text-emerald-600"
-            >
-              + Добавить работу
-            </button>
-          </div>
-          {works.map((w, idx) => (
-            <div key={idx} className="bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 space-y-2">
-              <div className="flex items-center gap-2">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
+          {!isOwn && (
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1">
+                  Модель авто
+                </label>
                 <input
                   type="text"
-                  value={w.name}
+                  value={clientModel}
+                  onChange={(e) => setClientModel(e.target.value)}
+                  className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1">
+                  Госномер
+                </label>
+                <input
+                  type="text"
+                  value={clientReg}
+                  onChange={(e) => setClientReg(e.target.value.toUpperCase())}
+                  className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold uppercase"
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1">
+              Пробег (одометр, км)
+            </label>
+            <input
+              type="number"
+              value={odometer}
+              onChange={(e) => setOdometer(e.target.value)}
+              placeholder="Пробег в км"
+              className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm font-bold"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-zinc-400">
+                Перечень работ ({works.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setWorks((prev) => [...prev, { name: '', minutes: '30' }])}
+                className="text-xs font-black text-emerald-600"
+              >
+                + Добавить работу
+              </button>
+            </div>
+            {works.map((w, idx) => (
+              <div
+                key={idx}
+                className="bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 space-y-2"
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={w.name}
+                    onChange={(e) =>
+                      setWorks((prev) =>
+                        prev.map((item, i) =>
+                          i === idx ? { ...item, name: e.target.value } : item,
+                        ),
+                      )
+                    }
+                    placeholder="Наименование работы"
+                    className="flex-1 bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                  />
+                  {works.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setWorks((prev) => prev.filter((_, i) => i !== idx))}
+                      className="text-rose-500 text-xs font-black px-1.5"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-zinc-500 font-bold">Время (мин):</span>
+                  <input
+                    type="number"
+                    value={w.minutes}
+                    onChange={(e) =>
+                      setWorks((prev) =>
+                        prev.map((item, i) =>
+                          i === idx ? { ...item, minutes: e.target.value } : item,
+                        ),
+                      )
+                    }
+                    className="w-24 bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-xs font-black"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-zinc-400">
+                Запчасти автосервиса ({parts.length})
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setParts((prev) => [...prev, { name: '', quantity: '1', unit: 'шт' }])
+                }
+                className="text-xs font-black text-emerald-600"
+              >
+                + Добавить запчасть
+              </button>
+            </div>
+            {parts.map((p, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={p.name}
                   onChange={(e) =>
-                    setWorks((prev) =>
+                    setParts((prev) =>
                       prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item)),
                     )
                   }
-                  placeholder="Наименование работы"
-                  className="flex-1 bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
+                  placeholder="Название запчасти"
+                  className="flex-1 border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
                 />
-                {works.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setWorks((prev) => prev.filter((_, i) => i !== idx))}
-                    className="text-rose-500 text-xs font-black px-1.5"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-zinc-500 font-bold">Время (мин):</span>
                 <input
                   type="number"
-                  value={w.minutes}
+                  value={p.quantity}
                   onChange={(e) =>
-                    setWorks((prev) =>
+                    setParts((prev) =>
                       prev.map((item, i) =>
-                        i === idx ? { ...item, minutes: e.target.value } : item,
+                        i === idx ? { ...item, quantity: e.target.value } : item,
                       ),
                     )
                   }
-                  className="w-24 bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-xs font-black"
+                  className="w-16 border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-bold text-center"
                 />
+                <button
+                  type="button"
+                  onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))}
+                  className="text-rose-500 text-xs font-black px-1.5"
+                >
+                  ✕
+                </button>
               </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase text-zinc-400">
-              Запчасти автосервиса ({parts.length})
-            </span>
-            <button
-              type="button"
-              onClick={() => setParts((prev) => [...prev, { name: '', quantity: '1', unit: 'шт' }])}
-              className="text-xs font-black text-emerald-600"
-            >
-              + Добавить запчасть
-            </button>
+            ))}
           </div>
-          {parts.map((p, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={p.name}
-                onChange={(e) =>
-                  setParts((prev) =>
-                    prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item)),
-                  )
-                }
-                placeholder="Название запчасти"
-                className="flex-1 border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-              />
-              <input
-                type="number"
-                value={p.quantity}
-                onChange={(e) =>
-                  setParts((prev) =>
-                    prev.map((item, i) =>
-                      i === idx ? { ...item, quantity: e.target.value } : item,
-                    ),
-                  )
-                }
-                className="w-16 border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-bold text-center"
-              />
+
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-emerald-900">
+                ЗП Механика (авторасчёт: {autoPay} ₽)
+              </span>
               <button
                 type="button"
-                onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))}
-                className="text-rose-500 text-xs font-black px-1.5"
+                onClick={() => setManualPay(autoPay)}
+                className="text-[10px] font-black text-emerald-700 underline"
               >
-                ✕
+                По времени ({totalMinutes} мин)
               </button>
             </div>
-          ))}
-        </div>
-
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-emerald-900">
-              ЗП Механика (авторасчёт: {autoPay} ₽)
-            </span>
-            <button
-              type="button"
-              onClick={() => setManualPay(autoPay)}
-              className="text-[10px] font-black text-emerald-700 underline"
-            >
-              По времени ({totalMinutes} мин)
-            </button>
+            <input
+              type="number"
+              step="0.01"
+              value={manualPay}
+              onChange={(e) => setManualPay(e.target.value)}
+              placeholder={autoPay}
+              className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-2 text-sm font-black text-emerald-900"
+            />
           </div>
-          <input
-            type="number"
-            step="0.01"
-            value={manualPay}
-            onChange={(e) => setManualPay(e.target.value)}
-            placeholder={autoPay}
-            className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-2 text-sm font-black text-emerald-900"
-          />
+
+          <div>
+            <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1">
+              Комментарий руководителя
+            </label>
+            <input
+              type="text"
+              value={adminNote}
+              onChange={(e) => setAdminNote(e.target.value)}
+              placeholder="Заметка к наряду..."
+              className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-xs font-medium"
+            />
+          </div>
         </div>
 
-        <div>
-          <label className="text-[10px] font-black uppercase text-zinc-400 block mb-1">
-            Комментарий руководителя
-          </label>
-          <input
-            type="text"
-            value={adminNote}
-            onChange={(e) => setAdminNote(e.target.value)}
-            placeholder="Заметка к наряду..."
-            className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-xs font-medium"
-          />
-        </div>
-
-        <div className="flex gap-2 pt-2">
+        <div className="shrink-0 flex gap-2 border-t border-zinc-100 bg-white px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={onClose}
