@@ -17,7 +17,7 @@ jobs:
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://salda-cargo-web.vercel.app/api/cron/wialon-sync" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "User-Agent: GitHub-Actions-Kontur2/1.0" \
-            --max-time 25)
+            --max-time 55)
 
           HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1 | cut -d':' -f2)
@@ -28,5 +28,6 @@ jobs:
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
             echo "Wialon telematics sync completed successfully."
           else
-            echo "Warning: Sync returned status $HTTP_STATUS"
+            echo "Error: Sync returned status $HTTP_STATUS"
+            exit 1
           fi

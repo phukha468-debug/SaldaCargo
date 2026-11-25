@@ -19,7 +19,11 @@ export function SettleModal({
   const initialSalaryTotal = parseFloat(user.debt);
   const advanceBalance = parseFloat(user.advance_balance ?? '0');
 
-  const { data: settleData, isLoading: isSettleLoading } = useQuery<{
+  const {
+    data: settleData,
+    isLoading: isSettleLoading,
+    refetch: refetchSettle,
+  } = useQuery<{
     salary_total: string;
     advance_balance: string;
     offset: string;
@@ -29,6 +33,8 @@ export function SettleModal({
   }>({
     queryKey: ['staff-settle-data', user.id],
     queryFn: () => fetch(`/api/staff/settle?user_id=${user.id}`).then((r) => r.json()),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const pendingList = useMemo(
@@ -158,7 +164,10 @@ export function SettleModal({
       });
     },
     onSuccess,
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => {
+      setError(e.message);
+      void refetchSettle();
+    },
     onSettled: () => setIsSubmitting(false),
   });
 
@@ -246,14 +255,14 @@ export function SettleModal({
         ) : (
           <>
             <div className="p-6 space-y-3">
-              {user.accountable_hold && user.accountable_hold > 0 && (
+              {(user.accountable_hold ?? 0) > 0 && (
                 <div className="bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-xs flex items-center justify-between text-amber-900 font-medium">
                   <span className="flex items-center gap-1.5">
                     <span>💵</span>
                     <span>Подотчёт на руках:</span>
                   </span>
                   <span className="font-black text-amber-950">
-                    {user.accountable_hold.toLocaleString('ru-RU')} ₽ (долг в кассу)
+                    {(user.accountable_hold ?? 0).toLocaleString('ru-RU')} ₽ (долг в кассу)
                   </span>
                 </div>
               )}

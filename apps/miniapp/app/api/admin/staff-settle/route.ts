@@ -135,7 +135,7 @@ export async function GET(request: Request) {
     payout: payout.toFixed(2),
     uncollected_cash: uncollectedCash.toFixed(2),
     unconfirmed_count: unconfirmedCount,
-    pending_transactions: pendingPayroll ?? [],
+    pending_transactions: activePending,
     history: history.map((t: any) => {
       const isPayoutTx =
         t.from_wallet_id !== null ||

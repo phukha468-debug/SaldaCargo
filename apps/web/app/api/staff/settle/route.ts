@@ -123,7 +123,7 @@ export async function GET(request: Request) {
     offset: offset.toFixed(2),
     payout: payout.toFixed(2),
     uncollected_cash: uncollectedCash.toFixed(2),
-    pending_transactions: pendingPayroll ?? [],
+    pending_transactions: activePending,
   });
 }
 

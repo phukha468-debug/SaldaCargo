@@ -9,7 +9,7 @@ interface MiniappAssetItem {
   id: string;
   short_name: string | null;
   reg_number: string | null;
-  type: string | null;
+  status: string | null;
   docs_count: number;
   pass_docs_count: number;
 }

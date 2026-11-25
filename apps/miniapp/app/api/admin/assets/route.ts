@@ -6,7 +6,7 @@ interface RawAssetRow {
   id: string;
   short_name: string | null;
   reg_number: string | null;
-  type: string | null;
+  status: string | null;
 }
 
 interface RawAssetDocCountRow {
@@ -26,9 +26,9 @@ export const GET = createMiniappApiHandler(
       await Promise.all([
         supabase
           .from('assets')
-          .select('id, short_name, reg_number, type')
+          .select('id, short_name, reg_number, status')
           .eq('organization_id', auth.organizationId)
-          .eq('is_active', true)
+          .eq('status', 'active')
           .order('short_name'),
         supabase
           .from('asset_documents')
@@ -56,7 +56,7 @@ export const GET = createMiniappApiHandler(
       id: a.id,
       short_name: a.short_name,
       reg_number: a.reg_number,
-      type: a.type,
+      status: a.status,
       docs_count: totalByAsset.get(a.id) ?? 0,
       pass_docs_count: passByAsset.get(a.id) ?? 0,
     }));
