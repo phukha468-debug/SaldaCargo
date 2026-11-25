@@ -69,9 +69,20 @@ function parseVehicleState(raw: unknown): VehicleState {
 
 function extractRecordedStopKeys(routesJson: unknown): string[] {
   if (!Array.isArray(routesJson)) return [];
-  return routesJson
-    .map((item) => (item && typeof item === 'object' ? (item as RouteStopRecord).stop_key : null))
-    .filter((k): k is string => typeof k === 'string' && k.length > 0);
+  const keys: string[] = [];
+  for (const item of routesJson) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as RouteStopRecord;
+    if (typeof rec.stop_key === 'string' && rec.stop_key.length > 0) {
+      keys.push(rec.stop_key);
+    }
+    if (Array.isArray(rec.merged_stop_keys)) {
+      for (const mk of rec.merged_stop_keys) {
+        if (typeof mk === 'string' && mk.length > 0) keys.push(mk);
+      }
+    }
+  }
+  return keys;
 }
 
 /**
@@ -329,12 +340,9 @@ export async function processVehicleSnapshot(params: {
     let trackDepartedWest = false;
 
     if (activeTrip && snapshot.externalUnitId) {
-      const tripStartSec = Math.floor(new Date(activeTrip.startedAtIso).getTime() / 1000);
-      const fromSec = Math.max(
-        tripStartSec - 900,
-        prevState.lastMsgTs > 0 ? prevState.lastMsgTs - 900 : tripStartSec - 900,
-      );
       const toSec = Math.floor(nowMs / 1000);
+      const tripStartSec = Math.floor(new Date(activeTrip.startedAtIso).getTime() / 1000);
+      const fromSec = Math.max(tripStartSec - 900, toSec - 6 * 3600);
 
       const track = await provider.fetchTrack(snapshot.externalUnitId, fromSec, toSec);
       const detected = detectStopsFromTrack(track, orgSettings.telematics, {
@@ -380,8 +388,6 @@ export async function processVehicleSnapshot(params: {
       webhookHint,
     });
 
-    nextState = evaluation.nextState;
-
     for (const cmd of evaluation.commands) {
       const refs = await executeAutopilotCommand(
         {
@@ -398,6 +404,9 @@ export async function processVehicleSnapshot(params: {
       if (refs.tripId) activeTripId = refs.tripId;
       commandsExecuted.push(cmd.type);
     }
+
+    // Сохраняем nextState только после успешного выполнения всех команд (иначе в finally сохранится prevState)
+    nextState = evaluation.nextState;
 
     await recordDiagnostics(supabase, organizationId, asset.id, source, evaluation.diagnostics, {
       orderId: activeOrderId,

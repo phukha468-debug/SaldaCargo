@@ -7,10 +7,12 @@ import {
   type TripRouteLeg,
 } from '@saldacargo/shared';
 import { resolveOrganizationFinanceIds } from '../organization/settings';
+import { calculateDistanceMeters } from '../providers/telematics/types';
 import type { AutopilotCommand, GeocodedCandidateStop } from './stateMachine';
 
 export interface RouteStopRecord {
   stop_key: string;
+  merged_stop_keys?: string[];
   type: 'loading' | 'unloading' | 'stop';
   geofence_id: string | null;
   name: string;
@@ -21,6 +23,7 @@ export interface RouteStopRecord {
   arrived_at: string;
   departed_at: string;
   duration_min: number;
+  odometer_km?: number;
   is_known: boolean;
   had_signal_gap: boolean;
 }
@@ -71,12 +74,26 @@ function buildRouteLegs(
   stops: readonly RouteStopRecord[],
   baseName: string,
   timezone: string,
+  tripStartedAtIso?: string | null,
+  tripStartOdoKm?: number,
 ): TripRouteLeg[] {
   if (stops.length === 0) return [];
   const legs: TripRouteLeg[] = [];
+  const baseDepIso = tripStartedAtIso || stops[0]!.arrived_at;
+  const startOdoBase =
+    Number.isFinite(tripStartOdoKm) && (tripStartOdoKm ?? 0) > 0 ? Math.round(tripStartOdoKm!) : 0;
+
+  let runningOdo = startOdoBase;
   const points = [
-    { name: baseName, arr: stops[0]!.arrived_at, dep: stops[0]!.arrived_at },
-    ...stops.map((s) => ({ name: s.name, arr: s.arrived_at, dep: s.departed_at })),
+    { name: baseName, arr: baseDepIso, dep: baseDepIso, odo: startOdoBase },
+    ...stops.map((s) => {
+      const stopOdo =
+        typeof s.odometer_km === 'number' && Number.isFinite(s.odometer_km) && s.odometer_km > 0
+          ? Math.round(s.odometer_km)
+          : runningOdo;
+      if (stopOdo > runningOdo) runningOdo = stopOdo;
+      return { name: s.name, arr: s.arrived_at, dep: s.departed_at, odo: runningOdo };
+    }),
   ];
 
   for (let i = 0; i < points.length - 1; i++) {
@@ -87,6 +104,9 @@ function buildRouteLegs(
     const durSec = Math.max(60, Math.floor((arrDate.getTime() - depDate.getTime()) / 1000));
     const h = Math.floor(durSec / 3600);
     const m = Math.floor((durSec % 3600) / 60);
+    const legStartOdo = fromPt.odo;
+    const legEndOdo = toPt.odo >= fromPt.odo ? toPt.odo : fromPt.odo;
+    const legKm = legStartOdo > 0 && legEndOdo > legStartOdo ? legEndOdo - legStartOdo : 0;
 
     legs.push({
       n: i + 1,
@@ -109,9 +129,9 @@ function buildRouteLegs(
         month: '2-digit',
         timeZone: timezone,
       }),
-      km: 0,
-      startOdo: 0,
-      endOdo: 0,
+      km: legKm,
+      startOdo: legStartOdo,
+      endOdo: legEndOdo,
     });
   }
   return legs;
@@ -339,8 +359,13 @@ async function executeRecordStop(
   if (!order) return;
 
   const existingStops = asRouteStops(order.routes_json);
-  if (existingStops.some((s) => s.stop_key === cmd.stop.stopKey)) {
-    return; // Идемпотентность: точка уже записана
+  const alreadyRecorded = existingStops.some(
+    (s) =>
+      s.stop_key === cmd.stop.stopKey ||
+      (Array.isArray(s.merged_stop_keys) && s.merged_stop_keys.includes(cmd.stop.stopKey)),
+  );
+  if (alreadyRecorded) {
+    return; // Идемпотентность: точка уже записана (или склеена с предыдущей)
   }
 
   const stopType: 'loading' | 'unloading' | 'stop' =
@@ -364,11 +389,50 @@ async function executeRecordStop(
     arrived_at: new Date(cmd.stop.startTs * 1000).toISOString(),
     departed_at: new Date(cmd.stop.endTs * 1000).toISOString(),
     duration_min: cmd.stop.durationMin,
+    odometer_km: cmd.stop.odometerKm > 0 ? Math.round(cmd.stop.odometerKm) : undefined,
     is_known: cmd.geo.isKnown,
     had_signal_gap: cmd.stop.hadSignalGap,
   };
 
-  const updatedStops = [...existingStops, newStop];
+  // Склейка подряд идущих стоянок на одном объекте / в одной геозоне (< 1000 м при совпадении city/name)
+  const lastStop = existingStops[existingStops.length - 1];
+  const isSameGeofence = Boolean(
+    lastStop && lastStop.geofence_id !== null && lastStop.geofence_id === newStop.geofence_id,
+  );
+  const isNearbySamePlace = Boolean(
+    lastStop &&
+    (lastStop.city === newStop.city || lastStop.name === newStop.name) &&
+    calculateDistanceMeters(lastStop.lat, lastStop.lon, newStop.lat, newStop.lon) < 1000,
+  );
+
+  let updatedStops: RouteStopRecord[];
+  if (lastStop && (isSameGeofence || isNearbySamePlace)) {
+    const mergedKeys = Array.from(
+      new Set([...(lastStop.merged_stop_keys ?? []), lastStop.stop_key, newStop.stop_key]),
+    );
+    const prevDepMs = new Date(lastStop.departed_at).getTime();
+    const newArrMs = new Date(newStop.arrived_at).getTime();
+    const newDepMs = new Date(newStop.departed_at).getTime();
+    const prevArrMs = new Date(lastStop.arrived_at).getTime();
+    const maxDepMs = Math.max(prevDepMs, newDepMs);
+    const mergedDurationMin =
+      newArrMs <= prevDepMs
+        ? Math.max(lastStop.duration_min, Math.round((maxDepMs - prevArrMs) / 60_000))
+        : lastStop.duration_min + newStop.duration_min;
+
+    const mergedLast: RouteStopRecord = {
+      ...lastStop,
+      stop_key: newStop.stop_key,
+      merged_stop_keys: mergedKeys,
+      departed_at: new Date(maxDepMs).toISOString(),
+      duration_min: mergedDurationMin,
+      odometer_km: newStop.odometer_km ?? lastStop.odometer_km,
+      had_signal_gap: lastStop.had_signal_gap || newStop.had_signal_gap,
+    };
+    updatedStops = [...existingStops.slice(0, -1), mergedLast];
+  } else {
+    updatedStops = [...existingStops, newStop];
+  }
   const prevPayload = asRecord(order.raw_parser_payload);
   const visitedPresets = Array.isArray(prevPayload.visited_preset_geofence_ids)
     ? prevPayload.visited_preset_geofence_ids.map(String)
@@ -380,7 +444,6 @@ async function executeRecordStop(
   }
 
   const loadingAddr = asRecord(order.loading_address_json);
-  const unloadingAddr = asRecord(order.unloading_address_json);
 
   const nextLoading =
     loadingAddr.raw && String(loadingAddr.raw).trim().length > 0
@@ -390,13 +453,12 @@ async function executeRecordStop(
         : { city: cmd.geo.city, raw: cmd.geo.rawAddress };
 
   const hasSecondPoint = updatedStops.length >= 2;
-  const nextUnloading = hasSecondPoint
-    ? { city: cmd.geo.city, raw: cmd.geo.rawAddress }
-    : unloadingAddr.raw && String(unloadingAddr.raw).trim().length > 0
-      ? unloadingAddr
+  const nextUnloading =
+    hasSecondPoint || cmd.geo.role === 'unloading'
+      ? { city: cmd.geo.city, raw: cmd.geo.rawAddress }
       : preset?.default_unloading_raw
         ? { city: preset.default_unloading_city ?? '', raw: preset.default_unloading_raw }
-        : unloadingAddr;
+        : { city: cmd.geo.city, raw: cmd.geo.rawAddress };
 
   const routeSummary = updatedStops.map((s) => s.name).join(' ➔ ');
   const orderUpdate: Record<string, unknown> = {
@@ -431,7 +493,7 @@ async function executeRecordStop(
   // Обновляем маршрутный лист в trips.driver_note для любых маршрутов
   const { data: tripRow } = await ctx.supabase
     .from('trips')
-    .select('driver_note')
+    .select('driver_note, started_at, odometer_start')
     .eq('id', cmd.tripId)
     .eq('organization_id', ctx.organizationId)
     .maybeSingle();
@@ -441,6 +503,8 @@ async function executeRecordStop(
       updatedStops,
       ctx.orgSettings.telematics.base_geofence.name,
       ctx.orgSettings.branding.timezone,
+      tripRow.started_at ? String(tripRow.started_at) : null,
+      Number(tripRow.odometer_start ?? 0),
     );
     if (legs.length > 0) {
       const updatedNote = encodeTripRouteSheet(legs, String(tripRow.driver_note ?? ''), true);

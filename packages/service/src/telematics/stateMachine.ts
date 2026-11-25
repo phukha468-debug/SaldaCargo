@@ -124,6 +124,8 @@ export interface StateMachineOutput {
   diagnostics: DiagnosticRecord[];
 }
 
+const MIN_WEBHOOK_DEPARTURE_DIST_M = 3000;
+
 function isValidPoint(pt: TelematicsPoint | null): pt is TelematicsPoint {
   if (!pt) return false;
   if (!Number.isFinite(pt.lat) || !Number.isFinite(pt.lon)) return false;
@@ -279,8 +281,11 @@ export function evaluateVehicleTelemetry(input: StateMachineInput): StateMachine
     }
   }
 
-  // 4. СЦЕНАРИЙ A: Машина ВНЕ геозоны базы
-  if (!insideBase) {
+  // 4. СЦЕНАРИЙ A: Машина ВНЕ геозоны базы (либо пришёл явный вебхук выезда за пределами 3 км от базы)
+  const isWebhookDepartureOutsideGarage =
+    !activeTrip && input.webhookHint === 'departure' && distBaseM >= MIN_WEBHOOK_DEPARTURE_DIST_M;
+
+  if (!insideBase || isWebhookDepartureOutsideGarage) {
     nextState.baseConfirmSinceIso = null;
 
     // A1. Выход из транзита (уже есть активный рейс)
@@ -318,6 +323,20 @@ export function evaluateVehicleTelemetry(input: StateMachineInput): StateMachine
         position.speedKmh <= thresholds.stop_max_speed_kmh && newlyRecordedExternalStops > 0
           ? 'AT_STOP'
           : 'EN_ROUTE';
+      if (source === 'webhook' && input.webhookHint === 'arrival') {
+        diagnostics.push({
+          decision: 'ignored_gps_noise',
+          reasonCode: 'webhook_ignored',
+          reasonText: `Вебхук прибытия отклонён: машина вне геозоны базы (${Math.round(distBaseM)} м > ${base.radius_m} м)`,
+          stateBefore: prevState.state,
+          stateAfter: nextState.state,
+          telemetrySnapshot: {
+            ...baseSnapshot,
+            dist_base_m: Math.round(distBaseM),
+            webhook_hint: input.webhookHint,
+          },
+        });
+      }
       return { nextState, commands, diagnostics };
     }
 
@@ -378,6 +397,23 @@ export function evaluateVehicleTelemetry(input: StateMachineInput): StateMachine
     nextState.state = 'AT_BASE';
     nextState.baseConfirmSinceIso = null;
     nextState.transitEnteredAtIso = null;
+    if (source === 'webhook' && input.webhookHint) {
+      diagnostics.push({
+        decision: 'ignored_gps_noise',
+        reasonCode: 'webhook_ignored',
+        reasonText:
+          input.webhookHint === 'departure'
+            ? `Вебхук выезда отклонён: машина слишком близко к базе (${Math.round(distBaseM)} м < ${MIN_WEBHOOK_DEPARTURE_DIST_M} м)`
+            : `Вебхук прибытия отклонён: нет активного рейса (${Math.round(distBaseM)} м от базы)`,
+        stateBefore: prevState.state,
+        stateAfter: 'AT_BASE',
+        telemetrySnapshot: {
+          ...baseSnapshot,
+          dist_base_m: Math.round(distBaseM),
+          webhook_hint: input.webhookHint,
+        },
+      });
+    }
     return { nextState, commands, diagnostics };
   }
 

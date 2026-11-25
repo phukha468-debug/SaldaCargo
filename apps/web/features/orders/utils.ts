@@ -1,5 +1,14 @@
 import { DISTANCE_MATRIX, MONTH_NAMES_RU } from './constants';
-import type { OrderItem, PipelineFolderId } from './types';
+import type { OrderItem, OrderRouteEntry, PipelineFolderId, TelematicsRouteStop } from './types';
+
+export function isTelematicsRouteStop(entry: unknown): entry is TelematicsRouteStop {
+  if (!entry || typeof entry !== 'object') return false;
+  const obj = entry as Record<string, unknown>;
+  return (
+    typeof obj.stop_key === 'string' ||
+    (typeof obj.name === 'string' && !('loading_city' in obj) && !('unloading_city' in obj))
+  );
+}
 
 export function isStrictDocCounterparty(name?: string | null): boolean {
   if (!name) return false;
@@ -44,16 +53,30 @@ export function normalizeCounterpartySearch(str?: string | null): string {
 }
 
 export function formatRouteSummary(order: OrderItem): string {
-  const routes = order.routes_json || order.raw_parser_payload?.routes;
-  if (routes && Array.isArray(routes) && routes.length > 1) {
-    const count = routes.length;
-    const first =
-      'loading_city' in (routes[0] || {}) ? routes[0]?.loading_city || 'Шайтанка' : 'Шайтанка';
-    const last =
-      'unloading_city' in (routes[count - 1] || {})
-        ? routes[count - 1]?.unloading_city || 'Салда'
-        : 'Салда';
-    return `${first} → ${last} (${count} точки)`;
+  const routes: OrderRouteEntry[] | undefined =
+    order.routes_json || (order.raw_parser_payload?.routes as OrderRouteEntry[] | undefined);
+  if (routes && Array.isArray(routes) && routes.length > 0) {
+    if (routes.some((r) => isTelematicsRouteStop(r))) {
+      const names = routes
+        .filter((r): r is TelematicsRouteStop => isTelematicsRouteStop(r))
+        .map((r) => r.name || r.city || '')
+        .filter(Boolean);
+      if (names.length > 0) {
+        return names.join(' ➔ ');
+      }
+    }
+    if (routes.length > 1) {
+      const count = routes.length;
+      const firstEntry = routes[0];
+      const lastEntry = routes[count - 1];
+      const first =
+        firstEntry && 'loading_city' in firstEntry
+          ? firstEntry.loading_city || 'Шайтанка'
+          : 'Шайтанка';
+      const last =
+        lastEntry && 'unloading_city' in lastEntry ? lastEntry.unloading_city || 'Салда' : 'Салда';
+      return `${first} → ${last} (${count} точки)`;
+    }
   }
   const load = order.loading_address_json?.city || 'Погрузка';
   const unload = order.unloading_address_json?.city || 'Салда';

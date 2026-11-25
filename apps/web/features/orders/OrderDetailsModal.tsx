@@ -2,7 +2,7 @@
 
 import { PIPELINE_FOLDERS } from './constants';
 import { OrderDetailsCargoAndVehicle } from './OrderDetailsCargoAndVehicle';
-import type { OrderItem, RouteStop } from './types';
+import type { OrderItem, OrderRouteEntry } from './types';
 
 export function OrderDetailsModal({
   order,
@@ -29,9 +29,9 @@ export function OrderDetailsModal({
   onDelete: () => void;
   onOpenDocTemplates?: () => void;
 }) {
-  const routes: RouteStop[] =
+  const routes: OrderRouteEntry[] =
     order.routes_json ||
-    (order.raw_parser_payload?.routes as unknown as RouteStop[] | undefined) ||
+    (order.raw_parser_payload?.routes as unknown as OrderRouteEntry[] | undefined) ||
     [];
   const isMulti = routes.length > 1;
   const isTransit = Boolean(

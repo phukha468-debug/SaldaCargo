@@ -11,6 +11,26 @@ export interface RouteStop {
   weight_kg?: number;
 }
 
+export interface TelematicsRouteStop {
+  stop_key: string;
+  merged_stop_keys?: string[];
+  type?: 'loading' | 'unloading' | 'stop';
+  geofence_id?: string | null;
+  name: string;
+  city?: string;
+  raw_address?: string;
+  lat?: number;
+  lon?: number;
+  arrived_at?: string;
+  departed_at?: string;
+  duration_min?: number;
+  odometer_km?: number;
+  is_known?: boolean;
+  had_signal_gap?: boolean;
+}
+
+export type OrderRouteEntry = RouteStop | TelematicsRouteStop;
+
 export interface BillingDocsWorkflow {
   waybill_type?: 'paper' | 'etrn'; // Строго один из двух: либо бумага (ТрН), либо ЭТрН!
   waybill_number?: string | null;
@@ -158,7 +178,7 @@ export interface OrderItem {
   planned_loading_at: string | null;
   planned_delivery_at: string | null;
 
-  routes_json?: RouteStop[];
+  routes_json?: OrderRouteEntry[];
   client_orders?: ClientOrderPart[];
   prevent_salda_auto_finish?: boolean;
   salda_transit_count?: number;

@@ -1,6 +1,26 @@
 'use client';
 
-import type { ClientOrderPart, OrderItem, RouteStop } from './types';
+import type { ClientOrderPart, OrderItem, OrderRouteEntry } from './types';
+import { isTelematicsRouteStop } from './utils';
+
+function formatStopTime(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Yekaterinburg',
+  });
+}
+
+function formatStopDuration(min?: number): string {
+  if (typeof min !== 'number' || !Number.isFinite(min) || min <= 0) return '';
+  if (min < 60) return `${min} мин`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}ч ${m}м` : `${h}ч`;
+}
 
 export function OrderDetailsCargoAndVehicle({
   order,
@@ -12,13 +32,14 @@ export function OrderDetailsCargoAndVehicle({
   onAssignVehicle,
 }: {
   order: OrderItem;
-  routes: RouteStop[];
+  routes: OrderRouteEntry[];
   isMulti: boolean;
   isTransit: boolean;
   isCash: boolean;
   onQuickEditRate?: (order: OrderItem) => void;
   onAssignVehicle: () => void;
 }) {
+  const hasTelematicsStops = routes.length > 0 && routes.some((r) => isTelematicsRouteStop(r));
   const subOrders: ClientOrderPart[] =
     order.client_orders && order.client_orders.length > 0
       ? order.client_orders
@@ -32,7 +53,14 @@ export function OrderDetailsCargoAndVehicle({
         <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
           <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
             <span>📍</span>
-            <span>Маршрут перевозки {isMulti ? `(${routes.length} сегмента)` : ''}</span>
+            <span>
+              Маршрут перевозки{' '}
+              {hasTelematicsStops
+                ? `(${routes.length} ${routes.length === 1 ? 'точка GPS' : 'точек GPS'})`
+                : isMulti
+                  ? `(${routes.length} сегмента)`
+                  : ''}
+            </span>
           </span>
 
           {isTransit && (
@@ -43,41 +71,96 @@ export function OrderDetailsCargoAndVehicle({
           )}
         </div>
 
-        {isMulti ? (
-          <div className="space-y-2">
-            {routes.map((r, idx) => (
-              <div
-                key={r.id || idx}
-                className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1"
-              >
-                <div className="flex items-center justify-between font-bold text-slate-800 text-[11px]">
-                  <span>
-                    Сегмент #{idx + 1}: {r.loading_city} → {r.unloading_city}
-                  </span>
-                  {r.weight_kg && (
-                    <span className="text-slate-500 font-mono">{r.weight_kg} кг</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[10.5px]">
-                  <div>
-                    <span className="text-slate-500 block">Погрузка (Откуда):</span>
-                    <span className="font-semibold text-slate-900">{r.loading_address}</span>
-                    {r.loading_org && (
-                      <span className="text-slate-500 block text-[10px]">ЛОП: {r.loading_org}</span>
+        {hasTelematicsStops ? (
+          <div className="space-y-1.5">
+            {routes.map((r, idx) => {
+              if (!isTelematicsRouteStop(r)) return null;
+              const arrTime = formatStopTime(r.arrived_at);
+              const depTime = formatStopTime(r.departed_at);
+              const timeRange = arrTime && depTime ? `${arrTime}–${depTime}` : arrTime || depTime;
+              const durLabel = formatStopDuration(r.duration_min);
+              const typeBadge =
+                r.type === 'loading'
+                  ? { label: 'Погрузка', cls: 'bg-sky-100 text-sky-800 border-sky-200' }
+                  : r.type === 'unloading'
+                    ? {
+                        label: 'Выгрузка',
+                        cls: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                      }
+                    : { label: 'Стоянка', cls: 'bg-slate-100 text-slate-700 border-slate-200' };
+              return (
+                <div
+                  key={r.stop_key || idx}
+                  className="px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-2 text-[11px]"
+                >
+                  <div className="min-w-0 flex items-center gap-1.5 truncate">
+                    <span className="font-mono font-bold text-slate-400 shrink-0">#{idx + 1}</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded border text-[9.5px] font-bold shrink-0 ${typeBadge.cls}`}
+                    >
+                      {typeBadge.label}
+                    </span>
+                    <span className="font-bold text-slate-900 shrink-0">
+                      {r.name || r.city || 'Точка'}
+                    </span>
+                    {r.raw_address && r.raw_address !== r.name && (
+                      <span className="text-slate-500 truncate" title={r.raw_address}>
+                        · {r.raw_address}
+                      </span>
                     )}
                   </div>
-                  <div>
-                    <span className="text-slate-500 block">Выгрузка (Куда):</span>
-                    <span className="font-semibold text-slate-900">{r.unloading_address}</span>
-                    {r.unloading_org && (
-                      <span className="text-slate-500 block text-[10px]">
-                        Получатель: {r.unloading_org}
+                  <div className="flex items-center gap-2 shrink-0 text-[10.5px] tabular-nums">
+                    {timeRange && <span className="text-slate-500">{timeRange}</span>}
+                    {durLabel && (
+                      <span className="font-bold text-slate-800 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
+                        ⏱ {durLabel}
                       </span>
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        ) : isMulti ? (
+          <div className="space-y-2">
+            {routes.map((r, idx) => {
+              if (isTelematicsRouteStop(r)) return null;
+              return (
+                <div
+                  key={r.id || idx}
+                  className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1"
+                >
+                  <div className="flex items-center justify-between font-bold text-slate-800 text-[11px]">
+                    <span>
+                      Сегмент #{idx + 1}: {r.loading_city} → {r.unloading_city}
+                    </span>
+                    {r.weight_kg && (
+                      <span className="text-slate-500 font-mono">{r.weight_kg} кг</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                    <div>
+                      <span className="text-slate-500 block">Погрузка (Откуда):</span>
+                      <span className="font-semibold text-slate-900">{r.loading_address}</span>
+                      {r.loading_org && (
+                        <span className="text-slate-500 block text-[10px]">
+                          ЛОП: {r.loading_org}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Выгрузка (Куда):</span>
+                      <span className="font-semibold text-slate-900">{r.unloading_address}</span>
+                      {r.unloading_org && (
+                        <span className="text-slate-500 block text-[10px]">
+                          Получатель: {r.unloading_org}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
