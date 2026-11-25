@@ -105,6 +105,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       deleted_expense_ids?: string[];
       odometer_start?: number;
       odometer_end?: number;
+      trip_type?: string;
+      asset_id?: string | null;
       driver_id?: string | null;
       admin_note?: string;
       driver_note?: string;
@@ -115,7 +117,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     // 1. Получаем данные рейса (статус, грузчики, водитель)
     const { data: trip, error: tripError } = await (supabase.from('trips') as any)
-      .select('id, lifecycle_status, driver_id, loader_id, loader2_id, admin_note, driver_note')
+      .select(
+        'id, organization_id, lifecycle_status, driver_id, loader_id, loader2_id, admin_note, driver_note',
+      )
       .eq('id', id)
       .single();
 
@@ -123,10 +127,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: tripError?.message ?? 'Рейс не найден' }, { status: 404 });
     }
 
-    // 1.1 Обновление данных самого рейса (одометр, заметки, подотчёт наличных, водитель)
+    // 1.1 Обновление данных самого рейса (одометр, тип, ТС, заметки, подотчёт наличных, водитель)
     const tripUpdates: Record<string, any> = {};
     if (body.odometer_start !== undefined) tripUpdates.odometer_start = body.odometer_start;
     if (body.odometer_end !== undefined) tripUpdates.odometer_end = body.odometer_end;
+    if (body.trip_type !== undefined) tripUpdates.trip_type = body.trip_type;
+    if (body.asset_id !== undefined && body.asset_id) tripUpdates.asset_id = body.asset_id;
     if (body.admin_note !== undefined) tripUpdates.admin_note = body.admin_note;
     if (body.driver_note !== undefined) tripUpdates.driver_note = body.driver_note;
 
@@ -408,6 +414,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         if (isNew) {
           if (amountNum > 0) {
             const { error: insExpErr } = await (supabase.from('trip_expenses') as any).insert({
+              ...(trip.organization_id ? { organization_id: trip.organization_id } : {}),
               trip_id: id,
               category_id: exp.category_id || CAT_FUEL,
               amount: amountNum.toFixed(2),

@@ -1,35 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-
-export interface RouteStop {
-  id: string;
-  loading_city: string;
-  loading_address: string;
-  loading_org?: string;
-  unloading_city: string;
-  unloading_address: string;
-  unloading_org?: string;
-  cargo_name?: string;
-  weight_kg?: number;
-}
-
-export interface ClientOrderPart {
-  id: string;
-  client_id: string;
-  client_name: string;
-  client_inn?: string;
-  base_doc_number: string;
-  cargo_name: string;
-  weight_gross_kg: number | '';
-  price_without_vat: number | '';
-  forwarder_id?: string;
-  forwarder_name?: string;
-  payment_method?: 'bank_invoice' | 'cash' | 'qr' | 'debt_cash';
-  payment_terms?: string;
-}
+import { FINANCIAL_CATEGORIES } from '@saldacargo/shared';
 
 export interface SmartTripOrderModalProps {
   trip: any;
@@ -38,816 +12,1052 @@ export interface SmartTripOrderModalProps {
   onSaved: () => void;
 }
 
+type TripKind = 'intercity' | 'local' | 'prr';
+type OrderPayMethod = 'bank_invoice' | 'cash' | 'debt_cash';
+
+interface EditableOrder {
+  id: string;
+  isNew?: boolean;
+  counterparty_id: string;
+  counterparty_name: string;
+  is_legal_entity?: boolean;
+  amount: string;
+  driver_pay: string;
+  driver_loader_pay: string;
+  payment_method: OrderPayMethod;
+  description: string;
+  loaders: Array<{ id: string; name: string; pay: string }>;
+}
+
+interface EditableExpense {
+  id: string;
+  isNew?: boolean;
+  kind: 'cube' | 'fuel' | 'other';
+  liters: string;
+  amount: string;
+  payment_method: string;
+  description: string;
+  category_id: string;
+}
+
+const TRIP_KINDS: Array<{ value: TripKind; label: string }> = [
+  { value: 'intercity', label: '🛣 Межгород' },
+  { value: 'local', label: '🏙 По городу' },
+  { value: 'prr', label: '👷 ПРР' },
+];
+
+const PAY_OPTIONS: Array<{
+  value: OrderPayMethod;
+  icon: string;
+  label: string;
+  activeCls: string;
+}> = [
+  {
+    value: 'bank_invoice',
+    icon: '🏦',
+    label: 'Р/С',
+    activeCls: 'border-purple-600 bg-purple-50 ring-2 ring-purple-200 text-purple-900',
+  },
+  {
+    value: 'cash',
+    icon: '💵',
+    label: 'Наличные',
+    activeCls: 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200 text-emerald-900',
+  },
+  {
+    value: 'debt_cash',
+    icon: '⏳',
+    label: 'Долг',
+    activeCls: 'border-rose-600 bg-rose-50 ring-2 ring-rose-200 text-rose-900',
+  },
+];
+
+let tempIdSeq = 0;
+function makeTempId(prefix: string): string {
+  tempIdSeq += 1;
+  return `${prefix}-${tempIdSeq}`;
+}
+
+function normalizeTripKind(raw: unknown): TripKind {
+  if (raw === 'local' || raw === 'moving') return 'local';
+  if (raw === 'prr' || raw === 'loaders_only') return 'prr';
+  return 'intercity';
+}
+
+function normalizePayMethod(raw: unknown): OrderPayMethod {
+  if (raw === 'cash') return 'cash';
+  if (raw === 'debt_cash' || raw === 'debt') return 'debt_cash';
+  return 'bank_invoice';
+}
+
+function parseCubeLiters(desc: string | null | undefined): string {
+  if (!desc) return '';
+  const m = desc.match(/(\d+(?:[.,]\d+)?)\s*л/i);
+  return m?.[1] ? m[1].replace(',', '.') : '';
+}
+
+function extractLoadersFromOrder(order: any): Array<{ id: string; name: string; pay: string }> {
+  if (Array.isArray(order?.loaders_data) && order.loaders_data.length > 0) {
+    return order.loaders_data.map((l: any) => ({
+      id: String(l.id || ''),
+      name: String(l.name || ''),
+      pay: String(l.pay ?? '0'),
+    }));
+  }
+  const list: Array<{ id: string; name: string; pay: string }> = [];
+  if (order?.loader_id || Number(order?.loader_pay || 0) > 0) {
+    list.push({
+      id: String(order.loader_id || ''),
+      name: String(order.loader?.name || ''),
+      pay: String(order.loader_pay ?? '0'),
+    });
+  }
+  if (order?.loader2_id || Number(order?.loader2_pay || 0) > 0) {
+    list.push({
+      id: String(order.loader2_id || ''),
+      name: String(order.loader2?.name || ''),
+      pay: String(order.loader2_pay ?? '0'),
+    });
+  }
+  return list;
+}
+
 export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTripOrderModalProps) {
-  const [selectedClientType, setSelectedClientType] = useState<'vsmpo' | 'geostroy' | 'manual'>(
-    'manual',
-  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [tripTypeOpen, setTripTypeOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [searchByIdx, setSearchByIdx] = useState<Record<number, string>>({});
 
-  // Загрузка справочника контрагентов
+  const [tripKind, setTripKind] = useState<TripKind>(() => normalizeTripKind(trip?.trip_type));
+  const [assetId, setAssetId] = useState<string>(() => trip?.asset?.id || trip?.asset_id || '');
+  const [driverId, setDriverId] = useState<string>(() => trip?.driver?.id || trip?.driver_id || '');
+  const [odometerStart, setOdometerStart] = useState<string>(() =>
+    trip?.odometer_start != null ? String(trip.odometer_start) : '',
+  );
+  const [odometerEnd, setOdometerEnd] = useState<string>(() =>
+    trip?.odometer_end != null ? String(trip.odometer_end) : '',
+  );
+  const [adminNote, setAdminNote] = useState<string>(() => trip?.admin_note || '');
+
+  const [deletedOrderIds, setDeletedOrderIds] = useState<string[]>([]);
+  const [deletedExpenseIds, setDeletedExpenseIds] = useState<string[]>([]);
+
+  const [orders, setOrders] = useState<EditableOrder[]>(() => {
+    const active = (trip?.trip_orders ?? []).filter((o: any) => o.lifecycle_status !== 'cancelled');
+    if (active.length > 0) {
+      return active.map((o: any) => ({
+        id: String(o.id),
+        isNew: false,
+        counterparty_id: String(o.counterparty_id || o.counterparty?.id || ''),
+        counterparty_name: String(o.counterparty?.name || o.counterparty_name || ''),
+        amount: o.amount != null ? String(Number(o.amount)) : '',
+        driver_pay: o.driver_pay != null ? String(Number(o.driver_pay)) : '',
+        driver_loader_pay:
+          o.driver_loader_pay != null && Number(o.driver_loader_pay) > 0
+            ? String(Number(o.driver_loader_pay))
+            : '',
+        payment_method: normalizePayMethod(o.payment_method),
+        description: String(o.description || ''),
+        loaders: extractLoadersFromOrder(o),
+      }));
+    }
+    return [
+      {
+        id: makeTempId('new-order'),
+        isNew: true,
+        counterparty_id: '',
+        counterparty_name: '',
+        amount: '',
+        driver_pay: '',
+        driver_loader_pay: '',
+        payment_method: 'debt_cash',
+        description: '',
+        loaders: [],
+      },
+    ];
+  });
+
+  const [expenses, setExpenses] = useState<EditableExpense[]>(() =>
+    (trip?.trip_expenses ?? []).map((e: any) => {
+      const isCube = e.payment_method === 'cube';
+      const isFuel =
+        isCube ||
+        e.category_id === FINANCIAL_CATEGORIES.FUEL ||
+        String(e.category?.name || '')
+          .toLowerCase()
+          .includes('топлив') ||
+        String(e.category?.name || '')
+          .toLowerCase()
+          .includes('гсм');
+      return {
+        id: String(e.id),
+        isNew: false,
+        kind: isCube ? 'cube' : isFuel ? 'fuel' : 'other',
+        liters: isCube ? parseCubeLiters(e.description) : '',
+        amount: e.amount != null ? String(Number(e.amount)) : '',
+        payment_method: String(e.payment_method || (isCube ? 'cube' : 'fuel_card')),
+        description: String(e.description || ''),
+        category_id: String(
+          e.category_id ||
+            e.category?.id ||
+            (isFuel ? FINANCIAL_CATEGORIES.FUEL : FINANCIAL_CATEGORIES.OTHER),
+        ),
+      };
+    }),
+  );
+
+  // Справочники
+  const { data: orgCtx } = useQuery<{
+    settings?: { finance?: { cube_fuel_price_per_liter?: number } };
+  }>({
+    queryKey: ['miniapp-org-context'],
+    queryFn: () =>
+      fetch('/api/organization/context')
+        .then((r) => (r.ok ? r.json() : {}))
+        .catch(() => ({})),
+    staleTime: 60_000,
+    enabled: isOpen,
+  });
+
+  const cubePrice = Number(orgCtx?.settings?.finance?.cube_fuel_price_per_liter ?? 60) || 60;
+
   const { data: counterparties = [] } = useQuery<any[]>({
     queryKey: ['miniapp-counterparties-all'],
     queryFn: () =>
       fetch('/api/driver/counterparties')
-        .then((r) => r.json())
+        .then((r) => (r.ok ? r.json() : []))
         .catch(() => []),
-    staleTime: 60000,
+    staleTime: 60_000,
+    enabled: isOpen,
   });
 
-  // Загрузка автомобилей
   const { data: vehicles = [] } = useQuery<any[]>({
     queryKey: ['miniapp-vehicles-list'],
     queryFn: () =>
       fetch('/api/vehicles/public')
-        .then((r) => r.json())
+        .then((r) => (r.ok ? r.json() : []))
         .catch(() => []),
-    staleTime: 60000,
+    staleTime: 60_000,
+    enabled: isOpen,
   });
 
-  // Загрузка водителей
   const { data: drivers = [] } = useQuery<any[]>({
     queryKey: ['miniapp-drivers-list'],
     queryFn: () =>
       fetch('/api/users/public?role=driver')
-        .then((r) => r.json())
+        .then((r) => (r.ok ? r.json() : []))
         .catch(() => []),
-    staleTime: 60000,
+    staleTime: 60_000,
+    enabled: isOpen,
   });
 
-  // Защита от автозавершения через Салду
-  const [preventSaldaAutoFinish, setPreventSaldaAutoFinish] = useState<boolean>(() => {
-    const note = (trip?.driver_note || '') + ' ' + (trip?.admin_note || '');
-    return note.toLowerCase().includes('шайтан') || note.toLowerCase().includes('мамин');
+  const { data: allLoaders = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['miniapp-loaders-list'],
+    queryFn: () =>
+      fetch('/api/driver/loaders')
+        .then((r) => (r.ok ? r.json() : []))
+        .catch(() => []),
+    staleTime: 60_000,
+    enabled: isOpen,
   });
 
-  // Точки маршрута (мульти-стоп)
-  const [routes, setRoutes] = useState<RouteStop[]>(() => {
-    const note = (trip?.driver_note || '') + ' ' + (trip?.admin_note || '');
-    const isShaytanka = note.toLowerCase().includes('шайтан');
-    const isMaminskoe = note.toLowerCase().includes('мамин');
+  const topCounterparties = useMemo(
+    () => counterparties.filter((c) => c.is_top).slice(0, 6),
+    [counterparties],
+  );
 
-    return [
-      {
-        id: '1',
-        loading_city: isShaytanka ? 'Шайтанка' : 'Верхняя Салда',
-        loading_address: isShaytanka ? 'пос. Шайтанка, Свердловская обл.' : 'г. Верхняя Салда',
-        loading_org: isShaytanka ? 'ООО "Геостройиндустрия"' : '',
-        unloading_city: isMaminskoe ? 'Маминское' : '',
-        unloading_address: isMaminskoe ? 'село Маминское, склад 2' : '',
-        unloading_org: isMaminskoe ? 'ООО "Геостройиндустрия"' : '',
-        cargo_name: isShaytanka ? 'Пробы керна' : 'Груз',
-        weight_kg: 0,
-      },
-    ];
-  });
+  if (!isOpen || !trip) return null;
 
-  // Заказы клиентов (мульти-заказы)
-  const [clientOrders, setClientOrders] = useState<ClientOrderPart[]>(() => {
-    const active = (trip?.trip_orders ?? []).filter(
-      (to: any) => to.lifecycle_status !== 'cancelled',
-    );
-    if (active.length > 0) {
-      return active.map((to: any, idx: number) => ({
-        id: to.id || String(idx + 1),
-        client_id: to.counterparty_id || '',
-        client_name: to.counterparty?.name || to.counterparty_name || '',
-        base_doc_number: to.invoice_number || String(trip.trip_number || ''),
-        cargo_name: to.description || '',
-        weight_gross_kg: '',
-        price_without_vat: to.amount ? Number(to.amount) : '',
-        forwarder_name: '— (Прямой заказчик)',
-        payment_method: to.payment_method || 'bank_invoice',
-      }));
-    }
+  const currentKindLabel = TRIP_KINDS.find((k) => k.value === tripKind)?.label ?? '🛣 Межгород';
 
-    return [
-      {
-        id: '1',
-        client_id: '',
-        client_name: '',
-        base_doc_number: String(trip?.trip_number || ''),
-        cargo_name: 'Пробы керна',
-        weight_gross_kg: '',
-        price_without_vat: 40000,
-        payment_method: 'bank_invoice',
-      },
-    ];
-  });
-
-  // Форма общих параметров рейса
-  const [form, setForm] = useState<any>(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const active = (trip?.trip_orders ?? []).filter(
-      (to: any) => to.lifecycle_status !== 'cancelled',
-    );
-    const firstTo = active[0];
-
-    const totalDriverPay = active.reduce(
-      (s: number, o: any) => s + (parseFloat(o.driver_pay || '0') || 0),
-      0,
-    );
-
-    return {
-      base_doc_number: String(trip?.trip_number || ''),
-      base_doc_date: trip?.started_at ? trip.started_at.slice(0, 10) : today,
-      client_id: firstTo?.counterparty_id || '',
-      client_name: firstTo?.counterparty?.name || '',
-      assigned_vehicle_id: trip?.asset?.id || trip?.asset_id || '',
-      assigned_driver_id: trip?.driver?.id || trip?.driver_id || '',
-      driver_pay: totalDriverPay > 0 ? totalDriverPay : 7900,
-      admin_note: trip?.admin_note || '',
-      driver_note: trip?.driver_note || '',
-    };
-  });
-
-  const LOCATION_PRESETS = [
-    {
-      key: 'shaytanka',
-      label: 'Шайтанка',
-      city: 'Шайтанка',
-      address: 'пос. Шайтанка, Свердловская обл.',
-      cargo: 'Пробы керна',
-    },
-    { key: 'maminskoe', label: 'Маминское', city: 'Маминское', address: 'село Маминское, склад 2' },
-    { key: 'rezh', label: 'Реж', city: 'Реж', address: 'г. Реж, Свердловская обл.' },
-    {
-      key: 'karpinsk',
-      label: 'Карпинск',
-      city: 'Карпинск',
-      address: 'г. Карпинск, Свердловская обл.',
-    },
-    {
-      key: 'vorontsovka',
-      label: 'Воронцовка',
-      city: 'Воронцовка',
-      address: 'пос. Воронцовка, Свердловская обл.',
-    },
-    {
-      key: 'salda',
-      label: 'В.Салда (База)',
-      city: 'Верхняя Салда',
-      address: 'г. Верхняя Салда, База',
-    },
-  ];
-
-  const applyLocationPreset = (field: 'loading' | 'unloading', presetKey: string, stopIdx = 0) => {
-    const loc = LOCATION_PRESETS.find((l) => l.key === presetKey);
-    if (!loc) return;
-
-    const updated = [...routes];
-    if (updated[stopIdx]) {
-      updated[stopIdx] = {
-        ...updated[stopIdx],
-        ...(field === 'loading'
-          ? {
-              loading_city: loc.city,
-              loading_address: loc.address,
-              ...(loc.cargo ? { cargo_name: loc.cargo } : {}),
-            }
-          : { unloading_city: loc.city, unloading_address: loc.address }),
-      };
-      setRoutes(updated);
-    }
-
-    const firstLoad = updated[0]?.loading_city?.toLowerCase() || '';
-    const lastUnload = updated[updated.length - 1]?.unloading_city?.toLowerCase() || '';
-
-    if (
-      (firstLoad.includes('шайтан') && lastUnload.includes('мамин')) ||
-      (firstLoad.includes('мамин') && lastUnload.includes('шайтан'))
-    ) {
-      setPreventSaldaAutoFinish(true);
-      setForm((f: any) => ({ ...f, driver_pay: 7900 }));
-      handleUpdateClientOrder(0, { price_without_vat: 40000 });
-      setStatusMessage('⭐ Применен маршрут Шайтанка ➔ Маминское (40 000 ₽, ЗП: 7 900 ₽)');
-    }
+  const updateOrder = (idx: number, patch: Partial<EditableOrder>) => {
+    setOrders((prev) => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
   };
 
-  const selectClientPreset = (type: 'vsmpo' | 'geostroy' | 'manual') => {
-    setSelectedClientType(type);
-    if (type === 'geostroy') {
-      const geoCp = counterparties.find((c: any) => c.name?.toLowerCase().includes('геострой'));
-      const geoName = geoCp?.name || 'ООО "Геостройиндустрия"';
-      const geoId = geoCp?.id || '';
+  const addOrder = () => {
+    setOrders((prev) => [
+      ...prev,
+      {
+        id: makeTempId('new-order'),
+        isNew: true,
+        counterparty_id: '',
+        counterparty_name: '',
+        amount: '',
+        driver_pay: '0',
+        driver_loader_pay: '',
+        payment_method: 'debt_cash',
+        description: '',
+        loaders: [],
+      },
+    ]);
+  };
 
-      setClientOrders([
+  const removeOrder = (idx: number) => {
+    const target = orders[idx];
+    if (!target) return;
+    if (!target.isNew) {
+      setDeletedOrderIds((prev) => [...prev, target.id]);
+    }
+    if (orders.length === 1) {
+      setOrders([
         {
-          id: '1',
-          client_id: geoId,
-          client_name: geoName,
-          base_doc_number: form.base_doc_number || String(trip?.trip_number || '1056'),
-          cargo_name: 'Пробы керна',
-          weight_gross_kg: 3500,
-          price_without_vat: 40000,
-          payment_method: 'bank_invoice',
+          id: makeTempId('new-order'),
+          isNew: true,
+          counterparty_id: '',
+          counterparty_name: '',
+          amount: '',
+          driver_pay: '',
+          driver_loader_pay: '',
+          payment_method: 'debt_cash',
+          description: '',
+          loaders: [],
         },
       ]);
-
-      setRoutes([
-        {
-          id: '1',
-          loading_city: 'Шайтанка',
-          loading_address: 'пос. Шайтанка, Свердловская обл.',
-          loading_org: geoName + ' (ЛОП)',
-          unloading_city: 'Маминское',
-          unloading_address: 'село Маминское, склад 2',
-          unloading_org: geoName,
-          cargo_name: 'Пробы керна',
-          weight_kg: 3500,
-        },
-      ]);
-
-      setForm((prev: any) => ({
-        ...prev,
-        client_id: geoId,
-        client_name: geoName,
-        driver_pay: 7900,
-      }));
-
-      setPreventSaldaAutoFinish(true);
-      setStatusMessage(
-        '⭐ Шаблон ООО «Геостройиндустрия»: 40 000 ₽ (Шайтанка ➔ Маминское, ЗП 7 900 ₽)',
-      );
-    } else if (type === 'vsmpo') {
-      const vsmpoCp = counterparties.find((c: any) => c.name?.toLowerCase().includes('всмпо'));
-      const vsmpoName = vsmpoCp?.name || 'ПАО «Корпорация ВСМПО-АВИСМА»';
-
-      setClientOrders([
-        {
-          id: '1',
-          client_id: vsmpoCp?.id || '',
-          client_name: vsmpoName,
-          base_doc_number: `794/${new Date().getFullYear()}`,
-          cargo_name: 'Пруток 20мм, труба нерж.сталь',
-          weight_gross_kg: 1500,
-          price_without_vat: 15000,
-          forwarder_name: 'ИП Парфенов Андрей Виталиевич',
-          payment_method: 'bank_invoice',
-        },
-      ]);
-
-      setRoutes([
-        {
-          id: '1',
-          loading_city: 'Заречный',
-          loading_address: 'г. Заречный, ул. Промзона БЗСК, д 2',
-          loading_org: 'ООО "Континенталь"',
-          unloading_city: 'Верхняя Салда',
-          unloading_address: 'г. Верхняя Салда, ул. Парковая, д 1',
-          unloading_org: vsmpoName,
-          cargo_name: 'Пруток 20мм, труба нерж.сталь',
-          weight_kg: 1500,
-        },
-      ]);
-
-      setForm((prev: any) => ({
-        ...prev,
-        client_id: vsmpoCp?.id || '',
-        client_name: vsmpoName,
-      }));
-
-      setStatusMessage('⭐ Шаблон ПАО «Корпорация ВСМПО-АВИСМА» (ИП Парфенов)');
     } else {
-      setStatusMessage('📝 Режим ручного ввода');
+      setOrders((prev) => prev.filter((_, i) => i !== idx));
     }
   };
 
-  const handleAddClientOrder = () => {
-    if (clientOrders.length >= 6) {
-      alert('Максимальное количество клиентов в рейсе — 6');
-      return;
-    }
-    setClientOrders((prev) => [
+  const addLoaderToOrder = (orderIdx: number) => {
+    const first = allLoaders[0];
+    setOrders((prev) =>
+      prev.map((o, i) =>
+        i === orderIdx
+          ? {
+              ...o,
+              loaders: [...o.loaders, { id: first?.id || '', name: first?.name || '', pay: '' }],
+            }
+          : o,
+      ),
+    );
+  };
+
+  const updateLoader = (
+    orderIdx: number,
+    loaderIdx: number,
+    patch: Partial<{ id: string; name: string; pay: string }>,
+  ) => {
+    setOrders((prev) =>
+      prev.map((o, i) =>
+        i === orderIdx
+          ? {
+              ...o,
+              loaders: o.loaders.map((l, li) => (li === loaderIdx ? { ...l, ...patch } : l)),
+            }
+          : o,
+      ),
+    );
+  };
+
+  const removeLoader = (orderIdx: number, loaderIdx: number) => {
+    setOrders((prev) =>
+      prev.map((o, i) =>
+        i === orderIdx ? { ...o, loaders: o.loaders.filter((_, li) => li !== loaderIdx) } : o,
+      ),
+    );
+  };
+
+  const addExpenseRow = (kind: 'cube' | 'fuel' | 'other') => {
+    setExpenses((prev) => [
       ...prev,
       {
-        id: String(Date.now()),
-        client_id: '',
-        client_name: '',
-        base_doc_number: '',
-        cargo_name: '',
-        weight_gross_kg: '',
-        price_without_vat: '',
-        payment_method: 'bank_invoice',
+        id: makeTempId('new-exp'),
+        isNew: true,
+        kind,
+        liters: '',
+        amount: '',
+        payment_method: kind === 'cube' ? 'cube' : kind === 'fuel' ? 'fuel_card' : 'cash',
+        description: kind === 'cube' ? 'Заправка из кубика' : kind === 'fuel' ? 'Топливо АЗС' : '',
+        category_id: kind === 'other' ? FINANCIAL_CATEGORIES.OTHER : FINANCIAL_CATEGORIES.FUEL,
       },
     ]);
   };
 
-  const handleRemoveClientOrder = (idx: number) => {
-    if (clientOrders.length <= 1) return;
-    setClientOrders((prev) => prev.filter((_, i) => i !== idx));
+  const updateExpense = (idx: number, patch: Partial<EditableExpense>) => {
+    setExpenses((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
   };
 
-  const handleUpdateClientOrder = (idx: number, patch: Partial<ClientOrderPart>) => {
-    setClientOrders((prev) => {
-      const updated = [...prev];
-      updated[idx] = { ...updated[idx], ...patch } as ClientOrderPart;
-      if (idx === 0 && patch.client_name !== undefined) {
-        setForm((f: any) => ({
-          ...f,
-          client_name: patch.client_name,
-          client_id: patch.client_id || f.client_id,
-        }));
-      }
-      return updated;
-    });
-  };
-
-  const handleAddRouteStop = () => {
-    if (routes.length >= 6) {
-      alert('Максимальное количество точек — 6');
-      return;
+  const removeExpense = (idx: number) => {
+    const target = expenses[idx];
+    if (!target) return;
+    if (!target.isNew) {
+      setDeletedExpenseIds((prev) => [...prev, target.id]);
     }
-    setRoutes((prev) => [
-      ...prev,
-      {
-        id: String(Date.now()),
-        loading_city: prev[prev.length - 1]?.unloading_city || 'Верхняя Салда',
-        loading_address: prev[prev.length - 1]?.unloading_address || '',
-        unloading_city: '',
-        unloading_address: '',
-        cargo_name: 'Груз',
-        weight_kg: 0,
-      },
-    ]);
+    setExpenses((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleRemoveRouteStop = (idx: number) => {
-    if (routes.length <= 1) return;
-    setRoutes((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleSave = async (andApprove = false) => {
+  const handleSave = async () => {
     setSaving(true);
     setError('');
     try {
-      const primaryLoadCity = routes[0]?.loading_city || 'Шайтанка';
-      const primaryUnloadCity = routes[routes.length - 1]?.unloading_city || 'Маминское';
+      const ordersPayload = orders
+        .filter(
+          (o) =>
+            !o.isNew ||
+            o.counterparty_id ||
+            o.counterparty_name.trim() ||
+            Number(o.amount || 0) > 0 ||
+            Number(o.driver_pay || 0) > 0,
+        )
+        .map((o) => {
+          const validLoaders = o.loaders.filter((l) => l.id || Number(l.pay || 0) > 0);
+          const loadingPayNum = tripKind === 'local' ? Number(o.driver_loader_pay || 0) : 0;
+          return {
+            id: o.isNew ? undefined : o.id,
+            isNew: o.isNew,
+            counterparty_id: o.counterparty_id || null,
+            counterparty_name: o.counterparty_name.trim() || undefined,
+            amount: String(Number(o.amount || 0)),
+            driver_pay: String(Number(o.driver_pay || 0)),
+            driver_loader_pay: String(loadingPayNum),
+            is_driver_loader: loadingPayNum > 0,
+            direction:
+              tripKind === 'local' ? 'local' : tripKind === 'prr' ? 'loaders_only' : 'intercity',
+            loaders_data: validLoaders,
+            loader_id: validLoaders[0]?.id || null,
+            loader_pay: String(Number(validLoaders[0]?.pay || 0)),
+            loader2_id: validLoaders[1]?.id || null,
+            loader2_pay: String(Number(validLoaders[1]?.pay || 0)),
+            payment_method: o.payment_method,
+            description: o.description.trim() || undefined,
+          };
+        });
 
-      const ordersPayload = clientOrders.map((co) => ({
-        id: co.id && !co.id.startsWith('new-') && co.id.length > 10 ? co.id : undefined,
-        isNew: !co.id || co.id.startsWith('new-') || co.id.length < 10,
-        counterparty_id: co.client_id || form.client_id || null,
-        counterparty_name: co.client_name || form.client_name,
-        amount: String(co.price_without_vat || 0),
-        driver_pay: String(
-          Math.round(Number(form.driver_pay || 0) / Math.max(1, clientOrders.length)),
-        ),
-        payment_method: co.payment_method || 'bank_invoice',
-        description: `[${primaryLoadCity} ➔ ${primaryUnloadCity}] ${co.cargo_name || 'Груз'}`,
-      }));
+      const expensesPayload = expenses
+        .filter((e) => !e.isNew || Number(e.amount || 0) > 0)
+        .map((e) => {
+          const desc =
+            e.kind === 'cube'
+              ? e.liters
+                ? `Заправка из кубика: ${e.liters} л`
+                : e.description || 'Заправка из кубика'
+              : e.description.trim() || (e.kind === 'fuel' ? 'Топливо АЗС' : 'Расход в рейсе');
+          return {
+            id: e.isNew ? undefined : e.id,
+            isNew: e.isNew,
+            amount: String(Number(e.amount || 0)),
+            payment_method: e.kind === 'cube' ? 'cube' : e.payment_method,
+            description: desc,
+            category_id: e.category_id,
+          };
+        });
 
-      // Сохраняем в trips через PATCH /api/admin/trips/:id
       const res = await fetch(`/api/admin/trips/${trip.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'edit_orders',
+          trip_type: tripKind,
+          asset_id: assetId || undefined,
+          driver_id: driverId || undefined,
+          odometer_start: odometerStart !== '' ? Number(odometerStart) : undefined,
+          odometer_end: odometerEnd !== '' ? Number(odometerEnd) : undefined,
+          admin_note: adminNote,
           orders: ordersPayload,
-          driver_pay: String(Number(form.driver_pay || 0)),
-          driver_id: form.assigned_driver_id || undefined,
-          note:
-            form.admin_note ||
-            `Маршрут: ${primaryLoadCity} ➔ ${primaryUnloadCity} | ЗП: ${Number(form.driver_pay || 0)} ₽`,
+          deleted_order_ids: deletedOrderIds,
+          expenses: expensesPayload,
+          deleted_expense_ids: deletedExpenseIds,
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || 'Ошибка сохранения рейса');
+        throw new Error(data.error || 'Ошибка сохранения рейса');
       }
 
-      if (andApprove) {
-        const approveRes = await fetch(`/api/admin/trips/${trip.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'approve' }),
-        });
-        if (!approveRes.ok) {
-          const ad = await approveRes.json();
-          throw new Error(ad.error || 'Ошибка одобрения рейса');
-        }
-      }
-
-      setSaving(false);
       onSaved();
-    } catch (e: any) {
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка сохранения');
+    } finally {
       setSaving(false);
-      setError(e.message || 'Ошибка сети');
     }
   };
 
-  if (!isOpen) return null;
-
-  const totalRevenue = clientOrders.reduce(
-    (sum, co) => sum + (Number(co.price_without_vat) || 0),
-    0,
-  );
-
   return (
-    <div
-      className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl border border-zinc-200 animate-in slide-in-from-bottom duration-150 overflow-hidden">
-        {/* Хэндл для свайпа на мобильных */}
-        <div className="pt-2 pb-1 sm:hidden flex justify-center bg-white shrink-0">
-          <div className="w-10 h-1 bg-zinc-300 rounded-full" />
-        </div>
-
-        {/* Заголовок (зафиксирован вверху) */}
-        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2.5 bg-white shrink-0">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900">
-                Рейс #{form.base_doc_number || trip.trip_number}
-              </span>
-              <span className="text-[10px] font-bold text-zinc-500">
-                {trip.asset?.short_name || 'Авто'} ({trip.asset?.reg_number})
-              </span>
-            </div>
-            <h3 className="font-black text-sm text-zinc-900 mt-0.5">
-              Редактирование рейса и точек маршрута
-            </h3>
-          </div>
+    <div className="fixed inset-0 z-50 bg-zinc-50 flex flex-col overflow-hidden">
+      {/* ── Шапка ── */}
+      <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold active:scale-95 transition-transform"
+            className="text-zinc-500 text-2xl font-bold p-1 -ml-1 active:scale-95"
           >
-            ✕
+            ←
           </button>
+          <div className="min-w-0">
+            <h1 className="font-black text-zinc-900 text-lg leading-tight truncate">
+              Рейс №{trip.trip_number}
+            </h1>
+            <p className="text-xs text-zinc-500 font-bold truncate">
+              🚚 {trip.asset?.short_name || 'Авто'}
+              {trip.asset?.reg_number ? ` · ${trip.asset.reg_number}` : ''}
+              {trip.driver?.name ? ` · ${trip.driver.name}` : ''}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-9 h-9 rounded-xl bg-zinc-100 text-zinc-600 font-black text-lg flex items-center justify-center shrink-0"
+        >
+          ✕
+        </button>
+      </header>
+
+      {/* ── Скроллируемая форма ── */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28 max-w-lg w-full mx-auto space-y-4">
+        {/* 1. Тип рейса: ОДНА кнопка-спойлер (3 выбора: Межгород / По городу / ПРР) */}
+        <div className="bg-white border-2 border-zinc-200 rounded-2xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setTripTypeOpen((v) => !v)}
+            className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-zinc-50"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-extrabold text-zinc-400 uppercase tracking-wider shrink-0">
+                Тип:
+              </span>
+              <span className="font-black text-base text-zinc-900 truncate">
+                {currentKindLabel}
+              </span>
+            </div>
+            <span className="text-sm font-black text-orange-600 bg-orange-50 px-2.5 py-1 rounded-lg shrink-0">
+              {tripTypeOpen ? 'Свернуть ▴' : 'Изменить ▾'}
+            </span>
+          </button>
+
+          {tripTypeOpen && (
+            <div className="px-3 pb-3 pt-1 border-t border-zinc-100 grid grid-cols-3 gap-2">
+              {TRIP_KINDS.map((k) => {
+                const active = tripKind === k.value;
+                return (
+                  <button
+                    key={k.value}
+                    type="button"
+                    onClick={() => {
+                      setTripKind(k.value);
+                      setTripTypeOpen(false);
+                    }}
+                    className={`border-2 rounded-xl py-2.5 px-2 font-black text-sm text-center active:scale-95 transition-all ${
+                      active
+                        ? 'border-orange-600 bg-orange-50 text-orange-900'
+                        : 'border-zinc-200 bg-white text-zinc-800'
+                    }`}
+                  >
+                    {k.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Скроллящееся содержимое формы */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 overscroll-contain">
-          {/* 1. БЫСТРЫЕ ШАБЛОНЫ (ВСМПО / ГЕОСТРОЙ / РУЧНОЙ) */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block">
-              Шаблон рейса (в 1 клик):
-            </label>
-            <div className="grid grid-cols-3 gap-1.5 bg-zinc-100 p-1 rounded-xl text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => selectClientPreset('manual')}
-                className={`py-1.5 rounded-lg transition ${
-                  selectedClientType === 'manual'
-                    ? 'bg-white text-indigo-700 shadow-xs font-black'
-                    : 'text-zinc-600'
-                }`}
-              >
-                📝 Ручной
-              </button>
-              <button
-                type="button"
-                onClick={() => selectClientPreset('geostroy')}
-                className={`py-1.5 rounded-lg transition ${
-                  selectedClientType === 'geostroy'
-                    ? 'bg-white text-indigo-700 shadow-xs font-black'
-                    : 'text-zinc-600'
-                }`}
-              >
-                🏗️ Геострой
-              </button>
-              <button
-                type="button"
-                onClick={() => selectClientPreset('vsmpo')}
-                className={`py-1.5 rounded-lg transition ${
-                  selectedClientType === 'vsmpo'
-                    ? 'bg-white text-indigo-700 shadow-xs font-black'
-                    : 'text-zinc-600'
-                }`}
-              >
-                🏢 ВСМПО
-              </button>
-            </div>
-          </div>
+        {/* 2–5. Заказы / Клиенты рейса */}
+        {orders.map((order, idx) => {
+          const searchVal = (searchByIdx[idx] ?? '').trim().toLowerCase();
+          const filteredCps = searchVal
+            ? counterparties
+                .filter((c) =>
+                  String(c.name || '')
+                    .toLowerCase()
+                    .includes(searchVal),
+                )
+                .slice(0, 8)
+            : [];
 
-          {statusMessage && (
-            <div className="p-2 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-900">
-              {statusMessage}
-            </div>
-          )}
-
-          {error && (
-            <div className="p-2 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-900">
-              ❌ {error}
-            </div>
-          )}
-
-          {/* 2. ТОЧКИ МАРШРУТА (МУЛЬТИ-СТОП) */}
-          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3 space-y-2.5">
-            <div className="flex items-center justify-between border-b border-zinc-200 pb-1.5">
-              <span className="text-xs font-black text-zinc-900 flex items-center gap-1">
-                <span>📍</span>
-                <span>Точки маршрута ({routes.length})</span>
-              </span>
-              <button
-                type="button"
-                onClick={handleAddRouteStop}
-                className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-0.5"
-              >
-                + Точка
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {routes.map((stop, idx) => (
-                <div
-                  key={stop.id}
-                  className="bg-white border border-zinc-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs"
-                >
-                  <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
-                    <span>
-                      {idx === 0
-                        ? '📍 Погрузка (Откуда)'
-                        : idx === routes.length - 1
-                          ? '🏁 Выгрузка (Куда)'
-                          : `Точка #${idx + 1}`}
-                    </span>
-                    {routes.length > 1 && (
+          return (
+            <div
+              key={order.id}
+              className="space-y-4 bg-white border-2 border-zinc-200 rounded-2xl p-3.5"
+            >
+              {/* Шапка контрагента */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-0.5">
+                  <label className="text-xs font-extrabold text-zinc-500 uppercase tracking-wider">
+                    {orders.length > 1 ? `Контрагент #${idx + 1}` : 'Контрагент'}
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {idx === 0 && (
                       <button
                         type="button"
-                        onClick={() => handleRemoveRouteStop(idx)}
-                        className="text-rose-600 text-[10px] font-bold"
+                        onClick={addOrder}
+                        className="text-xs font-black text-orange-600 active:scale-95"
                       >
-                        ✕ Удалить
+                        + Ещё клиент
                       </button>
                     )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div>
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-[10px] text-zinc-500 font-bold">Откуда:</span>
-                        <div className="flex gap-1 overflow-x-auto">
-                          {LOCATION_PRESETS.slice(0, 3).map((loc) => (
-                            <button
-                              key={`load-pre-${loc.key}-${idx}`}
-                              type="button"
-                              onClick={() => applyLocationPreset('loading', loc.key, idx)}
-                              className="text-[9px] bg-zinc-100 hover:bg-zinc-200 px-1 py-0.2 rounded font-semibold text-zinc-700 shrink-0"
-                            >
-                              {loc.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <input
-                        type="text"
-                        value={stop.loading_address}
-                        onChange={(e) => {
-                          const updated = [...routes];
-                          if (updated[idx]) {
-                            updated[idx] = {
-                              ...updated[idx],
-                              loading_address: e.target.value,
-                              loading_city: e.target.value.split(',')[0] || e.target.value,
-                            };
-                            setRoutes(updated);
-                          }
-                        }}
-                        className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-[10px] text-zinc-500 font-bold">Куда:</span>
-                        <div className="flex gap-1 overflow-x-auto">
-                          {LOCATION_PRESETS.slice(1, 4).map((loc) => (
-                            <button
-                              key={`unload-pre-${loc.key}-${idx}`}
-                              type="button"
-                              onClick={() => applyLocationPreset('unloading', loc.key, idx)}
-                              className="text-[9px] bg-zinc-100 hover:bg-zinc-200 px-1 py-0.2 rounded font-semibold text-zinc-700 shrink-0"
-                            >
-                              {loc.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <input
-                        type="text"
-                        value={stop.unloading_address}
-                        onChange={(e) => {
-                          const updated = [...routes];
-                          if (updated[idx]) {
-                            updated[idx] = {
-                              ...updated[idx],
-                              unloading_address: e.target.value,
-                              unloading_city: e.target.value.split(',')[0] || e.target.value,
-                            };
-                            setRoutes(updated);
-                          }
-                        }}
-                        className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                      />
-                    </div>
+                    {orders.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeOrder(idx)}
+                        className="text-xs font-black text-rose-600 active:scale-95"
+                      >
+                        Удалить
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Защита от автозавершения через Салду */}
-            <label className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-300 rounded-xl text-amber-950 font-bold text-xs select-none">
-              <input
-                type="checkbox"
-                checked={preventSaldaAutoFinish}
-                onChange={(e) => setPreventSaldaAutoFinish(e.target.checked)}
-                className="mt-0.5 rounded"
-              />
-              <div>
-                <span>🔄 Составной маршрут через Салду (защита Wialon)</span>
-                <span className="block text-[10px] font-normal text-amber-800">
-                  Рейс не закроется при заезде на базу перед выгрузкой.
-                </span>
+                {order.counterparty_name ? (
+                  <div className="flex items-center justify-between border-2 bg-blue-50 border-blue-300 rounded-2xl px-4 min-h-[54px] py-2">
+                    <span className="font-black text-base text-blue-950 truncate pr-2">
+                      {order.counterparty_name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateOrder(idx, { counterparty_id: '', counterparty_name: '' })
+                      }
+                      className="w-9 h-9 rounded-xl bg-white text-rose-600 font-black text-lg flex items-center justify-center shrink-0 active:scale-95"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {topCounterparties.length > 0 && !searchVal && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {topCounterparties.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              updateOrder(idx, {
+                                counterparty_id: String(c.id),
+                                counterparty_name: String(c.name),
+                              });
+                              setSearchByIdx((p) => ({ ...p, [idx]: '' }));
+                            }}
+                            className="px-3 py-2 rounded-xl border-2 border-zinc-200 bg-zinc-50 text-sm font-black text-zinc-800 active:scale-95"
+                          >
+                            {c.is_legal_entity ? '🏢' : '👤'} {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={searchByIdx[idx] ?? ''}
+                        onChange={(e) => setSearchByIdx((p) => ({ ...p, [idx]: e.target.value }))}
+                        placeholder="Поиск контрагента..."
+                        className="w-full rounded-2xl border-2 border-zinc-200 bg-white px-4 h-12 text-base font-bold text-zinc-900 focus:border-orange-500 focus:outline-none"
+                      />
+                      {filteredCps.length > 0 && (
+                        <div className="mt-1 bg-white border-2 border-zinc-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto divide-y divide-zinc-100">
+                          {filteredCps.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                updateOrder(idx, {
+                                  counterparty_id: String(c.id),
+                                  counterparty_name: String(c.name),
+                                });
+                                setSearchByIdx((p) => ({ ...p, [idx]: '' }));
+                              }}
+                              className="w-full text-left px-4 py-3 text-sm font-black text-zinc-900 hover:bg-orange-50"
+                            >
+                              {c.is_legal_entity ? '🏢' : '👤'} {c.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            </label>
-          </div>
 
-          {/* 3. КЛИЕНТЫ И ЗАКАЗЫ В РЕЙСЕ */}
-          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3 space-y-2">
-            <div className="flex items-center justify-between border-b border-zinc-200 pb-1.5">
-              <span className="text-xs font-black text-zinc-900 flex items-center gap-1">
-                <span>💼</span>
-                <span>Заказчики в рейсе ({clientOrders.length})</span>
-              </span>
-              <button
-                type="button"
-                onClick={handleAddClientOrder}
-                className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-0.5"
-              >
-                + Клиент
-              </button>
-            </div>
+              {/* Сумма заказа */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-extrabold text-zinc-500 uppercase tracking-wider pl-0.5">
+                  Сумма заказа, ₽
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={order.amount}
+                  onChange={(e) => updateOrder(idx, { amount: e.target.value })}
+                  placeholder="0"
+                  className="w-full rounded-2xl border-2 border-zinc-300 bg-white px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
+                />
+              </div>
 
-            <div className="space-y-2">
-              {clientOrders.map((co, idx) => (
-                <div
-                  key={co.id}
-                  className="bg-white border border-zinc-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs"
-                >
-                  <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
-                    <span>{idx === 0 ? '👑 Основной заказ' : `📦 Догруз #${idx + 1}`}</span>
-                    {clientOrders.length > 1 && (
+              {/* Сумма за погрузку — ТОЛЬКО при «По городу» */}
+              {tripKind === 'local' && (
+                <div className="space-y-1.5 bg-orange-50/70 border-2 border-orange-200 rounded-2xl p-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-orange-900 uppercase tracking-wider">
+                      📦 Сумма за погрузку, ₽
+                    </label>
+                    {order.driver_loader_pay && (
                       <button
                         type="button"
-                        onClick={() => handleRemoveClientOrder(idx)}
-                        className="text-rose-600 text-[10px] font-bold"
+                        onClick={() => updateOrder(idx, { driver_loader_pay: '' })}
+                        className="text-xs font-black text-rose-600"
                       >
-                        ✕ Удалить
+                        Очистить
                       </button>
                     )}
                   </div>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={order.driver_loader_pay}
+                    onChange={(e) => updateOrder(idx, { driver_loader_pay: e.target.value })}
+                    placeholder="0"
+                    className="w-full rounded-xl border-2 border-orange-300 bg-white px-4 h-12 text-2xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+              )}
 
-                  <div>
-                    <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
-                      Клиент:
-                    </label>
-                    <input
-                      type="text"
-                      value={co.client_name}
-                      onChange={(e) =>
-                        handleUpdateClientOrder(idx, { client_name: e.target.value })
-                      }
-                      placeholder="ООО Геостройиндустрия"
-                      className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                    />
+              {/* Способ оплаты — 3 компактные 1-строчные кнопки */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-extrabold text-zinc-500 uppercase tracking-wider pl-0.5">
+                  Способ оплаты
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PAY_OPTIONS.map((opt) => {
+                    const active = order.payment_method === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => updateOrder(idx, { payment_method: opt.value })}
+                        className={`border-2 rounded-xl py-2.5 px-2 flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                          active ? opt.activeCls : 'border-zinc-200 bg-white text-zinc-800'
+                        }`}
+                      >
+                        <span className="text-base leading-none">{opt.icon}</span>
+                        <span className="font-black text-sm leading-none">{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ЗП водителя + грузчики */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-0.5">
+                  <label className="text-xs font-extrabold text-zinc-500 uppercase tracking-wider">
+                    ЗП водителя, ₽
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => addLoaderToOrder(idx)}
+                    className="text-xs font-black text-orange-600 active:scale-95"
+                  >
+                    + Грузчик
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={order.driver_pay}
+                  onChange={(e) => updateOrder(idx, { driver_pay: e.target.value })}
+                  placeholder="0"
+                  className="w-full rounded-2xl border-2 border-zinc-300 bg-white px-4 h-14 text-2xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
+                />
+
+                {order.loaders.length > 0 && (
+                  <div className="space-y-2">
+                    {order.loaders.map((loader, lIdx) => (
+                      <div
+                        key={lIdx}
+                        className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl p-2"
+                      >
+                        <select
+                          value={loader.id}
+                          onChange={(e) => {
+                            const found = allLoaders.find((x) => x.id === e.target.value);
+                            updateLoader(idx, lIdx, {
+                              id: e.target.value,
+                              name: found?.name || '',
+                            });
+                          }}
+                          className="flex-1 min-w-0 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm font-black text-zinc-900"
+                        >
+                          <option value="">Грузчик</option>
+                          {allLoaders.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.name}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={loader.pay}
+                          onChange={(e) => updateLoader(idx, lIdx, { pay: e.target.value })}
+                          placeholder="₽"
+                          className="w-24 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-base font-black text-zinc-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeLoader(idx, lIdx)}
+                          className="w-9 h-9 rounded-lg bg-white border border-zinc-200 text-rose-600 font-black text-lg flex items-center justify-center shrink-0"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
                   </div>
+                )}
+              </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
-                        Груз:
-                      </label>
-                      <input
-                        type="text"
-                        value={co.cargo_name}
-                        onChange={(e) =>
-                          handleUpdateClientOrder(idx, { cargo_name: e.target.value })
-                        }
-                        placeholder="Пробы керна"
-                        className="w-full border border-zinc-200 rounded-lg px-2 py-1 text-xs font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
-                        Ставка (₽):
-                      </label>
+              {/* Комментарий к заказу */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-extrabold text-zinc-500 uppercase tracking-wider pl-0.5">
+                  Комментарий / груз
+                </label>
+                <input
+                  type="text"
+                  value={order.description}
+                  onChange={(e) => updateOrder(idx, { description: e.target.value })}
+                  placeholder="Груз, маршрут, адрес..."
+                  className="w-full rounded-2xl border-2 border-zinc-200 bg-white px-4 h-12 text-base font-bold text-zinc-900 focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          );
+        })}
+
+        {/* 6. Топливо и расходы (Кубик / АЗС / Расход) */}
+        <div className="bg-white border-2 border-zinc-200 rounded-2xl p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between gap-1.5 flex-wrap">
+            <span className="text-xs font-extrabold text-zinc-600 uppercase tracking-wider">
+              ⛽ Топливо и расходы
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => addExpenseRow('cube')}
+                className="text-xs font-black px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 active:scale-95"
+              >
+                + Кубик
+              </button>
+              <button
+                type="button"
+                onClick={() => addExpenseRow('fuel')}
+                className="text-xs font-black px-2.5 py-1 rounded-lg bg-orange-100 text-orange-800 active:scale-95"
+              >
+                + АЗС
+              </button>
+              <button
+                type="button"
+                onClick={() => addExpenseRow('other')}
+                className="text-xs font-black px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-700 active:scale-95"
+              >
+                + Расход
+              </button>
+            </div>
+          </div>
+
+          {expenses.length > 0 && (
+            <div className="space-y-2">
+              {expenses.map((exp, eIdx) =>
+                exp.kind === 'cube' ? (
+                  <div
+                    key={exp.id}
+                    className="flex items-center gap-1.5 bg-amber-50/70 border border-amber-200 rounded-xl p-2"
+                  >
+                    <span className="text-sm font-black text-amber-950 shrink-0 pl-1">🛢 Куб</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={exp.liters}
+                      onChange={(e) => {
+                        const liters = e.target.value;
+                        const num = Number(liters) || 0;
+                        updateExpense(eIdx, {
+                          liters,
+                          amount: num > 0 ? String(Math.round(num * cubePrice)) : exp.amount,
+                        });
+                      }}
+                      placeholder="Л"
+                      className="w-16 rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-sm font-black text-zinc-900"
+                    />
+                    <span className="text-xs font-bold text-amber-800 shrink-0">л =</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={exp.amount}
+                      onChange={(e) => updateExpense(eIdx, { amount: e.target.value })}
+                      placeholder="₽"
+                      className="flex-1 min-w-0 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-base font-black text-zinc-900"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeExpense(eIdx)}
+                      className="w-8 h-8 rounded-lg bg-white border border-amber-200 text-rose-600 font-black text-base flex items-center justify-center shrink-0"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    key={exp.id}
+                    className="space-y-1.5 bg-zinc-50 border border-zinc-200 rounded-xl p-2"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-black text-zinc-800 shrink-0 pl-1">
+                        {exp.kind === 'fuel' ? '⛽ АЗС' : '🧾 Расх.'}
+                      </span>
                       <input
                         type="number"
-                        value={co.price_without_vat}
-                        onChange={(e) =>
-                          handleUpdateClientOrder(idx, {
-                            price_without_vat: Number(e.target.value) || '',
-                          })
-                        }
-                        placeholder="40 000"
-                        className="w-full border border-zinc-200 rounded-lg px-2 py-1 text-xs font-black text-indigo-700"
+                        inputMode="numeric"
+                        value={exp.amount}
+                        onChange={(e) => updateExpense(eIdx, { amount: e.target.value })}
+                        placeholder="₽"
+                        className="w-24 rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-base font-black text-zinc-900"
                       />
+                      <select
+                        value={exp.payment_method}
+                        onChange={(e) => updateExpense(eIdx, { payment_method: e.target.value })}
+                        className="flex-1 min-w-0 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs font-bold text-zinc-700"
+                      >
+                        <option value="fuel_card">Карта / Opti24</option>
+                        <option value="cash">Наличные</option>
+                        <option value="bank_invoice">Р/С</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removeExpense(eIdx)}
+                        className="w-8 h-8 rounded-lg bg-white border border-zinc-200 text-rose-600 font-black text-base flex items-center justify-center shrink-0"
+                      >
+                        ×
+                      </button>
                     </div>
+                    {exp.kind === 'other' && (
+                      <input
+                        type="text"
+                        value={exp.description}
+                        onChange={(e) => updateExpense(eIdx, { description: e.target.value })}
+                        placeholder="За что расход (мойка, шиномонтаж...)"
+                        className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-bold text-zinc-800"
+                      />
+                    )}
                   </div>
-                </div>
-              ))}
+                ),
+              )}
             </div>
-
-            <div className="flex items-center justify-between p-2 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-black text-indigo-950">
-              <span>Итого выручка:</span>
-              <span>{totalRevenue.toLocaleString('ru-RU')} ₽</span>
-            </div>
-          </div>
-
-          {/* 4. АВТОМОБИЛЬ, ВОДИТЕЛЬ И ЗП */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-zinc-50 border border-zinc-200 rounded-2xl p-3">
-            <div>
-              <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">
-                Автомобиль:
-              </label>
-              <select
-                value={form.assigned_vehicle_id}
-                onChange={(e) => setForm({ ...form, assigned_vehicle_id: e.target.value })}
-                className="w-full border border-zinc-200 rounded-lg p-1.5 text-xs font-bold bg-white"
-              >
-                <option value="">-- Авто --</option>
-                {vehicles.map((v: any) => (
-                  <option key={v.id} value={v.id}>
-                    {v.short_name || v.brand_name || 'Авто'} ({v.reg_number})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-zinc-500 block mb-0.5">Водитель:</label>
-              <select
-                value={form.assigned_driver_id}
-                onChange={(e) => setForm({ ...form, assigned_driver_id: e.target.value })}
-                className="w-full border border-zinc-200 rounded-lg p-1.5 text-xs font-bold bg-white"
-              >
-                <option value="">-- Водитель --</option>
-                {drivers.map((d: any) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-0.5">
-                <label className="text-[10px] font-bold text-zinc-500">ЗП водителя:</label>
-                <button
-                  type="button"
-                  onClick={() => setForm((f: any) => ({ ...f, driver_pay: 7900 }))}
-                  className="text-[9px] text-emerald-700 font-bold"
-                >
-                  ⚡ 7 900 ₽
-                </button>
-              </div>
-              <input
-                type="number"
-                value={
-                  form.driver_pay === '' || form.driver_pay === undefined ? '' : form.driver_pay
-                }
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setForm({ ...form, driver_pay: val === '' ? '' : Number(val) });
-                }}
-                placeholder="0"
-                className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs font-black text-emerald-700 bg-white"
-              />
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Кнопки действий (Sticky Footer - ВСЕГДА зафиксированы внизу, не теряются) */}
-        <div className="p-3 bg-white border-t border-zinc-200 flex items-center gap-2 shrink-0 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] shadow-lg">
+        {/* 7. Спойлер: Машина, водитель, одометр, примечание */}
+        <div className="bg-white border-2 border-zinc-200 rounded-2xl overflow-hidden">
           <button
             type="button"
-            onClick={onClose}
-            className="px-4 py-3 bg-zinc-100 rounded-xl text-zinc-700 font-bold text-xs uppercase active:scale-95 transition"
+            onClick={() => setMoreOpen((v) => !v)}
+            className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-zinc-50"
           >
-            Отмена
+            <span className="font-black text-sm text-zinc-800">⚙️ Машина, водитель, пробег</span>
+            <span className="text-base font-black text-zinc-400">{moreOpen ? '▴' : '▾'}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => handleSave(false)}
-            disabled={saving}
-            className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase shadow-md active:scale-95 transition disabled:opacity-50"
-          >
-            {saving ? 'Сохранение...' : 'Сохранить рейс'}
-          </button>
-          {(trip?.lifecycle_status === 'draft' || trip?.lifecycle_status === 'returned') && (
-            <button
-              type="button"
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              className="py-3 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase shadow-md active:scale-95 transition disabled:opacity-50 flex items-center gap-1 shrink-0"
-              title="Сохранить изменения и сразу одобрить рейс"
-            >
-              <span>✓</span>
-              <span>Одобрить</span>
-            </button>
+
+          {moreOpen && (
+            <div className="px-4 pb-4 pt-2 border-t border-zinc-100 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                    Автомобиль
+                  </label>
+                  <select
+                    value={assetId}
+                    onChange={(e) => setAssetId(e.target.value)}
+                    className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-2.5 h-11 text-sm font-black text-zinc-900"
+                  >
+                    <option value="">Не выбрано</option>
+                    {vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.short_name} ({v.reg_number})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                    Водитель
+                  </label>
+                  <select
+                    value={driverId}
+                    onChange={(e) => setDriverId(e.target.value)}
+                    className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-2.5 h-11 text-sm font-black text-zinc-900"
+                  >
+                    <option value="">Не выбран</option>
+                    {drivers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                    Одометр старт
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={odometerStart}
+                    onChange={(e) => setOdometerStart(e.target.value)}
+                    className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-3 h-11 text-base font-black text-zinc-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                    Одометр финиш
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={odometerEnd}
+                    onChange={(e) => setOdometerEnd(e.target.value)}
+                    className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-3 h-11 text-base font-black text-zinc-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                  Заметка администратора
+                </label>
+                <input
+                  type="text"
+                  value={adminNote}
+                  onChange={(e) => setAdminNote(e.target.value)}
+                  className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-3 h-11 text-sm font-bold text-zinc-900"
+                />
+              </div>
+            </div>
           )}
+        </div>
+
+        {error && (
+          <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl px-4 py-3 text-rose-700 text-sm font-black">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* ── Закреплённая нижняя кнопка ── */}
+      <div className="shrink-0 p-4 bg-white border-t-2 border-zinc-200 shadow-lg pb-[calc(env(safe-area-inset-bottom,0px)+16px)]">
+        <div className="max-w-lg mx-auto">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full h-14 rounded-2xl bg-orange-600 hover:bg-orange-500 active:bg-orange-700 active:scale-[0.99] text-white font-black text-base uppercase tracking-wider shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <span>✅</span>
+            <span>{saving ? 'Сохраняем...' : 'Сохранить изменения'}</span>
+          </button>
         </div>
       </div>
     </div>

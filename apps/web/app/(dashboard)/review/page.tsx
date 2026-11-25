@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@saldacargo/ui';
-import { SmartOrderModal } from '@/components/SmartOrderModal';
+import { TripEditModal } from '@/features/review/trip-card/TripEditModal';
 import type {
   ReviewServiceOrder,
   SettlementTransactionItem,
@@ -786,8 +786,8 @@ export default function ReviewPage() {
       )}
 
       {editTrip && (
-        <SmartOrderModal
-          initialTrip={editTrip}
+        <TripEditModal
+          trip={editTrip}
           counterparties={counterpartiesList}
           vehicles={fleetVehicles}
           drivers={staffDrivers}

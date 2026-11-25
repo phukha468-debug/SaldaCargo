@@ -89,12 +89,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           is_driver_loader, direction, loaders_data,
           loader_id, loader_pay, loader2_id, loader2_pay,
           payment_method, settlement_status, lifecycle_status, description,
-          counterparty:counterparties(name),
+          counterparty_id,
+          counterparty:counterparties(id, name),
           loader:users!trip_orders_loader_id_fkey(id, name),
           loader2:users!trip_orders_loader2_id_fkey(id, name)
         ),
-        trip_expenses(id, amount, payment_method, description,
-          category:transaction_categories(name))
+        trip_expenses(id, amount, payment_method, description, category_id,
+          category:transaction_categories(id, name))
       `,
       )
       .eq('id', id)
@@ -129,12 +130,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     note?: string;
     problem_description?: string;
     driver_pay?: string;
+    driver_id?: string | null;
+    asset_id?: string | null;
+    trip_type?: string;
+    odometer_start?: number | null;
+    odometer_end?: number | null;
+    driver_note?: string;
+    admin_note?: string;
     loader_pays?: Array<{ user_id: string; name: string; amount: string }>;
     orders?: Array<{
       id?: string;
       isNew?: boolean;
       amount?: string;
       driver_pay?: string;
+      driver_car_pay?: string | number;
+      driver_loader_pay?: string | number;
+      is_driver_loader?: boolean;
+      direction?: string;
+      loaders_data?: Array<{ id: string; name: string; pay: string }>;
       loader_pay?: string;
       loader2_pay?: string;
       loader_id?: string | null;
@@ -145,6 +158,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       counterparty_name?: string;
     }>;
     deleted_order_ids?: string[];
+    expenses?: Array<{
+      id?: string;
+      isNew?: boolean;
+      amount?: string;
+      payment_method?: string;
+      description?: string;
+      category_id?: string;
+    }>;
+    deleted_expense_ids?: string[];
   };
   const supabase = createAdminClient();
 
@@ -199,12 +221,29 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.action === 'edit_orders') {
     // 1. Получаем рейс для статуса и грузчиков
     const { data: trip, error: tripError } = await (supabase.from('trips') as any)
-      .select('id, lifecycle_status, driver_id, loader_id, loader2_id')
+      .select('id, organization_id, lifecycle_status, driver_id, loader_id, loader2_id')
       .eq('id', id)
       .single();
 
     if (tripError || !trip) {
       return NextResponse.json({ error: tripError?.message ?? 'Рейс не найден' }, { status: 404 });
+    }
+
+    // 1.1 Обновляем поля самого рейса (тип, машина, водитель, одометр, заметки)
+    const tripUpdates: Record<string, any> = {};
+    if (body.trip_type !== undefined) tripUpdates.trip_type = body.trip_type;
+    if (body.asset_id !== undefined && body.asset_id) tripUpdates.asset_id = body.asset_id;
+    if (body.driver_id !== undefined && body.driver_id) tripUpdates.driver_id = body.driver_id;
+    if (body.odometer_start !== undefined) tripUpdates.odometer_start = body.odometer_start;
+    if (body.odometer_end !== undefined) tripUpdates.odometer_end = body.odometer_end;
+    if (body.driver_note !== undefined) tripUpdates.driver_note = body.driver_note;
+    if (body.admin_note !== undefined) tripUpdates.admin_note = body.admin_note;
+    if (Object.keys(tripUpdates).length > 0) {
+      tripUpdates.updated_at = new Date().toISOString();
+      const { error: tripUpdErr } = await (supabase.from('trips') as any)
+        .update(tripUpdates)
+        .eq('id', id);
+      if (tripUpdErr) return NextResponse.json({ error: tripUpdErr.message }, { status: 500 });
     }
 
     async function resolveCounterpartyId(cpId?: string | null, cpName?: string) {
@@ -289,11 +328,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
         if (isNew) {
           const newOrderPayload = {
+            ...(trip.organization_id ? { organization_id: trip.organization_id } : {}),
             trip_id: id,
             counterparty_id: resolvedCounterpartyId,
             description: order.description?.trim() || null,
             amount: parseFloat(order.amount ?? '0').toFixed(2),
             driver_pay: parseFloat(order.driver_pay ?? '0').toFixed(2),
+            driver_car_pay: parseFloat(String(order.driver_car_pay ?? '0')).toFixed(2),
+            driver_loader_pay: parseFloat(String(order.driver_loader_pay ?? '0')).toFixed(2),
+            is_driver_loader: Boolean(order.is_driver_loader),
+            direction: order.direction || 'local',
+            ...(order.loaders_data ? { loaders_data: order.loaders_data } : {}),
             loader_id: order.loader_id ?? trip.loader_id ?? null,
             loader_pay: parseFloat(order.loader_pay ?? '0').toFixed(2),
             loader2_id: order.loader2_id ?? trip.loader2_id ?? null,
@@ -313,14 +358,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           if (order.amount !== undefined) update.amount = parseFloat(order.amount).toFixed(2);
           if (order.driver_pay !== undefined)
             update.driver_pay = parseFloat(order.driver_pay).toFixed(2);
+          if (order.driver_car_pay !== undefined)
+            update.driver_car_pay = parseFloat(String(order.driver_car_pay)).toFixed(2);
+          if (order.driver_loader_pay !== undefined)
+            update.driver_loader_pay = parseFloat(String(order.driver_loader_pay)).toFixed(2);
+          if (order.is_driver_loader !== undefined)
+            update.is_driver_loader = Boolean(order.is_driver_loader);
+          if (order.direction !== undefined) update.direction = order.direction;
+          if (order.loaders_data !== undefined) update.loaders_data = order.loaders_data;
+          if (order.loader_id !== undefined) update.loader_id = order.loader_id;
           if (order.loader_pay !== undefined)
             update.loader_pay = parseFloat(order.loader_pay).toFixed(2);
+          if (order.loader2_id !== undefined) update.loader2_id = order.loader2_id;
           if (order.loader2_pay !== undefined)
             update.loader2_pay = parseFloat(order.loader2_pay).toFixed(2);
           if (order.description !== undefined)
             update.description = order.description?.trim() || null;
           if (order.payment_method !== undefined) {
-            update.payment_method = order.payment_method;
+            update.payment_method = paymentMethod;
             update.settlement_status = settlementStatus;
           }
           if (order.counterparty_id !== undefined || order.counterparty_name !== undefined) {
@@ -333,6 +388,55 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               .eq('id', order.id)
               .eq('trip_id', id);
             if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+          }
+        }
+      }
+    }
+
+    // 4. Удалённые расходы
+    if (body.deleted_expense_ids?.length) {
+      const { error: delExpErr } = await (supabase.from('trip_expenses') as any)
+        .delete()
+        .in('id', body.deleted_expense_ids)
+        .eq('trip_id', id);
+      if (delExpErr) return NextResponse.json({ error: delExpErr.message }, { status: 500 });
+    }
+
+    // 5. Создание / обновление расходов (Кубик, АЗС, Прочие)
+    if (body.expenses?.length) {
+      const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
+      for (const exp of body.expenses) {
+        const isNew =
+          exp.isNew || !exp.id || exp.id.startsWith('new-') || exp.id.startsWith('temp-');
+        const amountNum = parseFloat(exp.amount ?? '0');
+        const paymentMethod = exp.payment_method || 'fuel_card';
+
+        if (isNew) {
+          if (amountNum > 0) {
+            const { error: insExpErr } = await (supabase.from('trip_expenses') as any).insert({
+              ...(trip.organization_id ? { organization_id: trip.organization_id } : {}),
+              trip_id: id,
+              category_id: exp.category_id || CAT_FUEL,
+              amount: amountNum.toFixed(2),
+              payment_method: paymentMethod,
+              description: exp.description?.trim() || null,
+              idempotency_key: crypto.randomUUID(),
+            });
+            if (insExpErr) return NextResponse.json({ error: insExpErr.message }, { status: 500 });
+          }
+        } else {
+          const update: Record<string, any> = {};
+          if (exp.amount !== undefined) update.amount = amountNum.toFixed(2);
+          if (exp.payment_method !== undefined) update.payment_method = paymentMethod;
+          if (exp.description !== undefined) update.description = exp.description?.trim() || null;
+          if (exp.category_id !== undefined) update.category_id = exp.category_id;
+
+          if (Object.keys(update).length > 0) {
+            const { error: updExpErr } = await (supabase.from('trip_expenses') as any)
+              .update(update)
+              .eq('id', exp.id)
+              .eq('trip_id', id);
+            if (updExpErr) return NextResponse.json({ error: updExpErr.message }, { status: 500 });
           }
         }
       }
