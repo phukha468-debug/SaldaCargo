@@ -43,6 +43,48 @@ export function HistoryTripCard({
 
   const hasLoader = Boolean(trip.loader);
 
+  const isOrderUnpaidDebt = (o: { payment_method: string; settlement_status?: string | null }) =>
+    o.settlement_status === 'pending' ||
+    (o.payment_method === 'debt_cash' && o.settlement_status !== 'completed');
+
+  const unpaidDebtTotal = activeOrders
+    .filter(isOrderUnpaidDebt)
+    .reduce((s, o) => s + (parseFloat(o.amount) || 0), 0);
+
+  function getOrderPaymentBadge(o: { payment_method: string; settlement_status?: string | null }): {
+    label: string;
+    cls: string;
+  } {
+    if (o.settlement_status === 'pending') {
+      if (o.payment_method === 'bank_invoice') {
+        return {
+          label: '⏳ Долг (Р/С)',
+          cls: 'bg-amber-50 text-amber-800 border-amber-300',
+        };
+      }
+      return {
+        label: '⏳ Долг',
+        cls: 'bg-rose-50 text-rose-700 border-rose-300',
+      };
+    }
+    if (o.payment_method === 'debt_cash') {
+      if (o.settlement_status === 'completed') {
+        return {
+          label: '✅ Оплачен (долг)',
+          cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        };
+      }
+      return {
+        label: '⏳ Долг',
+        cls: 'bg-rose-50 text-rose-700 border-rose-300',
+      };
+    }
+    return {
+      label: PAYMENT_LABELS[o.payment_method] ?? o.payment_method,
+      cls: PAYMENT_STYLES[o.payment_method] ?? 'bg-zinc-100 border-zinc-200 text-zinc-500',
+    };
+  }
+
   return (
     <div
       className={cn(
@@ -74,6 +116,11 @@ export function HistoryTripCard({
                     #{trip.trip_number}
                   </span>
                   <LifecycleBadge status={trip.lifecycle_status} />
+                  {unpaidDebtTotal > 0 && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                      ⏳ Долг: {Math.round(unpaidDebtTotal).toLocaleString('ru-RU')} ₽
+                    </span>
+                  )}
                   {isCashNotSurrendered ? (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
                       ⚠️ Подотчёт
@@ -165,15 +212,19 @@ export function HistoryTripCard({
                       <p className="font-bold text-zinc-800 text-sm">
                         <Money amount={order.amount} />
                       </p>
-                      <span
-                        className={cn(
-                          'text-[9px] font-bold px-1.5 py-0.5 rounded border',
-                          PAYMENT_STYLES[order.payment_method] ??
-                            'bg-zinc-100 border-zinc-200 text-zinc-500',
-                        )}
-                      >
-                        {PAYMENT_LABELS[order.payment_method] ?? order.payment_method}
-                      </span>
+                      {(() => {
+                        const badge = getOrderPaymentBadge(order);
+                        return (
+                          <span
+                            className={cn(
+                              'text-[9px] font-bold px-1.5 py-0.5 rounded border inline-block',
+                              badge.cls,
+                            )}
+                          >
+                            {badge.label}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                 );

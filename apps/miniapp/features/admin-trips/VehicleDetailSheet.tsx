@@ -4,7 +4,42 @@ import type React from 'react';
 import { useState } from 'react';
 import { calcServiceOrder, calcTrip, formatDate } from '@saldacargo/shared';
 import { cn } from '@saldacargo/ui';
-import type { MiniappTrip, VehicleGroup } from './types';
+import { PAYMENT_LABELS, PAYMENT_STYLES, type MiniappTrip, type VehicleGroup } from './types';
+
+function getOrderDebtBadge(o: { payment_method?: string; settlement_status?: string | null }): {
+  label: string;
+  cls: string;
+} {
+  if (o.settlement_status === 'pending') {
+    if (o.payment_method === 'bank_invoice') {
+      return {
+        label: '⏳ Долг (Р/С)',
+        cls: 'bg-amber-50 text-amber-800 border-amber-300',
+      };
+    }
+    return {
+      label: '⏳ Долг',
+      cls: 'bg-rose-50 text-rose-700 border-rose-300',
+    };
+  }
+  if (o.payment_method === 'debt_cash') {
+    if (o.settlement_status === 'completed') {
+      return {
+        label: '✅ Оплачен (долг)',
+        cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      };
+    }
+    return {
+      label: '⏳ Долг',
+      cls: 'bg-rose-50 text-rose-700 border-rose-300',
+    };
+  }
+  const method = o.payment_method ?? '';
+  return {
+    label: PAYMENT_LABELS[method] ?? method,
+    cls: PAYMENT_STYLES[method] ?? 'bg-zinc-100 border-zinc-200 text-zinc-600',
+  };
+}
 
 export function VehicleDetailSheet({
   group,
@@ -156,6 +191,13 @@ export function VehicleDetailSheet({
             {group.trips.map((trip) => {
               const ct = calcTrip(trip);
               const isExp = expandedTripId === trip.id;
+              const tripDebtTotal = ct.activeOrders
+                .filter(
+                  (o) =>
+                    o.settlement_status === 'pending' ||
+                    (o.payment_method === 'debt_cash' && o.settlement_status !== 'completed'),
+                )
+                .reduce((s, o) => s + (parseFloat(o.amount || '0') || 0), 0);
               return (
                 <div
                   key={trip.id}
@@ -166,13 +208,18 @@ export function VehicleDetailSheet({
                     className="flex items-center justify-between cursor-pointer"
                   >
                     <div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-black text-slate-900 text-xs">
                           Рейс #{trip.trip_number}
                         </span>
                         <span className="text-[10px] text-slate-400">
                           {formatDate(trip.started_at || trip.created_at)}
                         </span>
+                        {tripDebtTotal > 0 && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                            ⏳ Долг: {Math.round(tripDebtTotal).toLocaleString('ru-RU')} ₽
+                          </span>
+                        )}
                       </div>
                       <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
                         {trip.driver?.name || 'Водитель не назначен'}
@@ -230,33 +277,48 @@ export function VehicleDetailSheet({
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
                         Заявки рейса ({ct.activeOrders.length}):
                       </span>
-                      {ct.activeOrders.map((o, idx) => (
-                        <div
-                          key={o.id || idx}
-                          className="bg-slate-50 p-2 rounded-lg text-[11px] flex items-center justify-between"
-                        >
-                          <div>
-                            <span className="font-bold text-slate-800 block">
-                              #{idx + 1} {o.counterparty_name || o.counterparty?.name || 'Клиент'}
-                            </span>
-                            {o.address_to && (
-                              <span className="text-[9px] text-slate-500 block truncate max-w-[200px]">
-                                {o.address_to}
+                      {ct.activeOrders.map((o, idx) => {
+                        const badge = getOrderDebtBadge(o);
+                        return (
+                          <div
+                            key={o.id || idx}
+                            className="bg-slate-50 p-2 rounded-lg text-[11px] flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-slate-800 block truncate">
+                                #{idx + 1} {o.counterparty_name || o.counterparty?.name || 'Клиент'}
                               </span>
-                            )}
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span
+                                  className={cn(
+                                    'text-[9px] font-bold px-1.5 py-0.5 rounded border',
+                                    badge.cls,
+                                  )}
+                                >
+                                  {badge.label}
+                                </span>
+                                {o.address_to && (
+                                  <span className="text-[9px] text-slate-500 truncate max-w-[160px]">
+                                    {o.address_to}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-black text-slate-900 block">
+                                {Math.round(parseFloat(o.amount || '0')).toLocaleString('ru-RU')} ₽
+                              </span>
+                              <span className="text-[9px] text-slate-500 block">
+                                ЗП вод:{' '}
+                                {Math.round(parseFloat(o.driver_pay || '0')).toLocaleString(
+                                  'ru-RU',
+                                )}{' '}
+                                ₽
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <span className="font-black text-slate-900 block">
-                              {Math.round(parseFloat(o.amount || '0')).toLocaleString('ru-RU')} ₽
-                            </span>
-                            <span className="text-[9px] text-slate-500 block">
-                              ЗП вод:{' '}
-                              {Math.round(parseFloat(o.driver_pay || '0')).toLocaleString('ru-RU')}{' '}
-                              ₽
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

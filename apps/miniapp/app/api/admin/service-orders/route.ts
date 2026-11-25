@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       client_vehicle_id, client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
       client_name, client_phone,
       works:service_order_works(
-        id, custom_work_name, custom_work_description, work_description, notes, created_at, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
+        id, custom_work_name, custom_work_description, work_description, notes, created_at, status, salary_paid, extra_work_status, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(id, name, norm_minutes)
       ),
       parts:service_order_parts(
@@ -58,11 +58,7 @@ export async function GET(request: Request) {
         .in('status', ['created', 'in_progress'])
         .not('lifecycle_status', 'in', '(approved,cancelled)');
     } else if (filter === 'history') {
-      q = q
-        .or(
-          'lifecycle_status.in.(cancelled,returned),and(lifecycle_status.eq.approved,payment_received.eq.true)',
-        )
-        .limit(500);
+      q = q.in('lifecycle_status', ['approved', 'cancelled', 'returned']).limit(500);
       if (machineType) {
         q = q.eq('machine_type', machineType);
       }
@@ -94,24 +90,20 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     const isPendingWorkReview = (w: any) =>
-      w.status === 'completed' && !w.salary_paid && !String(w.notes || '').includes('[reviewed]');
+      w.status === 'completed' &&
+      !w.salary_paid &&
+      w.extra_work_status !== 'rejected' &&
+      !String(w.notes || '').includes('[reviewed]');
 
     const rawList = rawOrders ?? [];
-    const orders =
-      filter === 'review'
-        ? rawList.filter((o: any) => {
-            if (o.status === 'completed') return true;
-            return (o.works ?? []).some(isPendingWorkReview);
-          })
-        : rawList;
-    const orderIds = orders.map((o: any) => o.id);
+    const rawOrderIds = rawList.map((o: any) => o.id);
 
-    // Подтягиваем транзакции ЗП механиков по этим нарядам
+    // Подтягиваем транзакции ЗП механиков по этим нарядам (до фильтрации review)
     const txByOrder = new Map<string, number>();
-    if (orderIds.length > 0) {
+    if (rawOrderIds.length > 0) {
       const { data: txs } = await (supabase.from('transactions') as any)
         .select('service_order_id, amount, lifecycle_status, from_wallet_id')
-        .in('service_order_id', orderIds)
+        .in('service_order_id', rawOrderIds)
         .eq('direction', 'expense')
         .neq('lifecycle_status', 'cancelled')
         .is('from_wallet_id', null);
@@ -122,6 +114,51 @@ export async function GET(request: Request) {
           t.service_order_id,
           (txByOrder.get(t.service_order_id) ?? 0) + (parseFloat(t.amount ?? '0') || 0),
         );
+      }
+    }
+
+    const orders =
+      filter === 'review'
+        ? rawList.filter((o: any) => {
+            const activeWorks = (o.works ?? []).filter(
+              (w: any) => w.status !== 'cancelled' && w.extra_work_status !== 'rejected',
+            );
+            const hasPendingWork = activeWorks.some(isPendingWorkReview);
+            if (hasPendingWork) return true;
+            // Завершённый черновик попадает в ревью только если ещё нет утверждённой ЗП и не все работы оплачены
+            if (o.status === 'completed' && o.lifecycle_status === 'draft') {
+              const hasPayrollTx = (txByOrder.get(o.id) ?? 0) > 0;
+              const allWorksPaid =
+                activeWorks.length > 0 && activeWorks.every((w: any) => Boolean(w.salary_paid));
+              return !hasPayrollTx && !allWorksPaid;
+            }
+            return false;
+          })
+        : rawList;
+
+    // Собираем имена всех механиков, участвующих в работах
+    const mechNameMap = new Map<string, string>();
+    const missingMechIds = new Set<string>();
+    for (const o of orders) {
+      if (o.mechanic?.id && o.mechanic?.name) mechNameMap.set(o.mechanic.id, o.mechanic.name);
+      if (o.second_mechanic?.id && o.second_mechanic?.name) {
+        mechNameMap.set(o.second_mechanic.id, o.second_mechanic.name);
+      }
+    }
+    for (const o of orders) {
+      for (const w of o.works ?? []) {
+        if (w.mechanic_id && !mechNameMap.has(w.mechanic_id)) missingMechIds.add(w.mechanic_id);
+        if (w.second_mechanic_id && !mechNameMap.has(w.second_mechanic_id)) {
+          missingMechIds.add(w.second_mechanic_id);
+        }
+      }
+    }
+    if (missingMechIds.size > 0) {
+      const { data: extraUsers } = await (supabase.from('users') as any)
+        .select('id, name')
+        .in('id', [...missingMechIds]);
+      for (const u of extraUsers ?? []) {
+        if (u?.id && u?.name) mechNameMap.set(u.id, u.name);
       }
     }
 
@@ -187,8 +224,17 @@ export async function GET(request: Request) {
       const orderDates = extractOrderDates(o);
       const effectiveDate = getOrderEffectiveDate(o);
 
+      const enrichedWorks = (o.works ?? []).map((w: any) => ({
+        ...w,
+        mechanic_name: w.mechanic_id ? (mechNameMap.get(w.mechanic_id) ?? null) : null,
+        second_mechanic_name: w.second_mechanic_id
+          ? (mechNameMap.get(w.second_mechanic_id) ?? null)
+          : null,
+      }));
+
       return {
         ...o,
+        works: enrichedWorks,
         is_partial_work_review: isPartialWorkReview,
         pending_review_works_count: activeWorks.filter(isPendingWorkReview).length,
         started_at: orderDates.started_at,

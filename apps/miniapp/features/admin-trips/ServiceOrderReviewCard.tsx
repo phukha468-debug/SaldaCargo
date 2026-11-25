@@ -12,15 +12,19 @@ export function ServiceOrderReviewCard({
   onReturn,
   onDelete,
   approving,
+  defaultExpanded = true,
+  readOnly = false,
 }: {
   order: MiniappServiceOrder;
   onEdit: (o: MiniappServiceOrder) => void;
-  onApprove: (id: string, isPartialWorkReview?: boolean) => void;
+  onApprove: (id: string, isPartialWorkReview?: boolean, mechanicPay?: number) => void;
   onReturn: (id: string) => void;
   onDelete: (id: string) => void;
   approving: boolean;
+  defaultExpanded?: boolean;
+  readOnly?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const isOwn = order.machine_type === 'own';
   const hourlyRate = Number(order.hourly_rate || (isOwn ? 1600 : 2000));
   const salaryPct = Number(order.salary_pct || 50);
@@ -76,7 +80,9 @@ export function ServiceOrderReviewCard({
           </div>
           <p className="text-xs font-extrabold text-zinc-800 truncate">{vehicleTitle}</p>
           <p className="text-[11px] text-zinc-500 font-bold mt-0.5">
-            👨‍🔧 {order.mechanic?.name ?? 'Механик не указан'} · 📅 {formatDate(order.created_at)}
+            👨‍🔧 {order.mechanic?.name ?? 'Механик не указан'}
+            {order.second_mechanic?.name ? ` + ${order.second_mechanic.name}` : ''} · 📅{' '}
+            {formatDate(order.created_at)}
             {odo ? ` · 🛣 ${Number(odo).toLocaleString('ru-RU')} км` : ''}
           </p>
         </div>
@@ -113,6 +119,21 @@ export function ServiceOrderReviewCard({
                   const wPct =
                     customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
                   const wPay = (wPrice * wPct) / 100;
+                  const wMech1 = w.mechanic_name || (!w.mechanic_id ? order.mechanic?.name : null);
+                  const wMech2 =
+                    w.second_mechanic_name ||
+                    (!w.mechanic_id && !w.second_mechanic_id ? order.second_mechanic?.name : null);
+                  const hasWorkMechs = Boolean(
+                    w.mechanic_id ||
+                    w.second_mechanic_id ||
+                    order.second_mechanic?.name ||
+                    w.mechanic_name ||
+                    w.second_mechanic_name,
+                  );
+                  const workMechsLabel =
+                    wMech1 && wMech2 && wMech2 !== wMech1
+                      ? `${wMech1} + ${wMech2}`
+                      : wMech1 || wMech2 || null;
                   return (
                     <div
                       key={w.id || i}
@@ -127,6 +148,11 @@ export function ServiceOrderReviewCard({
                               w.work_description ||
                               'Работа'}
                           </span>
+                          {hasWorkMechs && workMechsLabel && (
+                            <span className="text-[9px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
+                              👨‍🔧 {workMechsLabel}
+                            </span>
+                          )}
                           {isPartialWorkReview &&
                             (w.salary_paid || String(w.notes || '').includes('[reviewed]') ? (
                               <span className="text-[9px] font-extrabold text-zinc-500 bg-zinc-200/80 px-1.5 py-0.5 rounded">
@@ -215,48 +241,56 @@ export function ServiceOrderReviewCard({
             </div>
           </div>
 
-          <div className="px-4 pb-4 pt-3 border-t border-zinc-100 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onEdit(order)}
-              className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 border border-zinc-200 px-3.5 py-2.5 rounded-xl active:bg-zinc-100 shrink-0"
-            >
-              ✏️ Изменить
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(order.id)}
-              disabled={approving}
-              className="w-10 h-10 flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-500 active:bg-rose-100 disabled:opacity-50 shrink-0"
-              title="Удалить заказ-наряд"
-            >
-              🗑️
-            </button>
-            {canReview && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onReturn(order.id)}
-                  disabled={approving}
-                  className="flex-1 text-xs font-bold text-red-600 border border-red-200 bg-red-50 py-2.5 rounded-xl active:bg-red-100 text-center disabled:opacity-50"
-                >
-                  Вернуть
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onApprove(order.id, isPartialWorkReview)}
-                  disabled={approving}
-                  className="flex-1 text-xs font-black text-white bg-emerald-600 py-2.5 rounded-xl active:bg-emerald-700 text-center disabled:opacity-50 shadow-sm"
-                >
-                  {approving
-                    ? '...'
-                    : isPartialWorkReview
-                      ? '✓ Зафиксировать оценку'
-                      : '✓ Одобрить'}
-                </button>
-              </>
-            )}
-          </div>
+          {!readOnly && (
+            <div className="px-4 pb-4 pt-3 border-t border-zinc-100 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onEdit(order)}
+                className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 border border-zinc-200 px-3.5 py-2.5 rounded-xl active:bg-zinc-100 shrink-0"
+              >
+                ✏️ Изменить
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(order.id)}
+                disabled={approving}
+                className="w-10 h-10 flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-500 active:bg-rose-100 disabled:opacity-50 shrink-0"
+                title="Удалить заказ-наряд"
+              >
+                🗑️
+              </button>
+              {canReview && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onReturn(order.id)}
+                    disabled={approving}
+                    className="flex-1 text-xs font-bold text-red-600 border border-red-200 bg-red-50 py-2.5 rounded-xl active:bg-red-100 text-center disabled:opacity-50"
+                  >
+                    Вернуть
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onApprove(
+                        order.id,
+                        isPartialWorkReview,
+                        mechanicPay > 0 ? Number(mechanicPay.toFixed(2)) : undefined,
+                      )
+                    }
+                    disabled={approving}
+                    className="flex-1 text-xs font-black text-white bg-emerald-600 py-2.5 rounded-xl active:bg-emerald-700 text-center disabled:opacity-50 shadow-sm"
+                  >
+                    {approving
+                      ? '...'
+                      : isPartialWorkReview
+                        ? '✓ Зафиксировать оценку'
+                        : '✓ Одобрить'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

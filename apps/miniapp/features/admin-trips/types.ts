@@ -28,6 +28,7 @@ export interface MiniappTripOrder extends CalcTripOrderInput {
   amount: string;
   driver_pay: string;
   payment_method: string;
+  settlement_status?: 'pending' | 'completed' | string | null;
   description?: string | null;
   address_to?: string | null;
   counterparty_name?: string | null;
@@ -67,6 +68,7 @@ export interface MiniappServiceOrderWork {
   id?: string;
   status?: string | null;
   salary_paid?: boolean | null;
+  extra_work_status?: string | null;
   custom_work_name?: string | null;
   work_description?: string | null;
   work_catalog?: { name?: string | null } | null;
@@ -75,6 +77,10 @@ export interface MiniappServiceOrderWork {
   quantity?: number | string | null;
   price_client?: string | number | null;
   notes?: string | null;
+  mechanic_id?: string | null;
+  second_mechanic_id?: string | null;
+  mechanic_name?: string | null;
+  second_mechanic_name?: string | null;
 }
 
 export interface MiniappServiceOrderPart {
@@ -102,6 +108,7 @@ export interface MiniappServiceOrder extends CalcServiceOrderInput {
   works_total?: string | null;
   estimated_pay?: string | null;
   mechanic_pay?: string | null;
+  second_mechanic_pay?: string | null;
   odometer_start?: number | string | null;
   odometer_end?: number | string | null;
   client_vehicle_model?: string | null;
@@ -109,8 +116,17 @@ export interface MiniappServiceOrder extends CalcServiceOrderInput {
   client_vehicle_reg?: string | null;
   mechanic_note?: string | null;
   parts_provided_by_service?: boolean | null;
+  parts_total?: string | null;
+  order_total?: string | null;
   asset?: MiniappTripAsset | null;
-  mechanic?: { id?: string; name?: string | null } | null;
+  assigned_mechanic_id?: string | null;
+  mechanic?: { id?: string; name?: string | null; mechanic_salary_pct?: number | null } | null;
+  second_mechanic_id?: string | null;
+  second_mechanic?: {
+    id?: string;
+    name?: string | null;
+    mechanic_salary_pct?: number | null;
+  } | null;
   works?: MiniappServiceOrderWork[] | null;
   parts?: MiniappServiceOrderPart[] | null;
 }

@@ -94,7 +94,7 @@ function TripsContent() {
   >({
     queryKey: ['admin-service-orders-history', selectedDate, period],
     queryFn: () => {
-      let url = `/api/admin/service-orders?filter=history&machine_type=own`;
+      let url = `/api/admin/service-orders?filter=history`;
       if (period === 'month') {
         url += `&month=${selectedDate.slice(0, 7)}`;
       } else if (period === 'week') {
@@ -115,6 +115,25 @@ function TripsContent() {
   }, [filter, historyTrips, historyOrders]);
 
   const fleetSummary = useMemo(() => summarizeVehicleGroups(vehicleGroups), [vehicleGroups]);
+
+  const garageHistorySummary = useMemo(() => {
+    const safeOrders = Array.isArray(historyOrders) ? historyOrders : [];
+    const worksTotal = safeOrders.reduce((s, o) => s + (parseFloat(o.works_total || '0') || 0), 0);
+    const partsTotal = safeOrders.reduce((s, o) => s + (parseFloat(o.parts_total || '0') || 0), 0);
+    const payrollTotal = safeOrders.reduce(
+      (s, o) =>
+        s +
+        (parseFloat(o.mechanic_pay || o.estimated_pay || '0') || 0) +
+        (parseFloat(o.second_mechanic_pay || '0') || 0),
+      0,
+    );
+    return {
+      ordersCount: safeOrders.length,
+      worksTotal,
+      partsTotal,
+      payrollTotal,
+    };
+  }, [historyOrders]);
 
   const activeSelectedGroup = selectedGroup
     ? vehicleGroups.find((g) => g.assetKey === selectedGroup.assetKey) || selectedGroup
@@ -202,13 +221,22 @@ function TripsContent() {
     }
   }
 
-  async function handleApproveOrder(orderId: string, isPartialWorkReview = false) {
+  async function handleApproveOrder(
+    orderId: string,
+    isPartialWorkReview = false,
+    mechanicPay?: number,
+  ) {
     setApprovingId(orderId);
     try {
       const res = await fetch(`/api/admin/service-orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: isPartialWorkReview ? 'approve_works' : 'approve' }),
+        body: JSON.stringify({
+          action: isPartialWorkReview ? 'approve_works' : 'approve',
+          ...(!isPartialWorkReview && mechanicPay != null && mechanicPay > 0
+            ? { mechanic_pay: mechanicPay }
+            : {}),
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Ошибка утверждения');
       refresh();
@@ -435,6 +463,67 @@ function TripsContent() {
               />
             ))}
           </div>
+        )
+      ) : filter === 'history' && section === 'garage' ? (
+        historyOrders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-zinc-400">
+            <span className="text-5xl mb-4">🔧</span>
+            <p className="font-bold uppercase tracking-widest text-sm">{emptyLabel}</p>
+          </div>
+        ) : (
+          <>
+            <div className="p-2.5">
+              <div className="bg-white rounded-2xl border-2 border-emerald-200/80 p-2.5 shadow-xs space-y-1.5">
+                <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-wider text-slate-500 pb-1 border-b border-slate-100">
+                  <span>ИТОГО ГАРАЖ (СТО) · {garageHistorySummary.ordersCount} НАРЯДОВ</span>
+                  <span className="font-black px-1.5 py-0.5 rounded border text-[9px] text-emerald-700 bg-emerald-50 border-emerald-200">
+                    ФОТ: {Math.round(garageHistorySummary.payrollTotal).toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                  <div className="bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                    <span className="text-[7px] text-slate-400 font-bold block uppercase">
+                      Работы
+                    </span>
+                    <span className="font-black text-slate-900 text-xs">
+                      {Math.round(garageHistorySummary.worksTotal).toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                  <div className="bg-sky-50/60 p-1.5 rounded-xl border border-sky-100">
+                    <span className="text-[7px] text-sky-600 font-bold block uppercase">
+                      Запчасти
+                    </span>
+                    <span className="font-black text-sky-700 text-xs">
+                      {Math.round(garageHistorySummary.partsTotal).toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                  <div className="bg-emerald-50/70 p-1.5 rounded-xl border border-emerald-100">
+                    <span className="text-[7px] text-emerald-700 font-bold block uppercase">
+                      ЗП Механиков
+                    </span>
+                    <span className="font-black text-emerald-700 text-xs">
+                      {Math.round(garageHistorySummary.payrollTotal).toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-3 pb-6 space-y-2.5">
+              {historyOrders.map((order) => (
+                <ServiceOrderReviewCard
+                  key={order.id}
+                  order={order}
+                  onEdit={(o) => setEditOrder(o)}
+                  onApprove={handleApproveOrder}
+                  onReturn={handleReturnOrder}
+                  onDelete={handleDeleteOrder}
+                  approving={approvingId === order.id}
+                  defaultExpanded={false}
+                  readOnly
+                />
+              ))}
+            </div>
+          </>
         )
       ) : filter === 'history' ? (
         vehicleGroups.length === 0 ? (

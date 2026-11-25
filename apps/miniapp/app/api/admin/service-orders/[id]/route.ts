@@ -119,6 +119,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       minutes: number | string;
       price_client?: number | string;
       notes?: string | null;
+      mechanic_id?: string | null;
+      second_mechanic_id?: string | null;
     }>;
     parts?: Array<{
       id?: string;
@@ -163,7 +165,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // ── Редактирование заказ-наряда на ревью ──────────────────────────────
   if (action === 'edit_order') {
     const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
-      .select('id, machine_type, assigned_mechanic_id, admin_note, mechanic_note')
+      .select(
+        'id, organization_id, machine_type, assigned_mechanic_id, second_mechanic_id, admin_note, mechanic_note',
+      )
       .eq('id', targetId)
       .single();
     if (ordErr || !ord) {
@@ -207,6 +211,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const mp = parseFloat(String(body.mechanic_pay));
       updates.mechanic_pay = !isNaN(mp) && mp >= 0 ? mp.toFixed(2) : null;
     }
+    if (body.second_mechanic_id !== undefined) {
+      updates.second_mechanic_id = body.second_mechanic_id || null;
+    }
     if (body.started_at !== undefined) {
       const sVal = body.started_at ? String(body.started_at).trim() : null;
       updates.started_at = sVal ? (sVal.includes('T') ? sVal : `${sVal}T08:00:00.000Z`) : null;
@@ -237,6 +244,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           name: (w.name || '').trim(),
           minutes: Math.max(1, Math.round(Number(w.minutes) || 0)),
           notes: typeof w.notes === 'string' && w.notes.trim() ? w.notes.trim() : null,
+          mechanic_id:
+            w.mechanic_id !== undefined ? w.mechanic_id || null : ord.assigned_mechanic_id,
+          second_mechanic_id:
+            w.second_mechanic_id !== undefined
+              ? w.second_mechanic_id || null
+              : !w.mechanic_id
+                ? (ord.second_mechanic_id ?? null)
+                : null,
           price_client:
             w.price_client != null && !isNaN(Number(w.price_client)) && Number(w.price_client) > 0
               ? Number(w.price_client).toFixed(2)
@@ -257,7 +272,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             notes: w.notes,
             quantity: 1,
             status: 'completed',
-            mechanic_id: ord.assigned_mechanic_id,
+            mechanic_id: w.mechanic_id,
+            second_mechanic_id: w.second_mechanic_id,
           })),
         );
         updates.problem_description = validWorks.map((w) => w.name).join('; ');
@@ -431,17 +447,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         : parseFloat(settings?.hourly_rate_own ?? '1600') || 1600;
 
     const accruals: string[] = [];
-    const manualOverridePay =
+    const bodyPayNum =
       body.mechanic_pay != null &&
       !isNaN(Number(body.mechanic_pay)) &&
       Number(body.mechanic_pay) > 0
         ? Number(body.mechanic_pay)
         : null;
+    const storedOrderPayNum =
+      order.mechanic_pay != null &&
+      !isNaN(Number(order.mechanic_pay)) &&
+      Number(order.mechanic_pay) > 0
+        ? Number(order.mechanic_pay)
+        : null;
+    const manualOverridePay = bodyPayNum ?? storedOrderPayNum;
 
     let primaryMechanicPay: string | null = null;
+    let secondMechanicPay: string | null = null;
 
     // Шаг 5: При закрытии/выдаче машины начисляем ЗП всем механикам, выполнявшим работы в наряде
     if (unpaidWorks.length > 0 || !existingPayrollTx) {
+      const targetWorks = !existingPayrollTx && unpaidWorks.length === 0 ? works : unpaidWorks;
       const mechInfoMap = new Map<string, { id: string; name: string; pct: number }>();
       if (order.mechanic?.id) {
         mechInfoMap.set(order.mechanic.id, {
@@ -459,7 +484,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
 
       const workMechIds = new Set<string>();
-      for (const w of unpaidWorks) {
+      for (const w of targetWorks) {
         const m1 = w.mechanic_id || order.mechanic?.id;
         const m2 = w.second_mechanic_id || (!w.mechanic_id ? order.second_mechanic?.id : null);
         if (m1) workMechIds.add(m1);
@@ -490,10 +515,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           salaryByMech.set(mech.id, (hoursPerMech * hourlyRate * pct) / 100);
         }
       } else {
-        for (const w of unpaidWorks) {
+        for (const w of targetWorks) {
           const qty = Math.max(1, Number(w.quantity ?? 1));
-          const mins = Number(w.actual_minutes ?? w.norm_minutes ?? 0) * qty;
-          const explicitPrice = parseFloat(w.price_client ?? '0');
+          const normMin = Number(w.norm_minutes || 0);
+          const actualMin = Number(w.actual_minutes || 0);
+          const mins =
+            (order.machine_type === 'own'
+              ? normMin > 0
+                ? normMin
+                : actualMin
+              : actualMin > 0
+                ? actualMin
+                : normMin) * qty;
+          const explicitPrice = parseFloat(w.price_client ?? '0') || 0;
           const workPrice = explicitPrice > 0 ? explicitPrice : (mins / 60) * hourlyRate;
 
           const customPctMatch = w.notes
@@ -518,11 +552,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }
       }
 
-      // Если передан ручной оверрайд ЗП и участник один (и ранее ЗП не начислялась)
-      if (manualOverridePay != null && salaryByMech.size <= 1 && !existingPayrollTx) {
-        const onlyMechId = [...salaryByMech.keys()][0] || order.mechanic?.id;
-        if (onlyMechId) {
-          salaryByMech.set(onlyMechId, manualOverridePay);
+      // Если передан/сохранён ручной оверрайд ЗП и ранее ЗП не начислялась
+      if (manualOverridePay != null && !existingPayrollTx) {
+        if (salaryByMech.size === 0) {
+          if (order.mechanic?.id && order.second_mechanic?.id) {
+            salaryByMech.set(order.mechanic.id, manualOverridePay / 2);
+            salaryByMech.set(order.second_mechanic.id, manualOverridePay / 2);
+          } else if (order.mechanic?.id) {
+            salaryByMech.set(order.mechanic.id, manualOverridePay);
+          }
+        } else if (salaryByMech.size === 1) {
+          const onlyMechId = [...salaryByMech.keys()][0];
+          if (onlyMechId) {
+            salaryByMech.set(onlyMechId, manualOverridePay);
+          }
         }
       }
 
@@ -531,11 +574,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const info = mechInfoMap.get(mid);
         const salary = calcSalary.toFixed(2);
         if (idx === 0) primaryMechanicPay = salary;
+        else if (idx === 1) secondMechanicPay = salary;
         idx += 1;
         accruals.push(`${info?.name || mid}: ${salary} ₽`);
 
         if (calcSalary > 0) {
-          await (supabase.from('transactions') as any).insert({
+          const { error: txErr } = await (supabase.from('transactions') as any).insert({
             organization_id: order.organization_id || DEFAULT_ORGANIZATION_ID,
             direction: 'expense',
             category_id: PAYROLL_MECHANIC_CAT,
@@ -551,6 +595,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             created_by: adminId,
             idempotency_key: crypto.randomUUID(),
           });
+          if (txErr) {
+            return NextResponse.json(
+              { error: `Ошибка начисления ЗП механику: ${txErr.message}` },
+              { status: 500 },
+            );
+          }
         }
       }
     }
@@ -566,6 +616,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     };
     if (primaryMechanicPay) {
       updatePayload.mechanic_pay = primaryMechanicPay;
+    }
+    if (secondMechanicPay) {
+      updatePayload.second_mechanic_pay = secondMechanicPay;
     }
     if (body.odometer_start != null && !isNaN(Number(body.odometer_start))) {
       updatePayload.odometer_start = Number(body.odometer_start);

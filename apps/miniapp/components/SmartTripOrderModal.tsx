@@ -61,7 +61,7 @@ const PAY_OPTIONS: Array<{
   {
     value: 'cash',
     icon: '💵',
-    label: 'Наличные',
+    label: 'Нал',
     activeCls: 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200 text-emerald-900',
   },
   {
@@ -475,24 +475,23 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-50 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 h-[100dvh] bg-zinc-50 flex flex-col overflow-hidden">
       {/* ── Шапка ── */}
-      <header className="bg-white border-b-2 border-zinc-200 px-4 h-16 flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <header className="bg-white border-b border-zinc-200 px-3 h-11 flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-500 text-2xl font-bold p-1 -ml-1 active:scale-95"
+            className="text-zinc-500 text-lg font-bold px-1 -ml-1 active:scale-95"
           >
             ←
           </button>
-          <div className="min-w-0">
-            <h1 className="font-black text-zinc-900 text-lg leading-tight truncate">
+          <div className="min-w-0 flex items-center gap-1.5 truncate">
+            <h1 className="font-black text-zinc-900 text-sm leading-none shrink-0">
               Рейс №{trip.trip_number}
             </h1>
-            <p className="text-xs text-zinc-500 font-bold truncate">
-              🚚 {trip.asset?.short_name || 'Авто'}
-              {trip.asset?.reg_number ? ` · ${trip.asset.reg_number}` : ''}
+            <p className="text-[11px] text-zinc-500 font-bold truncate">
+              · {trip.asset?.short_name || 'Авто'}
               {trip.driver?.name ? ` · ${trip.driver.name}` : ''}
             </p>
           </div>
@@ -500,36 +499,34 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
         <button
           type="button"
           onClick={onClose}
-          className="w-9 h-9 rounded-xl bg-zinc-100 text-zinc-600 font-black text-lg flex items-center justify-center shrink-0"
+          className="w-7 h-7 rounded-lg bg-zinc-100 text-zinc-600 font-black text-sm flex items-center justify-center shrink-0"
         >
           ✕
         </button>
       </header>
 
       {/* ── Скроллируемая форма ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28 max-w-lg w-full mx-auto space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 py-2 pb-16 max-w-lg w-full mx-auto space-y-2">
         {/* 1. Тип рейса: ОДНА кнопка-спойлер (3 выбора: Межгород / По городу / ПРР) */}
-        <div className="bg-white border-2 border-zinc-200 rounded-2xl overflow-hidden">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
           <button
             type="button"
             onClick={() => setTripTypeOpen((v) => !v)}
-            className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-zinc-50"
+            className="w-full px-3 py-1.5 flex items-center justify-between text-left active:bg-zinc-50"
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-extrabold text-zinc-400 uppercase tracking-wider shrink-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider shrink-0">
                 Тип:
               </span>
-              <span className="font-black text-base text-zinc-900 truncate">
-                {currentKindLabel}
-              </span>
+              <span className="font-black text-xs text-zinc-900 truncate">{currentKindLabel}</span>
             </div>
-            <span className="text-sm font-black text-orange-600 bg-orange-50 px-2.5 py-1 rounded-lg shrink-0">
+            <span className="text-[11px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md shrink-0">
               {tripTypeOpen ? 'Свернуть ▴' : 'Изменить ▾'}
             </span>
           </button>
 
           {tripTypeOpen && (
-            <div className="px-3 pb-3 pt-1 border-t border-zinc-100 grid grid-cols-3 gap-2">
+            <div className="px-2 pb-2 pt-1 border-t border-zinc-100 grid grid-cols-3 gap-1.5">
               {TRIP_KINDS.map((k) => {
                 const active = tripKind === k.value;
                 return (
@@ -540,7 +537,7 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                       setTripKind(k.value);
                       setTripTypeOpen(false);
                     }}
-                    className={`border-2 rounded-xl py-2.5 px-2 font-black text-sm text-center active:scale-95 transition-all ${
+                    className={`border rounded-lg py-1 px-1.5 font-black text-xs text-center active:scale-95 transition-all ${
                       active
                         ? 'border-orange-600 bg-orange-50 text-orange-900'
                         : 'border-zinc-200 bg-white text-zinc-800'
@@ -570,20 +567,20 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
           return (
             <div
               key={order.id}
-              className="space-y-4 bg-white border-2 border-zinc-200 rounded-2xl p-3.5"
+              className="space-y-2 bg-white border border-zinc-200 rounded-xl p-2.5"
             >
               {/* Шапка контрагента */}
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <div className="flex items-center justify-between px-0.5">
-                  <label className="text-xs font-extrabold text-zinc-500 uppercase tracking-wider">
+                  <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider">
                     {orders.length > 1 ? `Контрагент #${idx + 1}` : 'Контрагент'}
                   </label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {idx === 0 && (
                       <button
                         type="button"
                         onClick={addOrder}
-                        className="text-xs font-black text-orange-600 active:scale-95"
+                        className="text-[11px] font-black text-orange-600 active:scale-95"
                       >
                         + Ещё клиент
                       </button>
@@ -592,7 +589,7 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                       <button
                         type="button"
                         onClick={() => removeOrder(idx)}
-                        className="text-xs font-black text-rose-600 active:scale-95"
+                        className="text-[11px] font-black text-rose-600 active:scale-95"
                       >
                         Удалить
                       </button>
@@ -601,8 +598,8 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                 </div>
 
                 {order.counterparty_name ? (
-                  <div className="flex items-center justify-between border-2 bg-blue-50 border-blue-300 rounded-2xl px-4 min-h-[54px] py-2">
-                    <span className="font-black text-base text-blue-950 truncate pr-2">
+                  <div className="flex items-center justify-between border bg-blue-50 border-blue-300 rounded-xl px-2.5 h-8">
+                    <span className="font-black text-xs text-blue-950 truncate pr-2">
                       {order.counterparty_name}
                     </span>
                     <button
@@ -610,15 +607,15 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                       onClick={() =>
                         updateOrder(idx, { counterparty_id: '', counterparty_name: '' })
                       }
-                      className="w-9 h-9 rounded-xl bg-white text-rose-600 font-black text-lg flex items-center justify-center shrink-0 active:scale-95"
+                      className="w-6 h-6 rounded-md bg-white text-rose-600 font-black text-xs flex items-center justify-center shrink-0 active:scale-95"
                     >
                       ✕
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {topCounterparties.length > 0 && !searchVal && (
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1">
                         {topCounterparties.map((c) => (
                           <button
                             key={c.id}
@@ -630,7 +627,7 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                               });
                               setSearchByIdx((p) => ({ ...p, [idx]: '' }));
                             }}
-                            className="px-3 py-2 rounded-xl border-2 border-zinc-200 bg-zinc-50 text-sm font-black text-zinc-800 active:scale-95"
+                            className="px-2 py-1 rounded-lg border border-zinc-200 bg-zinc-50 text-xs font-black text-zinc-800 active:scale-95"
                           >
                             {c.is_legal_entity ? '🏢' : '👤'} {c.name}
                           </button>
@@ -644,10 +641,10 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                         value={searchByIdx[idx] ?? ''}
                         onChange={(e) => setSearchByIdx((p) => ({ ...p, [idx]: e.target.value }))}
                         placeholder="Поиск контрагента..."
-                        className="w-full rounded-2xl border-2 border-zinc-200 bg-white px-4 h-12 text-base font-bold text-zinc-900 focus:border-orange-500 focus:outline-none"
+                        className="w-full rounded-xl border border-zinc-200 bg-white px-2.5 h-8 text-xs font-bold text-zinc-900 focus:border-orange-500 focus:outline-none"
                       />
                       {filteredCps.length > 0 && (
-                        <div className="mt-1 bg-white border-2 border-zinc-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto divide-y divide-zinc-100">
+                        <div className="mt-1 bg-white border border-zinc-200 rounded-xl shadow-lg max-h-40 overflow-y-auto divide-y divide-zinc-100">
                           {filteredCps.map((c) => (
                             <button
                               key={c.id}
@@ -659,7 +656,7 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                                 });
                                 setSearchByIdx((p) => ({ ...p, [idx]: '' }));
                               }}
-                              className="w-full text-left px-4 py-3 text-sm font-black text-zinc-900 hover:bg-orange-50"
+                              className="w-full text-left px-3 py-1.5 text-xs font-black text-zinc-900 hover:bg-orange-50"
                             >
                               {c.is_legal_entity ? '🏢' : '👤'} {c.name}
                             </button>
@@ -671,55 +668,77 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                 )}
               </div>
 
-              {/* Сумма заказа */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-zinc-500 uppercase tracking-wider pl-0.5">
-                  Сумма заказа, ₽
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={order.amount}
-                  onChange={(e) => updateOrder(idx, { amount: e.target.value })}
-                  placeholder="0"
-                  className="w-full rounded-2xl border-2 border-zinc-300 bg-white px-4 h-16 text-3xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
-                />
+              {/* Сумма заказа и ЗП водителя в одну строку */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <label className="block text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider pl-0.5">
+                    Сумма заказа, ₽
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={order.amount}
+                    onChange={(e) => updateOrder(idx, { amount: e.target.value })}
+                    placeholder="0"
+                    className="w-full rounded-xl border border-zinc-300 bg-white px-2.5 h-9 text-base font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-between px-0.5">
+                    <label className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider">
+                      ЗП водителя, ₽
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => addLoaderToOrder(idx)}
+                      className="text-[10px] font-black text-orange-600 active:scale-95"
+                    >
+                      + Грузчик
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={order.driver_pay}
+                    onChange={(e) => updateOrder(idx, { driver_pay: e.target.value })}
+                    placeholder="0"
+                    className="w-full rounded-xl border border-zinc-300 bg-white px-2.5 h-9 text-base font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
               </div>
 
               {/* Сумма за погрузку — ТОЛЬКО при «По городу» */}
               {tripKind === 'local' && (
-                <div className="space-y-1.5 bg-orange-50/70 border-2 border-orange-200 rounded-2xl p-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-extrabold text-orange-900 uppercase tracking-wider">
-                      📦 Сумма за погрузку, ₽
-                    </label>
-                    {order.driver_loader_pay && (
-                      <button
-                        type="button"
-                        onClick={() => updateOrder(idx, { driver_loader_pay: '' })}
-                        className="text-xs font-black text-rose-600"
-                      >
-                        Очистить
-                      </button>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2 bg-orange-50/70 border border-orange-200 rounded-xl px-2.5 py-1.5">
+                  <label className="text-[10px] font-extrabold text-orange-900 uppercase tracking-wider shrink-0">
+                    📦 Погрузка, ₽
+                  </label>
                   <input
                     type="number"
                     inputMode="numeric"
                     value={order.driver_loader_pay}
                     onChange={(e) => updateOrder(idx, { driver_loader_pay: e.target.value })}
                     placeholder="0"
-                    className="w-full rounded-xl border-2 border-orange-300 bg-white px-4 h-12 text-2xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
+                    className="flex-1 min-w-0 rounded-lg border border-orange-300 bg-white px-2 h-8 text-sm font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
                   />
+                  {order.driver_loader_pay && (
+                    <button
+                      type="button"
+                      onClick={() => updateOrder(idx, { driver_loader_pay: '' })}
+                      className="text-[10px] font-black text-rose-600 shrink-0"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               )}
 
               {/* Способ оплаты — 3 компактные 1-строчные кнопки */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-zinc-500 uppercase tracking-wider pl-0.5">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider pl-0.5">
                   Способ оплаты
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   {PAY_OPTIONS.map((opt) => {
                     const active = order.payment_method === opt.value;
                     return (
@@ -727,129 +746,103 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                         key={opt.value}
                         type="button"
                         onClick={() => updateOrder(idx, { payment_method: opt.value })}
-                        className={`border-2 rounded-xl py-2.5 px-2 flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                        className={`border rounded-lg py-1.5 px-1.5 flex items-center justify-center gap-1 transition-all active:scale-95 ${
                           active ? opt.activeCls : 'border-zinc-200 bg-white text-zinc-800'
                         }`}
                       >
-                        <span className="text-base leading-none">{opt.icon}</span>
-                        <span className="font-black text-sm leading-none">{opt.label}</span>
+                        <span className="text-xs leading-none">{opt.icon}</span>
+                        <span className="font-black text-xs leading-none whitespace-nowrap">
+                          {opt.label}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* ЗП водителя + грузчики */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-0.5">
-                  <label className="text-xs font-extrabold text-zinc-500 uppercase tracking-wider">
-                    ЗП водителя, ₽
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => addLoaderToOrder(idx)}
-                    className="text-xs font-black text-orange-600 active:scale-95"
-                  >
-                    + Грузчик
-                  </button>
-                </div>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={order.driver_pay}
-                  onChange={(e) => updateOrder(idx, { driver_pay: e.target.value })}
-                  placeholder="0"
-                  className="w-full rounded-2xl border-2 border-zinc-300 bg-white px-4 h-14 text-2xl font-black text-zinc-900 focus:border-orange-500 focus:outline-none"
-                />
-
-                {order.loaders.length > 0 && (
-                  <div className="space-y-2">
-                    {order.loaders.map((loader, lIdx) => (
-                      <div
-                        key={lIdx}
-                        className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl p-2"
+              {/* Грузчики */}
+              {order.loaders.length > 0 && (
+                <div className="space-y-1.5">
+                  {order.loaders.map((loader, lIdx) => (
+                    <div
+                      key={lIdx}
+                      className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 rounded-lg p-1.5"
+                    >
+                      <select
+                        value={loader.id}
+                        onChange={(e) => {
+                          const found = allLoaders.find((x) => x.id === e.target.value);
+                          updateLoader(idx, lIdx, {
+                            id: e.target.value,
+                            name: found?.name || '',
+                          });
+                        }}
+                        className="flex-1 min-w-0 rounded-md border border-zinc-300 bg-white px-2 h-7 text-xs font-black text-zinc-900"
                       >
-                        <select
-                          value={loader.id}
-                          onChange={(e) => {
-                            const found = allLoaders.find((x) => x.id === e.target.value);
-                            updateLoader(idx, lIdx, {
-                              id: e.target.value,
-                              name: found?.name || '',
-                            });
-                          }}
-                          className="flex-1 min-w-0 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm font-black text-zinc-900"
-                        >
-                          <option value="">Грузчик</option>
-                          {allLoaders.map((l) => (
-                            <option key={l.id} value={l.id}>
-                              {l.name}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          value={loader.pay}
-                          onChange={(e) => updateLoader(idx, lIdx, { pay: e.target.value })}
-                          placeholder="₽"
-                          className="w-24 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-base font-black text-zinc-900"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeLoader(idx, lIdx)}
-                          className="w-9 h-9 rounded-lg bg-white border border-zinc-200 text-rose-600 font-black text-lg flex items-center justify-center shrink-0"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                        <option value="">Грузчик</option>
+                        {allLoaders.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={loader.pay}
+                        onChange={(e) => updateLoader(idx, lIdx, { pay: e.target.value })}
+                        placeholder="₽"
+                        className="w-20 rounded-md border border-zinc-300 bg-white px-2 h-7 text-xs font-black text-zinc-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeLoader(idx, lIdx)}
+                        className="w-7 h-7 rounded-md bg-white border border-zinc-200 text-rose-600 font-black text-sm flex items-center justify-center shrink-0"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Комментарий к заказу */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-extrabold text-zinc-500 uppercase tracking-wider pl-0.5">
-                  Комментарий / груз
-                </label>
-                <input
-                  type="text"
-                  value={order.description}
-                  onChange={(e) => updateOrder(idx, { description: e.target.value })}
-                  placeholder="Груз, маршрут, адрес..."
-                  className="w-full rounded-2xl border-2 border-zinc-200 bg-white px-4 h-12 text-base font-bold text-zinc-900 focus:border-orange-500 focus:outline-none"
-                />
-              </div>
+              <input
+                type="text"
+                value={order.description}
+                onChange={(e) => updateOrder(idx, { description: e.target.value })}
+                placeholder="Комментарий / груз, маршрут, адрес..."
+                className="w-full rounded-xl border border-zinc-200 bg-white px-2.5 h-8 text-xs font-bold text-zinc-900 focus:border-orange-500 focus:outline-none"
+              />
             </div>
           );
         })}
 
         {/* 6. Топливо и расходы (Кубик / АЗС / Расход) */}
-        <div className="bg-white border-2 border-zinc-200 rounded-2xl p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between gap-1.5 flex-wrap">
-            <span className="text-xs font-extrabold text-zinc-600 uppercase tracking-wider">
+        <div className="bg-white border border-zinc-200 rounded-xl p-2.5 space-y-2">
+          <div className="flex items-center justify-between gap-1 flex-wrap">
+            <span className="text-[10px] font-extrabold text-zinc-600 uppercase tracking-wider">
               ⛽ Топливо и расходы
             </span>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => addExpenseRow('cube')}
-                className="text-xs font-black px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 active:scale-95"
+                className="text-[11px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 active:scale-95"
               >
-                + Кубик
+                + Куб
               </button>
               <button
                 type="button"
                 onClick={() => addExpenseRow('fuel')}
-                className="text-xs font-black px-2.5 py-1 rounded-lg bg-orange-100 text-orange-800 active:scale-95"
+                className="text-[11px] font-black px-2 py-0.5 rounded-md bg-orange-100 text-orange-800 active:scale-95"
               >
                 + АЗС
               </button>
               <button
                 type="button"
                 onClick={() => addExpenseRow('other')}
-                className="text-xs font-black px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-700 active:scale-95"
+                className="text-[11px] font-black px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 active:scale-95"
               >
                 + Расход
               </button>
@@ -857,14 +850,16 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
           </div>
 
           {expenses.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {expenses.map((exp, eIdx) =>
                 exp.kind === 'cube' ? (
                   <div
                     key={exp.id}
-                    className="flex items-center gap-1.5 bg-amber-50/70 border border-amber-200 rounded-xl p-2"
+                    className="flex items-center gap-1 bg-amber-50/70 border border-amber-200 rounded-lg p-1.5"
                   >
-                    <span className="text-sm font-black text-amber-950 shrink-0 pl-1">🛢 Куб</span>
+                    <span className="text-xs font-black text-amber-950 shrink-0 pl-0.5">
+                      🛢 Куб
+                    </span>
                     <input
                       type="number"
                       inputMode="decimal"
@@ -878,21 +873,21 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                         });
                       }}
                       placeholder="Л"
-                      className="w-16 rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-sm font-black text-zinc-900"
+                      className="w-14 rounded-md border border-amber-300 bg-white px-1.5 h-7 text-xs font-black text-zinc-900"
                     />
-                    <span className="text-xs font-bold text-amber-800 shrink-0">л =</span>
+                    <span className="text-[11px] font-bold text-amber-800 shrink-0">л =</span>
                     <input
                       type="number"
                       inputMode="numeric"
                       value={exp.amount}
                       onChange={(e) => updateExpense(eIdx, { amount: e.target.value })}
                       placeholder="₽"
-                      className="flex-1 min-w-0 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-base font-black text-zinc-900"
+                      className="flex-1 min-w-0 rounded-md border border-amber-300 bg-white px-2 h-7 text-xs font-black text-zinc-900"
                     />
                     <button
                       type="button"
                       onClick={() => removeExpense(eIdx)}
-                      className="w-8 h-8 rounded-lg bg-white border border-amber-200 text-rose-600 font-black text-base flex items-center justify-center shrink-0"
+                      className="w-7 h-7 rounded-md bg-white border border-amber-200 text-rose-600 font-black text-sm flex items-center justify-center shrink-0"
                     >
                       ×
                     </button>
@@ -900,10 +895,10 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                 ) : (
                   <div
                     key={exp.id}
-                    className="space-y-1.5 bg-zinc-50 border border-zinc-200 rounded-xl p-2"
+                    className="space-y-1 bg-zinc-50 border border-zinc-200 rounded-lg p-1.5"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-black text-zinc-800 shrink-0 pl-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-black text-zinc-800 shrink-0 pl-0.5">
                         {exp.kind === 'fuel' ? '⛽ АЗС' : '🧾 Расх.'}
                       </span>
                       <input
@@ -912,21 +907,21 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                         value={exp.amount}
                         onChange={(e) => updateExpense(eIdx, { amount: e.target.value })}
                         placeholder="₽"
-                        className="w-24 rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-base font-black text-zinc-900"
+                        className="w-20 rounded-md border border-zinc-300 bg-white px-2 h-7 text-xs font-black text-zinc-900"
                       />
                       <select
                         value={exp.payment_method}
                         onChange={(e) => updateExpense(eIdx, { payment_method: e.target.value })}
-                        className="flex-1 min-w-0 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs font-bold text-zinc-700"
+                        className="flex-1 min-w-0 rounded-md border border-zinc-300 bg-white px-1.5 h-7 text-[11px] font-bold text-zinc-700"
                       >
                         <option value="fuel_card">Карта / Opti24</option>
-                        <option value="cash">Наличные</option>
+                        <option value="cash">Нал</option>
                         <option value="bank_invoice">Р/С</option>
                       </select>
                       <button
                         type="button"
                         onClick={() => removeExpense(eIdx)}
-                        className="w-8 h-8 rounded-lg bg-white border border-zinc-200 text-rose-600 font-black text-base flex items-center justify-center shrink-0"
+                        className="w-7 h-7 rounded-md bg-white border border-zinc-200 text-rose-600 font-black text-sm flex items-center justify-center shrink-0"
                       >
                         ×
                       </button>
@@ -937,7 +932,7 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                         value={exp.description}
                         onChange={(e) => updateExpense(eIdx, { description: e.target.value })}
                         placeholder="За что расход (мойка, шиномонтаж...)"
-                        className="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-bold text-zinc-800"
+                        className="w-full rounded-md border border-zinc-200 bg-white px-2 h-7 text-xs font-bold text-zinc-800"
                       />
                     )}
                   </div>
@@ -948,27 +943,27 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
         </div>
 
         {/* 7. Спойлер: Машина, водитель, одометр, примечание */}
-        <div className="bg-white border-2 border-zinc-200 rounded-2xl overflow-hidden">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
           <button
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
-            className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-zinc-50"
+            className="w-full px-3 py-1.5 flex items-center justify-between text-left active:bg-zinc-50"
           >
-            <span className="font-black text-sm text-zinc-800">⚙️ Машина, водитель, пробег</span>
-            <span className="text-base font-black text-zinc-400">{moreOpen ? '▴' : '▾'}</span>
+            <span className="font-black text-xs text-zinc-800">⚙️ Машина, водитель, пробег</span>
+            <span className="text-sm font-black text-zinc-400">{moreOpen ? '▴' : '▾'}</span>
           </button>
 
           {moreOpen && (
-            <div className="px-4 pb-4 pt-2 border-t border-zinc-100 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
+            <div className="px-3 pb-2.5 pt-1.5 border-t border-zinc-100 space-y-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 <div>
-                  <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-zinc-500 uppercase mb-0.5">
                     Автомобиль
                   </label>
                   <select
                     value={assetId}
                     onChange={(e) => setAssetId(e.target.value)}
-                    className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-2.5 h-11 text-sm font-black text-zinc-900"
+                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 h-8 text-xs font-black text-zinc-900"
                   >
                     <option value="">Не выбрано</option>
                     {vehicles.map((v) => (
@@ -979,13 +974,13 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-zinc-500 uppercase mb-0.5">
                     Водитель
                   </label>
                   <select
                     value={driverId}
                     onChange={(e) => setDriverId(e.target.value)}
-                    className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-2.5 h-11 text-sm font-black text-zinc-900"
+                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 h-8 text-xs font-black text-zinc-900"
                   >
                     <option value="">Не выбран</option>
                     {drivers.map((d) => (
@@ -997,9 +992,9 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 <div>
-                  <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-zinc-500 uppercase mb-0.5">
                     Одометр старт
                   </label>
                   <input
@@ -1007,11 +1002,11 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                     inputMode="numeric"
                     value={odometerStart}
                     onChange={(e) => setOdometerStart(e.target.value)}
-                    className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-3 h-11 text-base font-black text-zinc-900"
+                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 h-8 text-xs font-black text-zinc-900"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                  <label className="block text-[10px] font-extrabold text-zinc-500 uppercase mb-0.5">
                     Одометр финиш
                   </label>
                   <input
@@ -1019,20 +1014,20 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
                     inputMode="numeric"
                     value={odometerEnd}
                     onChange={(e) => setOdometerEnd(e.target.value)}
-                    className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-3 h-11 text-base font-black text-zinc-900"
+                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 h-8 text-xs font-black text-zinc-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-extrabold text-zinc-500 uppercase mb-1">
+                <label className="block text-[10px] font-extrabold text-zinc-500 uppercase mb-0.5">
                   Заметка администратора
                 </label>
                 <input
                   type="text"
                   value={adminNote}
                   onChange={(e) => setAdminNote(e.target.value)}
-                  className="w-full rounded-xl border-2 border-zinc-200 bg-zinc-50 px-3 h-11 text-sm font-bold text-zinc-900"
+                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 h-8 text-xs font-bold text-zinc-900"
                 />
               </div>
             </div>
@@ -1040,20 +1035,20 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
         </div>
 
         {error && (
-          <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl px-4 py-3 text-rose-700 text-sm font-black">
+          <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-rose-700 text-xs font-black">
             {error}
           </div>
         )}
       </div>
 
       {/* ── Закреплённая нижняя кнопка ── */}
-      <div className="shrink-0 p-4 bg-white border-t-2 border-zinc-200 shadow-lg pb-[calc(env(safe-area-inset-bottom,0px)+16px)]">
+      <div className="shrink-0 px-3 py-2 bg-white border-t border-zinc-200 shadow-lg pb-[calc(env(safe-area-inset-bottom,0px)+8px)]">
         <div className="max-w-lg mx-auto">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="w-full h-14 rounded-2xl bg-orange-600 hover:bg-orange-500 active:bg-orange-700 active:scale-[0.99] text-white font-black text-base uppercase tracking-wider shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full h-9 rounded-xl bg-orange-600 hover:bg-orange-500 active:bg-orange-700 active:scale-[0.99] text-white font-black text-xs uppercase tracking-wider shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
             <span>✅</span>
             <span>{saving ? 'Сохраняем...' : 'Сохранить изменения'}</span>

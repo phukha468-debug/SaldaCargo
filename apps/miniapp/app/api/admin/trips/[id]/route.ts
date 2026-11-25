@@ -116,7 +116,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 /** PATCH /api/admin/trips/:id — одобрить, вернуть или отредактировать заказы */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const adminId = (await getVerifiedMiniappUserId()) || null;
+  const supabase = createAdminClient();
+  let adminId = (await getVerifiedMiniappUserId()) || null;
+  if (!adminId) {
+    const { data: adminUser } = await (supabase.from('users') as any)
+      .select('id')
+      .filter('roles', 'cs', '{"admin"}')
+      .limit(1)
+      .maybeSingle();
+    adminId = adminUser?.id ?? null;
+  }
   const body = (await request.json()) as {
     action?:
       | 'approve'
@@ -168,7 +177,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }>;
     deleted_expense_ids?: string[];
   };
-  const supabase = createAdminClient();
 
   // Обработка статуса подотчёта наличных (cash_not_surrendered)
   if (body.cash_not_surrendered !== undefined) {

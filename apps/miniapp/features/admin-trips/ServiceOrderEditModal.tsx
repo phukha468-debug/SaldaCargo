@@ -23,17 +23,33 @@ export function ServiceOrderEditModal({
     order.client_vehicle_model || order.client_vehicle_brand || '',
   );
   const [clientReg, setClientReg] = useState<string>(order.client_vehicle_reg || '');
-  const [works, setWorks] = useState<Array<{ name: string; minutes: string; notes?: string }>>(
-    () => {
-      const active = (order.works ?? []).filter((w) => w.status !== 'cancelled');
-      if (active.length === 0) return [{ name: order.problem_description || '', minutes: '60' }];
-      return active.map((w) => ({
-        name: w.custom_work_name || w.work_catalog?.name || w.work_description || '',
-        minutes: String(w.actual_minutes || w.norm_minutes || 30),
-        notes: w.notes || undefined,
-      }));
-    },
-  );
+  const [works, setWorks] = useState<
+    Array<{
+      name: string;
+      minutes: string;
+      notes?: string;
+      mechanic_id?: string | null;
+      second_mechanic_id?: string | null;
+    }>
+  >(() => {
+    const active = (order.works ?? []).filter((w) => w.status !== 'cancelled');
+    if (active.length === 0)
+      return [
+        {
+          name: order.problem_description || '',
+          minutes: '60',
+          mechanic_id: order.assigned_mechanic_id ?? order.mechanic?.id ?? null,
+          second_mechanic_id: order.second_mechanic_id ?? order.second_mechanic?.id ?? null,
+        },
+      ];
+    return active.map((w) => ({
+      name: w.custom_work_name || w.work_catalog?.name || w.work_description || '',
+      minutes: String(w.actual_minutes || w.norm_minutes || 30),
+      notes: w.notes || undefined,
+      mechanic_id: w.mechanic_id ?? null,
+      second_mechanic_id: w.second_mechanic_id ?? null,
+    }));
+  });
   const [parts, setParts] = useState<Array<{ name: string; quantity: string; unit: string }>>(() =>
     (order.parts ?? []).map((p) => ({
       name: p.custom_part_name || p.part?.name || '',
@@ -65,6 +81,7 @@ export function ServiceOrderEditModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'edit_order',
+          second_mechanic_id: order.second_mechanic_id ?? order.second_mechanic?.id ?? null,
           odometer_start: odometer ? Number(odometer) : null,
           odometer_end: odometer ? Number(odometer) : null,
           client_vehicle_model: !isOwn ? clientModel : undefined,
@@ -73,6 +90,8 @@ export function ServiceOrderEditModal({
             name: w.name,
             minutes: parseInt(w.minutes, 10) || 0,
             notes: w.notes,
+            mechanic_id: w.mechanic_id ?? null,
+            second_mechanic_id: w.second_mechanic_id ?? null,
           })),
           parts: parts.map((p) => ({
             name: p.name,
