@@ -1,198 +1,205 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedWebUserId } from '@/lib/auth';
+import { createWebApiHandler } from '@/lib/api';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 import { NextResponse } from 'next/server';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
 const BANK_ID = '10000000-0000-0000-0000-000000000001';
 
-async function resolveUserId(supabase: any): Promise<string> {
-  const fromCookie = await getVerifiedWebUserId();
-  if (fromCookie) return fromCookie;
-  const { data } = await (supabase.from('users') as any)
-    .select('id')
-    .or('roles.cs.{owner},roles.cs.{admin}')
-    .limit(1)
-    .single();
-  return data?.id ?? '00000000-0000-0000-0000-000000000000';
-}
-
 /**
  * POST /api/staff/debt
  * Запись долга/аванса сотруднику или его погашение (возврат в кассу).
  */
-export async function POST(request: Request) {
-  try {
-    const supabase = createAdminClient();
-    const adminId = await resolveUserId(supabase);
+export const POST = createWebApiHandler(
+  {
+    routeName: 'web:/api/staff/debt',
+    roles: ['admin', 'owner'],
+    requiredModule: 'payroll',
+  },
+  async ({ request, auth }) => {
+    try {
+      const supabase = createAdminClient();
+      const adminId = auth.userId;
+      const orgId = auth.organizationId;
 
-    const body = (await request.json()) as {
-      action?: 'add' | 'repay' | 'adjust';
-      user_id: string;
-      amount?: string;
-      target_amount?: string;
-      from_wallet_id?: string | null;
-      to_wallet_id?: string | null;
-      note?: string;
-    };
+      const body = (await request.json()) as {
+        action?: 'add' | 'repay' | 'adjust';
+        user_id: string;
+        amount?: string;
+        target_amount?: string;
+        from_wallet_id?: string | null;
+        to_wallet_id?: string | null;
+        note?: string;
+      };
 
-    if (!body.user_id) {
-      return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
-    }
-
-    const { data: user } = await (supabase as any)
-      .from('users')
-      .select('name')
-      .eq('id', body.user_id)
-      .single();
-
-    if (!user) return NextResponse.json({ error: 'Сотрудник не найден' }, { status: 404 });
-
-    if (body.action === 'adjust') {
-      const targetVal = parseFloat(body.target_amount ?? '0');
-      if (isNaN(targetVal) || targetVal < 0) {
-        return NextResponse.json({ error: 'Некорректная целевая сумма' }, { status: 400 });
+      if (!body.user_id) {
+        return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
       }
 
-      // Calculate current advance balance
-      const [{ data: advanceGiven }, { data: advanceOffset }] = await Promise.all([
-        (supabase.from('transactions') as any)
-          .select('amount')
-          .eq('direction', 'expense')
-          .eq('lifecycle_status', 'approved')
-          .eq('category_id', ADVANCE_CATEGORY_ID)
-          .eq('related_user_id', body.user_id),
+      const { data: user } = await (supabase as any)
+        .from('users')
+        .select('name')
+        .eq('id', body.user_id)
+        .single();
 
-        (supabase.from('transactions') as any)
-          .select('amount')
-          .eq('direction', 'income')
-          .eq('lifecycle_status', 'approved')
-          .eq('category_id', ADVANCE_CATEGORY_ID)
-          .eq('related_user_id', body.user_id),
-      ]);
+      if (!user) return NextResponse.json({ error: 'Сотрудник не найден' }, { status: 404 });
 
-      const advanceTotal = ((advanceGiven as any[]) ?? []).reduce(
-        (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
-        0,
-      );
-      const offsetTotal = ((advanceOffset as any[]) ?? []).reduce(
-        (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
-        0,
-      );
-      const currentBalance = Math.max(0, advanceTotal - offsetTotal);
-      const diff = targetVal - currentBalance;
+      if (body.action === 'adjust') {
+        const targetVal = parseFloat(body.target_amount ?? '0');
+        if (isNaN(targetVal) || targetVal < 0) {
+          return NextResponse.json({ error: 'Некорректная целевая сумма' }, { status: 400 });
+        }
 
-      if (Math.abs(diff) < 0.01) {
-        return NextResponse.json({ ok: true, message: 'Долг равен целевой сумме' });
+        // Calculate current advance balance
+        const [{ data: advanceGiven }, { data: advanceOffset }] = await Promise.all([
+          (supabase.from('transactions') as any)
+            .select('amount')
+            .eq('organization_id', orgId)
+            .eq('direction', 'expense')
+            .eq('lifecycle_status', 'approved')
+            .eq('category_id', ADVANCE_CATEGORY_ID)
+            .eq('related_user_id', body.user_id),
+
+          (supabase.from('transactions') as any)
+            .select('amount')
+            .eq('organization_id', orgId)
+            .eq('direction', 'income')
+            .eq('lifecycle_status', 'approved')
+            .eq('category_id', ADVANCE_CATEGORY_ID)
+            .eq('related_user_id', body.user_id),
+        ]);
+
+        const advanceTotal = ((advanceGiven as any[]) ?? []).reduce(
+          (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+          0,
+        );
+        const offsetTotal = ((advanceOffset as any[]) ?? []).reduce(
+          (s: number, t: any) => s + parseFloat(t.amount ?? '0'),
+          0,
+        );
+        const currentBalance = Math.max(0, advanceTotal - offsetTotal);
+        const diff = targetVal - currentBalance;
+
+        if (Math.abs(diff) < 0.01) {
+          return NextResponse.json({ ok: true, message: 'Долг равен целевой сумме' });
+        }
+
+        const isIncrease = diff > 0;
+        const absDiff = Math.abs(diff);
+        const noteText = body.note?.trim() ? ` (${body.note.trim()})` : '';
+
+        const { data, error } = await (supabase as any)
+          .from('transactions')
+          .insert({
+            organization_id: orgId,
+            direction: isIncrease ? 'expense' : 'income',
+            category_id: ADVANCE_CATEGORY_ID,
+            amount: absDiff.toFixed(2),
+            description: `Корректировка долга: ${user.name} — ${currentBalance.toFixed(0)} ₽ → ${targetVal.toFixed(0)} ₽${noteText}`,
+            lifecycle_status: 'approved',
+            settlement_status: 'completed',
+            related_user_id: body.user_id,
+            created_by: adminId,
+            idempotency_key: crypto.randomUUID(),
+          })
+          .select()
+          .single();
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        invalidateWalletsCache(orgId);
+        return NextResponse.json(data, { status: 201 });
       }
 
-      const isIncrease = diff > 0;
-      const absDiff = Math.abs(diff);
-      const noteText = body.note?.trim() ? ` (${body.note.trim()})` : '';
+      if (!body.amount) {
+        return NextResponse.json({ error: 'amount обязателен' }, { status: 400 });
+      }
+
+      const amount = parseFloat(body.amount);
+      if (isNaN(amount) || amount <= 0) {
+        return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
+      }
+
+      const isRepay = body.action === 'repay';
+      const defaultNote = isRepay
+        ? `Возврат долга: ${user.name}`
+        : `Долг / Аванс: ${user.name} — ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+      const description = body.note?.trim() || defaultNote;
+
+      const payload: any = {
+        organization_id: orgId,
+        direction: isRepay ? 'income' : 'expense',
+        category_id: ADVANCE_CATEGORY_ID,
+        amount: amount.toFixed(2),
+        description,
+        lifecycle_status: 'approved',
+        settlement_status: 'completed',
+        related_user_id: body.user_id,
+        created_by: adminId,
+        idempotency_key: crypto.randomUUID(),
+      };
+
+      if (isRepay) {
+        if (body.to_wallet_id && body.to_wallet_id !== 'none') {
+          payload.to_wallet_id = body.to_wallet_id;
+        }
+      } else {
+        if (body.from_wallet_id && body.from_wallet_id !== 'none') {
+          payload.from_wallet_id = body.from_wallet_id;
+        }
+
+        // Защита от задвоения расходов: если списание происходит с Р/С (Банк),
+        // проверяем, нет ли уже нераспределенной банковской операции на эту сумму за последние 3 дня.
+        if (body.from_wallet_id === BANK_ID) {
+          const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+          const { data: matchedBankTx } = await (supabase.from('transactions') as any)
+            .select('*')
+            .eq('organization_id', orgId)
+            .eq('from_wallet_id', BANK_ID)
+            .eq('direction', 'expense')
+            .or(`amount.eq.${amount},amount.eq.${amount.toFixed(2)}`)
+            .is('related_user_id', null)
+            .gte('transaction_date', threeDaysAgo)
+            .order('transaction_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (matchedBankTx) {
+            // Вместо создания второй записи связываем существующую банковскую транзакцию с сотрудником
+            const { data: updated, error: updErr } = await (supabase.from('transactions') as any)
+              .update({
+                related_user_id: body.user_id,
+                category_id: ADVANCE_CATEGORY_ID,
+                description: body.note?.trim()
+                  ? `${body.note.trim()} (аванс водителю)`
+                  : `Аванс водителю: ${user.name}`,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', matchedBankTx.id)
+              .eq('organization_id', orgId)
+              .select()
+              .single();
+
+            if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+            invalidateWalletsCache(orgId);
+            return NextResponse.json({ ...updated, deduplicated: true }, { status: 200 });
+          }
+        }
+      }
 
       const { data, error } = await (supabase as any)
         .from('transactions')
-        .insert({
-          direction: isIncrease ? 'expense' : 'income',
-          category_id: ADVANCE_CATEGORY_ID,
-          amount: absDiff.toFixed(2),
-          description: `Корректировка долга: ${user.name} — ${currentBalance.toFixed(0)} ₽ → ${targetVal.toFixed(0)} ₽${noteText}`,
-          lifecycle_status: 'approved',
-          settlement_status: 'completed',
-          related_user_id: body.user_id,
-          created_by: adminId,
-          idempotency_key: crypto.randomUUID(),
-        })
+        .insert(payload)
         .select()
         .single();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+      invalidateWalletsCache(orgId);
       return NextResponse.json(data, { status: 201 });
+    } catch (err: any) {
+      return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
     }
-
-    if (!body.amount) {
-      return NextResponse.json({ error: 'amount обязателен' }, { status: 400 });
-    }
-
-    const amount = parseFloat(body.amount);
-    if (isNaN(amount) || amount <= 0) {
-      return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
-    }
-
-    const isRepay = body.action === 'repay';
-    const defaultNote = isRepay
-      ? `Возврат долга: ${user.name}`
-      : `Долг / Аванс: ${user.name} — ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}`;
-
-    const description = body.note?.trim() || defaultNote;
-
-    const payload: any = {
-      direction: isRepay ? 'income' : 'expense',
-      category_id: ADVANCE_CATEGORY_ID,
-      amount: amount.toFixed(2),
-      description,
-      lifecycle_status: 'approved',
-      settlement_status: 'completed',
-      related_user_id: body.user_id,
-      created_by: adminId,
-      idempotency_key: crypto.randomUUID(),
-    };
-
-    if (isRepay) {
-      if (body.to_wallet_id && body.to_wallet_id !== 'none') {
-        payload.to_wallet_id = body.to_wallet_id;
-      }
-    } else {
-      if (body.from_wallet_id && body.from_wallet_id !== 'none') {
-        payload.from_wallet_id = body.from_wallet_id;
-      }
-
-      // Защита от задвоения расходов: если списание происходит с Р/С (Банк),
-      // проверяем, нет ли уже нераспределенной банковской операции на эту сумму за последние 3 дня.
-      if (body.from_wallet_id === BANK_ID) {
-        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-        const { data: matchedBankTx } = await (supabase.from('transactions') as any)
-          .select('*')
-          .eq('from_wallet_id', BANK_ID)
-          .eq('direction', 'expense')
-          .or(`amount.eq.${amount},amount.eq.${amount.toFixed(2)}`)
-          .is('related_user_id', null)
-          .gte('transaction_date', threeDaysAgo)
-          .order('transaction_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (matchedBankTx) {
-          // Вместо создания второй записи связываем существующую банковскую транзакцию с сотрудником
-          const { data: updated, error: updErr } = await (supabase.from('transactions') as any)
-            .update({
-              related_user_id: body.user_id,
-              category_id: ADVANCE_CATEGORY_ID,
-              description: body.note?.trim()
-                ? `${body.note.trim()} (аванс водителю)`
-                : `Аванс водителю: ${user.name}`,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', matchedBankTx.id)
-            .select()
-            .single();
-
-          if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-          return NextResponse.json({ ...updated, deduplicated: true }, { status: 200 });
-        }
-      }
-    }
-
-    const { data, error } = await (supabase as any)
-      .from('transactions')
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-    return NextResponse.json(data, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Ошибка сервера' }, { status: 500 });
-  }
-}
+  },
+);
