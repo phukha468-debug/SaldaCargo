@@ -323,7 +323,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.action === 'edit_order') {
       const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
         .select(
-          'id, order_number, machine_type, assigned_mechanic_id, second_mechanic_id, lifecycle_status, admin_note, mechanic_note',
+          'id, order_number, machine_type, assigned_mechanic_id, second_mechanic_id, lifecycle_status, admin_note, mechanic_note, approved_by, created_by',
         )
         .eq('id', targetId)
         .single();
@@ -575,10 +575,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       // Если заказ-наряд уже был утвержден (approved), синхронизируем транзакции ЗП
       if (ord.lifecycle_status === 'approved') {
         const CAT_PAYROLL_MECHANIC = '3d174f9f-34c2-4bc8-a3a9-d82f96f85bf6';
-        await (supabase.from('transactions') as any)
-          .delete()
+
+        // Гарантируем непустой created_by (NOT NULL constraint в transactions)
+        let txCreatedBy: string | null = session?.uid || ord.approved_by || ord.created_by || null;
+        if (!txCreatedBy) {
+          const { data: adminUser } = await (supabase.from('users') as any)
+            .select('id')
+            .or('roles.cs.{owner},roles.cs.{admin}')
+            .limit(1)
+            .maybeSingle();
+          txCreatedBy = adminUser?.id ?? null;
+        }
+
+        const { data: oldTxRows } = await (supabase.from('transactions') as any)
+          .select('id')
           .eq('service_order_id', targetId)
           .eq('category_id', CAT_PAYROLL_MECHANIC);
+        const oldTxIds = (oldTxRows ?? []).map((t: any) => t.id).filter(Boolean);
 
         const newTxns: any[] = [];
         for (const [mechId, amount] of workPayByMechanic.entries()) {
@@ -595,17 +608,35 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             category_id: CAT_PAYROLL_MECHANIC,
             related_user_id: mechId,
             service_order_id: targetId,
-            created_by: null,
+            created_by: txCreatedBy,
             description: `ЗП механика ${mUser?.name ?? 'Механик'} — наряд #${ord.order_number}`,
             idempotency_key: crypto.randomUUID(),
           });
         }
 
+        // Сначала вставляем новые транзакции, и только при успехе удаляем старые
         if (newTxns.length > 0) {
-          await (supabase.from('transactions') as any).insert(newTxns);
+          if (!txCreatedBy) {
+            return NextResponse.json(
+              { error: 'Не удалось определить created_by для транзакции ЗП механика' },
+              { status: 500 },
+            );
+          }
+          const { error: insTxErr } = await (supabase.from('transactions') as any).insert(newTxns);
+          if (insTxErr) {
+            return NextResponse.json(
+              { error: `Ошибка пересоздания транзакций ЗП: ${insTxErr.message}` },
+              { status: 500 },
+            );
+          }
+          if (oldTxIds.length > 0) {
+            await (supabase.from('transactions') as any).delete().in('id', oldTxIds);
+          }
           await (supabase.from('service_order_works') as any)
             .update({ salary_paid: true })
             .eq('service_order_id', targetId);
+        } else if (oldTxIds.length > 0) {
+          await (supabase.from('transactions') as any).delete().in('id', oldTxIds);
         }
       }
 
