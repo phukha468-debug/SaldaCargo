@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedWebUserId } from '@/lib/auth';
+import { getVerifiedWebSession, getVerifiedWebUserId } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 import { NextResponse } from 'next/server';
 
 const CASH_METHODS = ['cash'];
@@ -179,7 +181,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const supabase = createAdminClient();
-    const adminId = await resolveAdminUserId(supabase);
+    const [adminId, session] = await Promise.all([
+      resolveAdminUserId(supabase),
+      getVerifiedWebSession(),
+    ]);
+    const orgId = session?.oid || DEFAULT_ORGANIZATION_ID;
 
     const body = await request.json();
     const action = body.action || 'collect_hold';
@@ -243,6 +249,7 @@ export async function POST(request: Request) {
 
         // Транзакция на сданную часть
         await (supabase.from('transactions') as any).insert({
+          organization_id: holdTx.organization_id || orgId,
           direction: 'transfer',
           amount: collectAmount.toFixed(2),
           category_id: CASH_COLLECT_CAT,
@@ -299,6 +306,7 @@ export async function POST(request: Request) {
 
       // 3. Создаём транзакцию перевода в кассу/сейф
       await (supabase.from('transactions') as any).insert({
+        organization_id: orgId,
         direction: 'transfer',
         amount: numAmount.toFixed(2),
         category_id: CASH_COLLECT_CAT,
@@ -342,6 +350,7 @@ export async function POST(request: Request) {
 
       const { data: createdTx, error: txErr } = await (supabase.from('transactions') as any)
         .insert({
+          organization_id: orgId,
           direction: 'transfer',
           amount: numAmount.toFixed(2),
           category_id: CASH_COLLECT_CAT,
@@ -361,6 +370,7 @@ export async function POST(request: Request) {
       if (txErr) {
         return NextResponse.json({ error: txErr.message }, { status: 500 });
       }
+      invalidateWalletsCache(orgId);
 
       return NextResponse.json({
         ok: true,

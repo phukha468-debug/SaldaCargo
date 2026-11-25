@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedWebUserId } from '@/lib/auth';
+import { getVerifiedWebSession, getVerifiedWebUserId } from '@/lib/auth';
+import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
+import { invalidateWalletsCache } from '@saldacargo/domain-service';
 import { NextResponse } from 'next/server';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
@@ -208,7 +210,8 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminClient();
-    const adminId = await getAdminId(request);
+    const [adminId, session] = await Promise.all([getAdminId(request), getVerifiedWebSession()]);
+    const orgId = session?.oid || DEFAULT_ORGANIZATION_ID;
 
     if (body.idempotency_key) {
       const { data: existingTx } = await (supabase.from('transactions') as any)
@@ -397,6 +400,7 @@ export async function POST(request: Request) {
           const idempKey = idx === 0 ? baseKey : crypto.randomUUID();
 
           return (supabase.from('transactions') as any).insert({
+            organization_id: orgId,
             direction: 'expense',
             category_id: categoryId,
             amount: s.amount.toFixed(2),
@@ -414,6 +418,7 @@ export async function POST(request: Request) {
         const insResults = await Promise.all(insertOps);
         const insError = insResults.find((r) => r && r.error);
         if (insError) throw new Error(insError.error.message);
+        invalidateWalletsCache(orgId);
 
         return NextResponse.json({
           ok: true,
@@ -565,6 +570,7 @@ export async function POST(request: Request) {
 
         ops.push(
           (supabase.from('transactions') as any).insert({
+            organization_id: orgId,
             direction: 'expense',
             category_id: categoryId,
             amount: s.amount.toFixed(2),
@@ -618,9 +624,11 @@ export async function POST(request: Request) {
         delete restFields.settlement_status;
         delete restFields.amount;
         delete restFields.trip;
+        delete restFields.service_order;
         ops.push(
           (supabase.from('transactions') as any).insert({
             ...restFields,
+            organization_id: restFields.organization_id || orgId,
             created_by: splitTxn.created_by || adminId,
             amount: remainder.toFixed(2),
             settlement_status: 'pending',
@@ -638,6 +646,7 @@ export async function POST(request: Request) {
     if (nettedAmount > 0) {
       ops.push(
         (supabase.from('transactions') as any).insert({
+          organization_id: orgId,
           direction: 'expense',
           category_id: categoryId,
           amount: nettedAmount.toFixed(2),
@@ -705,6 +714,7 @@ export async function POST(request: Request) {
       // Запись о зачёте аванса (income = уменьшает остаток долга сотрудника, но НЕ пополняет кошелёк, т.к. деньги уже были выданы ранее)
       ops.push(
         (supabase.from('transactions') as any).insert({
+          organization_id: orgId,
           direction: 'income',
           category_id: ADVANCE_CATEGORY_ID,
           amount: actualOffset.toFixed(2),
@@ -726,6 +736,7 @@ export async function POST(request: Request) {
       console.error('Errors in settle:', errors);
       throw new Error(`Transaction failed: ${errors[0].error.message}`);
     }
+    invalidateWalletsCache(orgId);
 
     return NextResponse.json({
       ok: true,
