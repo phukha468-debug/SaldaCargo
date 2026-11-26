@@ -2,17 +2,9 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { syncTripFinancials } from '@/lib/tripFinancials';
+import { editTripOrdersPayloadSchema, executeEditTripOrders } from '@/lib/trips/editTripOrders';
 import { NextResponse } from 'next/server';
-import {
-  generateDeterministicUuid,
-  auditTripFuel,
-  isDebtPaymentMethod,
-  isNoCashCounterparty,
-  isStrictDocCounterparty,
-  resolveKnownMasterCounterpartyId,
-  cleanCounterpartySearchName,
-  escapePostgrestValue,
-} from '@saldacargo/shared';
+import { generateDeterministicUuid, auditTripFuel } from '@saldacargo/shared';
 
 async function updateAssetFuelAfterApproval(supabase: any, tripId: string) {
   try {
@@ -227,231 +219,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.action === 'edit_orders') {
-    // 1. Получаем рейс для статуса и грузчиков
-    const { data: trip, error: tripError } = await (supabase.from('trips') as any)
-      .select('id, organization_id, lifecycle_status, driver_id, loader_id, loader2_id')
-      .eq('id', id)
-      .single();
-
-    if (tripError || !trip) {
-      return NextResponse.json({ error: tripError?.message ?? 'Рейс не найден' }, { status: 404 });
+    const parsed = editTripOrdersPayloadSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Некорректные данные рейса', details: parsed.error.flatten() },
+        { status: 400 },
+      );
     }
-
-    // 1.1 Обновляем поля самого рейса (тип, машина, водитель, одометр, заметки)
-    const tripUpdates: Record<string, any> = {};
-    if (body.trip_type !== undefined) tripUpdates.trip_type = body.trip_type;
-    if (body.asset_id !== undefined && body.asset_id) tripUpdates.asset_id = body.asset_id;
-    if (body.driver_id !== undefined && body.driver_id) tripUpdates.driver_id = body.driver_id;
-    if (body.odometer_start !== undefined) tripUpdates.odometer_start = body.odometer_start;
-    if (body.odometer_end !== undefined) tripUpdates.odometer_end = body.odometer_end;
-    if (body.driver_note !== undefined) tripUpdates.driver_note = body.driver_note;
-    if (body.admin_note !== undefined) tripUpdates.admin_note = body.admin_note;
-    if (Object.keys(tripUpdates).length > 0) {
-      tripUpdates.updated_at = new Date().toISOString();
-      const { error: tripUpdErr } = await (supabase.from('trips') as any)
-        .update(tripUpdates)
-        .eq('id', id);
-      if (tripUpdErr) return NextResponse.json({ error: tripUpdErr.message }, { status: 500 });
-    }
-
-    async function resolveCounterpartyId(cpId?: string | null, cpName?: string) {
-      if (cpId) {
-        // Проверяем, не передан ли старый дубль мастер-контрагента
-        const { data: cpObj } = await (supabase.from('counterparties') as any)
-          .select('id, name')
-          .eq('id', cpId)
-          .maybeSingle();
-        const masterId = resolveKnownMasterCounterpartyId(cpObj?.name);
-        if (masterId) return masterId;
-        return cpId;
-      }
-      const name = cpName?.trim();
-      if (!name) return null;
-
-      // 1. Защита от дублей мастер-контрагентов (ВСМПО, АВИСМА, Геостройиндустрия)
-      const masterId = resolveKnownMasterCounterpartyId(name);
-      if (masterId) return masterId;
-
-      // 2. Поиск среди существующих активных контрагентов (с учётом форм собственности и кавычек)
-      const simplifiedName = cleanCounterpartySearchName(name);
-      const safeName = escapePostgrestValue(name);
-      const safeSimplified = escapePostgrestValue(simplifiedName || name);
-      const { data: foundList } = safeName
-        ? await (supabase.from('counterparties') as any)
-            .select('id, name')
-            .eq('is_active', true)
-            .or(`name.ilike.%${safeName}%,name.ilike.%${safeSimplified || safeName}%`)
-            .limit(5)
-        : { data: [] };
-
-      const matched = (foundList || []).find((c: any) => {
-        const cClean = cleanCounterpartySearchName(c.name);
-        return cClean === simplifiedName || c.name.toLowerCase() === name.toLowerCase();
-      });
-
-      if (matched) return matched.id;
-
-      // Если контрагент новый, помечаем юр. лицом, если в названии есть ООО/АО/ПАО/ЗАО
-      const isLegal = /\b(ооо|пао|зао|ао)\b/i.test(name);
-      const { data: created, error: createErr } = await (supabase.from('counterparties') as any)
-        .insert({ name, type: 'client', is_active: true, is_legal_entity: isLegal })
-        .select('id')
-        .single();
-      if (createErr) throw createErr;
-      return created.id;
-    }
-
-    // 2. Обработка удалённых заказов
-    if (body.deleted_order_ids?.length) {
-      const { error: delErr } = await (supabase.from('trip_orders') as any)
-        .update({
-          lifecycle_status: 'cancelled',
-          cancelled_reason: 'Удалено администратором при редактировании',
-        })
-        .in('id', body.deleted_order_ids)
-        .eq('trip_id', id);
-      if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
-    }
-
-    // 3. Обработка заказов
-    if (body.orders?.length) {
-      for (const order of body.orders) {
-        const isNew =
-          order.isNew || !order.id || order.id.startsWith('temp-') || order.id.startsWith('new-');
-
-        const resolvedCounterpartyId = await resolveCounterpartyId(
-          order.counterparty_id,
-          order.counterparty_name,
-        );
-
-        let paymentMethod = order.payment_method || 'debt_cash';
-        const isNoCash =
-          isNoCashCounterparty(order.counterparty_name) ||
-          isStrictDocCounterparty(order.counterparty_name);
-        if (isNoCash && (paymentMethod === 'cash' || paymentMethod === 'qr')) {
-          paymentMethod = 'bank_invoice';
-        }
-        const isDebt = isDebtPaymentMethod(paymentMethod);
-        const settlementStatus = isDebt ? 'pending' : 'completed';
-
-        if (isNew) {
-          const newOrderPayload = {
-            ...(trip.organization_id ? { organization_id: trip.organization_id } : {}),
-            trip_id: id,
-            counterparty_id: resolvedCounterpartyId,
-            description: order.description?.trim() || null,
-            amount: parseFloat(order.amount ?? '0').toFixed(2),
-            driver_pay: parseFloat(order.driver_pay ?? '0').toFixed(2),
-            driver_car_pay: parseFloat(String(order.driver_car_pay ?? '0')).toFixed(2),
-            driver_loader_pay: parseFloat(String(order.driver_loader_pay ?? '0')).toFixed(2),
-            is_driver_loader: Boolean(order.is_driver_loader),
-            direction: order.direction || 'local',
-            ...(order.loaders_data ? { loaders_data: order.loaders_data } : {}),
-            loader_id: order.loader_id ?? trip.loader_id ?? null,
-            loader_pay: parseFloat(order.loader_pay ?? '0').toFixed(2),
-            loader2_id: order.loader2_id ?? trip.loader2_id ?? null,
-            loader2_pay: parseFloat(order.loader2_pay ?? '0').toFixed(2),
-            payment_method: paymentMethod,
-            settlement_status: settlementStatus,
-            lifecycle_status: trip.lifecycle_status === 'approved' ? 'approved' : 'draft',
-            idempotency_key: crypto.randomUUID(),
-          };
-
-          const { error: insErr } = await (supabase.from('trip_orders') as any).insert(
-            newOrderPayload,
-          );
-          if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
-        } else {
-          const update: Record<string, any> = {};
-          if (order.amount !== undefined) update.amount = parseFloat(order.amount).toFixed(2);
-          if (order.driver_pay !== undefined)
-            update.driver_pay = parseFloat(order.driver_pay).toFixed(2);
-          if (order.driver_car_pay !== undefined)
-            update.driver_car_pay = parseFloat(String(order.driver_car_pay)).toFixed(2);
-          if (order.driver_loader_pay !== undefined)
-            update.driver_loader_pay = parseFloat(String(order.driver_loader_pay)).toFixed(2);
-          if (order.is_driver_loader !== undefined)
-            update.is_driver_loader = Boolean(order.is_driver_loader);
-          if (order.direction !== undefined) update.direction = order.direction;
-          if (order.loaders_data !== undefined) update.loaders_data = order.loaders_data;
-          if (order.loader_id !== undefined) update.loader_id = order.loader_id;
-          if (order.loader_pay !== undefined)
-            update.loader_pay = parseFloat(order.loader_pay).toFixed(2);
-          if (order.loader2_id !== undefined) update.loader2_id = order.loader2_id;
-          if (order.loader2_pay !== undefined)
-            update.loader2_pay = parseFloat(order.loader2_pay).toFixed(2);
-          if (order.description !== undefined)
-            update.description = order.description?.trim() || null;
-          if (order.payment_method !== undefined) {
-            update.payment_method = paymentMethod;
-            update.settlement_status = settlementStatus;
-          }
-          if (order.counterparty_id !== undefined || order.counterparty_name !== undefined) {
-            update.counterparty_id = resolvedCounterpartyId;
-          }
-
-          if (Object.keys(update).length > 0) {
-            const { error: updErr } = await (supabase.from('trip_orders') as any)
-              .update(update)
-              .eq('id', order.id)
-              .eq('trip_id', id);
-            if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-          }
-        }
-      }
-    }
-
-    // 4. Удалённые расходы
-    if (body.deleted_expense_ids?.length) {
-      const { error: delExpErr } = await (supabase.from('trip_expenses') as any)
-        .delete()
-        .in('id', body.deleted_expense_ids)
-        .eq('trip_id', id);
-      if (delExpErr) return NextResponse.json({ error: delExpErr.message }, { status: 500 });
-    }
-
-    // 5. Создание / обновление расходов (Кубик, АЗС, Прочие)
-    if (body.expenses?.length) {
-      const CAT_FUEL = '62cebf3f-9982-4cc6-904b-48c6169cf5e4';
-      for (const exp of body.expenses) {
-        const isNew =
-          exp.isNew || !exp.id || exp.id.startsWith('new-') || exp.id.startsWith('temp-');
-        const amountNum = parseFloat(exp.amount ?? '0');
-        const paymentMethod = exp.payment_method || 'fuel_card';
-
-        if (isNew) {
-          if (amountNum > 0) {
-            const { error: insExpErr } = await (supabase.from('trip_expenses') as any).insert({
-              ...(trip.organization_id ? { organization_id: trip.organization_id } : {}),
-              trip_id: id,
-              category_id: exp.category_id || CAT_FUEL,
-              amount: amountNum.toFixed(2),
-              payment_method: paymentMethod,
-              description: exp.description?.trim() || null,
-              idempotency_key: crypto.randomUUID(),
-            });
-            if (insExpErr) return NextResponse.json({ error: insExpErr.message }, { status: 500 });
-          }
-        } else {
-          const update: Record<string, any> = {};
-          if (exp.amount !== undefined) update.amount = amountNum.toFixed(2);
-          if (exp.payment_method !== undefined) update.payment_method = paymentMethod;
-          if (exp.description !== undefined) update.description = exp.description?.trim() || null;
-          if (exp.category_id !== undefined) update.category_id = exp.category_id;
-
-          if (Object.keys(update).length > 0) {
-            const { error: updExpErr } = await (supabase.from('trip_expenses') as any)
-              .update(update)
-              .eq('id', exp.id)
-              .eq('trip_id', id);
-            if (updExpErr) return NextResponse.json({ error: updExpErr.message }, { status: 500 });
-          }
-        }
-      }
-    }
-
-    await syncTripFinancials(supabase, id, adminId);
-    return NextResponse.json({ ok: true });
+    return executeEditTripOrders({
+      supabase,
+      tripId: id,
+      actorId: adminId,
+      allowAdminFields: true,
+      payload: parsed.data,
+    });
   }
 
   if (body.action === 'approve') {

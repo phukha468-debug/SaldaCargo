@@ -443,7 +443,7 @@ export function SmartTripOrderModal({ trip, isOpen, onClose, onSaved }: SmartTri
           };
         });
 
-      const res = await fetch(`/api/admin/trips/${trip.id}`, {
+      const res = await fetch(`/api/trips/${trip.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

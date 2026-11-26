@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { getVerifiedMiniappUserId, requireSession } from '@/lib/auth/server';
 import { syncTripFinancials } from '@/lib/tripFinancials';
+import { editTripOrdersPayloadSchema, executeEditTripOrders } from '@/lib/trips/editTripOrders';
 import { NextResponse } from 'next/server';
 
 /** GET /api/trips/:id — детали рейса */
@@ -35,14 +36,51 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return NextResponse.json(data);
 }
 
-/** PATCH /api/trips/:id — обновить поля рейса (только loaders_count, trip_type) */
+/** PATCH /api/trips/:id — обновить поля рейса или отредактировать заказы/расходы (edit_orders) */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const driverId = await getVerifiedMiniappUserId();
-  if (!driverId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireSession('transport');
+  if (auth instanceof NextResponse) return auth;
 
-  const body = (await request.json()) as Record<string, unknown>;
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Некорректное тело запроса' }, { status: 400 });
+  }
+
   const supabase = createAdminClient();
+
+  if (body.action === 'edit_orders') {
+    const parsed = editTripOrdersPayloadSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Некорректные данные рейса', details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const { data: caller } = await (supabase.from('users') as any)
+      .select('roles, is_active')
+      .eq('id', auth.userId)
+      .maybeSingle();
+
+    if (!caller || caller.is_active === false) {
+      return NextResponse.json({ error: 'Аккаунт не найден или деактивирован' }, { status: 403 });
+    }
+
+    const dbRoles = Array.isArray(caller.roles) ? caller.roles : auth.roles;
+    const isAdmin = dbRoles.some((r: string) =>
+      ['admin', 'owner', 'director', 'dispatcher'].includes(r),
+    );
+
+    return executeEditTripOrders({
+      supabase,
+      tripId: id,
+      actorId: auth.userId,
+      organizationId: auth.organizationId,
+      allowAdminFields: isAdmin,
+      payload: parsed.data,
+    });
+  }
 
   const { data: trip } = await (supabase.from('trips') as any)
     .select('driver_id, lifecycle_status')
@@ -50,7 +88,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .single();
 
   if (!trip) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
-  if (trip.driver_id !== driverId)
+  if (trip.driver_id !== auth.userId)
     return NextResponse.json({ error: 'Нет доступа' }, { status: 403 });
   if (trip.lifecycle_status === 'approved') {
     return NextResponse.json({ error: 'Рейс уже одобрен администратором' }, { status: 403 });
