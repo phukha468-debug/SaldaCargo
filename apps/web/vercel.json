@@ -10,10 +10,6 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/evening-audit",
-      "schedule": "30 16 * * *"
-    },
-    {
       "path": "/api/cron/wialon-sync",
       "schedule": "*/5 * * * *"
     }
