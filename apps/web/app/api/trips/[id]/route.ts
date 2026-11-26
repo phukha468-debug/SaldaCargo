@@ -2,6 +2,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getVerifiedWebUserId } from '@/lib/auth';
 import { syncTripFinancials } from '@/lib/tripFinancials';
+import { syncStrictOrdersForTrip } from '@/lib/orderTripSync';
 import {
   isNoCashCounterparty,
   isTerritoryCounterparty,
@@ -455,6 +456,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const adminId = (await getVerifiedWebUserId()) ?? null;
     await syncTripFinancials(supabase, id, adminId);
+
+    // Если рейс уже утверждён — пересинхронизируем «Сбор документов» (orders),
+    // чтобы добавленные/изменённые заказы строгих контрагентов сразу появились в docs_collection
+    if (trip.lifecycle_status === 'approved') {
+      await syncStrictOrdersForTrip(supabase, id, {
+        organizationId: trip.organization_id || undefined,
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {

@@ -4,7 +4,12 @@ import { getVerifiedMiniappUserId } from '@/lib/auth/server';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 import { editTripOrdersPayloadSchema, executeEditTripOrders } from '@/lib/trips/editTripOrders';
 import { NextResponse } from 'next/server';
-import { generateDeterministicUuid, auditTripFuel } from '@saldacargo/shared';
+import {
+  generateDeterministicUuid,
+  auditTripFuel,
+  isStrictDocCounterparty,
+} from '@saldacargo/shared';
+import { syncStrictOrdersForTrip } from '@saldacargo/domain-service';
 
 async function updateAssetFuelAfterApproval(supabase: any, tripId: string) {
   try {
@@ -237,7 +242,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (body.action === 'approve') {
     const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
-      .select('id, lifecycle_status')
+      .select('id, trip_number, organization_id, lifecycle_status')
       .eq('id', id)
       .single();
 
@@ -256,6 +261,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .update({ lifecycle_status: 'approved' })
       .eq('trip_id', id)
       .neq('lifecycle_status', 'cancelled');
+
+    // Синхронизируем «Сбор документов» (orders) для строгих контрагентов (ВСМПО, АВИСМА, Геострой)
+    await syncStrictOrdersForTrip(supabase, id, {
+      organizationId: trip.organization_id || undefined,
+    });
+
+    // Для остальных (не строгих) связанных заявок завершаем статус
+    const orConditions = [`active_trip_id.eq.${id}`];
+    if (trip.trip_number) orConditions.push(`order_number.eq.${trip.trip_number}`);
+
+    const { data: linkedOrders } = await (supabase.from('orders') as any)
+      .select(
+        'id, status, client_id, loading_org_name, client:counterparties!orders_client_id_fkey(id, name)',
+      )
+      .or(orConditions.join(','))
+      .in('status', ['in_progress', 'pending_review']);
+
+    for (const ord of linkedOrders || []) {
+      const effectiveName = ord.client?.name || ord.loading_org_name || '';
+      if (!isStrictDocCounterparty(effectiveName)) {
+        await (supabase.from('orders') as any)
+          .update({
+            status: 'completed',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', ord.id);
+      }
+    }
 
     await syncTripFinancials(supabase, id, adminId);
     await updateAssetFuelAfterApproval(supabase, id);
@@ -302,6 +335,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .update({ lifecycle_status: 'draft' })
       .eq('trip_id', id)
       .neq('lifecycle_status', 'cancelled');
+
+    // Синхронизируем связанную заявку в orders обратно на ревью
+    await (supabase.from('orders') as any)
+      .update({ status: 'pending_review', updated_at: new Date().toISOString() })
+      .eq('active_trip_id', id);
 
     return NextResponse.json({ ok: true, action: 'returned' });
   }

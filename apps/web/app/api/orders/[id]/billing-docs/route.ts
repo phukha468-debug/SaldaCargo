@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // 1. Получаем текущую заявку
     const { data: currentOrder, error: orderErr } = await (supabase.from('orders') as any)
       .select(
-        'id, base_doc_number, order_number, active_trip_id, client_id, price_without_vat, raw_parser_payload',
+        'id, status, base_doc_number, order_number, active_trip_id, client_id, price_without_vat, raw_parser_payload',
       )
       .eq('id', id)
       .single();

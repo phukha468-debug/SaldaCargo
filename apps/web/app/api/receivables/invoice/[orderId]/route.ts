@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { syncInvoiceToOrder } from '@/lib/orderTripSync';
 import { NextResponse } from 'next/server';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ orderId: string }> }) {
@@ -15,7 +16,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderI
     const supabase = createAdminClient();
 
     const { data: currentOrder } = await (supabase.from('trip_orders') as any)
-      .select('settlement_status, invoice_status, created_at, trip:trips(started_at)')
+      .select(
+        'trip_id, counterparty_id, organization_id, settlement_status, invoice_status, created_at, trip:trips(started_at)',
+      )
       .eq('id', orderId)
       .single();
 
@@ -29,10 +32,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderI
         ? String(currentOrder.created_at).slice(0, 10)
         : new Date().toISOString().slice(0, 10);
 
+    const finalInvoiceNumber = String(invoice_number).trim();
+    const finalInvoiceDate = invoice_date || tripDate;
+
     const { data, error } = await (supabase.from('trip_orders') as any)
       .update({
-        invoice_number: String(invoice_number).trim(),
-        invoice_date: invoice_date || tripDate,
+        invoice_number: finalInvoiceNumber,
+        invoice_date: finalInvoiceDate,
         invoice_status: newStatus,
         updated_at: new Date().toISOString(),
       })
@@ -43,6 +49,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ orderI
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Синхронизируем номер и дату счёта обратно в таблицу orders («Сбор документов»)
+    await syncInvoiceToOrder(supabase, orderId, {
+      invoice_number: finalInvoiceNumber,
+      invoice_date: finalInvoiceDate,
+      trip_id: currentOrder?.trip_id ?? null,
+      counterparty_id: currentOrder?.counterparty_id ?? null,
+      organization_id: currentOrder?.organization_id ?? null,
+    });
 
     return NextResponse.json({ ok: true, order: data });
   } catch (err: any) {

@@ -238,7 +238,10 @@ export const POST = createWebApiHandler<undefined, Record<string, string>, { id:
     // 2. Синхронизируем статус связанных заявок в orders:
     // Если в рейсе есть заказы компаний со строгим сбором документов (Геостройиндустрия, ВСМПО, ООО АВИСМА)
     // — гарантированно создаем/переводим их в статус 'docs_collection' (Сбор документов).
-    await syncStrictOrdersForTrip(supabase, id);
+    await syncStrictOrdersForTrip(supabase, id, {
+      organizationId: auth.organizationId,
+      orgSettings: auth.orgSettings,
+    });
 
     // Для остальных (не строгих) связанных заявок завершаем статус
     const orConditions = [`active_trip_id.eq.${id}`];

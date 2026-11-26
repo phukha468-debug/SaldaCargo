@@ -10,6 +10,7 @@ import {
   escapePostgrestValue,
 } from '@saldacargo/shared';
 import { syncTripFinancials } from '@/lib/tripFinancials';
+import { syncStrictOrdersForTrip } from '@saldacargo/domain-service';
 
 const moneyValueSchema = z.union([z.string(), z.number()]).optional();
 
@@ -341,5 +342,12 @@ export async function executeEditTripOrders({
   }
 
   await syncTripFinancials(supabase, tripId, actorId);
+
+  if (trip.lifecycle_status === 'approved') {
+    await syncStrictOrdersForTrip(supabase, tripId, {
+      organizationId: effectiveOrgId || undefined,
+    });
+  }
+
   return NextResponse.json({ ok: true });
 }

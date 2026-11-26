@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isStrictDocCounterparty } from '@saldacargo/shared';
+import { backfillStrictDocOrders } from '@/lib/orderTripSync';
 
 export async function GET(req: Request) {
   try {
@@ -9,6 +10,12 @@ export async function GET(req: Request) {
     const status = searchParams.get('status');
 
     const supabase = createAdminClient();
+
+    // Автосинхронизация «Сбора документов»: подтягиваем утверждённые неоплаченные заказы рейсов
+    // строгих контрагентов (ВСМПО, АВИСМА, Геостройиндустрия), которых ещё нет в таблице orders
+    if (!status || status === 'docs_collection') {
+      await backfillStrictDocOrders(supabase);
+    }
     let query = (supabase.from('orders') as any)
       .select(
         `
