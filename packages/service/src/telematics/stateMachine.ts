@@ -63,6 +63,10 @@ export interface StateMachineInput {
   trackDistanceKm?: number;
   /** Вышла ли машина на запад (по треку) */
   trackDepartedWest?: boolean;
+  /** Фактический момент последнего въезда в геозону базы по GPS-треку (unix sec) */
+  trackBaseEntryTs?: number;
+  /** Калиброванный одометр на момент въезда в геозону базы по треку */
+  trackBaseEntryOdometerKm?: number;
   /** Явная подсказка от вебхука (если источник = webhook) */
   webhookHint?: 'departure' | 'arrival';
 }
@@ -527,12 +531,34 @@ export function evaluateVehicleTelemetry(input: StateMachineInput): StateMachine
   nextState.baseConfirmSinceIso = null;
   nextState.transitEnteredAtIso = null;
 
+  const tripStartSec = Math.floor(new Date(activeTrip.startedAtIso).getTime() / 1000);
+  const nowSec = Math.floor(nowMs / 1000);
+  const validTrackEntryIso =
+    input.trackBaseEntryTs !== undefined &&
+    input.trackBaseEntryTs >= tripStartSec &&
+    input.trackBaseEntryTs <= nowSec + 60
+      ? new Date(input.trackBaseEntryTs * 1000).toISOString()
+      : null;
+  const webhookArrivalIso =
+    isWebhookArrival &&
+    position.timestampSec >= tripStartSec &&
+    position.timestampSec <= nowSec + 60
+      ? new Date(position.timestampSec * 1000).toISOString()
+      : null;
+
+  const resolvedArrivalIso =
+    validTrackEntryIso ?? prevState.baseConfirmSinceIso ?? webhookArrivalIso ?? nowIso;
+  const resolvedArrivalOdo = Math.max(
+    input.calibratedOdometerKm,
+    input.trackBaseEntryOdometerKm ?? 0,
+  );
+
   commands.push({
     type: 'CLOSE_TRIP_TO_REVIEW',
     orderId: activeTrip.orderId,
     tripId: activeTrip.tripId,
-    arrivalTimeIso: nowIso,
-    odometerKm: input.calibratedOdometerKm,
+    arrivalTimeIso: resolvedArrivalIso,
+    odometerKm: resolvedArrivalOdo,
     trackDistanceKm: effectiveTripKm > 0 ? effectiveTripKm : undefined,
     reason: 'normal_arrival',
   });

@@ -126,4 +126,69 @@ describe('detectStopsFromTrack — GPS track simulations', () => {
     expect(res.stops).toHaveLength(0);
     expect(res.trackDistanceKm).toBeGreaterThanOrEqual(40);
   });
+
+  it('5. Манёвр у пандуса: два 9-минутных куска с переездом 40 м за 1 мин склеиваются в единую стоянку', () => {
+    const t0 = 1_760_000_000;
+    const points: TelematicsPoint[] = [];
+
+    // Первые 9 минут у ворот склада
+    for (let m = 0; m <= 9; m++) {
+      points.push({
+        lat: 59.68459,
+        lon: 60.28087,
+        speedKmh: 0,
+        timestampSec: t0 + m * 60,
+        rawOdometerKm: 200_000,
+      });
+    }
+    // Короткий манёвр к пандусу (3 всплеска по 12 км/ч, смещение ~40 м)
+    for (let s = 15; s <= 45; s += 15) {
+      points.push({
+        lat: 59.6848,
+        lon: 60.281,
+        speedKmh: 12,
+        timestampSec: t0 + 9 * 60 + s,
+        rawOdometerKm: 200_000,
+      });
+    }
+    // Ещё 10 минут разгрузки у пандуса
+    for (let m = 10; m <= 20; m++) {
+      points.push({
+        lat: 59.6849,
+        lon: 60.2811,
+        speedKmh: 0,
+        timestampSec: t0 + m * 60,
+        rawOdometerKm: 200_000,
+      });
+    }
+
+    const res = detectStopsFromTrack(points, BASE_SETTINGS, { tripId: 'trip-5' });
+    expect(res.stops).toHaveLength(1);
+    expect(res.stops[0]?.durationMin).toBe(20);
+  });
+
+  it('6. Возврат на базу: lastBaseEntryTs фиксирует точный момент въезда в геозону базы, а не конец стоянки в гараже', () => {
+    const t0 = 1_760_000_000;
+    const entryTs = t0 + 120 * 60;
+    const points: TelematicsPoint[] = [
+      // Старт внутри базы Верхняя Салда
+      { lat: 58.053, lon: 60.552, speedKmh: 20, timestampSec: t0, rawOdometerKm: 300_000 },
+      // Выезд далеко за пределы базы (Нижний Тагил)
+      { lat: 57.92, lon: 60.0, speedKmh: 75, timestampSec: t0 + 60 * 60, rawOdometerKm: 300_045 },
+      // Пересечение границы геозоны базы на возврате (ровно в entryTs)
+      { lat: 58.04, lon: 60.54, speedKmh: 35, timestampSec: entryTs, rawOdometerKm: 300_090 },
+      // Стоит в гараже ещё 45 минут
+      {
+        lat: 58.053,
+        lon: 60.552,
+        speedKmh: 0,
+        timestampSec: entryTs + 45 * 60,
+        rawOdometerKm: 300_092,
+      },
+    ];
+
+    const res = detectStopsFromTrack(points, BASE_SETTINGS, { tripId: 'trip-6' });
+    expect(res.lastBaseEntryTs).toBe(entryTs);
+    expect(res.lastBaseEntryOdometerKm).toBe(300_090);
+  });
 });

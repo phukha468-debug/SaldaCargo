@@ -2810,6 +2810,7 @@ export type Database = {
       is_admin_or_owner: { Args: never; Returns: boolean };
       show_limit: { Args: never; Returns: number };
       show_trgm: { Args: { '': string }; Returns: string[] };
+      trigger_wialon_telematics_sync: { Args: never; Returns: number | null };
     };
     Enums: {
       asset_status: 'active' | 'repair' | 'reserve' | 'sold' | 'written_off';

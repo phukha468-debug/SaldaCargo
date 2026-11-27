@@ -2,8 +2,9 @@ name: Wialon Telematics Sync (Kontur 2)
 
 on:
   schedule:
-    # Запуск в облаке GitHub каждые 5 минут 24/7 без участия локального ПК
-    - cron: '*/5 * * * *'
+    # Резервный контур раз в час (~300 мин/мес в пределах бесплатной квоты GitHub Actions).
+    # Основной 5-минутный крон работает напрямую внутри Supabase PostgreSQL (pg_cron + pg_net).
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:

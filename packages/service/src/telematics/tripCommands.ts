@@ -350,7 +350,7 @@ async function executeRecordStop(
   const { data: order } = await ctx.supabase
     .from('orders')
     .select(
-      'id, client_id, cargo_name, price_without_vat, loading_address_json, unloading_address_json, routes_json, raw_parser_payload',
+      'id, base_doc_name, client_id, cargo_name, price_without_vat, loading_address_json, unloading_address_json, routes_json, raw_parser_payload',
     )
     .eq('id', cmd.orderId)
     .eq('organization_id', ctx.organizationId)
@@ -368,7 +368,7 @@ async function executeRecordStop(
     return; // Идемпотентность: точка уже записана (или склеена с предыдущей)
   }
 
-  const stopType: 'loading' | 'unloading' | 'stop' =
+  const initialRole: 'loading' | 'unloading' =
     cmd.geo.role === 'loading'
       ? 'loading'
       : cmd.geo.role === 'unloading'
@@ -379,7 +379,7 @@ async function executeRecordStop(
 
   const newStop: RouteStopRecord = {
     stop_key: cmd.stop.stopKey,
-    type: stopType,
+    type: initialRole,
     geofence_id: cmd.geo.geofenceId,
     name: cmd.geo.name,
     city: cmd.geo.city,
@@ -394,45 +394,77 @@ async function executeRecordStop(
     had_signal_gap: cmd.stop.hadSignalGap,
   };
 
-  // Склейка подряд идущих стоянок на одном объекте / в одной геозоне (< 1000 м при совпадении city/name)
-  const lastStop = existingStops[existingStops.length - 1];
-  const isSameGeofence = Boolean(
-    lastStop && lastStop.geofence_id !== null && lastStop.geofence_id === newStop.geofence_id,
-  );
-  const isNearbySamePlace = Boolean(
-    lastStop &&
-    (lastStop.city === newStop.city || lastStop.name === newStop.name) &&
-    calculateDistanceMeters(lastStop.lat, lastStop.lon, newStop.lat, newStop.lon) < 1000,
+  // Вставляем точку в хронологическом порядке (на случай догрузки ранних точек из «чёрного ящика» трекера)
+  // и склеиваем соседние по времени стоянки на одном объекте / в одной геозоне (< 1000 м при совпадении city/name)
+  const chronological = [...existingStops, newStop].sort(
+    (a, b) => new Date(a.arrived_at).getTime() - new Date(b.arrived_at).getTime(),
   );
 
-  let updatedStops: RouteStopRecord[];
-  if (lastStop && (isSameGeofence || isNearbySamePlace)) {
-    const mergedKeys = Array.from(
-      new Set([...(lastStop.merged_stop_keys ?? []), lastStop.stop_key, newStop.stop_key]),
+  const mergedStops: RouteStopRecord[] = [];
+  for (const item of chronological) {
+    const prev = mergedStops[mergedStops.length - 1];
+    const isSameGeofence = Boolean(
+      prev && prev.geofence_id !== null && prev.geofence_id === item.geofence_id,
     );
-    const prevDepMs = new Date(lastStop.departed_at).getTime();
-    const newArrMs = new Date(newStop.arrived_at).getTime();
-    const newDepMs = new Date(newStop.departed_at).getTime();
-    const prevArrMs = new Date(lastStop.arrived_at).getTime();
-    const maxDepMs = Math.max(prevDepMs, newDepMs);
-    const mergedDurationMin =
-      newArrMs <= prevDepMs
-        ? Math.max(lastStop.duration_min, Math.round((maxDepMs - prevArrMs) / 60_000))
-        : lastStop.duration_min + newStop.duration_min;
+    const isNearbySamePlace = Boolean(
+      prev &&
+      (prev.city === item.city || prev.name === item.name) &&
+      calculateDistanceMeters(prev.lat, prev.lon, item.lat, item.lon) < 1000,
+    );
 
-    const mergedLast: RouteStopRecord = {
-      ...lastStop,
-      stop_key: newStop.stop_key,
-      merged_stop_keys: mergedKeys,
-      departed_at: new Date(maxDepMs).toISOString(),
-      duration_min: mergedDurationMin,
-      odometer_km: newStop.odometer_km ?? lastStop.odometer_km,
-      had_signal_gap: lastStop.had_signal_gap || newStop.had_signal_gap,
-    };
-    updatedStops = [...existingStops.slice(0, -1), mergedLast];
-  } else {
-    updatedStops = [...existingStops, newStop];
+    if (prev && (isSameGeofence || isNearbySamePlace)) {
+      const mergedKeys = Array.from(
+        new Set([
+          ...(prev.merged_stop_keys ?? []),
+          prev.stop_key,
+          ...(item.merged_stop_keys ?? []),
+          item.stop_key,
+        ]),
+      );
+      const prevArrMs = new Date(prev.arrived_at).getTime();
+      const prevDepMs = new Date(prev.departed_at).getTime();
+      const curArrMs = new Date(item.arrived_at).getTime();
+      const curDepMs = new Date(item.departed_at).getTime();
+      const minArrMs = Math.min(prevArrMs, curArrMs);
+      const maxDepMs = Math.max(prevDepMs, curDepMs);
+      const mergedDurationMin =
+        curArrMs <= prevDepMs
+          ? Math.max(prev.duration_min, Math.round((maxDepMs - minArrMs) / 60_000))
+          : prev.duration_min + item.duration_min;
+
+      mergedStops[mergedStops.length - 1] = {
+        ...prev,
+        stop_key: item.stop_key,
+        merged_stop_keys: mergedKeys,
+        arrived_at: new Date(minArrMs).toISOString(),
+        departed_at: new Date(maxDepMs).toISOString(),
+        duration_min: mergedDurationMin,
+        odometer_km: item.odometer_km ?? prev.odometer_km,
+        had_signal_gap: prev.had_signal_gap || item.had_signal_gap,
+      };
+    } else {
+      mergedStops.push(item);
+    }
   }
+
+  // Нормализуем роли точек по хронологии (если у геозоны не задана жёсткая роль loading/unloading)
+  const knownById = new Map(
+    ctx.orgSettings.telematics.known_geofences.map((gf) => [gf.id, gf.role]),
+  );
+  const updatedStops: RouteStopRecord[] = mergedStops.map((stopItem, idx) => {
+    if (stopItem.type === 'stop') return stopItem;
+    const explicitRole = stopItem.geofence_id ? knownById.get(stopItem.geofence_id) : undefined;
+    const normalizedType: 'loading' | 'unloading' =
+      explicitRole === 'loading'
+        ? 'loading'
+        : explicitRole === 'unloading'
+          ? 'unloading'
+          : idx === 0
+            ? 'loading'
+            : 'unloading';
+    return stopItem.type === normalizedType ? stopItem : { ...stopItem, type: normalizedType };
+  });
+
   const prevPayload = asRecord(order.raw_parser_payload);
   const visitedPresets = Array.isArray(prevPayload.visited_preset_geofence_ids)
     ? prevPayload.visited_preset_geofence_ids.map(String)
@@ -443,22 +475,26 @@ async function executeRecordStop(
     visitedPresets.push(preset.trigger_geofence_id);
   }
 
+  const firstStop = updatedStops[0]!;
+  const lastStopItem = updatedStops[updatedStops.length - 1]!;
+  const isAutoEmergencyOrder = String(order.base_doc_name ?? '').includes('ВЫЕЗД БЕЗ ЗАЯВКИ');
   const loadingAddr = asRecord(order.loading_address_json);
+  const hasManualLoading =
+    !isAutoEmergencyOrder && Boolean(loadingAddr.raw && String(loadingAddr.raw).trim().length > 0);
 
-  const nextLoading =
-    loadingAddr.raw && String(loadingAddr.raw).trim().length > 0
-      ? loadingAddr
-      : preset?.default_loading_raw
-        ? { city: preset.default_loading_city ?? cmd.geo.city, raw: preset.default_loading_raw }
-        : { city: cmd.geo.city, raw: cmd.geo.rawAddress };
+  const nextLoading = hasManualLoading
+    ? loadingAddr
+    : preset?.default_loading_raw
+      ? { city: preset.default_loading_city ?? firstStop.city, raw: preset.default_loading_raw }
+      : { city: firstStop.city, raw: firstStop.raw_address };
 
   const hasSecondPoint = updatedStops.length >= 2;
   const nextUnloading =
-    hasSecondPoint || cmd.geo.role === 'unloading'
-      ? { city: cmd.geo.city, raw: cmd.geo.rawAddress }
+    hasSecondPoint || lastStopItem.type === 'unloading'
+      ? { city: lastStopItem.city, raw: lastStopItem.raw_address }
       : preset?.default_unloading_raw
         ? { city: preset.default_unloading_city ?? '', raw: preset.default_unloading_raw }
-        : { city: cmd.geo.city, raw: cmd.geo.rawAddress };
+        : { city: lastStopItem.city, raw: lastStopItem.raw_address };
 
   const routeSummary = updatedStops.map((s) => s.name).join(' ➔ ');
   const orderUpdate: Record<string, unknown> = {

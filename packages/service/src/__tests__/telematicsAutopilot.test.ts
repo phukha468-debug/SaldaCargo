@@ -12,6 +12,7 @@ import {
   type VehicleStateSnapshot,
 } from '../telematics/stateMachine';
 import { processVehicleSnapshot, type AssetForTelematics } from '../telematics/autopilotEngine';
+import { classifyServiceOrRestStop, matchKnownGeofence } from '../telematics/geocodeCache';
 import { executeAutopilotCommand } from '../telematics/tripCommands';
 
 const TENANT1_TELEMATICS = OrganizationTelematicsSettingsSchema.parse({
@@ -768,5 +769,354 @@ describe('processVehicleSnapshot — concurrency lock & manual driver_pay invari
     // Должен запросить с начала рейса (-15 мин), а не обрезать 6 часами
     expect(fromSec).toBe(tripStartSec - 900);
     expect(toSec - fromSec).toBeGreaterThan(20 * 3600);
+  });
+
+  it('11. Self-healing: даже если last_msg_ts уже сдвинут на 22 ч вперёд, fetchTrack сканирует весь трек от начала рейса', async () => {
+    const tripStartedIso = '2026-11-26T05:03:27Z';
+    const tripStartSec = Math.floor(Date.parse(tripStartedIso) / 1000);
+    const nowMs = Date.parse('2026-11-27T05:00:00Z');
+    const nowSec = Math.floor(nowMs / 1000);
+
+    const fetchTrackMock = vi.fn(async () => []);
+    const provider: TelematicsProvider = {
+      providerId: 'wialon',
+      fetchUnitsSnapshot: vi.fn(async () => []),
+      fetchTrack: fetchTrackMock,
+    };
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === 'vehicle_telematics_state') {
+          return {
+            update: () => ({
+              eq: () => ({
+                eq: () => ({
+                  or: () => ({
+                    select: () => ({
+                      maybeSingle: async () => ({
+                        data: {
+                          state: 'AT_STOP',
+                          base_confirm_since: null,
+                          depart_confirm_count: 0,
+                          transit_entered_at: null,
+                          // last_msg_ts уже обновлялся утром (всего 59 минут назад!)
+                          last_msg_ts: nowSec - 3540,
+                          last_lat: 59.7677,
+                          last_lon: 60.024,
+                          last_speed: 0,
+                          last_odometer_km: 469155,
+                        },
+                        error: null,
+                      }),
+                    }),
+                  }),
+                  eq: async () => ({ error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'orders') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    order: () => ({
+                      limit: () => ({
+                        maybeSingle: async () => ({
+                          data: {
+                            id: 'ord-1096',
+                            active_trip_id: 'trip-1096',
+                            routes_json: [],
+                            raw_parser_payload: { autopilot_v2: true },
+                            trip: {
+                              id: 'trip-1096',
+                              started_at: tripStartedIso,
+                              odometer_start: 468596,
+                            },
+                          },
+                          error: null,
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'telematics_events') {
+          return { insert: async () => ({ error: null }) };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    } as unknown as SupabaseClient;
+
+    await processVehicleSnapshot({
+      supabase: mockSupabase,
+      organizationId: '00000000-0000-4000-8000-000000000001',
+      orgSettings: OrganizationSettingsSchema.parse({
+        ...DEFAULT_ORGANIZATION_SETTINGS,
+        telematics: TENANT1_TELEMATICS,
+      }),
+      asset: {
+        id: 'asset-1096',
+        reg_number: 'А096МВ196',
+        short_name: 'Валдай 6м',
+        wialon_id: '11873',
+        odometer_current: 469155,
+        odometer_offset_km: 0,
+        assigned_driver_id: 'drv-1',
+      },
+      provider,
+      snapshot: {
+        externalUnitId: '11873',
+        unitName: 'А096МВ196',
+        isOnline: true,
+        position: { lat: 59.768, lon: 60.025, speedKmh: 0, timestampSec: nowSec - 10 },
+      },
+      source: 'cron',
+      nowMs,
+    });
+
+    const [, fromSec] = fetchTrackMock.mock.calls[0] as unknown as [string, number, number];
+    expect(fromSec).toBe(tripStartSec - 900);
+  });
+
+  it('12. Геозоны и фильтр техстоянок: выбирает ближайшую геозону и отсекает ночёвку у кафе / киоска / запчастей', () => {
+    const overlapping = [
+      {
+        id: 'karpinsk',
+        name: 'г. Карпинск',
+        city: 'Карпинск',
+        raw_address: 'г. Карпинск',
+        lat: 59.7681,
+        lon: 60.025,
+        radius_m: 20_000,
+        role: 'any' as const,
+      },
+      {
+        id: 'vorontsovka',
+        name: 'Воронцовка (Рудник)',
+        city: 'Воронцовка',
+        raw_address: 'пос. Воронцовка',
+        lat: 59.64,
+        lon: 60.3125,
+        radius_m: 2_000,
+        role: 'any' as const,
+      },
+    ];
+
+    // Точка на промплощадке Воронцовки попадает и в 20-км круг Карпинска, и в 2-км круг Воронцовки → выбирается ближайшая (Воронцовка)
+    const hit = matchKnownGeofence(59.6405, 60.313, overlapping);
+    expect(hit?.geofenceId).toBe('vorontsovka');
+
+    // Ночёвка в Серове (Вятчино, 59.6165, 60.4573) не попадает в 2-км геозону Воронцовки и отсекается как кафе
+    const serovNight = matchKnownGeofence(59.61656, 60.45726, [overlapping[1]!]);
+    expect(serovNight).toBeNull();
+    expect(classifyServiceOrRestStop('cafe', 'house', 'Восточная кухня, Вятчино, Серов')).toBe(
+      true,
+    );
+    expect(classifyServiceOrRestStop('kiosk', 'house', 'Минутка, улица Ленина, Черемисское')).toBe(
+      true,
+    );
+    expect(classifyServiceOrRestStop('car_parts', 'house', 'Track Nord, Серовский округ')).toBe(
+      true,
+    );
+    // Ночёвка на обочине региональной трассы 65К-2301000 без номера здания → техстоянка
+    expect(
+      classifyServiceOrRestStop('secondary', 'secondary', '65К-2301000, Вятчино, Серов', false),
+    ).toBe(true);
+    expect(
+      classifyServiceOrRestStop('industrial', 'house', '16, улица Чайковского, Карпинск', true),
+    ).toBe(false);
+  });
+
+  it('13. Хронологическая сборка RECORD_STOP: ретроспективная ранняя точка встаёт первой (loading), сдвигая позднюю в unloading', async () => {
+    const orderUpdates: Array<Record<string, unknown>> = [];
+    const tripNotes: string[] = [];
+
+    const karpinskArrIso = '2026-11-27T03:54:47.000Z';
+    const karpinskDepIso = '2026-11-27T04:58:10.000Z';
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === 'orders') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: async () => ({
+                    data: {
+                      id: 'ord-1096',
+                      base_doc_name: '⚠️ ВЫЕЗД БЕЗ ЗАЯВКИ',
+                      client_id: null,
+                      cargo_name: '',
+                      price_without_vat: null,
+                      loading_address_json: { city: 'Карпинск', raw: 'г. Карпинск' },
+                      unloading_address_json: { city: 'Карпинск', raw: 'г. Карпинск' },
+                      routes_json: [
+                        {
+                          stop_key: 'trip-1096:59768:60025:997640',
+                          type: 'loading',
+                          geofence_id: 'karpinsk',
+                          name: 'г. Карпинск',
+                          city: 'Карпинск',
+                          raw_address: 'г. Карпинск',
+                          lat: 59.7681,
+                          lon: 60.025,
+                          arrived_at: karpinskArrIso,
+                          departed_at: karpinskDepIso,
+                          duration_min: 63,
+                          odometer_km: 469155,
+                          is_known: true,
+                          had_signal_gap: false,
+                        },
+                      ],
+                      raw_parser_payload: { autopilot_v2: true },
+                    },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+            update: (payload: Record<string, unknown>) => {
+              orderUpdates.push(payload);
+              return { eq: () => ({ eq: async () => ({ error: null }) }) };
+            },
+          };
+        }
+        if (table === 'trips') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: async () => ({
+                    data: {
+                      driver_note: '⚡ Автовыезд (Автопилот v2)',
+                      started_at: '2026-11-26T05:03:27Z',
+                      odometer_start: 468596,
+                    },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+            update: (payload: Record<string, unknown>) => {
+              tripNotes.push(String(payload.driver_note ?? ''));
+              return { eq: () => ({ eq: async () => ({ error: null }) }) };
+            },
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    } as unknown as SupabaseClient;
+
+    // Догрузилась вчерашняя точка Першино / Реж (26.11 09:40 UTC)
+    const rezhStartSec = Math.floor(Date.parse('2026-11-26T09:40:29Z') / 1000);
+    const rezhEndSec = Math.floor(Date.parse('2026-11-26T10:48:53Z') / 1000);
+
+    await executeAutopilotCommand(
+      {
+        supabase: mockSupabase,
+        organizationId: '00000000-0000-4000-8000-000000000001',
+        assetId: 'asset-1096',
+        assignedDriverId: 'drv-1',
+        currentOdometerKm: 469155,
+        orgSettings: OrganizationSettingsSchema.parse({
+          ...DEFAULT_ORGANIZATION_SETTINGS,
+          telematics: TENANT1_TELEMATICS,
+        }),
+      },
+      {
+        type: 'RECORD_STOP',
+        orderId: 'ord-1096',
+        tripId: 'trip-1096',
+        stop: {
+          stopKey: 'trip-1096:57419:61482:997605',
+          lat: 57.419,
+          lon: 61.4818,
+          startTs: rezhStartSec,
+          endTs: rezhEndSec,
+          durationMin: 68,
+          isBase: false,
+          distFromBaseKm: 90.2,
+          odometerKm: 468763,
+          hadSignalGap: true,
+        },
+        geo: {
+          geofenceId: 'rezh',
+          name: 'г. Реж',
+          city: 'Реж',
+          rawAddress: 'г. Реж',
+          isKnown: true,
+          isServiceOrRestStop: false,
+          role: 'any',
+        },
+      },
+    );
+
+    const savedOrderUpdate = orderUpdates[0];
+    const savedTripNote = tripNotes[0] ?? '';
+    const routes = (savedOrderUpdate?.routes_json ?? []) as Array<Record<string, unknown>>;
+    expect(routes).toHaveLength(2);
+    expect(routes[0]?.name).toBe('г. Реж');
+    expect(routes[0]?.type).toBe('loading');
+    expect(routes[1]?.name).toBe('г. Карпинск');
+    expect(routes[1]?.type).toBe('unloading');
+    expect((savedOrderUpdate?.loading_address_json as Record<string, unknown>)?.city).toBe('Реж');
+    expect((savedOrderUpdate?.unloading_address_json as Record<string, unknown>)?.city).toBe(
+      'Карпинск',
+    );
+    expect(savedTripNote).toContain('Верхняя Салда ➔ г. Реж');
+    expect(savedTripNote).toContain('г. Реж ➔ г. Карпинск');
+  });
+
+  it('14. CLOSE_TRIP_TO_REVIEW: использует фактический момент въезда на базу из трека (trackBaseEntryTs), а не время крона', () => {
+    const tripStartedIso = '2026-11-26T05:03:27Z';
+    const actualEntryIso = '2026-11-27T10:12:00.000Z';
+    const actualEntrySec = Math.floor(Date.parse(actualEntryIso) / 1000);
+    const cronNowMs = Date.parse('2026-11-27T10:45:00.000Z'); // крон пришёл спустя 33 мин
+
+    const out = evaluateVehicleTelemetry({
+      source: 'cron',
+      nowMs: cronNowMs,
+      settings: TENANT1_TELEMATICS,
+      prevState: {
+        ...INITIAL_STATE,
+        state: 'EN_ROUTE',
+        baseConfirmSinceIso: '2026-11-27T10:15:00.000Z',
+      },
+      position: {
+        lat: 58.053,
+        lon: 60.552,
+        speedKmh: 0,
+        timestampSec: Math.floor(cronNowMs / 1000) - 30,
+      },
+      calibratedOdometerKm: 469410,
+      activeTrip: {
+        orderId: 'ord-1096',
+        tripId: 'trip-1096',
+        startedAtIso: tripStartedIso,
+        startOdometerKm: 468596,
+        recordedStopKeys: ['s1', 's2'],
+        departureDirection: 'west',
+        hasDepartedWest: true,
+        hasUnloaded: true,
+        transitAllowed: false,
+        visitedPresetGeofenceIds: [],
+      },
+      trackDistanceKm: 814,
+      trackBaseEntryTs: actualEntrySec,
+      trackBaseEntryOdometerKm: 469408,
+    });
+
+    const closeCmd = out.commands.find((c) => c.type === 'CLOSE_TRIP_TO_REVIEW');
+    expect(closeCmd).toBeDefined();
+    if (closeCmd?.type === 'CLOSE_TRIP_TO_REVIEW') {
+      expect(closeCmd.arrivalTimeIso).toBe(actualEntryIso);
+      expect(closeCmd.odometerKm).toBe(469410);
+    }
   });
 });

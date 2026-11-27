@@ -334,25 +334,21 @@ export async function processVehicleSnapshot(params: {
       ? asset.odometer_current
       : Math.max(rawCalibrated, asset.odometer_current);
 
-    // Если есть активный рейс — инкрементально догружаем трек и ищем остановки
+    // Если есть активный рейс — сканируем трек от старта рейса (self-healing) и ищем остановки
     let candidateStops: GeocodedCandidateStop[] = [];
     let trackDistanceKm: number | undefined;
     let trackDepartedWest = false;
+    let trackBaseEntryTs: number | undefined;
+    let trackBaseEntryOdometerKm: number | undefined;
 
     if (activeTrip && snapshot.externalUnitId) {
       const toSec = Math.floor(nowMs / 1000);
       const tripStartSec = Math.floor(new Date(activeTrip.startedAtIso).getTime() / 1000);
-      const DEFAULT_LOOKBACK_SEC = 6 * 3600;
       const MAX_TRACK_LOOKBACK_SEC = 72 * 3600;
-      // При штатном 5-минутном кроне берём 6-часовое окно (хватает на длинные стоянки).
-      // Если крон не приходил > 6 ч (например, только вебхуки выезда/приезда или простой крона),
-      // растягиваем окно назад до prevState.lastMsgTs (но не глубже 72 ч и начала рейса),
-      // чтобы не потерять промежуточные точки погрузки/выгрузки.
-      const desiredFromSec =
-        prevState.lastMsgTs > 0
-          ? Math.min(toSec - DEFAULT_LOOKBACK_SEC, prevState.lastMsgTs - 900)
-          : tripStartSec - 900;
-      const fromSec = Math.max(tripStartSec - 900, toSec - MAX_TRACK_LOOKBACK_SEC, desiredFromSec);
+      // Сканируем весь трек от начала активного рейса (до 72 ч): Wialon отдаёт суточный трек за ~0.4с,
+      // уже записанные stop_key мгновенно отсекаются в памяти, а пропущенные из-за связи/крона точки
+      // гарантированно добираются в хронологическом порядке.
+      const fromSec = Math.max(tripStartSec - 900, toSec - MAX_TRACK_LOOKBACK_SEC);
 
       const track = await provider.fetchTrack(snapshot.externalUnitId, fromSec, toSec);
       const detected = detectStopsFromTrack(track, orgSettings.telematics, {
@@ -362,6 +358,8 @@ export async function processVehicleSnapshot(params: {
 
       trackDistanceKm = detected.trackDistanceKm > 0 ? detected.trackDistanceKm : undefined;
       trackDepartedWest = detected.hasDepartedWest;
+      trackBaseEntryTs = detected.lastBaseEntryTs ?? undefined;
+      trackBaseEntryOdometerKm = detected.lastBaseEntryOdometerKm ?? undefined;
 
       if (detected.stops.length > 0) {
         const geocoder =
@@ -375,12 +373,13 @@ export async function processVehicleSnapshot(params: {
         const externalNewStops = detected.stops.filter(
           (s) => !s.isBase && !alreadyRecorded.has(s.stopKey),
         );
-        candidateStops = await Promise.all(
-          externalNewStops.map(async (stop) => ({
+        candidateStops = [];
+        for (const stop of externalNewStops) {
+          candidateStops.push({
             stop,
             geo: await geocoder(stop.lat, stop.lon),
-          })),
-        );
+          });
+        }
       }
     }
 
@@ -395,6 +394,8 @@ export async function processVehicleSnapshot(params: {
       candidateStops,
       trackDistanceKm,
       trackDepartedWest,
+      trackBaseEntryTs,
+      trackBaseEntryOdometerKm,
       webhookHint,
     });
 

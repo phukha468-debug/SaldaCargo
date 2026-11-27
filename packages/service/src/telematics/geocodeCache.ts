@@ -17,6 +17,7 @@ export type StopGeocoder = (lat: number, lon: number) => Promise<GeocodedStopInf
 
 const FUEL_KEYWORDS = [
   'азс',
+  'агзс',
   'заправка',
   'газпромнефть',
   'лукойл',
@@ -26,36 +27,80 @@ const FUEL_KEYWORDS = [
   'тебойл',
 ];
 
-const FOOD_KEYWORDS = ['кафе', 'столовая', 'пит-стоп', 'вкусно — и точка', 'шаурма', 'ресторан'];
+const FOOD_KEYWORDS = [
+  'кафе',
+  'столовая',
+  'пит-стоп',
+  'вкусно — и точка',
+  'шаурма',
+  'ресторан',
+  'закусочная',
+  'пекарня',
+  'восточная кухня',
+  'придорожн',
+];
 
-const REST_KEYWORDS = ['стоянка дальнобой', 'место отдыха', 'автостоянка'];
+const REST_KEYWORDS = [
+  'стоянка дальнобой',
+  'место отдыха',
+  'автостоянка',
+  'мотель',
+  'кемпинг',
+  'гостиница',
+  'шиномонтаж',
+  'автомойка',
+  'автозапчасти',
+  'автосервис',
+];
+
+const ROADSIDE_TYPES = new Set([
+  'fuel',
+  'cafe',
+  'fast_food',
+  'restaurant',
+  'parking',
+  'rest_area',
+  'services',
+  'motel',
+  'guest_house',
+  'car_wash',
+  'car_repair',
+  'car_parts',
+  'tyres',
+  'kiosk',
+  'convenience',
+]);
+
+const HIGHWAY_CORRIDOR_RE =
+  /\b\d{2}[а-яa-z]-\d+|\b[рма]-?\d{2,4}\b|автодорога|серовский тракт|сибирский тракт|московский тракт|обход\s+г\.|г\.\s*[а-яё-]+\s*—\s*г\.\s*[а-яё-]+/i;
+
+let lastNominatimCallMs = 0;
+
+async function throttleNominatim(minIntervalMs = 1100): Promise<void> {
+  const now = Date.now();
+  const elapsed = now - lastNominatimCallMs;
+  if (lastNominatimCallMs > 0 && elapsed < minIntervalMs) {
+    await new Promise((resolve) => setTimeout(resolve, minIntervalMs - elapsed));
+  }
+  lastNominatimCallMs = Date.now();
+}
 
 export function classifyServiceOrRestStop(
   amenity: string,
   osmType: string,
   displayName: string,
+  hasHouseNumber = false,
 ): boolean {
   const amen = amenity.toLowerCase();
   const type = osmType.toLowerCase();
   const disp = displayName.toLowerCase();
 
-  if (amen === 'fuel' || FUEL_KEYWORDS.some((k) => disp.includes(k))) return true;
-  if (
-    amen === 'cafe' ||
-    amen === 'fast_food' ||
-    amen === 'restaurant' ||
-    FOOD_KEYWORDS.some((k) => disp.includes(k))
-  ) {
-    return true;
-  }
-  if (
-    amen === 'parking' ||
-    type === 'rest_area' ||
-    type === 'services' ||
-    REST_KEYWORDS.some((k) => disp.includes(k))
-  ) {
-    return true;
-  }
+  if (ROADSIDE_TYPES.has(amen) || ROADSIDE_TYPES.has(type)) return true;
+  if (FUEL_KEYWORDS.some((k) => disp.includes(k))) return true;
+  if (FOOD_KEYWORDS.some((k) => disp.includes(k))) return true;
+  if (REST_KEYWORDS.some((k) => disp.includes(k))) return true;
+  // Стоянка/ночёвка прямо на полосе или обочине региональной/федеральной трассы (напр. 65К-2301000) без номера здания
+  if (!hasHouseNumber && HIGHWAY_CORRIDOR_RE.test(disp)) return true;
   return false;
 }
 
@@ -64,20 +109,27 @@ export function matchKnownGeofence(
   lon: number,
   knownGeofences: readonly TelematicsKnownGeofence[],
 ): GeocodedStopInfo | null {
+  let bestGf: TelematicsKnownGeofence | null = null;
+  let bestDist = Infinity;
+
   for (const gf of knownGeofences) {
-    if (calculateDistanceMeters(lat, lon, gf.lat, gf.lon) <= gf.radius_m) {
-      return {
-        geofenceId: gf.id,
-        name: gf.name,
-        city: gf.city,
-        rawAddress: gf.raw_address,
-        isKnown: true,
-        isServiceOrRestStop: false,
-        role: gf.role,
-      };
+    const dist = calculateDistanceMeters(lat, lon, gf.lat, gf.lon);
+    if (dist <= gf.radius_m && dist < bestDist) {
+      bestDist = dist;
+      bestGf = gf;
     }
   }
-  return null;
+
+  if (!bestGf) return null;
+  return {
+    geofenceId: bestGf.id,
+    name: bestGf.name,
+    city: bestGf.city,
+    rawAddress: bestGf.raw_address,
+    isKnown: true,
+    isServiceOrRestStop: false,
+    role: bestGf.role,
+  };
 }
 
 /**
@@ -127,10 +179,11 @@ export function createCachedStopGeocoder(
       return hit;
     }
 
-    // 3. Внешний Nominatim (если не отключён)
+    // 3. Внешний Nominatim (если не отключён) с детальным zoom=18 для определения POI (кафе/АЗС/склад)
     if (!options?.disableExternalFetch) {
       try {
-        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=16&addressdetails=1`;
+        await throttleNominatim();
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=18&addressdetails=1&accept-language=ru`;
         const res = await fetch(url, {
           headers: { 'User-Agent': 'SaldaCargoFleet/2.0 (contact@saldacargo.ru)' },
           signal: AbortSignal.timeout(4000),
@@ -145,7 +198,13 @@ export function createCachedStopGeocoder(
           const addr = json.address ?? {};
           const amen = String(addr.amenity ?? json.type ?? json.category ?? '');
           const disp = String(json.display_name ?? '');
-          const isService = classifyServiceOrRestStop(amen, String(json.type ?? ''), disp);
+          const hasHouseNumber = Boolean(addr.house_number && addr.house_number.trim().length > 0);
+          const isService = classifyServiceOrRestStop(
+            amen,
+            String(json.type ?? ''),
+            disp,
+            hasHouseNumber,
+          );
           const city =
             addr.city ?? addr.town ?? addr.village ?? addr.hamlet ?? addr.county ?? 'Неизвестно';
           const rawAddress = disp.split(',').slice(0, 3).join(',').trim() || city;
