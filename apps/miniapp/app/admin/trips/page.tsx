@@ -11,9 +11,15 @@ import { DateNav } from '@/features/admin-trips/DateNav';
 import { FleetHistorySummary, VehicleGroupCard } from '@/features/admin-trips/FleetHistoryViews';
 import { HistoryTripCard } from '@/features/admin-trips/HistoryTripCard';
 import { ServiceOrderEditModal } from '@/features/admin-trips/ServiceOrderEditModal';
+import { ServiceWorkEditModal } from '@/features/admin-trips/ServiceWorkEditModal';
 import { ServiceOrderReviewCard } from '@/features/admin-trips/ServiceOrderReviewCard';
 import { SimpleTripCard } from '@/features/admin-trips/SimpleTripCard';
-import type { MiniappServiceOrder, MiniappTrip, VehicleGroup } from '@/features/admin-trips/types';
+import type {
+  MiniappServiceOrder,
+  MiniappServiceOrderWork,
+  MiniappTrip,
+  VehicleGroup,
+} from '@/features/admin-trips/types';
 import { buildVehicleGroups, summarizeVehicleGroups } from '@/features/admin-trips/utils';
 import { VehicleDetailSheet } from '@/features/admin-trips/VehicleDetailSheet';
 
@@ -42,6 +48,10 @@ function TripsContent() {
   const searchTripNumber = tripSearch.trim().replace(/[^0-9]/g, '');
   const [editTrip, setEditTrip] = useState<MiniappTrip | null>(null);
   const [editOrder, setEditOrder] = useState<MiniappServiceOrder | null>(null);
+  const [editWork, setEditWork] = useState<{
+    order: MiniappServiceOrder;
+    work: MiniappServiceOrderWork;
+  } | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [showPrrModal, setShowPrrModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<VehicleGroup | null>(null);
@@ -225,6 +235,7 @@ function TripsContent() {
     orderId: string,
     isPartialWorkReview = false,
     mechanicPay?: number,
+    workId?: string,
   ) {
     setApprovingId(orderId);
     try {
@@ -233,6 +244,7 @@ function TripsContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: isPartialWorkReview ? 'approve_works' : 'approve',
+          ...(isPartialWorkReview && workId ? { work_id: workId } : {}),
           ...(!isPartialWorkReview && mechanicPay != null && mechanicPay > 0
             ? { mechanic_pay: mechanicPay }
             : {}),
@@ -600,6 +612,7 @@ function TripsContent() {
               key={order.id}
               order={order}
               onEdit={(o) => setEditOrder(o)}
+              onEditWork={(o, w) => setEditWork({ order: o, work: w })}
               onApprove={handleApproveOrder}
               onReturn={handleReturnOrder}
               onDelete={handleDeleteOrder}
@@ -635,6 +648,18 @@ function TripsContent() {
           onClose={() => setEditOrder(null)}
           onSaved={() => {
             setEditOrder(null);
+            refresh();
+          }}
+        />
+      )}
+
+      {editWork && (
+        <ServiceWorkEditModal
+          order={editWork.order}
+          work={editWork.work}
+          onClose={() => setEditWork(null)}
+          onSaved={() => {
+            setEditWork(null);
             refresh();
           }}
         />

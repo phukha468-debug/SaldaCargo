@@ -179,10 +179,10 @@ export async function GET(request: Request) {
           : 50;
 
       const activeWorks = (o.works ?? []).filter((w: any) => w.status !== 'cancelled');
+      const pendingWorks = activeWorks.filter(isPendingWorkReview);
       const isPartialWorkReview = filter === 'review' && o.status !== 'completed';
-      const reviewTargetWorks = isPartialWorkReview
-        ? activeWorks.filter(isPendingWorkReview)
-        : activeWorks;
+      const reviewTargetWorks =
+        filter === 'review' && pendingWorks.length > 0 ? pendingWorks : activeWorks;
 
       let totalMinutes = 0;
       let worksClientSum = 0;
@@ -224,7 +224,10 @@ export async function GET(request: Request) {
       const orderDates = extractOrderDates(o);
       const effectiveDate = getOrderEffectiveDate(o);
 
-      const enrichedWorks = (o.works ?? []).map((w: any) => ({
+      const sourceWorksForResponse =
+        filter === 'review' && pendingWorks.length > 0 ? pendingWorks : (o.works ?? []);
+
+      const enrichedWorks = sourceWorksForResponse.map((w: any) => ({
         ...w,
         mechanic_name: w.mechanic_id ? (mechNameMap.get(w.mechanic_id) ?? null) : null,
         second_mechanic_name: w.second_mechanic_id
@@ -236,7 +239,7 @@ export async function GET(request: Request) {
         ...o,
         works: enrichedWorks,
         is_partial_work_review: isPartialWorkReview,
-        pending_review_works_count: activeWorks.filter(isPendingWorkReview).length,
+        pending_review_works_count: pendingWorks.length,
         started_at: orderDates.started_at,
         completed_at: orderDates.completed_at,
         effective_date: effectiveDate,

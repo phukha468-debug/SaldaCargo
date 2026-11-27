@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Money, cn } from '@saldacargo/ui';
-import type { ReviewServiceOrder } from '../types';
+import type { ReviewServiceOrder, ReviewServiceOrderWork } from '../types';
 import { calcGarageOrder, formatOrderDateRange } from '../utils';
 import { GarageOrderExpandedDetails } from './GarageOrderExpandedDetails';
 
@@ -11,7 +11,9 @@ export function GarageOrderRow({
   expanded,
   onToggle,
   onEdit,
+  onEditWork,
   onApprove,
+  onApproveWork,
   onReturn,
   onDelete,
   onApproveExternal,
@@ -22,7 +24,9 @@ export function GarageOrderRow({
   expanded: boolean;
   onToggle: () => void;
   onEdit: () => void;
+  onEditWork?: (work: ReviewServiceOrderWork) => void;
   onApprove: () => void;
+  onApproveWork?: (workId: string) => void;
   onReturn: () => void;
   onDelete: () => void;
   onApproveExternal?: (
@@ -83,6 +87,107 @@ export function GarageOrderRow({
         : netProfit < 0
           ? 'border-l-rose-500'
           : 'border-l-slate-300';
+
+  // Компактный режим ревью конкретных работ (когда заказ-наряд в работе — показываем только работы на проверку без наслоения текста)
+  if (canReview && order.is_partial_work_review && calc.activeWorks.length > 0) {
+    const hourlyRate = Number(order.hourly_rate || calc.hourlyRate || (isOwn ? 1600 : 2000));
+    const salaryPct = calc.salaryPct || 50;
+    return (
+      <div className="space-y-2">
+        {calc.activeWorks.map((w, idx) => {
+          const mins =
+            Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
+          const explicitPrice = parseFloat(String(w.price_client || '0'));
+          const wPrice = explicitPrice > 0 ? explicitPrice : (mins / 60) * hourlyRate;
+          const customPctMatch = w.notes
+            ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+            : null;
+          const wPct =
+            customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+          const wPay = (wPrice * wPct) / 100;
+          const wMech1 = w.mechanic_name || (!w.mechanic_id ? order.mechanic?.name : null);
+          const wMech2 =
+            w.second_mechanic_name ||
+            (!w.mechanic_id && !w.second_mechanic_id ? order.second_mechanic?.name : null);
+          const mechLabel =
+            wMech1 && wMech2 && wMech2 !== wMech1
+              ? `${wMech1.split(' ')[0]} + ${wMech2.split(' ')[0]}`
+              : (wMech1 || wMech2 || 'Не назначен').split(' ')[0];
+          const workTitle =
+            w.custom_work_name || w.work_catalog?.name || w.work_description || 'Работа';
+
+          return (
+            <div
+              key={w.id || `${order.id}-${idx}`}
+              className={cn(
+                'bg-white border border-slate-200 border-l-4 rounded-2xl shadow-xs px-4 py-2.5 flex items-center gap-3 overflow-hidden',
+                isOwn ? 'border-l-sky-500' : 'border-l-amber-500',
+              )}
+            >
+              <span className="font-mono text-xs font-black text-sky-900 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded shrink-0">
+                НЗ-{order.order_number}
+              </span>
+              <span
+                className={cn(
+                  'text-[11px] font-bold px-2 py-0.5 rounded shrink-0 border',
+                  isOwn
+                    ? 'bg-sky-50 text-sky-700 border-sky-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200',
+                )}
+              >
+                {isOwn ? '🏢 Свой' : '🚗 Клиент'}
+              </span>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                  <span
+                    className="text-sm font-bold text-slate-900 truncate min-w-0"
+                    title={workTitle}
+                  >
+                    {workTitle}
+                  </span>
+                  <span
+                    className="text-xs text-slate-400 truncate shrink-0 max-w-[190px]"
+                    title={vehicleTitle}
+                  >
+                    · {vehicleTitle}
+                  </span>
+                </div>
+              </div>
+              <span className="text-xs font-semibold text-slate-600 shrink-0 whitespace-nowrap">
+                👨‍🔧 {mechLabel}
+              </span>
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded shrink-0 whitespace-nowrap tabular-nums">
+                ⏱ {mins} мин
+              </span>
+              <span className="text-sm font-black text-slate-900 shrink-0 whitespace-nowrap tabular-nums">
+                {Math.round(wPrice).toLocaleString('ru-RU')} ₽
+              </span>
+              <span className="text-sm font-black text-emerald-600 shrink-0 whitespace-nowrap tabular-nums">
+                ЗП {Math.round(wPay).toLocaleString('ru-RU')} ₽
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => (onEditWork ? onEditWork(w) : onEdit())}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 whitespace-nowrap cursor-pointer"
+                >
+                  ✏️ Изменить
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (onApproveWork ? onApproveWork(w.id) : onApprove())}
+                  disabled={approving}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black whitespace-nowrap cursor-pointer disabled:opacity-50"
+                >
+                  {approving ? '...' : '✓ Утвердить'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div

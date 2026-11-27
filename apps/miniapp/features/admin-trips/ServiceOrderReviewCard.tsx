@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { formatDate } from '@saldacargo/shared';
 import { LifecycleBadge, Money, cn } from '@saldacargo/ui';
-import type { MiniappServiceOrder } from './types';
+import type { MiniappServiceOrder, MiniappServiceOrderWork } from './types';
 
 export function ServiceOrderReviewCard({
   order,
   onEdit,
+  onEditWork,
   onApprove,
   onReturn,
   onDelete,
@@ -17,7 +18,13 @@ export function ServiceOrderReviewCard({
 }: {
   order: MiniappServiceOrder;
   onEdit: (o: MiniappServiceOrder) => void;
-  onApprove: (id: string, isPartialWorkReview?: boolean, mechanicPay?: number) => void;
+  onEditWork?: (o: MiniappServiceOrder, w: MiniappServiceOrderWork) => void;
+  onApprove: (
+    id: string,
+    isPartialWorkReview?: boolean,
+    mechanicPay?: number,
+    workId?: string,
+  ) => void;
   onReturn: (id: string) => void;
   onDelete: (id: string) => void;
   approving: boolean;
@@ -50,6 +57,107 @@ export function ServiceOrderReviewCard({
   const cleanMechanicNote = (order.mechanic_note || '')
     .replace('[Запчасти предоставил автосервис]', '')
     .trim();
+
+  // Компактный режим ревью конкретных работ (когда заказ-наряд в работе — показываем только работы на проверку)
+  if (!readOnly && isPartialWorkReview && activeWorks.length > 0) {
+    return (
+      <div className="space-y-2.5">
+        {activeWorks.map((w, idx) => {
+          const mins =
+            Number(w.actual_minutes || w.norm_minutes || 0) * Math.max(1, Number(w.quantity || 1));
+          const explicitPrice = parseFloat(String(w.price_client || '0'));
+          const wPrice = explicitPrice > 0 ? explicitPrice : (mins / 60) * hourlyRate;
+          const customPctMatch = w.notes
+            ? String(w.notes).match(/\[salary_pct:(\d+(?:\.\d+)?)\]/)
+            : null;
+          const wPct =
+            customPctMatch && customPctMatch[1] ? parseFloat(customPctMatch[1]) : salaryPct;
+          const wPay = (wPrice * wPct) / 100;
+          const wMech1 = w.mechanic_name || (!w.mechanic_id ? order.mechanic?.name : null);
+          const wMech2 =
+            w.second_mechanic_name ||
+            (!w.mechanic_id && !w.second_mechanic_id ? order.second_mechanic?.name : null);
+          const mechLabel =
+            wMech1 && wMech2 && wMech2 !== wMech1
+              ? `${wMech1.split(' ')[0]} + ${wMech2.split(' ')[0]}`
+              : (wMech1 || wMech2 || 'Не назначен').split(' ')[0];
+          const hoursVal = mins / 60;
+          const hoursStr = `${Number.isInteger(hoursVal) ? hoursVal.toString() : hoursVal.toFixed(1)} ч`;
+
+          return (
+            <div
+              key={w.id || `${order.id}-${idx}`}
+              className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+            >
+              <div className="px-3.5 py-2.5 flex items-center justify-between gap-2 border-b border-slate-100">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[11px] font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
+                    НЗ-{order.order_number}
+                  </span>
+                  <span className="text-xs font-bold text-slate-700 truncate">{vehicleTitle}</span>
+                </div>
+                <span
+                  className={cn(
+                    'text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border',
+                    isOwn
+                      ? 'bg-sky-50 text-sky-700 border-sky-200'
+                      : 'bg-amber-50 text-amber-800 border-amber-200',
+                  )}
+                >
+                  {isOwn ? '🏢 Свой' : '🚗 Клиент'}
+                </span>
+              </div>
+
+              <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-900 truncate">
+                    {w.custom_work_name || w.work_catalog?.name || w.work_description || 'Работа'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 truncate">
+                    👨‍🔧 {mechLabel} · ⏱ {mins} мин ({hoursStr})
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-black text-slate-900 tabular-nums">
+                    {Math.round(wPrice).toLocaleString('ru-RU')} ₽
+                  </p>
+                  <p className="text-xs font-bold text-emerald-600 tabular-nums">
+                    ЗП {Math.round(wPay).toLocaleString('ru-RU')} ₽
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-3.5 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => (onEditWork ? onEditWork(order, w) : onEdit(order))}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 active:bg-slate-100 shrink-0"
+                >
+                  ✏️ Изменить
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReturn(order.id)}
+                  disabled={approving}
+                  className="px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-600 active:bg-rose-100 disabled:opacity-50 shrink-0"
+                >
+                  ↩ Вернуть
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onApprove(order.id, true, undefined, w.id)}
+                  disabled={approving}
+                  className="flex-1 py-1.5 rounded-xl bg-emerald-600 active:bg-emerald-700 text-white text-xs font-black disabled:opacity-50 shadow-xs"
+                >
+                  {approving ? '...' : '✓ Утвердить работу'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border-2 border-zinc-100 shadow-sm overflow-hidden">

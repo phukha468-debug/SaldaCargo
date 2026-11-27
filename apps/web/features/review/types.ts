@@ -59,13 +59,33 @@ export interface TripForReview {
   }>;
 }
 
+export interface ReviewServiceOrderWork {
+  id: string;
+  custom_work_name: string | null;
+  work_description?: string | null;
+  status: string;
+  salary_paid: boolean;
+  actual_minutes: number | null;
+  price_client: string | null;
+  norm_minutes: number | null;
+  quantity?: number | null;
+  mechanic_id: string | null;
+  second_mechanic_id: string | null;
+  mechanic_name?: string | null;
+  second_mechanic_name?: string | null;
+  work_catalog?: { name: string } | null;
+  notes?: string | null;
+}
+
 export interface ReviewServiceOrder {
   id: string;
   order_number: number;
   machine_type: string;
   status: string;
   lifecycle_status: string;
+  hourly_rate?: number | string | null;
   is_partial_work_review?: boolean;
+  pending_review_works_count?: number;
   created_at: string;
   started_at?: string | null;
   completed_at?: string | null;
@@ -94,21 +114,7 @@ export interface ReviewServiceOrder {
     name: string;
     mechanic_salary_pct?: number | string | null;
   } | null;
-  works?: Array<{
-    id: string;
-    custom_work_name: string | null;
-    work_description?: string | null;
-    status: string;
-    salary_paid: boolean;
-    actual_minutes: number | null;
-    price_client: string | null;
-    norm_minutes: number | null;
-    quantity?: number | null;
-    mechanic_id: string | null;
-    second_mechanic_id: string | null;
-    work_catalog?: { name: string } | null;
-    notes?: string | null;
-  }>;
+  works?: ReviewServiceOrderWork[];
   parts?: Array<{
     id: string;
     custom_part_name: string | null;

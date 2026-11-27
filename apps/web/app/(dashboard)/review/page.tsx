@@ -7,6 +7,7 @@ import { cn } from '@saldacargo/ui';
 import { TripEditModal } from '@/features/review/trip-card/TripEditModal';
 import type {
   ReviewServiceOrder,
+  ReviewServiceOrderWork,
   SettlementTransactionItem,
   TripForReview,
 } from '@/features/review/types';
@@ -21,6 +22,7 @@ import { DateNav } from '@/features/review/DateNav';
 import { MaintenanceDetailModal } from '@/features/review/MaintenanceDetailModal';
 import { GarageOrderRow } from '@/features/review/garage-order/GarageOrderRow';
 import { GarageOrderEditModal } from '@/features/review/garage-order/GarageOrderEditModal';
+import { GarageWorkEditModal } from '@/features/review/garage-order/GarageWorkEditModal';
 import { ReviewStatsCards } from '@/features/review/ReviewStatsCards';
 import { VehicleGroupCard } from '@/features/review/VehicleGroupCard';
 
@@ -59,6 +61,10 @@ export default function ReviewPage() {
 
   const [editTrip, setEditTrip] = useState<TripForReview | null>(null);
   const [editServiceOrder, setEditServiceOrder] = useState<ReviewServiceOrder | null>(null);
+  const [editServiceWork, setEditServiceWork] = useState<{
+    order: ReviewServiceOrder;
+    work: ReviewServiceOrderWork;
+  } | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statsPeriod, setStatsPeriod] = useState<'day' | 'week' | 'month'>('day');
@@ -344,7 +350,11 @@ export default function ReviewPage() {
     }
   }
 
-  const handleApproveServiceOrder = (orderId: string, isPartialWorkReview = false) =>
+  const handleApproveServiceOrder = (
+    orderId: string,
+    isPartialWorkReview = false,
+    workId?: string,
+  ) =>
     runAction(
       orderId,
       setApprovingId,
@@ -354,7 +364,7 @@ export default function ReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           isPartialWorkReview
-            ? { action: 'approve_works' }
+            ? { action: 'approve_works', ...(workId ? { work_id: workId } : {}) }
             : { action: 'approve', lifecycle_status: 'approved' },
         ),
       },
@@ -659,9 +669,11 @@ export default function ReviewPage() {
                   expanded={expandedGarageOrderIds.has(order.id)}
                   onToggle={() => toggleInSet(setExpandedGarageOrderIds, order.id)}
                   onEdit={() => setEditServiceOrder(order)}
+                  onEditWork={(work) => setEditServiceWork({ order, work })}
                   onApprove={() =>
                     handleApproveServiceOrder(order.id, Boolean(order.is_partial_work_review))
                   }
+                  onApproveWork={(workId) => handleApproveServiceOrder(order.id, true, workId)}
                   onApproveExternal={handleApproveExternalServiceOrder}
                   onReturn={() => handleReturnServiceOrder(order.id)}
                   onDelete={() => handleDeleteServiceOrder(order.id)}
@@ -806,6 +818,18 @@ export default function ReviewPage() {
           onClose={() => setEditServiceOrder(null)}
           onSaved={() => {
             setEditServiceOrder(null);
+            refresh();
+          }}
+        />
+      )}
+
+      {editServiceWork && (
+        <GarageWorkEditModal
+          order={editServiceWork.order}
+          work={editServiceWork.work}
+          onClose={() => setEditServiceWork(null)}
+          onSaved={() => {
+            setEditServiceWork(null);
             refresh();
           }}
         />

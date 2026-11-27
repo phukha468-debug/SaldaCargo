@@ -96,6 +96,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       | 'cancel'
       | 'edit_note'
       | 'edit_order'
+      | 'edit_work'
       | 'approve_extra_work'
       | 'reject_extra_work';
     lifecycle_status?: string;
@@ -105,8 +106,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     adjusted_norm_minutes?: number;
     mechanic_pay?: number | string;
     work_id?: string;
-    mechanic_id?: string;
-    second_mechanic_id?: string;
+    name?: string;
+    minutes?: number | string;
+    price_client?: number | string;
+    mechanic_id?: string | null;
+    second_mechanic_id?: string | null;
     odometer_start?: number | string | null;
     odometer_end?: number | string | null;
     client_vehicle_model?: string;
@@ -325,6 +329,77 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ ok: true, action: 'edited', id: targetId });
   }
 
+  // ── Точечное редактирование одной конкретной работы на ревью ──────────
+  if (action === 'edit_work') {
+    if (!body.work_id) {
+      return NextResponse.json({ error: 'Не указан work_id' }, { status: 400 });
+    }
+    const workName = (body.name || '').trim();
+    if (!workName) {
+      return NextResponse.json({ error: 'Введите наименование работы' }, { status: 400 });
+    }
+
+    const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
+      .select('id, machine_type')
+      .eq('id', targetId)
+      .single();
+    if (ordErr || !ord) {
+      return NextResponse.json({ error: ordErr?.message ?? 'Наряд не найден' }, { status: 404 });
+    }
+
+    const { data: sto } = await (supabase.from('sto_settings') as any)
+      .select('hourly_rate, hourly_rate_own')
+      .limit(1)
+      .maybeSingle();
+    const hourlyRate =
+      ord.machine_type === 'client'
+        ? parseFloat(sto?.hourly_rate ?? '2000') || 2000
+        : parseFloat(sto?.hourly_rate_own ?? '1600') || 1600;
+
+    const minutes = Math.max(1, Math.round(Number(body.minutes) || 0));
+    const explicitPrice =
+      body.price_client != null &&
+      !isNaN(Number(body.price_client)) &&
+      Number(body.price_client) >= 0
+        ? Number(body.price_client)
+        : (minutes / 60) * hourlyRate;
+
+    const workUpdate: Record<string, any> = {
+      custom_work_name: workName,
+      actual_minutes: minutes,
+      norm_minutes: minutes,
+      price_client: explicitPrice.toFixed(2),
+      mechanic_id: body.mechanic_id || null,
+      second_mechanic_id: body.second_mechanic_id || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: workErr } = await (supabase.from('service_order_works') as any)
+      .update(workUpdate)
+      .eq('id', body.work_id)
+      .eq('service_order_id', targetId);
+
+    if (workErr) {
+      return NextResponse.json({ error: workErr.message }, { status: 500 });
+    }
+
+    if (body.admin_note !== undefined) {
+      await (supabase.from('service_orders') as any)
+        .update({
+          admin_note: body.admin_note.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetId);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      action: 'work_edited',
+      id: targetId,
+      work_id: body.work_id,
+    });
+  }
+
   // ── Утверждение наряда + начисление ЗП ────────────────────────────────
   // Шаг 4: Оценка работ в открытом наряде — фиксируем проверку [reviewed], ЗП начисляется позже при закрытии/выдаче авто
   if (action === 'approve_works') {
@@ -338,6 +413,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const pendingWorks = (worksRows ?? []).filter(
       (w: any) =>
+        (!body.work_id || w.id === body.work_id) &&
         w.status === 'completed' &&
         !w.salary_paid &&
         w.extra_work_status !== 'rejected' &&

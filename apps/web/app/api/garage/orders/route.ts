@@ -170,25 +170,76 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     const rawRows = data ?? [];
+    const isPendingWorkReview = (w: any) =>
+      w.status === 'completed' &&
+      !w.salary_paid &&
+      w.extra_work_status !== 'rejected' &&
+      !String(w.notes || '').includes('[reviewed]');
+
     const filteredRows =
       filter === 'review'
         ? rawRows.filter((o: any) => {
             if (o.status === 'completed') return true;
-            return (o.works ?? []).some(
-              (w: any) =>
-                w.status === 'completed' &&
-                !w.salary_paid &&
-                !String(w.notes || '').includes('[reviewed]'),
-            );
+            return (o.works ?? []).some(isPendingWorkReview);
           })
         : rawRows;
+
+    const [{ data: sto }] = await Promise.all([
+      (supabase.from('sto_settings') as any)
+        .select('hourly_rate, hourly_rate_own')
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const rateClient = parseFloat(sto?.hourly_rate ?? '2000') || 2000;
+    const rateOwn = parseFloat(sto?.hourly_rate_own ?? '1600') || 1600;
+
+    // Собираем имена механиков, участвующих в работах
+    const mechNameMap = new Map<string, string>();
+    const missingMechIds = new Set<string>();
+    for (const o of filteredRows) {
+      if (o.mechanic?.id && o.mechanic?.name) mechNameMap.set(o.mechanic.id, o.mechanic.name);
+      if (o.second_mechanic?.id && o.second_mechanic?.name) {
+        mechNameMap.set(o.second_mechanic.id, o.second_mechanic.name);
+      }
+      for (const w of o.works ?? []) {
+        if (w.mechanic_id && !mechNameMap.has(w.mechanic_id)) missingMechIds.add(w.mechanic_id);
+        if (w.second_mechanic_id && !mechNameMap.has(w.second_mechanic_id)) {
+          missingMechIds.add(w.second_mechanic_id);
+        }
+      }
+    }
+    if (missingMechIds.size > 0) {
+      const { data: extraUsers } = await (supabase.from('users') as any)
+        .select('id, name')
+        .in('id', [...missingMechIds]);
+      for (const u of extraUsers ?? []) {
+        if (u?.id && u?.name) mechNameMap.set(u.id, u.name);
+      }
+    }
 
     const mapped = filteredRows.map((o: any) => {
       const dates = extractOrderDates(o);
       const effectiveDate = getOrderEffectiveDate(o);
+      const activeWorks = (o.works ?? []).filter((w: any) => w.status !== 'cancelled');
+      const pendingWorks = activeWorks.filter(isPendingWorkReview);
+      const isPartialWorkReview = filter === 'review' && o.status !== 'completed';
+      const sourceWorks =
+        filter === 'review' && pendingWorks.length > 0 ? pendingWorks : (o.works ?? []);
+
+      const enrichedWorks = sourceWorks.map((w: any) => ({
+        ...w,
+        mechanic_name: w.mechanic_id ? (mechNameMap.get(w.mechanic_id) ?? null) : null,
+        second_mechanic_name: w.second_mechanic_id
+          ? (mechNameMap.get(w.second_mechanic_id) ?? null)
+          : null,
+      }));
+
       const copy = {
         ...o,
-        is_partial_work_review: filter === 'review' && o.status !== 'completed',
+        works: enrichedWorks,
+        hourly_rate: o.machine_type === 'own' ? rateOwn : rateClient,
+        is_partial_work_review: isPartialWorkReview,
+        pending_review_works_count: pendingWorks.length,
         started_at: dates.started_at,
         completed_at: dates.completed_at,
         effective_date: effectiveDate,

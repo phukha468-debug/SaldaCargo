@@ -643,8 +643,71 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ ok: true, action: 'edited', id: targetId });
     }
 
+    if (body.action === 'edit_work') {
+      const workId = typeof body.work_id === 'string' ? body.work_id : '';
+      const workName = typeof body.name === 'string' ? body.name.trim() : '';
+      if (!workId) {
+        return NextResponse.json({ error: 'Не указан work_id' }, { status: 400 });
+      }
+      if (!workName) {
+        return NextResponse.json({ error: 'Введите наименование работы' }, { status: 400 });
+      }
+
+      const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
+        .select('id, machine_type')
+        .eq('id', targetId)
+        .single();
+      if (ordErr || !ord) {
+        return NextResponse.json({ error: ordErr?.message ?? 'Наряд не найден' }, { status: 404 });
+      }
+
+      const { data: sto } = await (supabase.from('sto_settings') as any)
+        .select('hourly_rate, hourly_rate_own')
+        .limit(1)
+        .maybeSingle();
+      const hourlyRate =
+        ord.machine_type === 'client'
+          ? parseFloat(sto?.hourly_rate ?? '2000') || 2000
+          : parseFloat(sto?.hourly_rate_own ?? '1600') || 1600;
+
+      const minutes = Math.max(1, Math.round(Number(body.minutes) || 0));
+      const explicitPrice =
+        body.price_client != null &&
+        !isNaN(Number(body.price_client)) &&
+        Number(body.price_client) >= 0
+          ? Number(body.price_client)
+          : (minutes / 60) * hourlyRate;
+
+      const { error: workErr } = await (supabase.from('service_order_works') as any)
+        .update({
+          custom_work_name: workName,
+          actual_minutes: minutes,
+          norm_minutes: minutes,
+          price_client: explicitPrice.toFixed(2),
+          mechanic_id: (body.mechanic_id as string) || null,
+          second_mechanic_id: (body.second_mechanic_id as string) || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', workId)
+        .eq('service_order_id', targetId);
+
+      if (workErr) throw workErr;
+
+      if (typeof body.admin_note === 'string') {
+        await (supabase.from('service_orders') as any)
+          .update({
+            admin_note: body.admin_note.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', targetId);
+      }
+
+      return NextResponse.json({ ok: true, action: 'work_edited', id: targetId, work_id: workId });
+    }
+
     if (body.action === 'approve_works') {
       // Оценка работ в открытом наряде: фиксируем [reviewed], ЗП начислится разом при закрытии/выдаче машины
+      const targetWorkId = typeof body.work_id === 'string' ? body.work_id : '';
       const { data: worksRows, error: worksErr } = await (supabase as any)
         .from('service_order_works')
         .select('id, status, salary_paid, extra_work_status, notes')
@@ -654,6 +717,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       const pendingWorks = (worksRows ?? []).filter(
         (w: any) =>
+          (!targetWorkId || w.id === targetWorkId) &&
           w.status === 'completed' &&
           !w.salary_paid &&
           w.extra_work_status !== 'rejected' &&

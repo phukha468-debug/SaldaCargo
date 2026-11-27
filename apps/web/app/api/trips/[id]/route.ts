@@ -4,6 +4,7 @@ import { getVerifiedWebUserId } from '@/lib/auth';
 import { syncTripFinancials } from '@/lib/tripFinancials';
 import { syncStrictOrdersForTrip } from '@/lib/orderTripSync';
 import {
+  DEFAULT_ORGANIZATION_ID,
   isNoCashCounterparty,
   isTerritoryCounterparty,
   isGeostroyCounterparty,
@@ -326,6 +327,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         if (isNew) {
           // Создание новой заявки
           const newOrderPayload = {
+            organization_id: trip.organization_id || DEFAULT_ORGANIZATION_ID,
             trip_id: id,
             counterparty_id: resolvedCounterpartyId,
             description: order.description?.trim() || null,
