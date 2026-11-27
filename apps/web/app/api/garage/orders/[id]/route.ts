@@ -654,7 +654,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
 
       const { data: ord, error: ordErr } = await (supabase.from('service_orders') as any)
-        .select('id, machine_type')
+        .select('id, organization_id, machine_type')
         .eq('id', targetId)
         .single();
       if (ordErr || !ord) {
@@ -707,6 +707,49 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .eq('service_order_id', targetId);
 
       if (workErr) throw workErr;
+
+      if (Array.isArray(body.extra_works) && body.extra_works.length > 0) {
+        const toInsert = (
+          body.extra_works as Array<{
+            name?: string;
+            minutes?: number | string;
+            price_client?: number | string;
+            mechanic_id?: string | null;
+            second_mechanic_id?: string | null;
+          }>
+        )
+          .map((ew) => {
+            const ewName = (ew.name || '').trim();
+            const ewMinutes = Math.max(1, Math.round(Number(ew.minutes) || 0));
+            const ewPrice =
+              ew.price_client != null &&
+              !isNaN(Number(ew.price_client)) &&
+              Number(ew.price_client) >= 0
+                ? Number(ew.price_client)
+                : (ewMinutes / 60) * hourlyRate;
+            return {
+              organization_id: ord.organization_id || organizationId,
+              service_order_id: targetId,
+              custom_work_name: ewName,
+              actual_minutes: ewMinutes,
+              norm_minutes: ewMinutes,
+              price_client: ewPrice.toFixed(2),
+              quantity: 1,
+              status: 'completed',
+              mechanic_id: ew.mechanic_id || null,
+              second_mechanic_id: ew.second_mechanic_id || null,
+              notes: '[pending_review]',
+            };
+          })
+          .filter((ew) => ew.custom_work_name.length > 0);
+
+        if (toInsert.length > 0) {
+          const { error: insErr } = await (supabase.from('service_order_works') as any).insert(
+            toInsert,
+          );
+          if (insErr) throw insErr;
+        }
+      }
 
       if (typeof body.admin_note === 'string') {
         await (supabase.from('service_orders') as any)
