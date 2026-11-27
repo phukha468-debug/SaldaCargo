@@ -638,4 +638,135 @@ describe('processVehicleSnapshot — concurrency lock & manual driver_pay invari
     // Инвариант ручной ЗП: автосозданный trip_order всегда с driver_pay = "0.00"
     expect(tripOrderUpserts[0]?.driver_pay).toBe('0.00');
   });
+
+  it('10. После паузы крона > 6 ч (22 ч в пути) fetchTrack запрашивает трек с начала рейса, а не обрезает 6 часами', async () => {
+    const tripStartedIso = '2026-11-26T05:03:27Z';
+    const tripStartSec = Math.floor(Date.parse(tripStartedIso) / 1000);
+    const nowMs = Date.parse('2026-11-27T03:35:00Z'); // +22.5 ч от выезда
+    const nowSec = Math.floor(nowMs / 1000);
+
+    const fetchTrackMock = vi.fn(async () => []);
+    const provider: TelematicsProvider = {
+      providerId: 'wialon',
+      fetchUnitsSnapshot: vi.fn(async () => []),
+      fetchTrack: fetchTrackMock,
+    };
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === 'vehicle_telematics_state') {
+          return {
+            update: () => ({
+              eq: () => ({
+                eq: () => ({
+                  or: () => ({
+                    select: () => ({
+                      maybeSingle: async () => ({
+                        data: {
+                          state: 'EN_ROUTE',
+                          base_confirm_since: null,
+                          depart_confirm_count: 0,
+                          transit_entered_at: null,
+                          last_msg_ts: tripStartSec,
+                          last_lat: 58.025,
+                          last_lon: 60.498,
+                          last_speed: 62,
+                          last_odometer_km: 468596,
+                        },
+                        error: null,
+                      }),
+                    }),
+                  }),
+                  eq: async () => ({ error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'orders') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    order: () => ({
+                      limit: () => ({
+                        maybeSingle: async () => ({
+                          data: {
+                            id: 'ord-1096',
+                            active_trip_id: 'trip-1096',
+                            routes_json: [],
+                            raw_parser_payload: {
+                              autopilot_v2: true,
+                              departure_direction: 'west',
+                              has_departed_west: true,
+                            },
+                            trip: {
+                              id: 'trip-1096',
+                              started_at: tripStartedIso,
+                              odometer_start: 468596,
+                            },
+                          },
+                          error: null,
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'telematics_events') {
+          return { insert: async () => ({ error: null }) };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    } as unknown as SupabaseClient;
+
+    const asset: AssetForTelematics = {
+      id: 'asset-1096',
+      reg_number: 'А096МВ196',
+      short_name: 'Валдай 6м',
+      wialon_id: '11873',
+      odometer_current: 468596,
+      odometer_offset_km: 0,
+      assigned_driver_id: 'drv-1',
+    };
+
+    const snapshot: TelematicsUnitSnapshot = {
+      externalUnitId: '11873',
+      unitName: 'Нигамедьянов А096МВ196',
+      plateHint: 'А096МВ196',
+      isOnline: true,
+      position: {
+        lat: 59.668,
+        lon: 60.235,
+        speedKmh: 69,
+        timestampSec: nowSec - 15,
+        rawOdometerKm: 469100,
+      },
+    };
+
+    await processVehicleSnapshot({
+      supabase: mockSupabase,
+      organizationId: '00000000-0000-4000-8000-000000000001',
+      orgSettings: OrganizationSettingsSchema.parse({
+        ...DEFAULT_ORGANIZATION_SETTINGS,
+        telematics: TENANT1_TELEMATICS,
+      }),
+      asset,
+      provider,
+      snapshot,
+      source: 'cron',
+      nowMs,
+    });
+
+    expect(fetchTrackMock).toHaveBeenCalledTimes(1);
+    const [, fromSec, toSec] = fetchTrackMock.mock.calls[0] as unknown as [string, number, number];
+    expect(toSec).toBe(nowSec);
+    // Должен запросить с начала рейса (-15 мин), а не обрезать 6 часами
+    expect(fromSec).toBe(tripStartSec - 900);
+    expect(toSec - fromSec).toBeGreaterThan(20 * 3600);
+  });
 });

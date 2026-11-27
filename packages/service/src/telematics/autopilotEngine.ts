@@ -342,7 +342,17 @@ export async function processVehicleSnapshot(params: {
     if (activeTrip && snapshot.externalUnitId) {
       const toSec = Math.floor(nowMs / 1000);
       const tripStartSec = Math.floor(new Date(activeTrip.startedAtIso).getTime() / 1000);
-      const fromSec = Math.max(tripStartSec - 900, toSec - 6 * 3600);
+      const DEFAULT_LOOKBACK_SEC = 6 * 3600;
+      const MAX_TRACK_LOOKBACK_SEC = 72 * 3600;
+      // При штатном 5-минутном кроне берём 6-часовое окно (хватает на длинные стоянки).
+      // Если крон не приходил > 6 ч (например, только вебхуки выезда/приезда или простой крона),
+      // растягиваем окно назад до prevState.lastMsgTs (но не глубже 72 ч и начала рейса),
+      // чтобы не потерять промежуточные точки погрузки/выгрузки.
+      const desiredFromSec =
+        prevState.lastMsgTs > 0
+          ? Math.min(toSec - DEFAULT_LOOKBACK_SEC, prevState.lastMsgTs - 900)
+          : tripStartSec - 900;
+      const fromSec = Math.max(tripStartSec - 900, toSec - MAX_TRACK_LOOKBACK_SEC, desiredFromSec);
 
       const track = await provider.fetchTrack(snapshot.externalUnitId, fromSec, toSec);
       const detected = detectStopsFromTrack(track, orgSettings.telematics, {
