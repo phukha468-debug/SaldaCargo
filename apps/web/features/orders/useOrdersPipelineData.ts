@@ -207,11 +207,17 @@ export function useOrdersPipelineData({
         body: JSON.stringify(docs),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Ошибка сохранения документов');
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Ошибка сохранения документов (${res.status})`);
       }
       return res.json();
     },
+    retry: (failureCount, error) => {
+      if (failureCount >= 2) return false;
+      const msg = error instanceof Error ? error.message.toLowerCase() : '';
+      return msg.includes('failed to fetch') || msg.includes('networkerror');
+    },
+    retryDelay: (attempt) => 600 * (attempt + 1),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['orders-pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['receivables'] });
@@ -221,7 +227,14 @@ export function useOrdersPipelineData({
         );
       }
     },
-    onError: (err: Error) => alert(`Ошибка: ${err.message}`),
+    onError: (err: Error) => {
+      const isNetwork = err.message.toLowerCase().includes('failed to fetch');
+      alert(
+        isNetwork
+          ? 'Ошибка сети при сохранении документов. Проверьте подключение и нажмите «Сохранить» ещё раз.'
+          : `Ошибка: ${err.message}`,
+      );
+    },
   });
 
   const manualStageMutation = useMutation({

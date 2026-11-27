@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   syncStrictOrdersForTrip,
   backfillStrictDocOrders,
   syncInvoiceToOrder,
+  resetBackfillStrictDocOrdersState,
 } from '../orders/orderTripSync';
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
@@ -25,6 +26,10 @@ function makeQueryMock(result: { data?: any; error?: any }) {
 }
 
 describe('orderTripSync', () => {
+  beforeEach(() => {
+    resetBackfillStrictDocOrdersState();
+  });
+
   it('creates docs_collection orders WITH organization_id for every strict trip_order', async () => {
     const insertedPayloads: any[] = [];
     const updatedPayloads: any[] = [];
@@ -236,5 +241,153 @@ describe('orderTripSync', () => {
       invoice_number: 'СЧ-777',
       invoice_date: '2026-11-26',
     });
+  });
+
+  it('handles PostgreSQL 23505 unique_violation idempotently on concurrent insert race', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tripData = {
+      id: TRIP_ID,
+      organization_id: ORG_ID,
+      trip_number: 1090,
+      lifecycle_status: 'approved',
+      started_at: '2026-11-25T08:00:00Z',
+      asset_id: 'asset-1',
+      driver_id: 'driver-1',
+      trip_orders: [
+        {
+          id: 'to-race-1',
+          counterparty_id: CP_VSMPO,
+          amount: '20000.00',
+          payment_method: 'bank_invoice',
+          settlement_status: 'pending',
+          lifecycle_status: 'approved',
+          description: 'Рейс 1090',
+          counterparty: {
+            id: CP_VSMPO,
+            name: 'ПАО «Корпорация ВСМПО-АВИСМА»',
+            is_legal_entity: true,
+          },
+        },
+      ],
+    };
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'trips') {
+          return makeQueryMock({ data: tripData, error: null });
+        }
+        if (table === 'orders') {
+          return {
+            select: vi.fn(() => makeQueryMock({ data: [], error: null })),
+            insert: vi.fn(() =>
+              makeQueryMock({
+                data: null,
+                error: {
+                  code: '23505',
+                  message:
+                    'duplicate key value violates unique constraint "idx_orders_unique_active_trip_order_id"',
+                },
+              }),
+            ),
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    const res = await syncStrictOrdersForTrip(supabase, TRIP_ID);
+
+    expect(res).toEqual({ created: 0, updated: 0, cancelled: 0 });
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('backfillStrictDocOrders skips trip_order already covered by another active_trip_id (case 916)', async () => {
+    const insertedPayloads: any[] = [];
+    const pendingTripOrders = [
+      {
+        id: 'to-916',
+        trip_id: TRIP_ID,
+        organization_id: ORG_ID,
+        settlement_status: 'pending',
+        lifecycle_status: 'approved',
+        counterparty: { id: CP_VSMPO, name: 'ПАО «Корпорация ВСМПО-АВИСМА»' },
+        trip: { id: TRIP_ID, lifecycle_status: 'approved', started_at: '2026-10-30T10:00:00Z' },
+      },
+    ];
+
+    let ordersSelectCall = 0;
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'trip_orders') {
+          return makeQueryMock({ data: pendingTripOrders, error: null });
+        }
+        if (table === 'orders') {
+          return {
+            select: vi.fn(() => {
+              ordersSelectCall += 1;
+              // 1st select: by active_trip_id -> empty; 2nd select: by raw_parser_payload->>trip_order_id -> found!
+              if (ordersSelectCall === 1) {
+                return makeQueryMock({ data: [], error: null });
+              }
+              return makeQueryMock({
+                data: [
+                  {
+                    id: 'ord-existing-other-trip',
+                    active_trip_id: 'other-trip-id',
+                    status: 'completed',
+                    raw_parser_payload: {
+                      trip_order_id: 'to-916',
+                      billing_docs: { client_accepted_edo: true },
+                    },
+                  },
+                ],
+                error: null,
+              });
+            }),
+            insert: vi.fn((payload: any) => {
+              insertedPayloads.push(payload);
+              return makeQueryMock({ data: { id: 'should-not-create' }, error: null });
+            }),
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    const summary = await backfillStrictDocOrders(supabase, { organizationId: ORG_ID });
+
+    expect(summary).toEqual({ syncedTrips: 0, created: 0, updated: 0 });
+    expect(insertedPayloads).toHaveLength(0);
+  });
+
+  it('backfillStrictDocOrders coalesces concurrent calls (single-flight) and respects TTL', async () => {
+    let tripOrdersQueries = 0;
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'trip_orders') {
+          tripOrdersQueries += 1;
+          return makeQueryMock({ data: [], error: null });
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+
+    // Two concurrent calls share a single DB pass
+    const [r1, r2] = await Promise.all([
+      backfillStrictDocOrders(supabase, { organizationId: ORG_ID }),
+      backfillStrictDocOrders(supabase, { organizationId: ORG_ID }),
+    ]);
+    expect(r1).toEqual({ syncedTrips: 0, created: 0, updated: 0 });
+    expect(r2).toEqual({ syncedTrips: 0, created: 0, updated: 0 });
+    expect(tripOrdersQueries).toBe(1);
+
+    // Immediate subsequent call within TTL does not re-query DB
+    await backfillStrictDocOrders(supabase, { organizationId: ORG_ID });
+    expect(tripOrdersQueries).toBe(1);
+
+    // force: true bypasses TTL
+    await backfillStrictDocOrders(supabase, { organizationId: ORG_ID, force: true });
+    expect(tripOrdersQueries).toBe(2);
   });
 });

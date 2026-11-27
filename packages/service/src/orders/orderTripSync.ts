@@ -10,6 +10,34 @@ export interface SyncStrictOrdersOptions {
   orgSettings?: OrganizationSettings;
 }
 
+export interface BackfillStrictOrdersOptions extends SyncStrictOrdersOptions {
+  sinceDays?: number;
+  /** Пропустить 30-секундный TTL-кэш (используется в тестах и при явном ручном запуске) */
+  force?: boolean;
+}
+
+const BACKFILL_TTL_MS = 30_000;
+const inFlightBackfills = new Map<
+  string,
+  Promise<{ syncedTrips: number; created: number; updated: number }>
+>();
+const lastBackfillAt = new Map<string, number>();
+
+/** Сброс in-memory кэша/single-flight состояния backfill (для unit-тестов). */
+export function resetBackfillStrictDocOrdersState(): void {
+  inFlightBackfills.clear();
+  lastBackfillAt.clear();
+}
+
+function isUniqueViolationError(
+  err: { code?: string; message?: string } | null | undefined,
+): boolean {
+  if (!err) return false;
+  if (err.code === '23505') return true;
+  const msg = String(err.message || '').toLowerCase();
+  return msg.includes('duplicate key') || msg.includes('unique constraint');
+}
+
 export interface SyncStrictOrdersResult {
   created: number;
   updated: number;
@@ -70,12 +98,36 @@ export async function syncStrictOrdersForTrip(
       existingQuery = existingQuery.eq('organization_id', orgId);
     }
 
-    const { data: existingOrders, error: ordersErr } = await existingQuery;
+    const { data: existingByTrip, error: ordersErr } = await existingQuery;
 
     if (ordersErr) {
       console.error('Ошибка выборки существующих заявок для рейса:', ordersErr.message);
       return result;
     }
+
+    // Дополнительно ищем уже привязанные по trip_order_id заявки (даже если active_trip_id
+    // указывает на другой рейс), чтобы не плодить дубли уже существующих/закрытых заявок.
+    const existingById = new Map<string, any>();
+    for (const o of existingByTrip || []) {
+      existingById.set(String(o.id), o);
+    }
+
+    if (validTripOrders.length > 0) {
+      const validToIdList = validTripOrders.map((to: any) => String(to.id));
+      let byToQuery = (supabase.from('orders') as any)
+        .select('*')
+        .in('raw_parser_payload->>trip_order_id', validToIdList)
+        .neq('status', 'cancelled');
+      if (orgId) {
+        byToQuery = byToQuery.eq('organization_id', orgId);
+      }
+      const { data: existingByTo } = await byToQuery;
+      for (const o of existingByTo || []) {
+        existingById.set(String(o.id), o);
+      }
+    }
+
+    const existingOrders = Array.from(existingById.values());
 
     const assignedOrderIds = new Set<string>();
     const validTripOrderIds = new Set<string>(validTripOrders.map((to: any) => to.id));
@@ -226,6 +278,10 @@ export async function syncStrictOrdersForTrip(
         if (inserted?.id) {
           assignedOrderIds.add(inserted.id);
           result.created += 1;
+        } else if (isUniqueViolationError(insertErr)) {
+          // Идемпотентность при гонке параллельных запросов: другой запрос уже создал заявку
+          // с этим trip_order_id (уникальный индекс idx_orders_unique_active_trip_order_id).
+          continue;
         } else if (insertErr) {
           console.error('Ошибка создания заявки docs_collection для рейса:', insertErr.message);
         }
@@ -274,99 +330,154 @@ export async function syncStrictOrdersForTrip(
  */
 export async function backfillStrictDocOrders(
   supabase: any,
-  options?: SyncStrictOrdersOptions & { sinceDays?: number },
+  options?: BackfillStrictOrdersOptions,
 ): Promise<{ syncedTrips: number; created: number; updated: number }> {
-  const summary = { syncedTrips: 0, created: 0, updated: 0 };
+  const cacheKey = options?.organizationId || '__all__';
 
-  try {
-    let toQuery = (supabase.from('trip_orders') as any)
-      .select(
-        `
-        id, trip_id, organization_id, settlement_status, lifecycle_status,
-        counterparty:counterparties(id, name),
-        trip:trips!inner(id, lifecycle_status, started_at)
-      `,
-      )
-      .eq('lifecycle_status', 'approved')
-      .eq('trip.lifecycle_status', 'approved')
-      .eq('settlement_status', 'pending');
-
-    if (options?.organizationId) {
-      toQuery = toQuery.eq('organization_id', options.organizationId);
-    }
-
-    const { data: pendingTripOrders, error: toErr } = await toQuery;
-    if (toErr || !pendingTripOrders?.length) return summary;
-
-    const strictTripOrders = pendingTripOrders.filter(
-      (to: any) =>
-        to.trip_id &&
-        to.counterparty?.name &&
-        isStrictDocCounterparty(to.counterparty.name, options?.orgSettings),
-    );
-
-    if (strictTripOrders.length === 0) return summary;
-
-    const tripIds = Array.from(new Set(strictTripOrders.map((to: any) => String(to.trip_id))));
-
-    let ordQuery = (supabase.from('orders') as any)
-      .select('id, active_trip_id, status, raw_parser_payload')
-      .in('active_trip_id', tripIds)
-      .neq('status', 'cancelled');
-
-    if (options?.organizationId) {
-      ordQuery = ordQuery.eq('organization_id', options.organizationId);
-    }
-
-    const { data: existingOrders } = await ordQuery;
-
-    // Для каждого trip_id проверяем, покрыты ли все его strict trip_orders заявками в orders
-    const coveredByTripOrderId = new Set<string>();
-    const orderCountByTripId = new Map<string, number>();
-
-    for (const o of existingOrders || []) {
-      const linkedToId = o.raw_parser_payload?.trip_order_id;
-      if (linkedToId) {
-        coveredByTripOrderId.add(String(linkedToId));
-      }
-      if (o.active_trip_id) {
-        const key = String(o.active_trip_id);
-        orderCountByTripId.set(key, (orderCountByTripId.get(key) || 0) + 1);
-      }
-    }
-
-    const tripsNeedingSync = new Set<string>();
-    const strictCountByTripId = new Map<string, number>();
-    for (const to of strictTripOrders) {
-      const tid = String(to.trip_id);
-      strictCountByTripId.set(tid, (strictCountByTripId.get(tid) || 0) + 1);
-    }
-
-    for (const to of strictTripOrders) {
-      const tid = String(to.trip_id);
-      const hasExactLink = coveredByTripOrderId.has(String(to.id));
-      const existingCount = orderCountByTripId.get(tid) || 0;
-      const requiredCount = strictCountByTripId.get(tid) || 0;
-
-      if (!hasExactLink && existingCount < requiredCount) {
-        tripsNeedingSync.add(tid);
-      }
-    }
-
-    for (const tid of tripsNeedingSync) {
-      const res = await syncStrictOrdersForTrip(supabase, tid, {
-        organizationId: options?.organizationId,
-        orgSettings: options?.orgSettings,
-      });
-      summary.syncedTrips += 1;
-      summary.created += res.created;
-      summary.updated += res.updated;
-    }
-  } catch (err: any) {
-    console.error('Ошибка в backfillStrictDocOrders:', err?.message || err);
+  // Single-flight: если backfill для этой организации уже выполняется в параллельном запросе,
+  // возвращаем его Promise вместо запуска дублирующего прохода.
+  const existingInFlight = inFlightBackfills.get(cacheKey);
+  if (existingInFlight) {
+    return existingInFlight;
   }
 
-  return summary;
+  // Короткий TTL: защищает от лишней нагрузки и гонок при 10-секундном polling'е GET /api/orders.
+  const lastRun = lastBackfillAt.get(cacheKey) || 0;
+  if (!options?.force && Date.now() - lastRun < BACKFILL_TTL_MS) {
+    return { syncedTrips: 0, created: 0, updated: 0 };
+  }
+
+  const runPromise = (async () => {
+    const summary = { syncedTrips: 0, created: 0, updated: 0 };
+
+    try {
+      let toQuery = (supabase.from('trip_orders') as any)
+        .select(
+          `
+          id, trip_id, organization_id, settlement_status, lifecycle_status,
+          counterparty:counterparties(id, name),
+          trip:trips!inner(id, lifecycle_status, started_at)
+        `,
+        )
+        .eq('lifecycle_status', 'approved')
+        .eq('trip.lifecycle_status', 'approved')
+        .eq('settlement_status', 'pending');
+
+      if (options?.organizationId) {
+        toQuery = toQuery.eq('organization_id', options.organizationId);
+      }
+
+      const { data: pendingTripOrders, error: toErr } = await toQuery;
+      if (toErr) return summary;
+      if (!pendingTripOrders?.length) {
+        lastBackfillAt.set(cacheKey, Date.now());
+        return summary;
+      }
+
+      const strictTripOrders = pendingTripOrders.filter(
+        (to: any) =>
+          to.trip_id &&
+          to.counterparty?.name &&
+          isStrictDocCounterparty(to.counterparty.name, options?.orgSettings),
+      );
+
+      if (strictTripOrders.length === 0) {
+        lastBackfillAt.set(cacheKey, Date.now());
+        return summary;
+      }
+
+      const tripIds = Array.from(new Set(strictTripOrders.map((to: any) => String(to.trip_id))));
+      const strictTripOrderIds = Array.from(
+        new Set(strictTripOrders.map((to: any) => String(to.id))),
+      );
+
+      let ordQuery = (supabase.from('orders') as any)
+        .select('id, active_trip_id, status, raw_parser_payload')
+        .in('active_trip_id', tripIds)
+        .neq('status', 'cancelled');
+
+      if (options?.organizationId) {
+        ordQuery = ordQuery.eq('organization_id', options.organizationId);
+      }
+
+      const { data: existingByTrip } = await ordQuery;
+
+      // Дополнительно проверяем покрытие по trip_order_id независимо от active_trip_id
+      let ordByToQuery = (supabase.from('orders') as any)
+        .select('id, active_trip_id, status, raw_parser_payload')
+        .in('raw_parser_payload->>trip_order_id', strictTripOrderIds)
+        .neq('status', 'cancelled');
+
+      if (options?.organizationId) {
+        ordByToQuery = ordByToQuery.eq('organization_id', options.organizationId);
+      }
+
+      const { data: existingByTo } = await ordByToQuery;
+
+      const existingMap = new Map<string, any>();
+      for (const o of existingByTrip || []) {
+        existingMap.set(String(o.id), o);
+      }
+      for (const o of existingByTo || []) {
+        existingMap.set(String(o.id), o);
+      }
+      const existingOrders = Array.from(existingMap.values());
+
+      // Для каждого trip_id проверяем, покрыты ли все его strict trip_orders заявками в orders
+      const coveredByTripOrderId = new Set<string>();
+      const orderCountByTripId = new Map<string, number>();
+
+      for (const o of existingOrders) {
+        const linkedToId = o.raw_parser_payload?.trip_order_id;
+        if (linkedToId) {
+          coveredByTripOrderId.add(String(linkedToId));
+        }
+        if (o.active_trip_id) {
+          const key = String(o.active_trip_id);
+          orderCountByTripId.set(key, (orderCountByTripId.get(key) || 0) + 1);
+        }
+      }
+
+      const tripsNeedingSync = new Set<string>();
+      const strictCountByTripId = new Map<string, number>();
+      for (const to of strictTripOrders) {
+        const tid = String(to.trip_id);
+        strictCountByTripId.set(tid, (strictCountByTripId.get(tid) || 0) + 1);
+      }
+
+      for (const to of strictTripOrders) {
+        const tid = String(to.trip_id);
+        const hasExactLink = coveredByTripOrderId.has(String(to.id));
+        const existingCount = orderCountByTripId.get(tid) || 0;
+        const requiredCount = strictCountByTripId.get(tid) || 0;
+
+        if (!hasExactLink && existingCount < requiredCount) {
+          tripsNeedingSync.add(tid);
+        }
+      }
+
+      for (const tid of tripsNeedingSync) {
+        const res = await syncStrictOrdersForTrip(supabase, tid, {
+          organizationId: options?.organizationId,
+          orgSettings: options?.orgSettings,
+        });
+        summary.syncedTrips += 1;
+        summary.created += res.created;
+        summary.updated += res.updated;
+      }
+
+      lastBackfillAt.set(cacheKey, Date.now());
+    } catch (err: any) {
+      console.error('Ошибка в backfillStrictDocOrders:', err?.message || err);
+    } finally {
+      inFlightBackfills.delete(cacheKey);
+    }
+
+    return summary;
+  })();
+
+  inFlightBackfills.set(cacheKey, runPromise);
+  return runPromise;
 }
 
 /**

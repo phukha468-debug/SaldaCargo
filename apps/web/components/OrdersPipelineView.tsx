@@ -171,18 +171,22 @@ export function OrdersPipelineView() {
   };
 
   const handleSaveEpe = (isReset = false) => {
-    if (!epeModalOrder) return;
+    if (!epeModalOrder || billingDocsMutation.isPending) return;
     const { order } = epeModalOrder;
     const cur = order.billing_docs || {};
-    billingDocsMutation.mutate({
-      orderId: order.id,
-      docs: {
-        ...cur,
-        epe_received_edo: isReset ? false : epeReceivedInput,
-        epe_number: isReset ? null : epeNumberInput.trim() || null,
+    billingDocsMutation.mutate(
+      {
+        orderId: order.id,
+        docs: {
+          ...cur,
+          epe_received_edo: isReset ? false : epeReceivedInput,
+          epe_number: isReset ? null : epeNumberInput.trim() || null,
+        },
       },
-    });
-    setEpeModalOrder(null);
+      {
+        onSuccess: () => setEpeModalOrder(null),
+      },
+    );
   };
 
   const handleToggleDocsSent = (order: OrderItem) => {
