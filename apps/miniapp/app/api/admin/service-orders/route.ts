@@ -95,6 +95,16 @@ export async function GET(request: Request) {
       w.extra_work_status !== 'rejected' &&
       !String(w.notes || '').includes('[reviewed]');
 
+    const isUnratedOrEditedPendingWork = (w: any) => {
+      if (!isPendingWorkReview(w)) return false;
+      const hasPendingTag = String(w.notes || '').includes('[pending_review]');
+      const isUnrated =
+        Number(w.actual_minutes || 0) <= 0 &&
+        Number(w.norm_minutes || 0) <= 0 &&
+        parseFloat(String(w.price_client || '0')) <= 0;
+      return hasPendingTag || isUnrated;
+    };
+
     const rawList = rawOrders ?? [];
     const rawOrderIds = rawList.map((o: any) => o.id);
 
@@ -180,9 +190,18 @@ export async function GET(request: Request) {
 
       const activeWorks = (o.works ?? []).filter((w: any) => w.status !== 'cancelled');
       const pendingWorks = activeWorks.filter(isPendingWorkReview);
-      const isPartialWorkReview = filter === 'review' && o.status !== 'completed';
+      const focusedPendingWorks = activeWorks.filter(isUnratedOrEditedPendingWork);
+      const hasFocusedWorks = filter === 'review' && focusedPendingWorks.length > 0;
+      const isPartialWorkReview =
+        filter === 'review' && (o.status !== 'completed' || hasFocusedWorks);
       const reviewTargetWorks =
-        filter === 'review' && pendingWorks.length > 0 ? pendingWorks : activeWorks;
+        filter === 'review'
+          ? hasFocusedWorks
+            ? focusedPendingWorks
+            : pendingWorks.length > 0
+              ? pendingWorks
+              : activeWorks
+          : activeWorks;
 
       let totalMinutes = 0;
       let worksClientSum = 0;
@@ -225,7 +244,13 @@ export async function GET(request: Request) {
       const effectiveDate = getOrderEffectiveDate(o);
 
       const sourceWorksForResponse =
-        filter === 'review' && pendingWorks.length > 0 ? pendingWorks : (o.works ?? []);
+        filter === 'review'
+          ? hasFocusedWorks
+            ? focusedPendingWorks
+            : pendingWorks.length > 0
+              ? pendingWorks
+              : (o.works ?? [])
+          : (o.works ?? []);
 
       const enrichedWorks = sourceWorksForResponse.map((w: any) => ({
         ...w,

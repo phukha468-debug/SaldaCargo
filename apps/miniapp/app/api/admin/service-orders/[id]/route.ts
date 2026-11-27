@@ -364,6 +364,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         ? Number(body.price_client)
         : (minutes / 60) * hourlyRate;
 
+    const { data: existingWork } = await (supabase.from('service_order_works') as any)
+      .select('notes')
+      .eq('id', body.work_id)
+      .eq('service_order_id', targetId)
+      .maybeSingle();
+
+    const currNotes = String(existingWork?.notes || '');
+    const nextNotes =
+      currNotes.includes('[reviewed]') || currNotes.includes('[pending_review]')
+        ? currNotes || null
+        : currNotes
+          ? `${currNotes.trim()} [pending_review]`
+          : '[pending_review]';
+
     const workUpdate: Record<string, any> = {
       custom_work_name: workName,
       actual_minutes: minutes,
@@ -371,6 +385,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       price_client: explicitPrice.toFixed(2),
       mechanic_id: body.mechanic_id || null,
       second_mechanic_id: body.second_mechanic_id || null,
+      notes: nextNotes,
       updated_at: new Date().toISOString(),
     };
 
@@ -426,7 +441,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     await Promise.all(
       pendingWorks.map((w: any) => {
-        const nextNotes = w.notes ? `${String(w.notes).trim()} [reviewed]` : '[reviewed]';
+        const cleaned = String(w.notes || '')
+          .replace(/\[pending_review\]/g, '')
+          .trim();
+        const nextNotes = cleaned ? `${cleaned} [reviewed]` : '[reviewed]';
         return (supabase.from('service_order_works') as any)
           .update({ notes: nextNotes })
           .eq('id', w.id);

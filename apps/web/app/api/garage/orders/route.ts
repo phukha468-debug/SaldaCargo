@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg,
       client_name, client_phone,
       works:service_order_works(
-        id, custom_work_name, work_description, notes, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
+        id, custom_work_name, work_description, notes, status, salary_paid, extra_work_status, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       second_mechanic:users!service_orders_second_mechanic_id_fkey(id, name, mechanic_salary_pct),
       client_vehicle_brand, client_vehicle_model, client_vehicle_reg, client_name,
       works:service_order_works(
-        id, custom_work_name, work_description, notes, status, salary_paid, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
+        id, custom_work_name, work_description, notes, status, salary_paid, extra_work_status, actual_minutes, price_client, norm_minutes, quantity, mechanic_id, second_mechanic_id,
         work_catalog:work_catalog(name)
       ),
       parts:service_order_parts(
@@ -176,6 +176,16 @@ export async function GET(request: Request) {
       w.extra_work_status !== 'rejected' &&
       !String(w.notes || '').includes('[reviewed]');
 
+    const isUnratedOrEditedPendingWork = (w: any) => {
+      if (!isPendingWorkReview(w)) return false;
+      const hasPendingTag = String(w.notes || '').includes('[pending_review]');
+      const isUnrated =
+        Number(w.actual_minutes || 0) <= 0 &&
+        Number(w.norm_minutes || 0) <= 0 &&
+        parseFloat(String(w.price_client || '0')) <= 0;
+      return hasPendingTag || isUnrated;
+    };
+
     const filteredRows =
       filter === 'review'
         ? rawRows.filter((o: any) => {
@@ -222,9 +232,18 @@ export async function GET(request: Request) {
       const effectiveDate = getOrderEffectiveDate(o);
       const activeWorks = (o.works ?? []).filter((w: any) => w.status !== 'cancelled');
       const pendingWorks = activeWorks.filter(isPendingWorkReview);
-      const isPartialWorkReview = filter === 'review' && o.status !== 'completed';
+      const focusedPendingWorks = activeWorks.filter(isUnratedOrEditedPendingWork);
+      const hasFocusedWorks = filter === 'review' && focusedPendingWorks.length > 0;
+      const isPartialWorkReview =
+        filter === 'review' && (o.status !== 'completed' || hasFocusedWorks);
       const sourceWorks =
-        filter === 'review' && pendingWorks.length > 0 ? pendingWorks : (o.works ?? []);
+        filter === 'review'
+          ? hasFocusedWorks
+            ? focusedPendingWorks
+            : pendingWorks.length > 0
+              ? pendingWorks
+              : (o.works ?? [])
+          : (o.works ?? []);
 
       const enrichedWorks = sourceWorks.map((w: any) => ({
         ...w,
