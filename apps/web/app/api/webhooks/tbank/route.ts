@@ -11,7 +11,17 @@ import {
 import { invalidateDailyBalanceCache } from '../../finance/daily-balance/route';
 
 const MAX_BOT_API = 'https://botapi.max.ru';
-const DEFAULT_DIRECTOR_MAX_ID = '184730162';
+const DEFAULT_DIRECTOR_MAX_IDS = ['184730162', '76489387'];
+
+function resolveDirectorMaxIds(): string[] {
+  const raw = process.env.DIRECTOR_MAX_USER_IDS || process.env.DIRECTOR_MAX_USER_ID;
+  if (!raw) return DEFAULT_DIRECTOR_MAX_IDS;
+  const parsed = raw
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? Array.from(new Set(parsed)) : DEFAULT_DIRECTOR_MAX_IDS;
+}
 
 function extractOperationsFromWebhookPayload(payload: any): TBankOperation[] {
   if (!payload || typeof payload !== 'object') return [];
@@ -67,7 +77,7 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const organizationId = DEFAULT_ORGANIZATION_ID;
     const maxToken = getMaxBotEnv()?.token;
-    const directorMaxId = process.env.DIRECTOR_MAX_USER_ID || DEFAULT_DIRECTOR_MAX_ID;
+    const directorMaxIds = resolveDirectorMaxIds();
 
     let notified = 0;
 
@@ -81,32 +91,36 @@ export async function POST(request: Request) {
       const opId = String(op.operationId || '').trim();
       if (!opId) continue;
 
-      // Проверяем, не отправляли ли уже уведомление по этой операции (retry protection)
-      const { data: existingNotif } = await (supabase.from('bank_debit_notifications') as any)
-        .select('id')
-        .eq('organization_id', organizationId)
-        .eq('bank_operation_id', opId)
-        .eq('recipient_max_id', directorMaxId)
-        .maybeSingle();
-
-      if (existingNotif) continue;
-
       // Проверяем, не привязана ли уже операция
-      const [{ data: existingTx }, { data: existingLink }] = await Promise.all([
-        (supabase.from('transactions') as any)
-          .select('id')
-          .eq('organization_id', organizationId)
-          .eq('idempotency_key', opId)
-          .maybeSingle(),
-        (supabase.from('bank_debit_links') as any)
-          .select('id')
-          .eq('organization_id', organizationId)
-          .eq('bank_operation_id', opId)
-          .limit(1)
-          .maybeSingle(),
-      ]);
+      const [{ data: existingTx }, { data: existingLink }, { data: existingNotifs }] =
+        await Promise.all([
+          (supabase.from('transactions') as any)
+            .select('id')
+            .eq('organization_id', organizationId)
+            .eq('idempotency_key', opId)
+            .maybeSingle(),
+          (supabase.from('bank_debit_links') as any)
+            .select('id')
+            .eq('organization_id', organizationId)
+            .eq('bank_operation_id', opId)
+            .limit(1)
+            .maybeSingle(),
+          (supabase.from('bank_debit_notifications') as any)
+            .select('recipient_max_id')
+            .eq('organization_id', organizationId)
+            .eq('bank_operation_id', opId)
+            .in('recipient_max_id', directorMaxIds),
+        ]);
 
       if (existingTx || existingLink) continue;
+
+      const alreadySent = new Set(
+        ((existingNotifs ?? []) as Array<{ recipient_max_id: string }>).map(
+          (row) => row.recipient_max_id,
+        ),
+      );
+      const pendingRecipients = directorMaxIds.filter((id) => !alreadySent.has(id));
+      if (pendingRecipients.length === 0) continue;
 
       const opDate = getBankOpEffectiveDate(op);
       const receiver = op.receiver?.name || op.counterParty?.name || 'Получатель не указан';
@@ -135,32 +149,40 @@ export async function POST(request: Request) {
         `🔗 ${webBaseUrl}/finance?tab=daily&unmatched=1`;
 
       if (maxToken) {
-        const maxRes = await fetch(
-          `${MAX_BOT_API}/messages?user_id=${encodeURIComponent(directorMaxId)}`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: maxToken,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ text }),
-          },
-        );
+        await Promise.allSettled(
+          pendingRecipients.map(async (recipientId) => {
+            const maxRes = await fetch(
+              `${MAX_BOT_API}/messages?user_id=${encodeURIComponent(recipientId)}`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: maxToken,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text }),
+              },
+            );
 
-        if (maxRes.ok) {
-          await (supabase.from('bank_debit_notifications') as any).upsert(
-            {
-              organization_id: organizationId,
-              bank_operation_id: opId,
-              recipient_max_id: directorMaxId,
-              amount: amount.toFixed(2),
-            },
-            { onConflict: 'organization_id,bank_operation_id,recipient_max_id' },
-          );
-          notified++;
-        } else {
-          console.error('MAX webhook notification failed:', maxRes.status, await maxRes.text());
-        }
+            if (maxRes.ok) {
+              await (supabase.from('bank_debit_notifications') as any).upsert(
+                {
+                  organization_id: organizationId,
+                  bank_operation_id: opId,
+                  recipient_max_id: recipientId,
+                  amount: amount.toFixed(2),
+                },
+                { onConflict: 'organization_id,bank_operation_id,recipient_max_id' },
+              );
+              notified++;
+            } else {
+              console.error(
+                `MAX webhook notification failed for ${recipientId}:`,
+                maxRes.status,
+                await maxRes.text(),
+              );
+            }
+          }),
+        );
       }
     }
 
