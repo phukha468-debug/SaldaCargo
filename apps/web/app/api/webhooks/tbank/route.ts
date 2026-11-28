@@ -11,7 +11,7 @@ import {
 import { invalidateDailyBalanceCache } from '../../finance/daily-balance/route';
 
 const MAX_BOT_API = 'https://botapi.max.ru';
-const DEFAULT_DIRECTOR_MAX_IDS = ['184730162', '76489387'];
+const DEFAULT_DIRECTOR_MAX_IDS = ['56628256', '76489387'];
 
 function resolveDirectorMaxIds(): string[] {
   const raw = process.env.DIRECTOR_MAX_USER_IDS || process.env.DIRECTOR_MAX_USER_ID;
