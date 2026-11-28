@@ -190,6 +190,7 @@ export async function GET(request: Request) {
       { data: auditRow },
       { data: categoriesList },
       { data: calendarOverrides },
+      bankDebitLinksRes,
     ] = await Promise.all([
       // Transactions of the period
       (supabase.from('transactions') as any)
@@ -233,7 +234,13 @@ export async function GET(request: Request) {
       (supabase.from('payment_calendar_overrides') as any)
         .select('*')
         .eq('period', date.slice(0, 7)),
+
+      // Привязки банковских списаний к расходам (без дублей)
+      (supabase.from('bank_debit_links') as any)
+        .select('id, bank_operation_id, transaction_id, allocated_amount, bank_operation_amount')
+        .gte('created_at', new Date(Date.now() - 45 * 24 * 3600 * 1000).toISOString()),
     ]);
+    const bankDebitLinks = bankDebitLinksRes?.error ? [] : (bankDebitLinksRes?.data ?? []);
 
     // 3. Последний подтвержденный аудит ДО начала текущего периода (базовая точка отсчета)
     const { data: priorAudit } = await (supabase.from('daily_finance_audits') as any)
@@ -548,6 +555,7 @@ export async function GET(request: Request) {
       trip_orders: dayTripOrders ?? [],
       cash_collections: cleanDayCollections,
       bank_operations: bankStatementOps,
+      bank_debit_links: bankDebitLinks,
       categories: categoriesList ?? [],
       calendar_overrides: calendarOverrides ?? [],
     };

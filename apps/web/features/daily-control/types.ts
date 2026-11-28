@@ -151,6 +151,13 @@ export interface DailyBalanceData {
   trip_orders: TripOrderTx[];
   cash_collections: CashCollectionTx[];
   bank_operations?: TBankOp[];
+  bank_debit_links?: Array<{
+    id: string;
+    bank_operation_id: string;
+    transaction_id: string;
+    allocated_amount: string | number;
+    bank_operation_amount?: string | number;
+  }>;
   categories: CategoryItem[];
   calendar_overrides?: Array<{
     id: string;

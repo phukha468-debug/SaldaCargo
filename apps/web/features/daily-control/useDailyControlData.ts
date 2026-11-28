@@ -11,6 +11,8 @@ import {
   type PeriodMode,
   type WarehousePartItem,
 } from './types';
+import type { LinkDebitSubmitPayload } from './LinkBankDebitModal';
+import type { UnmatchedDebitItem, UnmatchedDebitsResponse } from './UnmatchedBankDebitsBanner';
 
 export interface CategorizePayload {
   id: string;
@@ -116,6 +118,13 @@ export function useDailyControlData({
     queryFn: () => fetch('/api/users').then((r) => r.json()),
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: unmatchedDebitsData, refetch: refetchUnmatchedDebits } =
+    useQuery<UnmatchedDebitsResponse>({
+      queryKey: ['unmatched-bank-debits'],
+      queryFn: () => fetch('/api/finance/unmatched-debits?days=14').then((r) => r.json()),
+      staleTime: 30 * 1000,
+    });
 
   const categorizeMutation = useMutation({
     mutationFn: async (payload: CategorizePayload) => {
@@ -446,10 +455,64 @@ export function useDailyControlData({
     },
   });
 
+  const linkDebitMutation = useMutation({
+    mutationFn: async (payload: LinkDebitSubmitPayload) => {
+      const res = await fetch('/api/finance/link-debit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Ошибка привязки списания');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unmatched-bank-debits'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['finance-month'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-calendar-items'] });
+      queryClient.invalidateQueries({ queryKey: ['wallets'] });
+    },
+  });
+
+  const batchCommissionsMutation = useMutation({
+    mutationFn: async (ops: UnmatchedDebitItem[]) => {
+      const res = await fetch('/api/finance/link-debit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'batch_commissions',
+          operations: ops.map((op) => ({
+            operationId: op.operationId,
+            operationDate: op.operationDate,
+            amount: op.remainingAmount,
+            description: op.description || 'Комиссия Т-Банка',
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Ошибка проведения комиссий');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unmatched-bank-debits'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['finance-month'] });
+    },
+  });
+
   return {
     data,
     isFetching,
-    refetch,
+    refetch: () => {
+      refetch();
+      refetchUnmatchedDebits();
+    },
+    unmatchedDebitsData,
     calendarItems: calendarData?.items ?? [],
     warehouseParts: warehousePartsData?.parts ?? [],
     users: usersData ?? [],
@@ -457,5 +520,7 @@ export function useDailyControlData({
     auditMutation,
     createManualMutation,
     linkBankOpMutation,
+    linkDebitMutation,
+    batchCommissionsMutation,
   };
 }

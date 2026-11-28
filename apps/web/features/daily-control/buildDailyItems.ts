@@ -441,6 +441,15 @@ export function buildDailyExpenses({
   });
 
   if (data?.bank_operations && data.bank_operations.length > 0) {
+    const debitLinksByOp = new Map<string, number>();
+    for (const l of data.bank_debit_links ?? []) {
+      const k = String(l.bank_operation_id);
+      debitLinksByOp.set(
+        k,
+        (debitLinksByOp.get(k) ?? 0) + (parseFloat(String(l.allocated_amount ?? '0')) || 0),
+      );
+    }
+
     const debitBankOps = data.bank_operations.filter((op) => {
       if (op.typeOfOperation !== 'Debit') return false;
       if (activeWallet !== 'all' && activeWallet !== 'bank') return false;
@@ -448,12 +457,22 @@ export function buildDailyExpenses({
         const opDay = getOpLocalDate(op);
         if (opDay && opDay !== selectedDate) return false;
       }
-      return !(data?.transactions ?? []).some((t) => t.idempotency_key === op.operationId);
+      if ((data?.transactions ?? []).some((t) => t.idempotency_key === op.operationId)) {
+        return false;
+      }
+      const opAmt = op.operationAmount || op.rubleAmount || 0;
+      const linkedAmt = debitLinksByOp.get(String(op.operationId)) ?? 0;
+      if (linkedAmt >= opAmt - 0.01) {
+        return false;
+      }
+      return true;
     });
 
     debitBankOps.forEach((op) => {
       const desc = (op.description || op.payPurpose || '').toLowerCase();
       const opAmt = op.operationAmount || op.rubleAmount || 0;
+      const linkedAmt = debitLinksByOp.get(String(op.operationId)) ?? 0;
+      const remainingAmt = Math.max(0, Math.round((opAmt - linkedAmt) * 100) / 100);
       const dateVal =
         op.trxnPostDate || op.authorizationDate || op.operationDate || op.operationTime;
       const opTime = formatTxTime(dateVal, period);
@@ -469,7 +488,7 @@ export function buildDailyExpenses({
           id: `tbank-deb-${op.operationId}`,
           title: op.description || op.payPurpose || 'Комиссия банка',
           author: 'Т-Банк (Авто)',
-          amount: opAmt,
+          amount: remainingAmt,
           time: opTime,
           dateSort: opDateSort,
           bankOp: op,
@@ -479,12 +498,12 @@ export function buildDailyExpenses({
         individualExpenses.push({
           id: `tbank-deb-${op.operationId}`,
           title: op.description || op.payPurpose || `Списание с Р/С · ${receiverName}`,
-          category: 'Списание с Р/С (API)',
+          category: linkedAmt > 0 ? 'Списание с Р/С (остаток)' : 'Списание с Р/С (API)',
           categoryId: null,
           wallet: 'bank',
           walletName: 'Р/С Банк',
           author: receiverName,
-          amount: opAmt,
+          amount: remainingAmt,
           time: opTime,
           dateSort: opDateSort,
           bankOp: op,

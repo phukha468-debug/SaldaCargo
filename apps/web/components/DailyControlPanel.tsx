@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AuditCashModal } from '@/features/daily-control/AuditCashModal';
 import {
   buildDailyExpenses,
@@ -8,11 +9,15 @@ import {
   computeWalletSummary,
 } from '@/features/daily-control/buildDailyItems';
 import { DailyControlHeader } from '@/features/daily-control/DailyControlHeader';
-import { DailyExpensesColumn } from '@/features/daily-control/DailyExpensesColumn';
-import { DailyIncomesColumn } from '@/features/daily-control/DailyIncomesColumn';
+import { DailyLedgerTable } from '@/features/daily-control/DailyLedgerTable';
 import { EditTxModal } from '@/features/daily-control/EditTxModal';
+import { LinkBankDebitModal } from '@/features/daily-control/LinkBankDebitModal';
 import { LinkBankOpModal } from '@/features/daily-control/LinkBankOpModal';
 import { ManualTxModal } from '@/features/daily-control/ManualTxModal';
+import {
+  UnmatchedBankDebitsBanner,
+  type UnmatchedDebitItem,
+} from '@/features/daily-control/UnmatchedBankDebitsBanner';
 import type {
   EditingTxState,
   PeriodMode,
@@ -22,6 +27,9 @@ import type {
 import { useDailyControlData } from '@/features/daily-control/useDailyControlData';
 
 export function DailyControlPanel() {
+  const searchParams = useSearchParams();
+  const autoExpandUnmatched = searchParams.get('unmatched') === '1';
+
   const [todayStr] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [yesterdayStr] = useState<string>(() =>
     new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
@@ -38,11 +46,13 @@ export function DailyControlPanel() {
     op: TBankOp;
     suggestedOrderId?: string;
   } | null>(null);
+  const [linkingDebit, setLinkingDebit] = useState<UnmatchedDebitItem | null>(null);
 
   const {
     data,
     isFetching,
     refetch,
+    unmatchedDebitsData,
     calendarItems,
     warehouseParts,
     users,
@@ -50,6 +60,8 @@ export function DailyControlPanel() {
     auditMutation,
     createManualMutation,
     linkBankOpMutation,
+    linkDebitMutation,
+    batchCommissionsMutation,
   } = useDailyControlData({
     selectedDate,
     period,
@@ -107,7 +119,7 @@ export function DailyControlPanel() {
   );
 
   return (
-    <div className="space-y-3 font-sans pb-10">
+    <div className="space-y-2.5 font-sans pb-10">
       <DailyControlHeader
         data={data}
         selectedDate={selectedDate}
@@ -131,33 +143,26 @@ export function DailyControlPanel() {
         onRefetch={() => refetch()}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-        <DailyExpensesColumn
-          period={period}
-          selectedDate={selectedDate}
-          expenseItems={expenseItems}
-          totalDayExpenses={totalDayExpenses}
-          expandedGroups={expandedGroups}
-          onToggleGroup={toggleGroup}
-          onOpenManualExpense={() => setManualModalType('expense')}
-          onEditExpense={setEditingTx}
-        />
+      <UnmatchedBankDebitsBanner
+        data={unmatchedDebitsData}
+        defaultExpanded={autoExpandUnmatched}
+        isBatchingCommissions={batchCommissionsMutation.isPending}
+        onLinkDebit={(item) => setLinkingDebit(item)}
+        onBatchCommissions={(ops) => batchCommissionsMutation.mutate(ops)}
+      />
 
-        <DailyIncomesColumn
-          data={data}
-          period={period}
-          selectedDate={selectedDate}
-          incomeItems={incomeItems}
-          totalDayIncomes={totalDayIncomes}
-          expandedGroups={expandedGroups}
-          linkPending={linkBankOpMutation.isPending}
-          onToggleGroup={toggleGroup}
-          onOpenManualIncome={() => setManualModalType('income')}
-          onEditIncome={setEditingTx}
-          onLinkBankOp={(payload) => linkBankOpMutation.mutate(payload)}
-          onOpenLinkModal={(op, suggestedOrderId) => setLinkingState({ op, suggestedOrderId })}
-        />
-      </div>
+      <DailyLedgerTable
+        data={data}
+        expenseItems={expenseItems}
+        incomeItems={incomeItems}
+        expandedGroups={expandedGroups}
+        linkPending={linkBankOpMutation.isPending}
+        onToggleGroup={toggleGroup}
+        onEditTx={setEditingTx}
+        onOpenIncomeLinkModal={(op, suggestedOrderId) => setLinkingState({ op, suggestedOrderId })}
+        onQuickLinkIncome={(payload) => linkBankOpMutation.mutate(payload)}
+        onOpenDebitLinkModal={(item) => setLinkingDebit(item)}
+      />
 
       {editingTx && (
         <EditTxModal
@@ -195,6 +200,28 @@ export function DailyControlPanel() {
           isPending={linkBankOpMutation.isPending}
           onSubmit={(payload) => linkBankOpMutation.mutate(payload)}
           onClose={() => setLinkingState(null)}
+        />
+      )}
+
+      {linkingDebit && (
+        <LinkBankDebitModal
+          key={linkingDebit.operationId}
+          debitOp={linkingDebit}
+          candidates={unmatchedDebitsData?.candidate_expenses ?? []}
+          categories={data?.categories ?? []}
+          calendarItems={calendarItems}
+          isPending={linkDebitMutation.isPending}
+          errorMessage={
+            linkDebitMutation.isError
+              ? (linkDebitMutation.error as Error)?.message || 'Ошибка привязки'
+              : null
+          }
+          onSubmit={(payload) =>
+            linkDebitMutation.mutate(payload, {
+              onSuccess: () => setLinkingDebit(null),
+            })
+          }
+          onClose={() => setLinkingDebit(null)}
         />
       )}
 

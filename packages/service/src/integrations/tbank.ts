@@ -84,28 +84,44 @@ export function invalidateTBankCache(cacheKey?: string): void {
 /**
  * Запрос к Open API Т-Банка со строгой TLS-верификацией (НУЦ Минцифры РФ + стандартные CA).
  */
-function requestTBankApi(host: string, path: string, token: string): Promise<unknown> {
+function requestTBankApi(
+  host: string,
+  path: string,
+  token: string,
+  method: 'GET' | 'POST' | 'DELETE' = 'GET',
+  bodyPayload?: unknown,
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    const bodyString = bodyPayload !== undefined ? JSON.stringify(bodyPayload) : undefined;
+    const headers: Record<string, string | number> = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    };
+    if (bodyString !== undefined) {
+      headers['Content-Length'] = Buffer.byteLength(bodyString);
+    }
+
     const req = https.request(
       {
         hostname: host,
         port: 443,
         path,
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
+        method,
+        headers,
         ca: getTBankTrustedCaList(),
         rejectUnauthorized: true,
-        timeout: 2500,
+        timeout: 4000,
       },
       (res) => {
         let body = '';
         res.on('data', (chunk) => (body += chunk));
         res.on('end', () => {
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            if (!body.trim()) {
+              resolve({ ok: true });
+              return;
+            }
             try {
               resolve(JSON.parse(body));
             } catch {
@@ -125,6 +141,9 @@ function requestTBankApi(host: string, path: string, token: string): Promise<unk
       req.destroy();
       reject(new Error('Таймаут соединения с Т-Банк API'));
     });
+    if (bodyString !== undefined) {
+      req.write(bodyString);
+    }
     req.end();
   });
 }
@@ -304,4 +323,79 @@ export async function syncTBankBalance(
 
   inFlightBalancePromises.set(cacheKey, promise);
   return promise;
+}
+
+export interface RegisterTBankWebhookParams {
+  apiToken: string;
+  url: string;
+  eventType?: string;
+  email?: string;
+  authSecret?: string;
+}
+
+/**
+ * Зарегистрировать вебхук в Open API Т-Бизнеса (по умолчанию на событие `oper-feed-operation`).
+ */
+export async function registerTBankWebhook(
+  params: RegisterTBankWebhookParams,
+): Promise<{ success: boolean; data?: unknown; error?: string }> {
+  const payload: Record<string, unknown> = {
+    url: params.url,
+    eventType: params.eventType || 'oper-feed-operation',
+  };
+  if (params.email) payload.email = params.email;
+  if (params.authSecret) {
+    payload.authType = 'Bearer';
+    payload.authSecret = params.authSecret;
+  }
+
+  let lastError: unknown;
+  for (const host of TBANK_HOSTS) {
+    try {
+      const data = await requestTBankApi(
+        host,
+        '/openapi/api/v1/webhook',
+        params.apiToken,
+        'POST',
+        payload,
+      );
+      return { success: true, data };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  return {
+    success: false,
+    error:
+      lastError instanceof Error ? lastError.message : 'Не удалось зарегистрировать вебхук Т-Банка',
+  };
+}
+
+/**
+ * Получить список активных вебхуков компании в Т-Бизнесе.
+ */
+export async function listTBankWebhooks(
+  apiToken: string,
+): Promise<{ success: boolean; data?: unknown; error?: string }> {
+  let lastError: unknown;
+  for (const host of TBANK_HOSTS) {
+    try {
+      const data = await requestTBankApi(
+        host,
+        '/openapi/api/v1/webhooks/by-company',
+        apiToken,
+        'GET',
+      );
+      return { success: true, data };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  return {
+    success: false,
+    error:
+      lastError instanceof Error
+        ? lastError.message
+        : 'Не удалось получить список вебхуков Т-Банка',
+  };
 }

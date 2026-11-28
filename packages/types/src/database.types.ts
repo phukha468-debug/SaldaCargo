@@ -422,6 +422,95 @@ export type Database = {
           },
         ];
       };
+      bank_debit_links: {
+        Row: {
+          allocated_amount: number;
+          bank_operation_amount: number;
+          bank_operation_date: string | null;
+          bank_operation_desc: string | null;
+          bank_operation_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          organization_id: string;
+          transaction_id: string;
+        };
+        Insert: {
+          allocated_amount: number;
+          bank_operation_amount: number;
+          bank_operation_date?: string | null;
+          bank_operation_desc?: string | null;
+          bank_operation_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          organization_id: string;
+          transaction_id: string;
+        };
+        Update: {
+          allocated_amount?: number;
+          bank_operation_amount?: number;
+          bank_operation_date?: string | null;
+          bank_operation_desc?: string | null;
+          bank_operation_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          organization_id?: string;
+          transaction_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'bank_debit_links_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'bank_debit_links_transaction_id_fkey';
+            columns: ['transaction_id'];
+            isOneToOne: false;
+            referencedRelation: 'transactions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      bank_debit_notifications: {
+        Row: {
+          amount: number;
+          bank_operation_id: string;
+          id: string;
+          organization_id: string;
+          recipient_max_id: string;
+          sent_at: string;
+        };
+        Insert: {
+          amount: number;
+          bank_operation_id: string;
+          id?: string;
+          organization_id: string;
+          recipient_max_id: string;
+          sent_at?: string;
+        };
+        Update: {
+          amount?: number;
+          bank_operation_id?: string;
+          id?: string;
+          organization_id?: string;
+          recipient_max_id?: string;
+          sent_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'bank_debit_notifications_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       audit_log: {
         Row: {
           action: string;
