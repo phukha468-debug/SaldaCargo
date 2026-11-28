@@ -339,26 +339,22 @@ export interface RegisterTBankWebhookParams {
 export async function registerTBankWebhook(
   params: RegisterTBankWebhookParams,
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
+  const eventType = params.eventType || 'oper-feed-operation';
   const payload: Record<string, unknown> = {
     url: params.url,
-    eventType: params.eventType || 'oper-feed-operation',
+    email: params.email || 'info@tk501.ru',
   };
-  if (params.email) payload.email = params.email;
   if (params.authSecret) {
     payload.authType = 'Bearer';
     payload.authSecret = params.authSecret;
   }
 
+  const endpointPath = `/openapi/api/v1/webhook?eventType=${encodeURIComponent(eventType)}`;
+
   let lastError: unknown;
   for (const host of TBANK_HOSTS) {
     try {
-      const data = await requestTBankApi(
-        host,
-        '/openapi/api/v1/webhook',
-        params.apiToken,
-        'POST',
-        payload,
-      );
+      const data = await requestTBankApi(host, endpointPath, params.apiToken, 'POST', payload);
       return { success: true, data };
     } catch (err) {
       lastError = err;
