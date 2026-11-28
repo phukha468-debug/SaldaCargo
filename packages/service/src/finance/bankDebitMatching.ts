@@ -1,5 +1,11 @@
 import type { TBankOperation } from '../integrations/tbank';
 
+/**
+ * Дата старта полного контроля привязки банковских списаний (29.11.2026 00:00 +05:00).
+ * Все более ранние неразобранные списания считаются закрытыми и не попадают в список долгов по привязке.
+ */
+export const BANK_DEBIT_CONTROL_START_ISO = '2026-11-29T00:00:00+05:00';
+
 export interface BankDebitLinkRecord {
   id: string;
   bank_operation_id: string;

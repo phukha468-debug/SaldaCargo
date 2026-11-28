@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DEFAULT_ORGANIZATION_ID, getMaxBotEnv } from '@saldacargo/shared';
 import {
+  BANK_DEBIT_CONTROL_START_ISO,
   getBankOpAmount,
   getBankOpEffectiveDate,
   isBankCommissionOp,
@@ -123,6 +124,9 @@ export async function POST(request: Request) {
       if (pendingRecipients.length === 0) continue;
 
       const opDate = getBankOpEffectiveDate(op);
+      const controlStartMs = new Date(BANK_DEBIT_CONTROL_START_ISO).getTime();
+      const opDateMs = new Date(opDate).getTime();
+      if (!Number.isNaN(opDateMs) && opDateMs < controlStartMs) continue;
       const receiver = op.receiver?.name || op.counterParty?.name || 'Получатель не указан';
       const desc = (op.description || op.payPurpose || 'Списание с расчётного счёта')
         .replace(/\s+/g, ' ')

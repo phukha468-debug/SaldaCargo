@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DEFAULT_ORGANIZATION_ID } from '@saldacargo/shared';
 import {
+  BANK_DEBIT_CONTROL_START_ISO,
   computeBankDebitStatuses,
   fetchTBankStatement,
   getIntegrationConfig,
@@ -30,9 +31,14 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient();
     const now = new Date();
-    const fromDate = new Date(now.getTime() - days * 24 * 3600 * 1000);
+    const controlStartDate = new Date(BANK_DEBIT_CONTROL_START_ISO);
+    const controlStartMs = controlStartDate.getTime();
+    const rollingFromDate = new Date(now.getTime() - days * 24 * 3600 * 1000);
+    const effectiveFromDate =
+      rollingFromDate.getTime() > controlStartMs ? rollingFromDate : controlStartDate;
     const txFromDate = new Date(now.getTime() - (days + 7) * 24 * 3600 * 1000);
-    const fromIso = fromDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const fromIso = effectiveFromDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const isBeforeControlStart = now.getTime() < controlStartMs;
 
     // Получаем credentials Т-Банка для организации
     let token: string | undefined;
@@ -56,7 +62,9 @@ export async function GET(request: Request) {
     }
 
     const [bankOps, txsRes, linksRes] = await Promise.all([
-      fetchTBankStatement(fromIso, undefined, token, accountNumber, forceRefresh),
+      isBeforeControlStart
+        ? Promise.resolve([])
+        : fetchTBankStatement(fromIso, undefined, token, accountNumber, forceRefresh),
       (supabase.from('transactions') as any)
         .select(
           'id, amount, direction, description, created_at, transaction_date, from_wallet_id, idempotency_key, category:transaction_categories(id, name, code)',
@@ -77,7 +85,10 @@ export async function GET(request: Request) {
     const txs: DebitMatchTransaction[] = txsRes.data ?? [];
     const links: BankDebitLinkRecord[] = linksRes.error ? [] : (linksRes.data ?? []);
 
-    const allStatuses = computeBankDebitStatuses(bankOps, txs, links);
+    const allStatuses = computeBankDebitStatuses(bankOps, txs, links).filter((s) => {
+      const ts = new Date(s.operationDate).getTime();
+      return Number.isNaN(ts) || ts >= controlStartMs;
+    });
 
     const unmatchedDebits = allStatuses.filter((s) => s.status !== 'matched' && !s.isCommission);
     const unmatchedCommissions = allStatuses.filter(
