@@ -5,6 +5,7 @@ import { syncTripFinancials } from '@/lib/tripFinancials';
 import { editTripOrdersPayloadSchema, executeEditTripOrders } from '@/lib/trips/editTripOrders';
 import { NextResponse } from 'next/server';
 import {
+  DEFAULT_ORGANIZATION_ID,
   generateDeterministicUuid,
   auditTripFuel,
   isStrictDocCounterparty,
@@ -346,11 +347,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (body.action === 'reissue_salary') {
     const { data: tripInfo } = await (supabase.from('trips') as any)
-      .select('driver_id, trip_number, started_at, driver:users!trips_driver_id_fkey(name)')
+      .select(
+        'driver_id, organization_id, trip_number, started_at, driver:users!trips_driver_id_fkey(name)',
+      )
       .eq('id', id)
       .single();
 
     if (!tripInfo) return NextResponse.json({ error: 'Рейс не найден' }, { status: 404 });
+    const tripOrgId = tripInfo.organization_id || DEFAULT_ORGANIZATION_ID;
 
     // Отменяем pending ЗП-транзакции
     await (supabase.from('transactions') as any)
@@ -365,6 +369,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const driverPay = parseFloat(body.driver_pay ?? '0');
     if (driverPay > 0 && tripInfo.driver_id) {
       newTxns.push({
+        organization_id: tripOrgId,
         direction: 'expense',
         category_id: PAYROLL_DRIVER_CAT,
         amount: driverPay.toFixed(2),
@@ -386,6 +391,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const amt = parseFloat(loader.amount ?? '0');
       if (amt > 0 && loader.user_id) {
         newTxns.push({
+          organization_id: tripOrgId,
           direction: 'expense',
           category_id: PAYROLL_LOADER_CAT,
           amount: amt.toFixed(2),
@@ -414,7 +420,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.action === 'convert_to_repair') {
     const { data: trip, error: fetchErr } = await (supabase.from('trips') as any)
       .select(
-        'id, asset_id, driver_id, trip_number, odometer_start, driver_note, admin_note, asset:assets(short_name, reg_number, odometer_current)',
+        'id, organization_id, asset_id, driver_id, trip_number, odometer_start, driver_note, admin_note, asset:assets(short_name, reg_number, odometer_current)',
       )
       .eq('id', id)
       .single();
@@ -441,6 +447,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       const { data: createdSo, error: soErr } = await (supabase.from('service_orders') as any)
         .insert({
+          organization_id: trip.organization_id || DEFAULT_ORGANIZATION_ID,
           asset_id: trip.asset_id,
           machine_type: 'own',
           status: 'in_progress',

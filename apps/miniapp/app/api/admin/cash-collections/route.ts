@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 const CASH_METHODS = ['cash'];
@@ -76,8 +76,9 @@ export async function GET() {
 
 /** POST /api/admin/cash-collections — record a cash collection from driver */
 export async function POST(request: Request) {
-  const adminId = await getVerifiedMiniappUserId();
-  if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireRole(['admin', 'owner'], 'finance');
+  if (auth instanceof NextResponse) return auth;
+  const adminId = auth.userId;
 
   const body = (await request.json()) as {
     driver_id: string;
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
   // 1. Создаём запись в cash_collections (для совместимости со старой логикой балансов)
   const { data: collection, error } = await (supabase.from('cash_collections') as any)
     .insert({
+      organization_id: auth.organizationId,
       driver_id: body.driver_id,
       amount: body.amount,
       collected_by: adminId,
@@ -123,6 +125,7 @@ export async function POST(request: Request) {
     if (category) {
       const CASH_ID = '10000000-0000-0000-0000-000000000002';
       await (supabase.from('transactions') as any).insert({
+        organization_id: auth.organizationId,
         direction: 'transfer',
         amount: body.amount,
         category_id: category.id,

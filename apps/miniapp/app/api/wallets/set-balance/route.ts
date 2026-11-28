@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import { invalidateWalletsCache } from '@saldacargo/domain-service';
 
@@ -17,6 +18,9 @@ const sum = (rows: any[]) =>
 /** POST /api/wallets/set-balance — скорректировать баланс кошелька (сейф, топливо, гараж) */
 export async function POST(request: Request) {
   try {
+    const auth = await requireRole(['admin', 'owner'], 'finance');
+    if (auth instanceof NextResponse) return auth;
+
     const { wallet, target_amount, notes, audited_by } = (await request.json()) as {
       wallet: string;
       target_amount: string | number;
@@ -173,6 +177,7 @@ export async function POST(request: Request) {
             : 'Корректировка остатка';
 
       await (supabase.from('transactions') as any).insert({
+        organization_id: auth.organizationId,
         direction: isIncome ? 'income' : 'expense',
         amount: adjustmentAmount,
         category_id: isIncome ? CAT_OTHER_INCOME : CAT_OTHER_EXPENSE,
@@ -180,7 +185,7 @@ export async function POST(request: Request) {
         lifecycle_status: 'approved',
         settlement_status: 'completed',
         description: notes || defaultDesc,
-        created_by: adminUser.id,
+        created_by: auth.userId,
         created_at: new Date(now.getTime() - 1000).toISOString(),
         idempotency_key: crypto.randomUUID(),
       });
@@ -190,6 +195,7 @@ export async function POST(request: Request) {
     if (wallet === 'cash' || wallet === 'fuel_card') {
       const auditPayload = {
         id: todayStr,
+        organization_id: auth.organizationId,
         date: todayStr,
         audited_at: now.toISOString(),
         audited_by: audited_by || adminUser.name || 'Директор (Бот)',
@@ -208,7 +214,7 @@ export async function POST(request: Request) {
     }
 
     // 5. Очищаем кэш балансов кошельков
-    invalidateWalletsCache();
+    invalidateWalletsCache(auth.organizationId);
 
     return NextResponse.json({
       ok: true,

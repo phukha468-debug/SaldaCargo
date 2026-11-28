@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 const LOAN_REPAYMENT_CATEGORY = '00000000-0000-0000-0000-000000000020';
 
 export async function POST(request: Request) {
   try {
-    const userId = await getVerifiedMiniappUserId();
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireRole(['admin', 'owner'], 'finance');
+    if (auth instanceof NextResponse) return auth;
+    const userId = auth.userId;
 
     const body = (await request.json()) as {
       loan_id: string;
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
 
     // Создаём транзакцию
     const { error: txError } = await (supabase.from('transactions') as any).insert({
+      organization_id: auth.organizationId,
       direction: 'expense',
       amount: amt.toFixed(2),
       category_id: LOAN_REPAYMENT_CATEGORY,

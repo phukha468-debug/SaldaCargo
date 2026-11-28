@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 const TRIP_REVENUE_CATEGORY = '74008cf7-0527-4e9f-afd2-d232b8f8125a';
@@ -10,8 +10,9 @@ type OrderItem = { id: string; type: 'trip_order' | 'manual'; amount: string };
 
 /** POST /api/admin/receivables/close-all — погасить весь долг контрагента одной транзакцией */
 export async function POST(req: Request) {
-  const adminId = await getVerifiedMiniappUserId();
-  if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireRole(['admin', 'owner'], 'finance');
+  if (auth instanceof NextResponse) return auth;
+  const adminId = auth.userId;
 
   const body = (await req.json()) as {
     orders: OrderItem[];
@@ -89,6 +90,7 @@ export async function POST(req: Request) {
   });
 
   const { error: txErr } = await (supabase as any).from('transactions').insert({
+    organization_id: auth.organizationId,
     direction: 'income',
     category_id: TRIP_REVENUE_CATEGORY,
     amount: totalAmount,

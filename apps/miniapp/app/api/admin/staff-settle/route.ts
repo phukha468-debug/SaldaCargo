@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 const ADVANCE_CATEGORY_ID = 'a0000000-0000-0000-0000-000000000001';
@@ -223,8 +223,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'user_id обязателен' }, { status: 400 });
     }
 
-    const adminId = await getVerifiedMiniappUserId();
-    if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireRole(['admin', 'owner']);
+    if (auth instanceof NextResponse) return auth;
+    const adminId = auth.userId;
 
     const supabase = createAdminClient();
 
@@ -424,6 +425,7 @@ export async function POST(request: Request) {
           const idempKey = idx === 0 ? baseKey : crypto.randomUUID();
 
           return (supabase.from('transactions') as any).insert({
+            organization_id: auth.organizationId,
             direction: 'expense',
             category_id: categoryId,
             amount: s.amount.toFixed(2),
@@ -585,6 +587,7 @@ export async function POST(request: Request) {
 
         ops.push(
           (supabase.from('transactions') as any).insert({
+            organization_id: auth.organizationId,
             direction: 'expense',
             category_id: categoryId,
             amount: s.amount.toFixed(2),
@@ -640,6 +643,7 @@ export async function POST(request: Request) {
         ops.push(
           (supabase.from('transactions') as any).insert({
             ...restFields,
+            organization_id: auth.organizationId,
             created_by: splitTxn.created_by || adminId,
             amount: remainder.toFixed(2),
             settlement_status: 'pending',
@@ -657,6 +661,7 @@ export async function POST(request: Request) {
     if (nettedAmount > 0) {
       ops.push(
         (supabase.from('transactions') as any).insert({
+          organization_id: auth.organizationId,
           direction: 'expense',
           category_id: categoryId,
           amount: nettedAmount.toFixed(2),
@@ -677,6 +682,7 @@ export async function POST(request: Request) {
       const surplus = Math.round((uncollectedCash - nettedAmount) * 100) / 100;
       ops.push(
         (supabase.from('cash_collections') as any).insert({
+          organization_id: auth.organizationId,
           driver_id: body.user_id,
           amount: surplus.toFixed(2),
           collected_by: adminId,
@@ -724,6 +730,7 @@ export async function POST(request: Request) {
       // Запись о зачёте аванса (income = уменьшает остаток долга сотрудника, но НЕ пополняет кошелёк)
       ops.push(
         (supabase.from('transactions') as any).insert({
+          organization_id: auth.organizationId,
           direction: 'income',
           category_id: ADVANCE_CATEGORY_ID,
           amount: actualOffset.toFixed(2),

@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 /** POST /api/admin/manual-receivable — добавить ручную запись дебиторки */
 export async function POST(request: Request) {
-  const adminId = await getVerifiedMiniappUserId();
-  if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireRole(['admin', 'owner'], 'finance');
+  if (auth instanceof NextResponse) return auth;
+  const adminId = auth.userId;
 
   const body = await request.json();
   const { counterparty_id, amount, description, date } = body;
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   const { data, error } = await (supabase as any)
     .from('manual_receivables')
     .insert({
+      organization_id: auth.organizationId,
       counterparty_id,
       amount: parseFloat(amount).toFixed(2),
       description: description?.trim() || null,

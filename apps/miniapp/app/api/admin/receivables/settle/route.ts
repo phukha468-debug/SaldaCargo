@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 import { v4 as uuid } from 'uuid';
 
@@ -15,8 +15,9 @@ function walletForDebt(isLegalEntity: boolean): string {
 
 /** POST /api/admin/receivables/settle — погасить долг по заказу или ручной записи */
 export async function POST(request: Request) {
-  const adminId = await getVerifiedMiniappUserId();
-  if (!adminId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await requireRole(['admin', 'owner'], 'finance');
+  if (auth instanceof NextResponse) return auth;
+  const adminId = auth.userId;
 
   const body = (await request.json()) as {
     id: string;
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
       ],
     });
     const { error: txErr } = await (supabase as any).from('transactions').insert({
+      organization_id: auth.organizationId,
       direction: 'income',
       category_id: TRIP_REVENUE_CATEGORY,
       amount: payAmount.toFixed(2),
@@ -155,6 +157,7 @@ export async function POST(request: Request) {
   });
 
   const { error: txErr } = await (supabase.from('transactions') as any).insert({
+    organization_id: auth.organizationId,
     direction: 'income',
     category_id: TRIP_REVENUE_CATEGORY,
     amount: payAmount.toFixed(2),
@@ -171,5 +174,4 @@ export async function POST(request: Request) {
 
   if (txErr) return NextResponse.json({ error: txErr.message }, { status: 500 });
   return NextResponse.json({ ok: true, paid: payAmount.toFixed(2), partial: isPartial });
-  return NextResponse.json({ ok: true });
 }

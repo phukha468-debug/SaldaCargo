@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 const CASH_COLLECT_CAT = '72f677d4-84af-4d0d-a845-a1b63c7ae607';
@@ -75,23 +75,11 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const adminId = await getVerifiedMiniappUserId();
+    const auth = await requireRole(['admin', 'owner'], 'finance');
+    if (auth instanceof NextResponse) return auth;
+    const resolvedAdminId = auth.userId;
 
     const supabase = createAdminClient();
-
-    let resolvedAdminId = adminId;
-    if (!resolvedAdminId) {
-      const { data: fallbackAdmin } = await (supabase.from('users') as any)
-        .select('id')
-        .or('roles.cs.{admin},roles.cs.{owner}')
-        .limit(1)
-        .single();
-      resolvedAdminId = fallbackAdmin?.id;
-    }
-
-    if (!resolvedAdminId) {
-      return NextResponse.json({ error: 'Не удалось определить администратора' }, { status: 401 });
-    }
 
     const body = (await request.json()) as {
       driver_id: string;
@@ -121,6 +109,7 @@ export async function POST(request: Request) {
     // Создаём транзакцию со статусом pending (перенос зафиксирован, но деньги еще не сданы)
     const { data: createdTx, error: txErr } = await (supabase.from('transactions') as any)
       .insert({
+        organization_id: auth.organizationId,
         direction: 'transfer',
         amount: numAmount.toFixed(2),
         category_id: CASH_COLLECT_CAT,
@@ -166,19 +155,11 @@ export async function POST(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const adminId = await getVerifiedMiniappUserId();
+    const auth = await requireRole(['admin', 'owner'], 'finance');
+    if (auth instanceof NextResponse) return auth;
+    const resolvedAdminId = auth.userId;
 
     const supabase = createAdminClient();
-
-    let resolvedAdminId = adminId;
-    if (!resolvedAdminId) {
-      const { data: fallbackAdmin } = await (supabase.from('users') as any)
-        .select('id')
-        .or('roles.cs.{admin},roles.cs.{owner}')
-        .limit(1)
-        .single();
-      resolvedAdminId = fallbackAdmin?.id;
-    }
 
     const body = (await request.json()) as {
       hold_id?: string;
@@ -223,6 +204,7 @@ export async function PATCH(request: Request) {
 
       // 1. Создаём запись в cash_collections
       await (supabase.from('cash_collections') as any).insert({
+        organization_id: auth.organizationId,
         driver_id: body.driver_id,
         amount: collectAmount.toFixed(2),
         collected_by: resolvedAdminId,
@@ -257,6 +239,7 @@ export async function PATCH(request: Request) {
             .eq('id', h.id);
 
           await (supabase.from('transactions') as any).insert({
+            organization_id: auth.organizationId,
             direction: 'transfer',
             amount: remainingToSettle.toFixed(2),
             category_id: CASH_COLLECT_CAT,
@@ -301,6 +284,7 @@ export async function PATCH(request: Request) {
 
     // 1. Создаём запись в cash_collections
     await (supabase.from('cash_collections') as any).insert({
+      organization_id: auth.organizationId,
       driver_id: holdTx.related_user_id,
       amount: collectAmount.toFixed(2),
       collected_by: resolvedAdminId,
@@ -332,6 +316,7 @@ export async function PATCH(request: Request) {
 
       // И создаём completed транзакцию на сданную часть
       await (supabase.from('transactions') as any).insert({
+        organization_id: auth.organizationId,
         direction: 'transfer',
         amount: collectAmount.toFixed(2),
         category_id: CASH_COLLECT_CAT,

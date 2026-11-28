@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getVerifiedMiniappUserId } from '@/lib/auth/server';
+import { requireRole } from '@/lib/auth/server';
 import { NextResponse } from 'next/server';
 
 const SUPPLIERS = [
@@ -42,13 +42,15 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient();
 
-    const userId = await getVerifiedMiniappUserId();
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireRole(['admin', 'owner'], 'finance');
+    if (auth instanceof NextResponse) return auth;
+    const userId = auth.userId;
 
     const description = body.description?.trim() || `Запчасти в кредит: ${supplier.name}`;
 
     const { data, error } = await (supabase.from('transactions') as any)
       .insert({
+        organization_id: auth.organizationId,
         direction: 'expense',
         amount: amt.toFixed(2),
         category_id: supplier.category,
