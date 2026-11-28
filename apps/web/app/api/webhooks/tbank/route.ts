@@ -133,9 +133,10 @@ export async function POST(request: Request) {
         maximumFractionDigits: 2,
       });
 
-      const webBaseUrl = (
-        process.env.NEXT_PUBLIC_WEB_URL || 'https://salda-cargo-web.vercel.app'
-      ).replace(/\/+$/, '');
+      const botUsername = (
+        process.env.NEXT_PUBLIC_MAX_BOT_USERNAME || 'id660704814106_bot'
+      ).replace(/^@/, '');
+      const miniappDeepLink = `https://max.ru/${botUsername}?startapp=unmatched_debits`;
 
       const text =
         `💳 Списание с Р/С Т-Банк — требуется привязка\n` +
@@ -145,8 +146,26 @@ export async function POST(request: Request) {
         `Получатель: ${receiver}\n` +
         `Назначение: ${desc}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `Привяжите списание к расходной позиции (или разбейте по статьям), чтобы сумма не потерялась и не задвоилась в учёте:\n` +
-        `🔗 ${webBaseUrl}/finance?tab=daily&unmatched=1`;
+        `Привяжите списание к расходной позиции в мини-приложении (или разбейте по статьям), чтобы сумма не потерялась и не задвоилась:\n` +
+        `📱 ${miniappDeepLink}`;
+
+      const attachments = [
+        {
+          type: 'inline_keyboard',
+          payload: {
+            buttons: [
+              [
+                {
+                  type: 'open_app',
+                  text: '🔗 Привязать расход',
+                  web_app: botUsername,
+                  payload: 'unmatched_debits',
+                },
+              ],
+            ],
+          },
+        },
+      ];
 
       if (maxToken) {
         await Promise.allSettled(
@@ -159,7 +178,7 @@ export async function POST(request: Request) {
                   Authorization: maxToken,
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({ text, attachments }),
               },
             );
 

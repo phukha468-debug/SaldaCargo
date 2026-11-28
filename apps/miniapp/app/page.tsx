@@ -105,14 +105,40 @@ export default function RootDispatcher() {
               }
             }
 
+            const startParam =
+              typeof window !== 'undefined'
+                ? (() => {
+                    const sp = new URLSearchParams(window.location.search);
+                    const webApp = (
+                      window as unknown as {
+                        WebApp?: { initDataUnsafe?: { start_param?: string } };
+                      }
+                    ).WebApp;
+                    return (
+                      webApp?.initDataUnsafe?.start_param ||
+                      sp.get('WebAppStartParam') ||
+                      sp.get('startapp') ||
+                      null
+                    );
+                  })()
+                : null;
+
+            const isAdminRole =
+              effectiveRole === 'admin' ||
+              effectiveRole === 'owner' ||
+              (Array.isArray(user.roles) &&
+                (user.roles.includes('admin') || user.roles.includes('owner')));
+
             const targetPath =
-              effectiveRole === 'driver'
-                ? '/driver'
-                : effectiveRole === 'admin' || effectiveRole === 'owner'
-                  ? '/admin'
-                  : effectiveRole === 'mechanic'
-                    ? '/mechanic'
-                    : '/loader';
+              startParam === 'unmatched_debits' && isAdminRole
+                ? '/admin/finance/bank-debits'
+                : effectiveRole === 'driver'
+                  ? '/driver'
+                  : effectiveRole === 'admin' || effectiveRole === 'owner'
+                    ? '/admin'
+                    : effectiveRole === 'mechanic'
+                      ? '/mechanic'
+                      : '/loader';
 
             router.replace(targetPath);
             return;

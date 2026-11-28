@@ -94,6 +94,19 @@ function FinanceContent() {
       </header>
 
       <div className="p-4 space-y-4">
+        {/* Компактная 1-строчная кнопка перехода к привязке списаний Р/С Т-Банка */}
+        {showForm === null && (
+          <Link
+            href="/admin/finance/bank-debits"
+            className="w-full bg-amber-50 border border-amber-200 rounded-xl px-3 h-10 flex items-center justify-between gap-2 active:scale-[0.99] transition-transform"
+          >
+            <span className="text-xs font-bold text-amber-900 truncate">
+              💳 Привязка списаний с Р/С Т-Банк
+            </span>
+            <span className="text-xs font-black text-amber-700 shrink-0">Открыть →</span>
+          </Link>
+        )}
+
         {/* Подменю ДОХОД */}
         {showForm === 'income_menu' && (
           <div className="space-y-3">
